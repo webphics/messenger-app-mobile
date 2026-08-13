@@ -1,5 +1,15 @@
-import { PlaceholderScreen } from '@/components/placeholder-screen'
+import { InboxScreen } from '@/components/inbox/inbox-screen'
+import { CONVERSATIONS } from '@/lib/mock-data'
 
 export default function AgentUnassignedScreen() {
-  return <PlaceholderScreen chatHref="/chat/conv-unassigned" />
+  const conversations = CONVERSATIONS.filter((c) => c.assigneeId === null)
+
+  return (
+    <InboxScreen
+      conversations={conversations}
+      showChips={false}
+      showCompose={false}
+      title="Unassigned"
+    />
+  )
 }

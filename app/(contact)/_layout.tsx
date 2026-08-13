@@ -10,6 +10,7 @@ export default function ContactLayout() {
         name="index"
         options={{
           title: 'Home',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => <House color={color} size={size} />,
         }}
       />

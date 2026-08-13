@@ -12,12 +12,12 @@ Pixel target = locked mocks in the current phase spec. Structure + tokens, not p
 
 Light chrome only. Screen `bg`, cards/header/composer `surface`. Incoming bubble ≈ `#F2F2F2`; outgoing = `primary` `#3452D9`. Radius: hub cards ~16, bubbles ~18–20.
 
-Do not follow system dark mode. Headers + tab bars must use `@/lib/tokens` (`tabChrome` / `stackChrome`). Placeholder shells: `bg-bg` + `bg-surface` card + `border-line` + `text-ink`.
+Do not follow system dark mode. React Navigation chrome (`headerStyle`, `tabBarStyle`) uses `@/lib/tokens`. App UI is Uniwind `className`. Chat: `headerShown: false` until `ThreadScreen` `setOptions` (`stackChrome` + Uniwind `ThreadHeader` in `headerTitle`, native back). Do not leave a default title “Chat” on the Stack.Screen. Do not StyleSheet the thread. Placeholder shells: `bg-bg` + `bg-surface` card + `border-line` + `text-ink`.
 
 Forbidden looks: nsave maroon, Messenger dark, red outgoing, GIF/mic/camera/thumbs-up composer, in-bubble identity block on every 1:1 message, case-status stepper.
 
-Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Compose icon visible, **dead**. Unassigned tab: hide chips.
+Inbox chips: selected = `bg-primary-soft` + primary text; idle = line/grey. Compose icon visible, **dead**. Unassigned tab: hide chips.
 
-Offers promo: full-bleed gradient from local `visual` key, white CTA. `"Sponsored"` is a label. Initials if `avatarUrl` is null.
+Offers promo: locked hub mock. `"Sponsored"` is the section label only — not on the card. Cards peek the next slide (~78% width). Visual marks: payouts = blue + zap, zero-fee = gold + `0%`, verify = green + shield. White **View offer** pill. **Join Offers chat** = primary pill + message icon. No photography.
 
 Use RN `Image` until the expo-image phase. Do not rewrite `components/ui/*` class strings to chase a mock.

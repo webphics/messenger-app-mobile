@@ -1,5 +1,13 @@
-import { PlaceholderScreen } from '@/components/placeholder-screen'
+import { InboxScreen } from '@/components/inbox/inbox-screen'
+import { CONVERSATIONS } from '@/lib/mock-data'
 
 export default function AdminConversationsScreen() {
-  return <PlaceholderScreen chatHref="/chat/conv-group" />
+  return (
+    <InboxScreen
+      conversations={CONVERSATIONS}
+      showChips
+      showCompose
+      title="Messages"
+    />
+  )
 }

@@ -1,5 +1,5 @@
-import { PlaceholderScreen } from '@/components/placeholder-screen'
+import { FaqList } from '@/components/hub/faq-list'
 
 export default function ContactHelpScreen() {
-  return <PlaceholderScreen />
+  return <FaqList />
 }

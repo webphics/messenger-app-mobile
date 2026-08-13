@@ -10,7 +10,7 @@ Role groups: `(auth)`, `(contact)`, `(agent)`, `(admin)`.
 
 Shared thread: `app/chat/[id].tsx` → `/chat/:id`. Offers group id is literally `'offers'` → `/chat/offers`. Opening a thread is full-screen (no tab bar). That is intentional.
 
-Chat and sign-in headers live on the **root** Stack only. Do not add a nested `chat/_layout` or auth Stack header — double navigators cause layout jump. Root `animation: 'slide_from_right'`. Sign out `router.replace('/(auth)/sign-in')`. Continue `router.replace(ROLE_HREF[DEV_ROLE])` — never bounce through `/`.
+Sign-in header: root Stack `stackChrome`. Chat: `headerShown: false` until `ThreadScreen` `setOptions` (`stackChrome` + `ThreadHeader`; native back). Do not default the chat screen to `title: 'Chat'` (Expo Go flash → hub). Do not add a nested `chat/_layout`. Root `animation: 'slide_from_right'`. Sign out `router.replace('/(auth)/sign-in')`. Continue `router.replace(ROLE_HREF[DEV_ROLE])` — never bounce through `/`.
 
 Contact tabs: **Home | Settings**. Inbox/Help are **hidden tab screens** (`href: null`) at `app/(contact)/messages.tsx` and `help.tsx` — tab bar stays. Do not nest `home/` under contact (Tabs without `index` hang Expo Router). Do not put messages/help on the root stack.
 
@@ -24,6 +24,8 @@ Never gate `_layout` on `useFonts` / `SplashScreen.preventAutoHideAsync`. Hide s
 
 Import navigation only from `expo-router`. Never `@react-navigation/*` (SDK 56+).
 
-`id` param: `const id = Array.isArray(raw) ? raw[0] : raw`. Do not `Redirect` until params have hydrated.
+Open chat with `chatHref(id)` (`lib/chat-route-id.ts`) — `{ pathname: '/chat/[id]', params: { id } }`. Do not `router.push(\`/chat/${id}\`)` (web-only param fill). Resolve `id` with `chatIdFromRoute` + `chatIdFromSegments`. Unresolved / unauthorized → `Redirect` to `ROLE_HREF[DEV_ROLE]`. Never `return null`.
+
+Expo Go: `pnpm start` = local CLI + `-c` (LAN). `pnpm expo start` skips the script. **Do not tap Expo Go Recents** — it replays the last `exp://` and hangs if that URL is stale or unreachable. Scan the QR from the current Metro session. LAN blocked (Windows firewall / different Wi-Fi) → `pnpm start:tunnel`. `@expo/ngrok` must be a **project** devDependency; Expo’s `npm i -g` does not work with pnpm ([SO](https://stackoverflow.com/questions/75865574/expo-tunnel-not-working-commanderror-please-install-expo-ngrok4-1-0-and-try), [expo#24627](https://github.com/expo/expo/issues/24627)). `updates.enabled: false` ([expo#17461](https://github.com/expo/expo/issues/17461)). Do not treat Expo Go spinner as Uniwind.
 
 Do not put test files under `app/`.

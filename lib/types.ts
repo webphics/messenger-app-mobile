@@ -5,6 +5,8 @@ export type Person = {
   displayName: string
   role: UserRole
   avatarUrl: string | null
+  isOnline: boolean
+  lastActiveLabel: string
 }
 
 export type ConversationKind = 'direct' | 'group'
@@ -24,6 +26,7 @@ export type Conversation = {
   labelIds: string[]
   lastMessagePreview: string
   updatedAt: string
+  unreadCount: number
 }
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read'
@@ -43,4 +46,21 @@ export type InternalNote = {
   authorId: string
   body: string
   createdAt: string
+}
+
+export type OfferVisual = 'payouts' | 'zero-fee' | 'verify'
+
+export type Offer = {
+  id: string
+  title: string
+  subtitle: string
+  ctaLabel: string
+  visual: OfferVisual
+  chatId: 'offers'
+}
+
+export type FaqItem = {
+  id: string
+  question: string
+  answer: string
 }

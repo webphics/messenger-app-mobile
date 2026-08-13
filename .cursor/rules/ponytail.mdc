@@ -1,5 +1,5 @@
 ---
-description: Ponytail, lazy senior dev mode. Always pick the simplest solution that works.
+description: Ponytail — efficient, not the flimsiest unblock. Long-term fix over escape-hatch patches.
 globs:
 alwaysApply: true
 ---
@@ -16,11 +16,15 @@ Before writing any code, stop at the first rung that holds:
 4. Does a native platform feature cover it? Use it.
 5. Does an already-installed dependency solve it? Use it.
 6. Can this be one line? Make it one line.
-7. Only then: write the minimum code that works.
+7. Only then: write the minimum code that works **under the library/platform’s real constraints**.
 
-The ladder runs after you understand the problem, not instead of it: read the task and the code it touches, trace the real flow end to end, then climb.
+The ladder runs after you understand the problem, not instead of it: read the task and the code it touches, trace the real flow end to end, then climb. If a dependency is involved (Uniwind, Expo Router, RNR), read how *it* works before inventing a bypass.
 
 Bug fix = root cause, not symptom: a report names a symptom. Grep every caller of the function you touch and fix the shared function once — one guard there is a smaller diff than one per caller, and patching only the path the ticket names leaves a sibling caller still broken.
+
+**Stop gate — before any workaround:** name the long-term fix in one sentence. If you can do that fix in this change, do it. If you don’t know the library constraint yet, look it up, then implement. Do not ship the bypass “for now.”
+
+User frustration, a red Metro, SDD time pressure, or a plan “escape hatch” (`bg-[#…]` if token missing) do **not** authorize a patch. Unblock by fixing the constraint (e.g. token in both `@variant` themes), not by deleting the token or hardcoding hex.
 
 Rules:
 
@@ -28,9 +32,11 @@ Rules:
 - No new dependency if it can be avoided.
 - No boilerplate nobody asked for.
 - Deletion over addition. Boring over clever. Fewest files possible.
-- Shortest working diff wins, but only once you understand the problem. The smallest change in the wrong place isn't lazy, it's a second bug.
+- Shortest diff among **correct** options. Smallest diff that unblocks by cutting a corner is not lazy — it is the patch this rule forbids.
 - Question complex requests: "Do you actually need X, or does Y cover it?"
 - Pick the edge-case-correct option when two stdlib approaches are the same size, lazy means less code, not the flimsier algorithm.
 - Mark deliberate simplifications that cut a real corner with a known ceiling (global lock, O(n²) scan, naive heuristic) with a `ponytail:` comment naming the ceiling and upgrade path.
+
+**Forbidden patches (this repo):** arbitrary palette hex (`bg-[#…]`, `text-[#…]`) when a token exists or can be added; removing/omitting a CSS token to silence Uniwind; `as any` / `as unknown as` to shut tsc; `Alert('coming soon')`; duplicating a guard on one caller instead of the shared helper; skipping library docs after that library just crashed the build.
 
 Not lazy about: understanding the problem (read it fully and trace the real flow before picking a rung, a small diff you don't understand is just laziness dressed up as efficiency), input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without its check is unfinished: non-trivial logic leaves ONE runnable check behind, the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.

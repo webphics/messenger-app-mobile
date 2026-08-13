@@ -1,13 +1,15 @@
 import type {
   Conversation,
+  FaqItem,
   InternalNote,
   Label,
   Message,
+  Offer,
   Person,
   UserRole,
 } from '@/lib/types'
 
-export const DEV_ROLE: UserRole = 'agent'
+export const DEV_ROLE: UserRole = 'contact'
 
 export const ROLE_HREF = {
   contact: '/(contact)',
@@ -16,11 +18,46 @@ export const ROLE_HREF = {
 } as const
 
 export const PEOPLE: Person[] = [
-  { id: 'admin-1', displayName: 'Amina Okonkwo', role: 'admin', avatarUrl: null },
-  { id: 'agent-1', displayName: 'Jonah Reed', role: 'agent', avatarUrl: null },
-  { id: 'agent-2', displayName: 'Priya Shah', role: 'agent', avatarUrl: null },
-  { id: 'contact-1', displayName: 'Luis Ferreira', role: 'contact', avatarUrl: null },
-  { id: 'contact-2', displayName: 'Elena Voss', role: 'contact', avatarUrl: null },
+  {
+    id: 'admin-1',
+    displayName: 'Amina Okonkwo',
+    role: 'admin',
+    avatarUrl: null,
+    isOnline: true,
+    lastActiveLabel: 'Active now',
+  },
+  {
+    id: 'agent-1',
+    displayName: 'Jonah Reed',
+    role: 'agent',
+    avatarUrl: null,
+    isOnline: true,
+    lastActiveLabel: 'Active now',
+  },
+  {
+    id: 'agent-2',
+    displayName: 'Priya Shah',
+    role: 'agent',
+    avatarUrl: null,
+    isOnline: false,
+    lastActiveLabel: 'Active 12h ago',
+  },
+  {
+    id: 'contact-1',
+    displayName: 'Luis Ferreira',
+    role: 'contact',
+    avatarUrl: null,
+    isOnline: false,
+    lastActiveLabel: 'Active 3h ago',
+  },
+  {
+    id: 'contact-2',
+    displayName: 'Elena Voss',
+    role: 'contact',
+    avatarUrl: null,
+    isOnline: true,
+    lastActiveLabel: 'Active now',
+  },
 ]
 
 export function getDevUser(): Person {
@@ -32,8 +69,9 @@ export function getDevUser(): Person {
 export const DEV_USER_ID = getDevUser().id
 
 export const LABELS: Label[] = [
-  { id: 'label-urgent', name: 'Urgent', color: '#d64545' },
-  { id: 'label-billing', name: 'Billing', color: '#3452d9' },
+  { id: 'label-urgent', name: 'Urgent', color: '#D64545' },
+  { id: 'label-billing', name: 'Billing', color: '#3452D9' },
+  { id: 'label-resolved', name: 'Resolved', color: '#1F9D6C' },
 ]
 
 export const CONVERSATIONS: Conversation[] = [
@@ -46,6 +84,7 @@ export const CONVERSATIONS: Conversation[] = [
     labelIds: ['label-urgent'],
     lastMessagePreview: 'I still cannot get past the email step.',
     updatedAt: '2026-08-13T08:12:00.000Z',
+    unreadCount: 2,
   },
   {
     id: 'conv-unassigned',
@@ -56,6 +95,7 @@ export const CONVERSATIONS: Conversation[] = [
     labelIds: ['label-billing'],
     lastMessagePreview: 'The March invoice does not match our PO.',
     updatedAt: '2026-08-13T09:40:00.000Z',
+    unreadCount: 1,
   },
   {
     id: 'conv-group',
@@ -63,9 +103,10 @@ export const CONVERSATIONS: Conversation[] = [
     subject: 'Warehouse onboarding',
     participantIds: ['contact-1', 'contact-2', 'agent-1'],
     assigneeId: 'agent-1',
-    labelIds: [],
+    labelIds: ['label-resolved'],
     lastMessagePreview: 'Sharing the access checklist here.',
     updatedAt: '2026-08-12T16:05:00.000Z',
+    unreadCount: 0,
   },
   {
     id: 'offers',
@@ -76,6 +117,7 @@ export const CONVERSATIONS: Conversation[] = [
     labelIds: [],
     lastMessagePreview: 'This week’s offers are live.',
     updatedAt: '2026-08-13T10:00:00.000Z',
+    unreadCount: 3,
   },
 ]
 
@@ -128,6 +170,14 @@ export const MESSAGES: Message[] = [
     createdAt: '2026-08-13T10:00:00.000Z',
     status: 'sent',
   },
+  {
+    id: 'msg-7',
+    conversationId: 'offers',
+    senderId: 'admin-1',
+    body: 'Zero-fee payouts run through Friday.',
+    createdAt: '2026-08-13T10:02:00.000Z',
+    status: 'sent',
+  },
 ]
 
 export const INTERNAL_NOTES: InternalNote[] = [
@@ -137,5 +187,50 @@ export const INTERNAL_NOTES: InternalNote[] = [
     authorId: 'agent-1',
     body: 'Possible typo in the contact email on file.',
     createdAt: '2026-08-13T08:08:00.000Z',
+  },
+]
+
+export const OFFERS: Offer[] = [
+  {
+    id: 'offer-payouts',
+    title: 'Faster payouts this week',
+    subtitle: 'Get paid up to 2 days earlier. Limited time only.',
+    ctaLabel: 'View offer',
+    visual: 'payouts',
+    chatId: 'offers',
+  },
+  {
+    id: 'offer-zero-fee',
+    title: 'Zero-fee internal transfers',
+    subtitle: 'Send and receive money instantly. No fees.',
+    ctaLabel: 'View offer',
+    visual: 'zero-fee',
+    chatId: 'offers',
+  },
+  {
+    id: 'offer-verify',
+    title: 'ID Verification bonus',
+    subtitle: 'Verify your ID and bonus credit.',
+    ctaLabel: 'View offer',
+    visual: 'verify',
+    chatId: 'offers',
+  },
+]
+
+export const FAQ_ITEMS: FaqItem[] = [
+  {
+    id: 'faq-reset',
+    question: 'How do I reset my password?',
+    answer: 'Open Messages and start a thread with Support. An agent will send a reset link.',
+  },
+  {
+    id: 'faq-hours',
+    question: 'What are support hours?',
+    answer: 'Agents are online 08:00–20:00 local time on weekdays. Offers chat is always open.',
+  },
+  {
+    id: 'faq-offers',
+    question: 'What are Offers?',
+    answer: 'In-app promos from Support. Tap Join Offers chat to read this week’s announcements.',
   },
 ]

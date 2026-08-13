@@ -8,6 +8,9 @@
     "scheme": "internal-support-messenger",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "updates": {
+      "enabled": false
+    },
     "ios": {
       "icon": "./assets/expo.icon"
     },

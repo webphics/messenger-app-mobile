@@ -7,6 +7,7 @@ export const colors = {
   muted: '#6B7280',
   line: '#E4E6EC',
   primary: '#3452D9',
+  primaryForeground: '#FFFFFF',
   success: '#1F9D6C',
   danger: '#D64545',
   amber: '#E2831C',

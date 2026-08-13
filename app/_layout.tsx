@@ -45,10 +45,12 @@ export default function RootLayout() {
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
           animation: 'slide_from_right',
-          freezeOnBlur: true,
         }}
       >
-        <Stack.Screen name="chat/[id]" options={{ ...stackChrome, title: 'Chat' }} />
+        <Stack.Screen
+          name="chat/[id]"
+          options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+        />
         <Stack.Screen name="(auth)" options={{ ...stackChrome, title: 'Sign in' }} />
       </Stack>
     </GestureHandlerRootView>
