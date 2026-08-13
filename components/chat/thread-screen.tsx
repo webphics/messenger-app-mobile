@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BackHandler,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   View,
@@ -8,13 +9,9 @@ import {
 import { FlatList } from "react-native-gesture-handler";
 
 import { Composer } from "@/components/chat/composer";
-import {
-  MessageActions,
-  type ReactionAnchor,
-} from "@/components/chat/message-actions";
+import { MessageActions } from "@/components/chat/message-actions";
 import {
   MessageBubble,
-  type OpenMenuPayload,
   type QuotedMessage,
 } from "@/components/chat/message-bubble";
 import { ThreadHeader } from "@/components/chat/thread-header";
@@ -23,7 +20,11 @@ import { Text } from "@/components/ui/text";
 import { formatDayLabel, shouldShowDayDivider } from "@/lib/message-day";
 import { quotePreview, toggleReaction } from "@/lib/message-react";
 import { DEV_USER_ID, PEOPLE, getDevUser } from "@/lib/mock-data";
-import { overlayFrame, overlayFrameFromPoint } from "@/lib/overlay-frame";
+import {
+  anchorFromPayload,
+  type OpenMenuPayload,
+  type ReactionAnchor,
+} from "@/lib/overlay-frame";
 import type { Conversation, Message } from "@/lib/types";
 
 type ThreadScreenProps = {
@@ -37,20 +38,6 @@ type Row =
 
 function personName(id: string): string {
   return PEOPLE.find((p) => p.id === id)?.displayName ?? "Unknown";
-}
-
-function quotedOf(
-  messages: Message[],
-  replyToId?: string,
-): QuotedMessage | undefined {
-  if (!replyToId) return undefined;
-  const quoted = messages.find((m) => m.id === replyToId);
-  if (!quoted) return undefined;
-  return {
-    name: personName(quoted.senderId),
-    body: quotePreview(quoted.body),
-    isMe: quoted.senderId === DEV_USER_ID,
-  };
 }
 
 function buildRows(messages: Message[], isGroup: boolean): Row[] {
@@ -80,6 +67,10 @@ function buildRows(messages: Message[], isGroup: boolean): Row[] {
   return rows.reverse();
 }
 
+function keyExtractor(item: Row) {
+  return item.id;
+}
+
 export function ThreadScreen({
   conversation,
   initialMessages,
@@ -92,10 +83,26 @@ export function ThreadScreen({
   const [menu, setMenu] = useState<ReactionAnchor | null>(null);
   const isGroup = conversation.kind === "group" || conversation.id === "offers";
   const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup]);
+  const quotedById = useMemo(() => {
+    const byId = new Map(messages.map((m) => [m.id, m]));
+    const out = new Map<string, QuotedMessage>();
+    for (const message of messages) {
+      if (!message.replyToId) continue;
+      const quoted = byId.get(message.replyToId);
+      if (!quoted) continue;
+      out.set(message.id, {
+        name: personName(quoted.senderId),
+        body: quotePreview(quoted.body),
+        isMe: quoted.senderId === DEV_USER_ID,
+      });
+    }
+    return out;
+  }, [messages]);
   const replyQuote = replyTo
     ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
     : null;
   const menuOpen = menu !== null;
+  const menuId = menu?.messageId ?? null;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -106,42 +113,25 @@ export function ThreadScreen({
     return () => sub.remove();
   }, [menuOpen]);
 
-  function dismissMenu() {
+  const dismissMenu = useCallback(() => {
     setMenu(null);
-  }
+  }, []);
 
-  function openMenu(payload: OpenMenuPayload) {
+  const openMenu = useCallback((payload: OpenMenuPayload) => {
     const host = hostRef.current;
     if (!host) return;
+    const screen = Dimensions.get("window");
     host.measureInWindow((hx, hy, hw, hh) => {
-      const hostFrame = { x: hx, y: hy, width: hw, height: hh };
-      const rect =
-        payload.width > 0 && payload.height > 0
-          ? overlayFrame(
-              {
-                x: payload.pageX,
-                y: payload.pageY,
-                width: payload.width,
-                height: payload.height,
-              },
-              hostFrame,
-            )
-          : overlayFrameFromPoint(
-              payload.pageX,
-              payload.pageY,
-              { width: 120, height: 40 },
-              hostFrame,
-            );
-      setMenu({
-        messageId: payload.messageId,
-        outgoing: payload.outgoing,
-        ...rect,
-        hostWidth: hw,
-      });
+      const next = anchorFromPayload(
+        payload,
+        { x: hx, y: hy, width: hw, height: hh },
+        screen,
+      );
+      if (next) setMenu(next);
     });
-  }
+  }, []);
 
-  function react(messageId: string, emoji: string) {
+  const react = useCallback((messageId: string, emoji: string) => {
     setMessages((prev) =>
       prev.map((m) =>
         m.id === messageId
@@ -150,34 +140,64 @@ export function ThreadScreen({
       ),
     );
     setMenu(null);
-  }
+  }, [me.id]);
 
-  function startReply(message: Message) {
+  const startReply = useCallback((message: Message) => {
     setReplyTo(message);
     setMenu(null);
-  }
+  }, []);
 
   function send() {
     const body = draft.trim();
     if (!body) return;
     const id = `local-${Date.now()}`;
-    const createdAt = new Date().toISOString();
-    const base: Message = {
-      id,
-      conversationId: conversation.id,
-      senderId: me.id,
-      body,
-      createdAt,
-      status: "sending",
-      replyToId: replyTo?.id,
-    };
     setDraft("");
     setReplyTo(null);
-    setMessages((prev) => [...prev, base]);
-    setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: "sent" } : m)),
-    );
+    setMessages((prev) => [
+      ...prev,
+      {
+        id,
+        conversationId: conversation.id,
+        senderId: me.id,
+        body,
+        createdAt: new Date().toISOString(),
+        status: "sent",
+        replyToId: replyTo?.id,
+      },
+    ]);
   }
+
+  const renderItem = useCallback(
+    ({ item }: { item: Row }) => {
+      if (item.type === "day") {
+        return (
+          <View className="my-2 items-center">
+            <Text className="font-sans text-xs font-medium text-muted">
+              {item.label}
+            </Text>
+          </View>
+        );
+      }
+      return (
+        <MessageBubble
+          messageId={item.message.id}
+          body={item.message.body}
+          outgoing={item.message.senderId === DEV_USER_ID}
+          status={item.message.status}
+          senderName={item.senderName}
+          quoted={quotedById.get(item.message.id)}
+          reactions={item.message.reactions}
+          currentUserId={me.id}
+          selected={menuId === item.message.id}
+          enter={item.message.id.startsWith("local-")}
+          onOpenMenu={openMenu}
+          onReply={() => startReply(item.message)}
+          onToggleReaction={(emoji) => react(item.message.id, emoji)}
+        />
+      );
+    },
+    [me.id, menuId, openMenu, quotedById, react, startReply],
+  );
 
   const host = (
     <View ref={hostRef} collapsable={false} className="flex-1">
@@ -185,13 +205,15 @@ export function ThreadScreen({
         inverted
         className="flex-1"
         scrollEnabled={!menuOpen}
+        extraData={menuId}
         contentInsetAdjustmentBehavior="never"
         contentContainerClassName="px-4 py-2"
         data={rows}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         removeClippedSubviews={false}
+        renderItem={renderItem}
         CellRendererComponent={({ children, style, ...rest }) => (
           <View
             {...rest}
@@ -201,34 +223,6 @@ export function ThreadScreen({
             {children}
           </View>
         )}
-        renderItem={({ item }) => {
-          if (item.type === "day") {
-            return (
-              <View className="my-2 items-center">
-                <Text className="font-sans text-xs font-medium text-muted">
-                  {item.label}
-                </Text>
-              </View>
-            );
-          }
-          return (
-            <MessageBubble
-              messageId={item.message.id}
-              body={item.message.body}
-              outgoing={item.message.senderId === DEV_USER_ID}
-              status={item.message.status}
-              senderName={item.senderName}
-              quoted={quotedOf(messages, item.message.replyToId)}
-              reactions={item.message.reactions}
-              currentUserId={me.id}
-              selected={menu?.messageId === item.message.id}
-              enter={item.message.id.startsWith("local-")}
-              onOpenMenu={openMenu}
-              onReply={() => startReply(item.message)}
-              onToggleReaction={(emoji) => react(item.message.id, emoji)}
-            />
-          );
-        }}
       />
       <Composer
         value={draft}
@@ -251,31 +245,22 @@ export function ThreadScreen({
     </View>
   );
 
-  const header = (
-    <InScreenHeader>
-      <ThreadHeader conversation={conversation} />
-    </InScreenHeader>
-  );
-
-  if (Platform.OS === "android") {
-    return (
-      <View className="flex-1 bg-bg">
-        {header}
-        {host}
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1 bg-bg">
-      {header}
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior="padding"
-        keyboardVerticalOffset={0}
-      >
-        {host}
-      </KeyboardAvoidingView>
+      <InScreenHeader>
+        <ThreadHeader conversation={conversation} />
+      </InScreenHeader>
+      {Platform.OS === "android" ? (
+        host
+      ) : (
+        <KeyboardAvoidingView
+          className="flex-1"
+          behavior="padding"
+          keyboardVerticalOffset={0}
+        >
+          {host}
+        </KeyboardAvoidingView>
+      )}
     </View>
   );
 }

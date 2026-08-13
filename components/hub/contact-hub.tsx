@@ -14,27 +14,26 @@ import { OffersCarousel } from "@/components/hub/offers-carousel";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
+import { conversationTitle } from "@/lib/conversation-title";
 import { firstName, formatRelativeTime, initials } from "@/lib/display";
-import { CONVERSATIONS, getDevUser, PEOPLE } from "@/lib/mock-data";
+import { listInboxConversations } from "@/lib/inbox-filter";
+import { CONVERSATIONS, DEV_ROLE, getDevUser, PEOPLE } from "@/lib/mock-data";
 import { colors, screenTopPad } from "@/lib/tokens";
 
 function assignedAgents() {
   return PEOPLE.filter((p) => p.role === "agent");
 }
 
-function latestOwnThread(userId: string) {
-  return CONVERSATIONS.filter(
-    (c) => c.id !== "offers" && c.participantIds.includes(userId),
-  ).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
-}
-
 export function ContactHub() {
   const insets = useSafeAreaInsets();
   const me = getDevUser();
   const agents = assignedAgents();
-  const recent = latestOwnThread(me.id);
-  const otherId = recent?.participantIds.find((id) => id !== me.id);
-  const other = PEOPLE.find((p) => p.id === otherId);
+  const recent = listInboxConversations(DEV_ROLE, me.id, CONVERSATIONS)
+    .filter((c) => c.id !== "offers")
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+  const recentTitle = recent
+    ? conversationTitle(recent, PEOPLE, me.id)
+    : "";
   const bottomPad = Platform.OS === "ios" ? insets.bottom + 24 : 24;
 
   return (
@@ -58,6 +57,7 @@ export function ContactHub() {
               {agents.map((agent, i) => (
                 <Avatar
                   key={agent.id}
+                  alt={agent.displayName}
                   className="size-9 border-2 border-bg"
                   style={{ marginLeft: i === 0 ? 0 : -10 }}
                 >
@@ -122,10 +122,10 @@ export function ContactHub() {
             onPress={() => router.push(chatHref(recent.id))}
             className="mt-4 flex-row items-center gap-3 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
           >
-            <Avatar className="size-11">
+            <Avatar alt={recentTitle} className="size-11">
               <AvatarFallback className="bg-primary-soft">
                 <Text className="font-sans text-sm font-semibold text-primary">
-                  {initials(other?.displayName ?? recent.subject ?? "S")}
+                  {initials(recentTitle)}
                 </Text>
               </AvatarFallback>
             </Avatar>
@@ -134,7 +134,7 @@ export function ContactHub() {
                 className="font-sans text-base font-medium text-ink"
                 numberOfLines={1}
               >
-                {other?.displayName ?? recent.subject ?? "Support"}
+                {recentTitle}
               </Text>
               <Text
                 className="mt-0.5 font-sans text-sm font-normal text-muted"

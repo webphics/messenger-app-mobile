@@ -12,7 +12,7 @@
 
 - Spec: `docs/superpowers/specs/2026-08-13-phase-1-ui-design.md` §6 + §9. Depends on Plan 1 types/mock (`unreadCount`, `isOnline`, `lastActiveLabel`, `Resolved` label, `offers` conversation, `lib/display.ts`).
 - No CaseStatus type. Open = conversation does **not** include a label named `Resolved`. Resolved = includes that label. All = no chip filter.
-- Agent Unassigned: `assigneeId === null` only. **Hide chips.** Hide compose.
+- Agent Unassigned: `listUnassignedConversations` (`assigneeId === null` only). **Hide chips.** Hide compose.
 - Agent Chats: assigned **or** participant (includes Offers if in group). **Not** the unassigned pool. Header title already **Messages** via `(agent)/_layout.tsx`. Tab label **Chats**.
 - Admin Conversations: all threads. Header title already **Messages**. Tab label **Conversations**.
 - Contact Messages: `canViewConversation` list (offers already includes `contact-1`). Stack push from hub with native back. No Contact tab bar.
@@ -25,10 +25,10 @@
 
 | Path | Responsibility |
 |---|---|
-| `lib/conversation-title.ts` | Inbox/thread title rule |
-| `lib/conversation-title.test.ts` | Title cases |
-| `lib/inbox-filter.ts` | `listInboxConversations`, `filterConversations`, `isResolved` |
-| `lib/inbox-filter.test.ts` | Visibility + chip + search |
+| `lib/conversation-title.ts` | `otherParticipant` + inbox/thread title rule |
+| `lib/conversation-title.test.ts` | Title + other-participant cases |
+| `lib/inbox-filter.ts` | `listInboxConversations`, `listUnassignedConversations`, `filterConversations`, `isResolved` |
+| `lib/inbox-filter.test.ts` | Visibility + unassigned + chip + search |
 | `components/inbox/conversation-row.tsx` | One row |
 | `components/inbox/inbox-screen.tsx` | Search + chips + list + header chrome |
 | `app/(contact)/messages.tsx` | Contact inbox |

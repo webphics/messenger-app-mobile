@@ -7,17 +7,22 @@ import { Text } from "@/components/ui/text";
 import { FAQ_ITEMS } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 
+function FaqSeparator() {
+  return <View className="h-3" />;
+}
+
 export function FaqList() {
   const [openId, setOpenId] = useState<string | null>(FAQ_ITEMS[0]?.id ?? null);
 
   return (
     <FlatList
       className="flex-1 bg-bg"
+      extraData={openId}
       showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
       data={FAQ_ITEMS}
       keyExtractor={(item) => item.id}
-      ItemSeparatorComponent={() => <View className="h-3" />}
+      ItemSeparatorComponent={FaqSeparator}
       renderItem={({ item }) => {
         const open = item.id === openId;
         return (

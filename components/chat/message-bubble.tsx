@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { Check, CheckCheck, CornerUpLeft, Reply } from "lucide-react-native";
-import { Pressable, View } from "react-native";
+import { Dimensions, Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  cancelAnimation,
   Extrapolation,
   FadeIn,
   interpolate,
@@ -17,22 +18,19 @@ import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { replyCaption } from "@/lib/message-react";
 import { messageStatusLabel } from "@/lib/message-status";
+import {
+  measureWindowOrPage,
+  type OpenMenuPayload,
+} from "@/lib/overlay-frame";
 import { colors } from "@/lib/tokens";
 import type { MessageReaction, MessageStatus } from "@/lib/types";
+
+export type { OpenMenuPayload };
 
 export type QuotedMessage = {
   name: string;
   body: string;
   isMe: boolean;
-};
-
-export type OpenMenuPayload = {
-  messageId: string;
-  outgoing: boolean;
-  pageX: number;
-  pageY: number;
-  width: number;
-  height: number;
 };
 
 type MessageBubbleProps = {
@@ -158,7 +156,7 @@ function ReactionBadge({
   );
 }
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   messageId,
   body,
   outgoing,
@@ -182,58 +180,73 @@ export function MessageBubble({
     if (!selected) tint.value = withTiming(0, { duration: 60 });
   }, [selected, tint]);
 
-  function reportOpen(absX: number, absY: number) {
-    const size = sizeRef.current;
-    const fallback = () => {
-      onOpenMenu({
-        messageId,
-        outgoing,
-        pageX: absX - size.width / 2,
-        pageY: absY - size.height / 2,
-        width: size.width,
-        height: size.height,
-      });
+  useEffect(() => {
+    return () => {
+      cancelAnimation(tint);
     };
-    const node = bubbleRef.current;
-    if (!node) {
-      fallback();
-      return;
-    }
-    node.measureInWindow((pageX, pageY, width, height) => {
-      if (width <= 0 || height <= 0) {
+  }, [tint]);
+
+  const reportOpen = useCallback(
+    (absX: number, absY: number) => {
+      const size = sizeRef.current;
+      const fallback = () => {
+        onOpenMenu({
+          messageId,
+          outgoing,
+          pageX: absX - size.width / 2,
+          pageY: absY - size.height / 2,
+          width: size.width,
+          height: size.height,
+        });
+      };
+      const node = bubbleRef.current;
+      if (!node) {
         fallback();
         return;
       }
-      onOpenMenu({ messageId, outgoing, pageX, pageY, width, height });
-    });
-  }
+      void measureWindowOrPage(node, Dimensions.get("window")).then((rect) => {
+        onOpenMenu({
+          messageId,
+          outgoing,
+          pageX: rect.x,
+          pageY: rect.y,
+          width: rect.width,
+          height: rect.height,
+        });
+      });
+    },
+    [messageId, onOpenMenu, outgoing],
+  );
 
-  const swipe = Gesture.Pan()
-    .activeOffsetX(18)
-    .failOffsetY([-18, 18])
-    .onUpdate((e) => {
-      x.value = Math.max(0, Math.min(e.translationX, 80));
-    })
-    .onEnd(() => {
-      if (x.value >= SWIPE_REPLY) runOnJS(onReply)();
-      x.value = withSpring(0, { damping: 18, stiffness: 260, mass: 0.55 });
-    });
-
-  const openMenu = Gesture.LongPress()
-    .minDuration(LONG_PRESS_MS)
-    .maxDistance(12)
-    .onBegin(() => {
-      tint.value = withTiming(0.55, { duration: 80 });
-    })
-    .onStart((e) => {
-      tint.value = 1;
-      runOnJS(reportOpen)(e.absoluteX, e.absoluteY);
-    })
-    .onFinalize((_, success) => {
-      if (!success) tint.value = withTiming(0, { duration: 60 });
-    });
-
-  const gesture = Gesture.Race(openMenu, swipe);
+  const gesture = useMemo(
+    () =>
+      Gesture.Race(
+        Gesture.LongPress()
+          .minDuration(LONG_PRESS_MS)
+          .maxDistance(12)
+          .onBegin(() => {
+            tint.value = withTiming(0.55, { duration: 80 });
+          })
+          .onStart((e) => {
+            tint.value = 1;
+            runOnJS(reportOpen)(e.absoluteX, e.absoluteY);
+          })
+          .onFinalize((_, ok) => {
+            if (!ok) tint.value = withTiming(0, { duration: 60 });
+          }),
+        Gesture.Pan()
+          .activeOffsetX(18)
+          .failOffsetY([-18, 18])
+          .onUpdate((e) => {
+            x.value = Math.max(0, Math.min(e.translationX, 80));
+          })
+          .onEnd(() => {
+            if (x.value >= SWIPE_REPLY) runOnJS(onReply)();
+            x.value = withSpring(0, { damping: 18, stiffness: 260, mass: 0.55 });
+          }),
+      ),
+    [onReply, reportOpen, tint, x],
+  );
 
   const swipeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }],
@@ -348,4 +361,4 @@ export function MessageBubble({
       </View>
     </Animated.View>
   );
-}
+});

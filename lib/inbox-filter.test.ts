@@ -1,4 +1,9 @@
-import { filterConversations, isResolved, listInboxConversations } from '@/lib/inbox-filter'
+import {
+  filterConversations,
+  isResolved,
+  listInboxConversations,
+  listUnassignedConversations,
+} from '@/lib/inbox-filter'
 import { CONVERSATIONS, LABELS, PEOPLE } from '@/lib/mock-data'
 
 const resolved = CONVERSATIONS.find((c) => c.id === 'conv-group')!
@@ -29,6 +34,14 @@ describe('listInboxConversations', () => {
     expect(listInboxConversations('admin', 'admin-1', CONVERSATIONS)).toHaveLength(
       CONVERSATIONS.length,
     )
+  })
+})
+
+describe('listUnassignedConversations', () => {
+  test('only assigneeId null', () => {
+    expect(listUnassignedConversations(CONVERSATIONS).map((c) => c.id)).toEqual([
+      unassigned.id,
+    ])
   })
 })
 

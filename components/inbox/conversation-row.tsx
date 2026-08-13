@@ -3,9 +3,10 @@ import { Pressable, View } from "react-native";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Text } from "@/components/ui/text";
-import { conversationTitle } from "@/lib/conversation-title";
+import { conversationTitle, otherParticipant } from "@/lib/conversation-title";
 import { formatRelativeTime, initials } from "@/lib/display";
 import { DEV_USER_ID, PEOPLE } from "@/lib/mock-data";
+import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
 
 type ConversationRowProps = {
@@ -13,18 +14,13 @@ type ConversationRowProps = {
   onPress: () => void;
 };
 
-function otherPerson(conversation: Conversation) {
-  const otherId = conversation.participantIds.find((id) => id !== DEV_USER_ID);
-  return PEOPLE.find((p) => p.id === otherId);
-}
-
 export function ConversationRow({
   conversation,
   onPress,
 }: ConversationRowProps) {
   const title = conversationTitle(conversation, PEOPLE, DEV_USER_ID);
   const isOffers = conversation.id === "offers";
-  const other = otherPerson(conversation);
+  const other = otherParticipant(conversation, PEOPLE, DEV_USER_ID);
   const online = isOffers ? false : Boolean(other?.isOnline);
 
   return (
@@ -38,7 +34,7 @@ export function ConversationRow({
         <Avatar alt={title} className="size-12">
           {isOffers ? (
             <AvatarFallback className="bg-primary">
-              <Megaphone color="#FFFFFF" size={22} />
+              <Megaphone color={colors.primaryForeground} size={22} />
             </AvatarFallback>
           ) : (
             <AvatarFallback className="bg-primary-soft">
@@ -71,7 +67,7 @@ export function ConversationRow({
 
       {conversation.unreadCount > 0 ? (
         <View className="min-h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5">
-          <Text className="font-sans text-xs font-bold text-white">
+          <Text className="font-sans text-xs font-bold text-primary-foreground">
             {conversation.unreadCount}
           </Text>
         </View>

@@ -19,6 +19,10 @@ const CHIPS: { id: InboxChip; label: string }[] = [
   { id: "resolved", label: "Resolved" },
 ];
 
+function InboxSeparator() {
+  return <View className="ml-20 h-px bg-line" />;
+}
+
 type InboxScreenProps = {
   conversations: Conversation[];
   showChips: boolean;
@@ -116,7 +120,7 @@ export function InboxScreen({
         showsVerticalScrollIndicator={false}
         data={visible}
         keyExtractor={(item) => item.id}
-        ItemSeparatorComponent={() => <View className="ml-20 h-px bg-line" />}
+        ItemSeparatorComponent={InboxSeparator}
         renderItem={({ item }) => (
           <ConversationRow
             conversation={item}

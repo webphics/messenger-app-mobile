@@ -10,14 +10,14 @@ import Animated, {
 
 import { Text } from "@/components/ui/text";
 import { REACT_EMOJIS } from "@/lib/message-react";
-import { replyStyle, trayStyle, type OverlayRect } from "@/lib/overlay-frame";
+import {
+  replyStyle,
+  trayStyle,
+  type ReactionAnchor,
+} from "@/lib/overlay-frame";
 import { colors } from "@/lib/tokens";
 
-export type ReactionAnchor = OverlayRect & {
-  messageId: string;
-  outgoing: boolean;
-  hostWidth: number;
-};
+export type { ReactionAnchor };
 
 type MessageActionsProps = {
   anchor: ReactionAnchor;
@@ -34,20 +34,18 @@ export function MessageActions({
 }: MessageActionsProps) {
   const scale = useSharedValue(0.85);
   const opacity = useSharedValue(0);
-  const replyOpacity = useSharedValue(0);
 
   useLayoutEffect(() => {
     scale.value = withSpring(1, { damping: 14, stiffness: 340, mass: 0.4 });
     opacity.value = withTiming(1, { duration: 80 });
-    replyOpacity.value = withTiming(1, { duration: 80 });
-  }, [opacity, replyOpacity, scale]);
+  }, [opacity, scale]);
 
   const trayAnim = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: scale.value }],
   }));
   const replyAnim = useAnimatedStyle(() => ({
-    opacity: replyOpacity.value,
+    opacity: opacity.value,
   }));
 
   const trayPos = trayStyle(anchor, anchor.outgoing, anchor.hostWidth);

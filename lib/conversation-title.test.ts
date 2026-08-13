@@ -1,4 +1,4 @@
-import { conversationTitle } from '@/lib/conversation-title'
+import { conversationTitle, otherParticipant } from '@/lib/conversation-title'
 import type { Conversation, Person } from '@/lib/types'
 
 const people: Person[] = [
@@ -28,6 +28,19 @@ const base = {
   updatedAt: '2026-08-13T08:00:00.000Z',
   unreadCount: 0,
 }
+
+describe('otherParticipant', () => {
+  test('returns the other person in a direct thread', () => {
+    const c: Conversation = {
+      ...base,
+      id: 'conv-assigned',
+      kind: 'direct',
+      subject: 'Cannot reset password',
+    }
+    expect(otherParticipant(c, people, 'contact-1')?.displayName).toBe('Jonah Reed')
+    expect(otherParticipant(c, people, 'agent-1')?.displayName).toBe('Luis Ferreira')
+  })
+})
 
 describe('conversationTitle', () => {
   test('offers id is Offers', () => {

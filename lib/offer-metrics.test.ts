@@ -1,6 +1,10 @@
-import { offerCardMetrics } from "@/lib/offer-metrics";
+import { CARD_MIN_HEIGHT, offerCardMetrics } from "@/lib/offer-metrics";
 
 describe("offerCardMetrics", () => {
+  test("card min height is shared", () => {
+    expect(CARD_MIN_HEIGHT).toBe(196);
+  });
+
   test("left edge pad 16, card ~78% width, snap includes gap", () => {
     const m = offerCardMetrics(400);
     expect(m.edgePad).toBe(16);

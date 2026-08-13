@@ -3,6 +3,7 @@ import { Image, type ImageSourcePropType, Pressable, View } from 'react-native'
 import Animated, { FadeInRight } from 'react-native-reanimated'
 
 import { Text } from '@/components/ui/text'
+import { CARD_MIN_HEIGHT } from '@/lib/offer-metrics'
 import type { Offer, OfferVisual } from '@/lib/types'
 
 const OFFER_IMAGES: Record<OfferVisual, ImageSourcePropType> = {
@@ -28,7 +29,7 @@ export function OfferCard({ offer, cardWidth, index, onPress }: OfferCardProps) 
         className="overflow-hidden rounded-2xl shadow-md shadow-black/20"
         style={{ width: cardWidth }}
       >
-        <View style={{ minHeight: 196 }}>
+        <View style={{ minHeight: CARD_MIN_HEIGHT }}>
           <Image
             source={OFFER_IMAGES[offer.visual]}
             accessibilityIgnoresInvertColors
@@ -39,7 +40,7 @@ export function OfferCard({ offer, cardWidth, index, onPress }: OfferCardProps) 
             colors={['rgba(15,17,23,0.15)', 'rgba(15,17,23,0.78)']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
-            style={{ minHeight: 196, justifyContent: 'flex-end', paddingHorizontal: 20, paddingVertical: 20 }}
+            style={{ minHeight: CARD_MIN_HEIGHT, justifyContent: 'flex-end', paddingHorizontal: 20, paddingVertical: 20 }}
           >
             <Text className="font-sans text-xl font-bold text-white">{offer.title}</Text>
             <Text className="mt-1.5 font-sans text-sm font-normal leading-5 text-white/90">{offer.subtitle}</Text>

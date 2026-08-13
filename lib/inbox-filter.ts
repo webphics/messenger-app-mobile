@@ -24,6 +24,10 @@ export function listInboxConversations(
   )
 }
 
+export function listUnassignedConversations(list: Conversation[]): Conversation[] {
+  return list.filter((c) => c.assigneeId === null)
+}
+
 export function filterConversations(
   list: Conversation[],
   query: string,
@@ -33,9 +37,13 @@ export function filterConversations(
   selfId: string,
 ): Conversation[] {
   const q = query.trim().toLowerCase()
+  const resolvedIds = new Set(
+    labels.filter((label) => label.name === 'Resolved').map((label) => label.id),
+  )
   return list.filter((conversation) => {
-    if (chip === 'open' && isResolved(conversation, labels)) return false
-    if (chip === 'resolved' && !isResolved(conversation, labels)) return false
+    const resolved = conversation.labelIds.some((id) => resolvedIds.has(id))
+    if (chip === 'open' && resolved) return false
+    if (chip === 'resolved' && !resolved) return false
     if (!q) return true
     const title = conversationTitle(conversation, people, selfId).toLowerCase()
     const preview = conversation.lastMessagePreview.toLowerCase()

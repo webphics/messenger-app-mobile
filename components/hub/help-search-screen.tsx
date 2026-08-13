@@ -26,6 +26,7 @@ export function HelpSearchScreen() {
       </InScreenHeader>
       <FlatList
         className="flex-1 bg-surface"
+        extraData={openId}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         data={results}

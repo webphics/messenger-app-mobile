@@ -89,7 +89,7 @@ export function OffersCarousel() {
         className="mx-4 mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-full bg-primary px-4 shadow-md shadow-black/15"
       >
         <MessageCircle color={colors.primaryForeground} size={18} />
-        <Text className="font-sans font-semibold text-white">
+        <Text className="font-sans font-semibold text-primary-foreground">
           Join Offers chat
         </Text>
       </Pressable>

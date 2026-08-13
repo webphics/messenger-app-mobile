@@ -45,8 +45,8 @@
 | `lib/message-day.test.ts`             | Day-change cases                               |
 | `components/chat/message-bubble.tsx`  | Pill + quote + reaction chips + ticks + hold   |
 | `components/chat/message-actions.tsx` | Thread overlay: dismiss + tray + Reply         |
-| `lib/overlay-frame.ts`                | Window frame → overlay-local tray/reply rect   |
-| `lib/overlay-frame.test.ts`           | Host-local rect + tray/reply inset             |
+| `lib/overlay-frame.ts`                | Rect + plausible measure + tray/reply inset    |
+| `lib/overlay-frame.test.ts`           | Plausible rect + anchorFromPayload + insets    |
 | `components/chat/composer.tsx`        | Pill input + dead attach + send + reply banner |
 | `lib/message-react.ts`                | toggleReaction + quotePreview                  |
 | `components/chat/thread-header.tsx`   | Back is native; custom title block             |
