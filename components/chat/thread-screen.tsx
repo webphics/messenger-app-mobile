@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
 
 import { Composer } from "@/components/chat/composer";
-import { MessageActions } from "@/components/chat/message-actions";
+import {
+    MessageActions,
+    type BubbleAnchor,
+} from "@/components/chat/message-actions";
 import {
     MessageBubble,
     type QuotedMessage,
@@ -77,7 +80,10 @@ export function ThreadScreen({
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState(initialMessages);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [actionFor, setActionFor] = useState<Message | null>(null);
+  const [menu, setMenu] = useState<{
+    message: Message;
+    anchor: BubbleAnchor;
+  } | null>(null);
   const isGroup = conversation.kind === "group" || conversation.id === "offers";
   const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup]);
   const replyQuote = replyTo
@@ -92,12 +98,12 @@ export function ThreadScreen({
           : m,
       ),
     );
-    setActionFor(null);
+    setMenu(null);
   }
 
   function startReply(message: Message) {
     setReplyTo(message);
-    setActionFor(null);
+    setMenu(null);
   }
 
   function send() {
@@ -133,7 +139,7 @@ export function ThreadScreen({
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        onScrollBeginDrag={() => setActionFor(null)}
+        onScrollBeginDrag={() => setMenu(null)}
         renderItem={({ item }) => {
           if (item.type === "day") {
             return (
@@ -153,26 +159,31 @@ export function ThreadScreen({
               quoted={quotedOf(messages, item.message.replyToId)}
               reactions={item.message.reactions}
               currentUserId={me.id}
-              selected={actionFor?.id === item.message.id}
               enter={item.message.id.startsWith("local-")}
-              onLongPress={() => setActionFor(item.message)}
+              onLongPress={(anchor) =>
+                setMenu({ message: item.message, anchor })
+              }
               onReply={() => startReply(item.message)}
               onToggleReaction={(emoji) => react(item.message.id, emoji)}
             />
           );
         }}
       />
-      {actionFor ? (
-        <MessageActions onReply={() => startReply(actionFor)} />
-      ) : (
-        <Composer
-          value={draft}
-          onChangeText={setDraft}
-          onSend={send}
-          replyTo={replyQuote}
-          onCancelReply={() => setReplyTo(null)}
+      <Composer
+        value={draft}
+        onChangeText={setDraft}
+        onSend={send}
+        replyTo={replyQuote}
+        onCancelReply={() => setReplyTo(null)}
+      />
+      {menu ? (
+        <MessageActions
+          anchor={menu.anchor}
+          onReact={(emoji) => react(menu.message.id, emoji)}
+          onReply={() => startReply(menu.message)}
+          onDismiss={() => setMenu(null)}
         />
-      )}
+      ) : null}
     </>
   );
 

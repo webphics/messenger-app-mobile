@@ -1,19 +1,21 @@
+import { useRef } from "react";
 import { Check, CheckCheck, CornerUpLeft, Reply } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-    Extrapolation,
-    FadeIn,
-    interpolate,
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
+  Extrapolation,
+  FadeIn,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from "react-native-reanimated";
 
+import type { BubbleAnchor } from "@/components/chat/message-actions";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
-import { REACT_EMOJIS, replyCaption } from "@/lib/message-react";
+import { replyCaption } from "@/lib/message-react";
 import { messageStatusLabel } from "@/lib/message-status";
 import { colors } from "@/lib/tokens";
 import type { MessageReaction, MessageStatus } from "@/lib/types";
@@ -32,9 +34,8 @@ type MessageBubbleProps = {
   quoted?: QuotedMessage;
   reactions?: MessageReaction[];
   currentUserId: string;
-  selected?: boolean;
   enter?: boolean;
-  onLongPress: () => void;
+  onLongPress: (anchor: BubbleAnchor) => void;
   onReply: () => void;
   onToggleReaction: (emoji: string) => void;
 };
@@ -145,32 +146,6 @@ function ReactionBadge({
   );
 }
 
-function EmojiPill({
-  outgoing,
-  onReact,
-}: {
-  outgoing: boolean;
-  onReact: (emoji: string) => void;
-}) {
-  return (
-    <View className={cn("mb-1.5", outgoing ? "items-end" : "items-start")}>
-      <View className="flex-row rounded-full border border-line bg-surface px-1.5 py-1 shadow-md shadow-black/15">
-        {REACT_EMOJIS.map((emoji) => (
-          <Pressable
-            key={emoji}
-            accessibilityRole="button"
-            accessibilityLabel={`React ${emoji}`}
-            onPress={() => onReact(emoji)}
-            className="size-9 items-center justify-center"
-          >
-            <Text className="font-sans text-xl leading-6">{emoji}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 export function MessageBubble({
   body,
   outgoing,
@@ -179,13 +154,19 @@ export function MessageBubble({
   quoted,
   reactions = [],
   currentUserId,
-  selected,
   enter,
   onLongPress,
   onReply,
   onToggleReaction,
 }: MessageBubbleProps) {
+  const bubbleRef = useRef<View>(null);
   const x = useSharedValue(0);
+
+  function openMenu() {
+    bubbleRef.current?.measureInWindow((px, py, width, height) => {
+      onLongPress({ x: px, y: py, width, height, outgoing });
+    });
+  }
   const gesture = Gesture.Pan()
     .activeOffsetX(18)
     .failOffsetY([-18, 18])
@@ -247,9 +228,6 @@ export function MessageBubble({
                 senderName={senderName}
               />
             ) : null}
-            {selected ? (
-              <EmojiPill outgoing={outgoing} onReact={onToggleReaction} />
-            ) : null}
             <View className={cn("relative", reactions.length > 0 && "mb-2")}>
               <Pressable
                 accessibilityRole="button"
@@ -257,9 +235,11 @@ export function MessageBubble({
                   outgoing ? "Outgoing message" : "Incoming message"
                 }
                 delayLongPress={250}
-                onLongPress={onLongPress}
+                onLongPress={openMenu}
               >
                 <View
+                  ref={bubbleRef}
+                  collapsable={false}
                   className={cn(
                     "px-3.5 py-2.5 shadow-sm shadow-black/10",
                     outgoing
