@@ -101,7 +101,7 @@ Keep Phase 0 tokens. Do not switch to nsave maroon or Messenger black.
 | `primary` `#3452D9`          | actions, outgoing bubbles, active tab, unread pill, Join Offers chat |
 | `success`                    | online dot                                                           |
 
-Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: full-bleed gradient (local `visual` key), white CTA. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill ≈ `#F2F2F2`; outgoing = `primary`; radius ~18–20.
+Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: gradient (local `visual` key), white CTA, carousel `edgePad` 16 on the left. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill ≈ `#E4E7F0`; outgoing = `primary`; radius ~18–20.
 
 Compose icon on inbox: visible, **dead** (no new-thread flow).
 
@@ -248,7 +248,7 @@ lib/inbox-filter.ts                # filterConversations(list, query, chip) + te
 lib/message-react.ts               # toggleReaction + quotePreview + replyCaption + test
 ```
 
-Prefer **one** `InboxScreen` used by Contact messages, Agent chats, Admin conversations (props: `conversations`, `showChips`, `showCompose`, `title`). Contact is a **Stack** (no tab bar). Hub `router.push('/(contact)/messages')`. Do **not** nest `app/(contact)/home/`. Do **not** use root `app/messages.tsx`. Chat stays `app/chat/[id].tsx` (full-screen). Offers carousel is **full-bleed** (cards start at the screen edge, ~78% width peek). Other hub blocks keep `px-4`.
+Prefer **one** `InboxScreen` used by Contact messages, Agent chats, Admin conversations (props: `conversations`, `showChips`, `showCompose`, `title`). Contact is a **Stack** (no tab bar). Hub `router.push('/(contact)/messages')`. Do **not** nest `app/(contact)/home/`. Do **not** use root `app/messages.tsx`. Chat stays `app/chat/[id].tsx` (full-screen). Offers carousel left pad 16, ~78% width peek on the right. Other hub blocks keep `px-4`. No scrollbars.
 
 ---
 

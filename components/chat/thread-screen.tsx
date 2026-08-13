@@ -13,7 +13,6 @@ import { Text } from "@/components/ui/text";
 import { formatDayLabel, shouldShowDayDivider } from "@/lib/message-day";
 import { quotePreview, toggleReaction } from "@/lib/message-react";
 import { DEV_USER_ID, PEOPLE, getDevUser } from "@/lib/mock-data";
-import { stackChrome } from "@/lib/tokens";
 import type { Conversation, Message } from "@/lib/types";
 
 type ThreadScreenProps = {
@@ -88,7 +87,6 @@ export function ThreadScreen({
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      ...stackChrome,
       headerShown: true,
       headerTitle: () => <ThreadHeader conversation={conversation} />,
       title: "",
@@ -143,6 +141,7 @@ export function ThreadScreen({
         data={rows}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
         onScrollBeginDrag={() => setActionFor(null)}
         renderItem={({ item }) => {
           if (item.type === "day") {
@@ -164,6 +163,7 @@ export function ThreadScreen({
               reactions={item.message.reactions}
               currentUserId={me.id}
               selected={actionFor?.id === item.message.id}
+              enter={item.message.id.startsWith("local-")}
               onLongPress={() => setActionFor(item.message)}
               onReply={() => startReply(item.message)}
               onToggleReaction={(emoji) => react(item.message.id, emoji)}

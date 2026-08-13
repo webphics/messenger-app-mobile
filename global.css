@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import "uniwind";
 
+@layer base {
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
 @theme {
   --font-sans: "Manrope";
   --font-mono: "JetBrains Mono";
@@ -13,7 +25,7 @@
   --color-line: #e4e6ec;
   --color-primary: #3452d9;
   --color-primary-soft: #e8edfb;
-  --color-bubble-in: #f2f2f2;
+  --color-bubble-in: #e4e7f0;
   --color-success: #1f9d6c;
   --color-danger: #d64545;
   --color-amber: #e2831c;
@@ -44,7 +56,7 @@
       --color-line: #e4e6ec;
       --color-primary: #3452d9;
       --color-primary-soft: #e8edfb;
-      --color-bubble-in: #f2f2f2;
+      --color-bubble-in: #e4e7f0;
       --color-success: #1f9d6c;
       --color-danger: #d64545;
       --color-amber: #e2831c;

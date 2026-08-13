@@ -13,6 +13,7 @@ export function FaqList() {
   return (
     <FlatList
       className="flex-1 bg-bg"
+      showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
       data={FAQ_ITEMS}
       keyExtractor={(item) => item.id}

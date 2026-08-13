@@ -10,7 +10,7 @@ alwaysApply: false
 
 Pixel target = locked mocks in the current phase spec. Structure + tokens, not photography.
 
-Light chrome only. Screen `bg`, cards/header/composer `surface`. Incoming bubble ≈ `#F2F2F2`; outgoing = `primary` `#3452D9`. Radius: hub cards ~16, bubbles ~18–20.
+Light chrome only. Screen `bg`, cards/header/composer `surface`. Incoming bubble ≈ `#E4E7F0`; outgoing = `primary` `#3452D9`. Radius: hub cards ~16, bubbles ~18–20.
 
 Do not follow system dark mode. React Navigation chrome (`headerStyle`, `tabBarStyle`) uses `@/lib/tokens`. App UI is Uniwind `className`. Chat: `headerShown: false` until `ThreadScreen` `setOptions` (`stackChrome` + Uniwind `ThreadHeader` in `headerTitle`, native back). Do not leave a default title “Chat” on the Stack.Screen. Do not StyleSheet the thread. Placeholder shells: `bg-bg` + `bg-surface` card + `border-line` + `text-ink`.
 
@@ -20,6 +20,6 @@ Thread reactions + reply: light Messenger chrome — swipe right to reply, emoji
 
 Inbox chips: selected = `bg-primary-soft` + primary text; idle = line/grey. Compose icon visible, **dead**. Unassigned tab: hide chips.
 
-Offers promo: locked hub mock. `"Sponsored"` is the section label only. Carousel is **full-bleed** (first card flush to the left edge, next slide peeks, ~78% of screen width). Title + Join Offers stay `px-4`. Background = local `assets/offers/*.png` + dark gradient overlay + white **View offer**. **Join Offers chat** = primary pill + message icon. RN `Image` only (no expo-image). Contact hub has **no tab bar**.
+Offers promo: locked hub mock. `"Sponsored"` is the section label only. Carousel left pad 16 (`edgePad`); next slide peeks off the right (~78% width). Title + Join Offers stay `px-4`. Background = local `assets/offers/*.png` + dark gradient overlay + white **View offer**. **Join Offers chat** = primary pill + message icon. RN `Image` only (no expo-image). Contact hub has **no tab bar**. No scrollbars (`showsVerticalScrollIndicator={false}` + CSS).
 
 Use RN `Image` until the expo-image phase. Do not rewrite `components/ui/*` class strings to chase a mock.

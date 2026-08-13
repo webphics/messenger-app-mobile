@@ -33,6 +33,7 @@ type MessageBubbleProps = {
   reactions?: MessageReaction[];
   currentUserId: string;
   selected?: boolean;
+  enter?: boolean;
   onLongPress: () => void;
   onReply: () => void;
   onToggleReaction: (emoji: string) => void;
@@ -179,6 +180,7 @@ export function MessageBubble({
   reactions = [],
   currentUserId,
   selected,
+  enter,
   onLongPress,
   onReply,
   onToggleReaction,
@@ -219,7 +221,7 @@ export function MessageBubble({
 
   return (
     <Animated.View
-      entering={FadeIn.springify().damping(20).stiffness(220)}
+      entering={enter ? FadeIn.springify().damping(20).stiffness(220) : undefined}
       className="mb-4"
     >
       <View className="justify-center">

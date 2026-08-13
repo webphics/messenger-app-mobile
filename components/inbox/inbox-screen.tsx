@@ -113,6 +113,7 @@ export function InboxScreen({
 
       <FlatList
         className="flex-1 bg-surface"
+        showsVerticalScrollIndicator={false}
         data={visible}
         keyExtractor={(item) => item.id}
         ItemSeparatorComponent={() => <View className="ml-20 h-px bg-line" />}
