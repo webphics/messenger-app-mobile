@@ -6,6 +6,7 @@ import { ScrollView, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { hapticSuccess } from "@/lib/haptics";
+import { colors } from "@/lib/tokens";
 import type { KnowledgeArticle } from "@/lib/types";
 
 type KnowledgeArticleViewProps = {
@@ -61,10 +62,16 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
         <Button
           onPress={() => void onCopy()}
           variant={copied ? "secondary" : "default"}
-          className="min-h-12"
+          className="min-h-12 flex-row items-center justify-center gap-2"
         >
-          {copied ? <Check size={18} /> : <Copy size={18} />}
-          <Text>{copied ? "Copied to clipboard" : "Copy article text"}</Text>
+          {copied ? (
+            <Check color={colors.primary} size={18} />
+          ) : (
+            <Copy color={colors.primaryForeground} size={18} />
+          )}
+          <Text className={copied ? "text-primary font-semibold" : "text-primary-foreground font-semibold"}>
+            {copied ? "Copied to clipboard" : "Copy article text"}
+          </Text>
         </Button>
       </View>
     </ScrollView>

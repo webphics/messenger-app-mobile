@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { MessageCircle, Sparkles } from "lucide-react-native";
+import { ChevronRight, MessageCircle } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { ScrollView, useWindowDimensions, View } from "react-native";
 
@@ -46,11 +46,12 @@ export function OffersCarousel() {
           accessibilityRole="button"
           accessibilityLabel="See all offers"
           onPress={openOffers}
-          className="min-h-9 justify-center pl-2"
+          className="min-h-9 flex-row items-center gap-0.5 justify-center pl-2"
         >
           <Text className="font-sans text-sm font-semibold text-primary">
             See all
           </Text>
+          <ChevronRight color={colors.primary} size={16} />
         </TactilePressable>
       </View>
 
