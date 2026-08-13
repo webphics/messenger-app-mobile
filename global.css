@@ -17,7 +17,7 @@
   --font-sans: "Manrope";
   --font-mono: "JetBrains Mono";
 
-  --color-bg: #f5f6f9;
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
   --color-ink: #14161f;
   --color-ink-soft: #3a3d4a;
@@ -48,7 +48,7 @@
 @layer theme {
   :root {
     @variant light {
-      --color-bg: #f5f6f9;
+      --color-bg: #ffffff;
       --color-surface: #ffffff;
       --color-ink: #14161f;
       --color-ink-soft: #3a3d4a;

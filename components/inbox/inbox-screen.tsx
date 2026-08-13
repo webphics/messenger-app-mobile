@@ -19,10 +19,6 @@ const CHIPS: { id: InboxChip; label: string }[] = [
   { id: "resolved", label: "Resolved" },
 ];
 
-function InboxSeparator() {
-  return <View className="ml-20 h-px bg-line" />;
-}
-
 type InboxScreenProps = {
   conversations: Conversation[];
   showChips: boolean;
@@ -116,11 +112,12 @@ export function InboxScreen({
       </View>
 
       <FlatList
-        className="flex-1 bg-surface"
+        className="flex-1 bg-bg"
         showsVerticalScrollIndicator={false}
         data={visible}
         keyExtractor={(item) => item.id}
-        ItemSeparatorComponent={InboxSeparator}
+        contentContainerClassName="px-4 py-3"
+        ItemSeparatorComponent={() => <View className="h-3" />}
         renderItem={({ item }) => (
           <ConversationRow
             conversation={item}

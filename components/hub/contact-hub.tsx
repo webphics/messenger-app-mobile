@@ -95,7 +95,7 @@ export function ContactHub() {
             accessibilityRole="button"
             accessibilityLabel="Messages"
             onPress={() => router.push("/(contact)/messages")}
-            className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
+            className="min-h-24 flex-1 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
           >
             <MessageCircle color={colors.primary} size={22} />
             <Text className="mt-3 font-sans text-base font-medium text-ink">
@@ -106,7 +106,7 @@ export function ContactHub() {
             accessibilityRole="button"
             accessibilityLabel="Help"
             onPress={() => router.push("/(contact)/help")}
-            className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
+            className="min-h-24 flex-1 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
           >
             <HelpCircle color={colors.primary} size={22} />
             <Text className="mt-3 font-sans text-base font-medium text-ink">
@@ -120,7 +120,7 @@ export function ContactHub() {
             accessibilityRole="button"
             accessibilityLabel="Open recent message"
             onPress={() => router.push(chatHref(recent.id))}
-            className="mt-4 flex-row items-center gap-3 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
+            className="mt-4 flex-row items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
           >
             <Avatar alt={recentTitle} className="size-11">
               <AvatarFallback className="bg-primary-soft">
@@ -152,7 +152,7 @@ export function ContactHub() {
           accessibilityRole="button"
           accessibilityLabel="Search for help"
           onPress={() => router.push("/(contact)/search")}
-          className="mt-4 min-h-11 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-md shadow-black/10"
+          className="mt-4 min-h-11 flex-row items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/10"
         >
           <Search color={colors.muted} size={20} />
           <Text className="font-sans text-base font-normal text-muted">
@@ -168,7 +168,7 @@ export function ContactHub() {
           accessibilityRole="button"
           accessibilityLabel="Frequently asked questions"
           onPress={() => router.push("/(contact)/faq")}
-          className="mt-6 min-h-11 flex-row items-center justify-between rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
+          className="mt-6 min-h-11 flex-row items-center justify-between rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
         >
           <View className="min-w-0 flex-1 pr-2">
             <Text className="font-sans text-base font-medium text-ink">

@@ -28,7 +28,7 @@ export function ConversationRow({
       accessibilityRole="button"
       accessibilityLabel={title}
       onPress={onPress}
-      className="min-h-16 flex-row items-center gap-3 px-4 py-3"
+      className="min-h-16 flex-row items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
     >
       <View className="relative">
         <Avatar alt={title} className="size-12">

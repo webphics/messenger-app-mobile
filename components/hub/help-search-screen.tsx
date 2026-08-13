@@ -20,12 +20,12 @@ export function HelpSearchScreen() {
   }, []);
 
   return (
-    <View className="flex-1 bg-surface">
+    <View className="flex-1 bg-bg">
       <InScreenHeader>
         <HelpSearchField ref={inputRef} onQuery={setQuery} />
       </InScreenHeader>
       <FlatList
-        className="flex-1 bg-surface"
+        className="flex-1 bg-bg"
         extraData={openId}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"

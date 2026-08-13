@@ -96,14 +96,14 @@ Keep Phase 0 tokens. Do not switch to nsave maroon or Messenger black.
 
 | Token                        | Use                                                                  |
 | ---------------------------- | -------------------------------------------------------------------- |
-| `bg` `#F5F6F9`               | screen                                                               |
-| `surface` `#FFFFFF`          | cards, header, bubbles in, composer                                  |
+| `bg` `#FFFFFF`               | screen                                                               |
+| `surface` `#FFFFFF`          | cards, header, composer                                              |
 | `ink` / `ink-soft` / `muted` | text                                                                 |
 | `line`                       | dividers, chip idle, search border                                   |
 | `primary` `#3452D9`          | actions, outgoing bubbles, active tab, unread pill, Join Offers chat |
 | `success`                    | online dot                                                           |
 
-Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: gradient (local `visual` key), white CTA, carousel `edgePad` 16 on start and end. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill = white (`#FFFFFF`) light / gray (`#2A2E3B`) dark; outgoing = `primary`; radius ~18–20. Type weight: titles `font-bold`, sections `font-semibold`, cards/rows `font-medium`, body `font-normal` (Manrope faces via `global.css` utilities). Hub title **SUPPORT** uppercase.
+Hub cards: ~16 radius, `border-line` + light shadow, white `surface` on white `bg`. Offers promo cards: gradient (local `visual` key), white CTA, carousel `edgePad` 16 on start and end. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill = white (`#FFFFFF`) light / gray (`#2A2E3B`) dark + `border-line` on light; outgoing = `primary`; radius ~18–20. Type weight: titles `font-bold`, sections `font-semibold`, cards/rows `font-medium`, body `font-normal` (Manrope faces via `global.css` utilities). Hub title **SUPPORT** uppercase.
 
 Compose icon on inbox: visible, **dead** (no new-thread flow).
 
@@ -151,7 +151,7 @@ Pixel target = locked inbox mock.
 
 Chrome: title “Messages”, dead compose icon, search (client filter on name/subject/preview), chips **All | Open | Resolved**.
 
-**Row:** avatar, green online dot if `Person.isOnline`, medium title (displayName or subject or `Offers`), grey `preview · relativeTime`, blue unread count if `unreadCount > 0`. Offers row: megaphone-in-circle avatar, title `Offers`, always shown to Contact.
+**Row:** individual `bg-surface` cards (`rounded-2xl`, `border-line`, `shadow-md`) on `bg`, not a hairline separator list. Avatar, green online dot if `Person.isOnline`, medium title (displayName or subject or `Offers`), grey `preview · relativeTime`, blue unread count if `unreadCount > 0`. Offers row: megaphone-in-circle avatar, title `Offers`, always shown to Contact. **Pinned first** in the inbox whenever it is in the filtered list (`filterConversations`).
 
 **Title rule:**
 
@@ -204,7 +204,7 @@ Simple Messenger-like pills on **light** chrome. Rejected: old generated thread 
 
 **Header:** `MainActivity` pads `android.R.id.content` by status bar height. Android native-stack: `disableTopInsetApplication` so CustomToolbar does not add a second inset. Do not fake `headerStyle.height: 48`. Headerless screens (hub, search, chat) use `screenTopPad(insets.top)`.
 
-**System nav (Android):** `android.edgeToEdgeEnabled: true` (rebuild APK after changing it). `MainActivity` applies system-bar + cutout WindowInsets as padding on `android.R.id.content` after `super.onCreate` (do not call `WindowCompat` before splash). Keep the 3-button / gesture bar **visible**. Status + nav bar color = `bg` `#F5F6F9` (native, after `enableEdgeToEdge`); dark icons. Lock light UI (`Appearance.setColorScheme('light')` + `AppCompatDelegate.MODE_NIGHT_NO`). `<StatusBar style="dark" />` only (no JS `backgroundColor`). `<NavigationBar hidden={false} style="dark" />` + re-apply on AppState `active`. Composer/hub/tabs also use `useSafeAreaInsets` (Expo Go). Not our tab bar.
+**System nav (Android):** `android.edgeToEdgeEnabled: true` (rebuild APK after changing it). `MainActivity` applies system-bar + cutout WindowInsets as padding on `android.R.id.content` after `super.onCreate` (do not call `WindowCompat` before splash). Keep the 3-button / gesture bar **visible**. Status + nav bar color = `bg` `#FFFFFF` (native, after `enableEdgeToEdge`); dark icons. Lock light UI (`Appearance.setColorScheme('light')` + `AppCompatDelegate.MODE_NIGHT_NO`). `<StatusBar style="dark" />` only (no JS `backgroundColor`). `<NavigationBar hidden={false} style="dark" />` + re-apply on AppState `active`. Composer/hub/tabs also use `useSafeAreaInsets` (Expo Go). Not our tab bar.
 
 **Stack motion:** root `animation: 'ios_from_right'` (not linear `slide_from_right`). Hub/thread entering uses Reanimated spring, not linear FadeIn duration.
 

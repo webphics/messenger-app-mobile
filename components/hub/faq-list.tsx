@@ -30,7 +30,7 @@ export function FaqList() {
             accessibilityRole="button"
             accessibilityState={{ expanded: open }}
             onPress={() => setOpenId(open ? null : item.id)}
-            className="rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
+            className="rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
           >
             <View className="flex-row items-start justify-between gap-3">
               <Text className="flex-1 font-sans text-base font-medium text-ink">

@@ -95,7 +95,7 @@ function QuoteChrome({
           })}
         </Text>
       </View>
-      <View className="max-w-[92%] rounded-[18px] bg-bubble-in px-3 py-1.5 opacity-80">
+      <View className="max-w-[92%] rounded-[18px] border border-line bg-bubble-in px-3 py-1.5 opacity-80">
         <Text
           className="font-sans text-xs font-normal leading-4 text-muted"
           numberOfLines={2}
@@ -328,7 +328,7 @@ export const MessageBubble = memo(function MessageBubble({
                   "overflow-hidden px-3.5 py-2.5 shadow-sm shadow-black/10",
                   outgoing
                     ? "rounded-[22px] rounded-br-md bg-primary"
-                    : "rounded-[22px] rounded-bl-md bg-bubble-in",
+                    : "rounded-[22px] rounded-bl-md border border-line bg-bubble-in",
                 )}
               >
                 <Text

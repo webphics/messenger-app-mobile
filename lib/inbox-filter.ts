@@ -40,7 +40,7 @@ export function filterConversations(
   const resolvedIds = new Set(
     labels.filter((label) => label.name === 'Resolved').map((label) => label.id),
   )
-  return list.filter((conversation) => {
+  const filtered = list.filter((conversation) => {
     const resolved = conversation.labelIds.some((id) => resolvedIds.has(id))
     if (chip === 'open' && resolved) return false
     if (chip === 'resolved' && !resolved) return false
@@ -50,4 +50,7 @@ export function filterConversations(
     const subject = (conversation.subject ?? '').toLowerCase()
     return title.includes(q) || preview.includes(q) || subject.includes(q)
   })
+  const pinned = filtered.filter((c) => c.id === 'offers')
+  const rest = filtered.filter((c) => c.id !== 'offers')
+  return [...pinned, ...rest]
 }

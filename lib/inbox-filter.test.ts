@@ -48,8 +48,12 @@ describe('listUnassignedConversations', () => {
 describe('filterConversations', () => {
   const all = CONVERSATIONS
 
-  test('all chip returns the list', () => {
-    expect(filterConversations(all, '', 'all', LABELS, PEOPLE, 'agent-1')).toEqual(all)
+  test('all chip returns every conversation with offers pinned first', () => {
+    const ids = filterConversations(all, '', 'all', LABELS, PEOPLE, 'agent-1').map(
+      (c) => c.id,
+    )
+    expect(ids[0]).toBe('offers')
+    expect([...ids].sort()).toEqual(all.map((c) => c.id).sort())
   })
 
   test('open excludes Resolved label', () => {
@@ -71,6 +75,13 @@ describe('filterConversations', () => {
     expect(byPreview.map((c) => c.id)).toEqual([unassigned.id])
 
     const byOffers = filterConversations(all, 'offers', 'all', LABELS, PEOPLE, 'agent-1')
-    expect(byOffers.map((c) => c.id)).toContain(offers.id)
+    expect(byOffers.map((c) => c.id)).toEqual([offers.id])
+  })
+
+  test('offers stays out when chip excludes it', () => {
+    const ids = filterConversations(all, '', 'resolved', LABELS, PEOPLE, 'agent-1').map(
+      (c) => c.id,
+    )
+    expect(ids).not.toContain(offers.id)
   })
 })

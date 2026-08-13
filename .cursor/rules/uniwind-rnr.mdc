@@ -6,13 +6,13 @@ alwaysApply: false
 
 # Uniwind + RNR
 
-Use `className` + `cn()` from `@/lib/cn`. Locked tokens: `bg` `#F5F6F9`, `surface` `#FFFFFF`, `ink` / `ink-soft` / `muted`, `line`, `primary` `#3452D9`, `primary-soft` `#E8EDFB`, `bubble-in` light `#FFFFFF` / dark `#2A2E3B`, `success`, `danger`, `amber`.
+Use `className` + `cn()` from `@/lib/cn`. Locked tokens: `bg` `#FFFFFF`, `surface` `#FFFFFF`, `ink` / `ink-soft` / `muted`, `line`, `primary` `#3452D9`, `primary-soft` `#E8EDFB`, `bubble-in` light `#FFFFFF` / dark `#2A2E3B`, `success`, `danger`, `amber`.
 
 New `--color-*` tokens go in `@theme` (utility) **and** both `@variant light` and `@variant dark` with the same variable name. Uniwind only diffs `@variant` blocks — missing one side crashes Metro. Do not use arbitrary hex (`bg-[#…]`) for palette colors.
 
 Light chrome only this phase. `Uniwind.setTheme('light')` + `userInterfaceStyle: "light"`. React Navigation `headerStyle` / `tabBarStyle` use hex from `@/lib/tokens`. Everything else is Uniwind. Lucide `color` props may use `colors.*` (icons have no `className`).
 
-Do not invent a palette. Forbidden looks: nsave maroon, Messenger dark chrome, red outgoing bubbles. Incoming bubble = white on light / gray on dark (`bg-bubble-in`); outgoing = `primary`. RN `fontWeight` does not switch Manrope faces — `font-medium` / `font-semibold` / `font-bold` map to `Manrope-Medium` / `Manrope-SemiBold` / `Manrope-Bold` in `global.css`.
+Do not invent a palette. Forbidden looks: nsave maroon, Messenger dark chrome, red outgoing bubbles. Incoming bubble = white + `border-line` on light / gray on dark (`bg-bubble-in`); outgoing = `primary`. RN `fontWeight` does not switch Manrope faces — `font-medium` / `font-semibold` / `font-bold` map to `Manrope-Medium` / `Manrope-SemiBold` / `Manrope-Bold` in `global.css`.
 
 Forbidden: NativeWind, `cssInterop`, `remapProps`, `nativewind/babel`, wrapping RN core views with `withUniwind`. `expo-image` is a later phase — use RN `Image` until then.
 

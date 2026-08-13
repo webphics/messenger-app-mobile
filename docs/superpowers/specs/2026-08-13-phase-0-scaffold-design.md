@@ -140,7 +140,7 @@ Light messenger palette in `@theme` (hex values are placeholders until client br
 
 | Token | Use |
 |---|---|
-| `--color-bg` | Screen background `#F5F6F9` |
+| `--color-bg` | Screen background `#FFFFFF` |
 | `--color-surface` | Cards, bars `#FFFFFF` |
 | `--color-ink` / `--color-ink-soft` | Primary / secondary text `#14161F` / `#3A3D4A` |
 | `--color-muted` | Timestamps, placeholders `#6B7280` |

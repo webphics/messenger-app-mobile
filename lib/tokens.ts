@@ -14,7 +14,7 @@ export function screenBottomPad(insetBottom: number, extra = 0) {
 
 /** Hex copies of `global.css` @theme. Native headers/tabs cannot use className. */
 export const colors = {
-  bg: "#F5F6F9",
+  bg: "#FFFFFF",
   surface: "#FFFFFF",
   ink: "#14161F",
   inkSoft: "#3A3D4A",

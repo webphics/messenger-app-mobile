@@ -57,7 +57,7 @@ export function HelpHome() {
           accessibilityRole="button"
           accessibilityLabel={link.a11y}
           onPress={() => router.push(link.href)}
-          className={`min-h-11 flex-row items-center gap-3 rounded-2xl bg-surface p-4 shadow-md shadow-black/10 ${i === 0 ? "mt-4" : "mt-3"}`}
+          className={`min-h-11 flex-row items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10 ${i === 0 ? "mt-4" : "mt-3"}`}
         >
           <link.Icon color={colors.primary} size={22} />
           <View className="min-w-0 flex-1">
