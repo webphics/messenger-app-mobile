@@ -1,6 +1,5 @@
-import { useRef } from "react";
 import { Check, CheckCheck, CornerUpLeft, Reply } from "lucide-react-native";
-import { Pressable, View } from "react-native";
+import { Pressable, View, type GestureResponderEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
@@ -159,13 +158,11 @@ export function MessageBubble({
   onReply,
   onToggleReaction,
 }: MessageBubbleProps) {
-  const bubbleRef = useRef<View>(null);
   const x = useSharedValue(0);
 
-  function openMenu() {
-    bubbleRef.current?.measureInWindow((px, py, width, height) => {
-      onLongPress({ x: px, y: py, width, height, outgoing });
-    });
+  function openMenu(event: GestureResponderEvent) {
+    const { pageX, pageY } = event.nativeEvent;
+    onLongPress({ pageX, pageY, outgoing });
   }
   const gesture = Gesture.Pan()
     .activeOffsetX(18)
@@ -238,8 +235,6 @@ export function MessageBubble({
                 onLongPress={openMenu}
               >
                 <View
-                  ref={bubbleRef}
-                  collapsable={false}
                   className={cn(
                     "px-3.5 py-2.5 shadow-sm shadow-black/10",
                     outgoing

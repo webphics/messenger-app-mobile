@@ -9,10 +9,8 @@ import { REACT_EMOJIS } from "@/lib/message-react";
 import { colors } from "@/lib/tokens";
 
 export type BubbleAnchor = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  pageX: number;
+  pageY: number;
   outgoing: boolean;
 };
 
@@ -36,14 +34,17 @@ export function MessageActions({
   const { width: winW, height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const pillW = Math.min(252, winW - 24);
+  const menuH = PILL_H + GAP + REPLY_H;
 
-  let left = anchor.outgoing ? anchor.x + anchor.width - pillW : anchor.x;
+  let left = anchor.outgoing ? anchor.pageX - pillW + 24 : anchor.pageX - 24;
   left = Math.max(12, Math.min(left, winW - pillW - 12));
 
-  const menuH = PILL_H + GAP + REPLY_H;
-  let top = anchor.y - menuH - GAP;
+  let top = anchor.pageY - menuH - GAP;
   if (top < insets.top + 8) {
-    top = Math.min(anchor.y + anchor.height + GAP, winH - menuH - insets.bottom - 12);
+    top = Math.min(
+      anchor.pageY + GAP,
+      winH - menuH - insets.bottom - 12,
+    );
   }
 
   return (
