@@ -198,9 +198,9 @@ Simple Messenger-like pills on **light** chrome. Rejected: old generated thread 
 
 **Composer:** one pill `Message…`, `+` attach **dead**, send → append local `Message` with `status: 'sending'` then immediately `'sent'` (mock). Body required non-empty. Reply banner = thin “Replying to {name}” + snippet + X. Send copies `replyToId`. Composer `bg-surface` goes to the screen edge. Android: **no** bottom inset / wrapper pad. iOS: home-indicator pad **inside** the composer. Keyboard: `softwareKeyboardLayoutMode: resize`.
 
-**Header:** Android `headerStatusBarHeight: 0` + `headerStyle.height: 48` (opaque StatusBar already sits above the header — a second status inset is the top chin). iOS keeps default status inset.
+**Header:** Expo Router uses native-stack — JS `headerStatusBarHeight` is ignored. Android edge-to-edge: `unstable_nativeProps.headerConfig.disableTopInsetApplication` (native header already consumes the status inset; a second RN inset is the top chin). iOS keeps default status inset.
 
-**System nav (Android):** `expo-navigation-bar` `<NavigationBar hidden />` + re-hide on AppState active. Swipe from the bottom edge to reveal 3-button / gesture nav. Not our tab bar.
+**System nav (Android):** keep the 3-button / gesture bar **visible**. Lock `Appearance.setColorScheme('light')` so RN edge-to-edge does not paint white icons (device dark mode + light chrome = white-on-white). `<NavigationBar hidden={false} style="dark" />` + re-apply on AppState `active`. Composer/hub sit above it. Not our tab bar.
 
 **Stack motion:** root `animation: 'ios_from_right'` (not linear `slide_from_right`). Hub/thread entering uses Reanimated spring, not linear FadeIn duration.
 

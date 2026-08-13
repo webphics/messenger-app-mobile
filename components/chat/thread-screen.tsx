@@ -125,6 +125,7 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
       <FlatList
         inverted
         className="flex-1"
+        contentInsetAdjustmentBehavior="never"
         contentContainerClassName="px-4 py-2"
         data={rows}
         keyExtractor={(item) => item.id}

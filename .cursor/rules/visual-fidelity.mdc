@@ -16,7 +16,7 @@ Do not follow system dark mode. React Navigation chrome (`headerStyle`, `tabBarS
 
 Forbidden looks: nsave maroon, Messenger dark, red outgoing, GIF/mic/camera/thumbs-up composer, in-bubble identity block on every 1:1 message, case-status stepper.
 
-Thread reactions + reply: light Messenger chrome — swipe right to reply, emoji pill on long-press, fused quote pill above the bubble, overlapping reaction badge, thin “Replying to” composer banner. Receipts = ticks only. Android header `headerStatusBarHeight: 0`. Composer/tab flush to screen bottom (no chin). Not Messenger dark, not call/video, not thumbs-up composer.
+Thread reactions + reply: light Messenger chrome — swipe right to reply, emoji pill on long-press, fused quote pill above the bubble, overlapping reaction badge, thin “Replying to” composer banner. Receipts = ticks only. Android: `disableTopInsetApplication` only (JS `headerStatusBarHeight` is a no-op). Keep the system 3-button / gesture bar visible under composer/tabs. Lock `Appearance.setColorScheme('light')` + `NavigationBar style="dark"` (re-apply on AppState active) so icons stay dark on the white chin. iOS home-indicator pad lives inside composer `bg-surface`. Not Messenger dark, not call/video, not thumbs-up composer.
 
 Inbox chips: selected = `bg-primary-soft` + primary text; idle = line/grey. Compose icon visible, **dead**. Unassigned tab: hide chips.
 

@@ -34,6 +34,7 @@ export function ContactHub() {
   return (
     <ScrollView
       className="flex-1 bg-bg"
+      contentInsetAdjustmentBehavior="never"
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: bottomPad }}
     >
       <View className="px-4">

@@ -23,6 +23,19 @@ const headerChrome = {
   headerShadowVisible: false,
 } as const
 
+/** Android edge-to-edge: native-stack ignores `headerStatusBarHeight` (JS stack only). */
+const androidStackChrome =
+  Platform.OS === 'android'
+    ? {
+        headerStatusBarHeight: 0,
+        unstable_nativeProps: {
+          headerConfig: {
+            disableTopInsetApplication: true,
+          },
+        },
+      }
+    : null
+
 export const tabChrome = {
   ...headerChrome,
   tabBarActiveTintColor: colors.primary,
@@ -31,9 +44,6 @@ export const tabChrome = {
     backgroundColor: colors.surface,
     borderTopColor: colors.line,
   },
-  ...(Platform.OS === 'android'
-    ? { safeAreaInsets: { bottom: 0, left: 0, right: 0 } }
-    : null),
   sceneStyle: { backgroundColor: colors.bg },
 } as const
 
@@ -41,7 +51,7 @@ export const stackChrome = {
   ...headerChrome,
   headerBackTitleVisible: false,
   headerTitleAlign: 'left' as const,
-  headerStatusBarHeight: Platform.OS === 'android' ? 0 : undefined,
+  ...androidStackChrome,
   headerStyle: {
     backgroundColor: colors.surface,
     ...(Platform.OS === 'android' ? { height: 48, elevation: 0 } : null),

@@ -3,7 +3,8 @@ import { MessageCircle } from 'lucide-react-native'
 import { useState } from 'react'
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native'
 
-import { OfferCard, offerCardMetrics } from '@/components/hub/offer-card'
+import { OfferCard } from '@/components/hub/offer-card'
+import { offerCardMetrics } from '@/lib/offer-metrics'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
 import { chatHref } from '@/lib/chat-route-id'
@@ -13,7 +14,7 @@ import { colors } from '@/lib/tokens'
 export function OffersCarousel() {
   const { width } = useWindowDimensions()
   const [index, setIndex] = useState(0)
-  const { cardWidth, snap } = offerCardMetrics(width)
+  const { cardWidth, snap, gap, edgePad } = offerCardMetrics(width)
 
   function openOffers() {
     router.push(chatHref('offers'))
@@ -42,7 +43,8 @@ export function OffersCarousel() {
         snapToInterval={snap}
         decelerationRate="fast"
         showsHorizontalScrollIndicator={false}
-        contentContainerClassName="mt-3 gap-3"
+        contentInsetAdjustmentBehavior="never"
+        contentContainerStyle={{ marginTop: 12, paddingStart: edgePad, paddingEnd: edgePad, gap }}
         onMomentumScrollEnd={(e) => {
           const next = Math.round(e.nativeEvent.contentOffset.x / snap)
           setIndex(Math.min(Math.max(next, 0), OFFERS.length - 1))

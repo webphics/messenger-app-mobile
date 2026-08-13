@@ -11,12 +11,6 @@ const OFFER_IMAGES: Record<OfferVisual, ImageSourcePropType> = {
   verify: require('../../assets/offers/verify.png'),
 }
 
-export function offerCardMetrics(screenWidth: number) {
-  const cardWidth = Math.round(screenWidth * 0.78)
-  const gap = 12
-  return { cardWidth, gap, snap: cardWidth + gap }
-}
-
 type OfferCardProps = {
   offer: Offer
   cardWidth: number

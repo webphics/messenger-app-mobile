@@ -17,13 +17,19 @@ import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
-import { AppState, Platform } from 'react-native'
+import { Appearance, AppState, Platform } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { Uniwind } from 'uniwind'
 
 import { colors, stackChrome } from '@/lib/tokens'
 
 Uniwind.setTheme('light')
+Appearance.setColorScheme('light')
+
+function applyAndroidNavChrome() {
+  NavigationBar.setHidden(false)
+  NavigationBar.setStyle('dark')
+}
 
 export default function RootLayout() {
   useFonts({
@@ -38,9 +44,9 @@ export default function RootLayout() {
   useEffect(() => {
     void SplashScreen.hideAsync()
     if (Platform.OS !== 'android') return
-    NavigationBar.setHidden(true)
+    applyAndroidNavChrome()
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') NavigationBar.setHidden(true)
+      if (state === 'active') applyAndroidNavChrome()
     })
     return () => sub.remove()
   }, [])
@@ -48,7 +54,7 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style="dark" backgroundColor={colors.surface} />
-      {Platform.OS === 'android' ? <NavigationBar hidden style="light" /> : null}
+      {Platform.OS === 'android' ? <NavigationBar hidden={false} style="dark" /> : null}
       <Stack
         screenOptions={{
           headerShown: false,
