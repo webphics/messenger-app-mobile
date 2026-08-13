@@ -1,39 +1,38 @@
 import type { ReactNode } from 'react'
-import { Link } from 'expo-router'
-import { View } from 'react-native'
+import { router } from 'expo-router'
+import { Pressable, View } from 'react-native'
 
 import { Badge } from '@/components/ui/badge'
 import { Text } from '@/components/ui/text'
-import type { UserRole } from '@/lib/types'
+import { DEV_ROLE } from '@/lib/mock-data'
 
 type PlaceholderScreenProps = {
-  title: string
-  role: UserRole
-  chatHref?: '/chat/conv-assigned' | '/chat/conv-unassigned' | '/chat/conv-group'
+  chatHref?: `/chat/${string}`
   children?: ReactNode
 }
 
-export function PlaceholderScreen({
-  title,
-  role,
-  chatHref,
-  children,
-}: PlaceholderScreenProps) {
+export function PlaceholderScreen({ chatHref, children }: PlaceholderScreenProps) {
   return (
     <View className="flex-1 bg-bg px-4 pt-4">
-      <Text className="font-sans text-2xl font-semibold text-ink">{title}</Text>
-      <View className="mt-3 flex-row items-center gap-2">
-        <Badge variant="secondary">
-          <Text>{role}</Text>
-        </Badge>
-        <Text className="font-sans text-muted">Not wired</Text>
+      <View className="rounded-2xl border border-line bg-surface p-4">
+        <View className="flex-row items-center gap-2">
+          <Badge variant="secondary">
+            <Text>{DEV_ROLE}</Text>
+          </Badge>
+          <Text className="font-sans text-muted">Not wired</Text>
+        </View>
+        {chatHref ? (
+          <Pressable
+            className="mt-6 min-h-11 justify-center"
+            accessibilityRole="button"
+            accessibilityLabel="Open sample chat"
+            onPress={() => router.push(chatHref)}
+          >
+            <Text className="font-sans text-primary">Open sample chat</Text>
+          </Pressable>
+        ) : null}
+        {children}
       </View>
-      {chatHref ? (
-        <Link href={chatHref} className="mt-6">
-          <Text className="font-sans text-primary">Open sample chat</Text>
-        </Link>
-      ) : null}
-      {children}
     </View>
   )
 }

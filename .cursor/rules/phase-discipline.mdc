@@ -1,12 +1,26 @@
 ---
-description: Phase 0 — mock data only, no backend packages
+description: Current phase constraints, session, dead controls, phase bump
 alwaysApply: true
 ---
 
 # Phase discipline
 
-Mock data lives only in `lib/mock-data.ts`. `DEV_ROLE` is the session. Sign-in does not authenticate.
+Current phase is `AGENTS.md` + `docs/scope.md`. Do not install or wire the next phase’s stack.
 
-Do not install or wire: TanStack Query, socket.io-client, expo-sqlite, Drizzle, better-auth, expo-secure-store, expo-image, react-native-keyboard-controller, i18next, FlashList, LegendList.
+## Now (Phase 1 — UI mock)
 
-No fake JWT. No `fetch` to a missing API. No SecureStore.
+Mock data only in `lib/mock-data.ts`. `DEV_ROLE` is the session role. Current user = the `Person` whose `role === DEV_ROLE` (`getDevUser()` / `DEV_USER_ID` once added). Sign-in does not authenticate.
+
+Optimistic send = local component state. No Zustand/Redux/global message store. No `fetch` to a missing API. No fake JWT. No SecureStore.
+
+Dead controls stay dead: inbox compose, thread attach. No `Alert('coming soon')` fake flows.
+
+RBAC capability ≠ UI this phase. Do not render internal notes. Do not build accept-from-pool, assign/transfer, delete, or broadcast screens.
+
+Do not install: TanStack Query, socket.io-client, expo-sqlite, Drizzle, better-auth, expo-secure-store, expo-image, react-native-keyboard-controller, i18next, FlashList, LegendList.
+
+Never edit `.env`. Never commit secrets. Do not log message bodies or PII.
+
+## Phase bump
+
+Same change must update: `AGENTS.md` (Now + spec link), `docs/scope.md` (phase list), this file, `.cursor/rules/expo-router.mdc`, and `project-scope.mdc` if the product surface changed.

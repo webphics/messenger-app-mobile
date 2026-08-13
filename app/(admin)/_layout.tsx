@@ -1,14 +1,11 @@
 import { LayoutDashboard, MessageCircle, Settings, Users } from 'lucide-react-native'
 import { Tabs } from 'expo-router'
 
+import { tabChrome } from '@/lib/tokens'
+
 export default function AdminLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: true,
-        tabBarActiveTintColor: '#3452d9',
-      }}
-    >
+    <Tabs screenOptions={tabChrome}>
       <Tabs.Screen
         name="index"
         options={{
@@ -26,7 +23,8 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="conversations"
         options={{
-          title: 'Conversations',
+          title: 'Messages',
+          tabBarLabel: 'Conversations',
           tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
         }}
       />

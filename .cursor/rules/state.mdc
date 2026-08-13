@@ -1,0 +1,28 @@
+---
+description: Phase 1 state — mock data + local useState only. No stores or fake APIs.
+globs:
+  - app/**/*.{ts,tsx}
+  - components/**/*.{ts,tsx}
+  - lib/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# State
+
+This phase: `lib/mock-data.ts` is the only data source. Session is `DEV_ROLE` + `getDevUser()`. Import them. Do not put session in React Context.
+
+UI state (`search`, chips, FAQ expand, composer text, optimistic messages) = `useState` on the screen or feature component that owns it.
+
+Optimistic send: append a local `Message` (`status: 'sending'` → `'sent'`). Do not mutate exported mock arrays; overlay in component state.
+
+Forbidden until a later phase: Zustand, Redux, Jotai, global message Context, TanStack Query, `fetch` to a missing API, fake JWT, SecureStore, AsyncStorage as a database.
+
+```tsx
+// BAD
+void fetch('/api/messages')
+setMessages(CONVERSATIONS) // mutate module fixtures
+
+// GOOD
+const [messages, setMessages] = useState(initial)
+setMessages((prev) => [...prev, optimistic])
+```

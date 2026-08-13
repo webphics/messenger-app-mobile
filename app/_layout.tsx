@@ -14,15 +14,17 @@ import {
 } from '@expo-google-fonts/manrope'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
+import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { Uniwind } from 'uniwind'
 
-SplashScreen.preventAutoHideAsync()
+import { colors, stackChrome } from '@/lib/tokens'
 
-const SPLASH_FALLBACK_MS = 2500
+Uniwind.setTheme('light')
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
+  useFonts({
     Manrope: Manrope_400Regular,
     'Manrope-Medium': Manrope_500Medium,
     'Manrope-SemiBold': Manrope_600SemiBold,
@@ -32,23 +34,23 @@ export default function RootLayout() {
   })
 
   useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync()
-    }
-  }, [loaded, error])
-
-  useEffect(() => {
-    // ponytail: Google Fonts on Expo Go can stay pending forever (loaded=false, error=null).
-    // Ceiling: hide splash after 2.5s. Upgrade: drop the gate and use expo-font config plugin with bundled TTFs.
-    const timeout = setTimeout(() => {
-      SplashScreen.hideAsync()
-    }, SPLASH_FALLBACK_MS)
-    return () => clearTimeout(timeout)
+    void SplashScreen.hideAsync()
   }, [])
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }} />
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <StatusBar style="dark" backgroundColor={colors.surface} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+          animation: 'slide_from_right',
+          freezeOnBlur: true,
+        }}
+      >
+        <Stack.Screen name="chat/[id]" options={{ ...stackChrome, title: 'Chat' }} />
+        <Stack.Screen name="(auth)" options={{ ...stackChrome, title: 'Sign in' }} />
+      </Stack>
     </GestureHandlerRootView>
   )
 }

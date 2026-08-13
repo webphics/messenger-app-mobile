@@ -1,18 +1,16 @@
 import { Inbox, MessageCircle, Settings } from 'lucide-react-native'
 import { Tabs } from 'expo-router'
 
+import { tabChrome } from '@/lib/tokens'
+
 export default function AgentLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: true,
-        tabBarActiveTintColor: '#3452d9',
-      }}
-    >
+    <Tabs screenOptions={tabChrome}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Assigned',
+          title: 'Messages',
+          tabBarLabel: 'Chats',
           tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
         }}
       />

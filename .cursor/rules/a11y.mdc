@@ -1,0 +1,29 @@
+---
+description: Accessibility baseline for Pressables, lists, and composer
+globs: "**/*.{tsx}"
+alwaysApply: false
+---
+
+# Accessibility
+
+Icon-only controls: `accessibilityRole="button"` + `accessibilityLabel`. No unlabeled lucide `Pressable`.
+
+Unread / online must not be color-only — keep the unread count pill; don’t drop text for a green dot alone.
+
+Don’t set `accessible={false}` on tappable rows. Hit target ≥ 44.
+
+Composer `TextInput`: `accessibilityLabel` (e.g. `"Message"`).
+
+```tsx
+// BAD
+<Pressable onPress={onPress}><Plus /></Pressable>
+
+// GOOD
+<Pressable
+  accessibilityRole="button"
+  accessibilityLabel="Attach"
+  onPress={onPress}
+>
+  <Plus />
+</Pressable>
+```

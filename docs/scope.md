@@ -18,16 +18,18 @@ Mobile in this app includes Contact, Agent, and a **slim** Admin surface (overvi
 - Case-status stepper (Received → Assigned → In Review → Resolved)
 - Casewire name/branding
 
+Offers (Phase 1) are an in-app promo carousel plus a shared group chat (`id: 'offers'`). `"Sponsored"` is a label. Not stories, not an ad SDK.
+
 Broadcasts are in-inbox announcements (later), not stories.
 
 ## Phases
 
-0. **Scaffold (current)** — Expo SDK 57, Uniwind, RNR primitives, role shells, mock data, RBAC helpers, AI rules.
-1. Auth shell — better-auth + expo-secure-store.
-2. Inbox + chat mock UI.
+0. Scaffold (done) — Expo SDK 57, Uniwind, RNR primitives, role shells, mock data, RBAC helpers, AI rules.
+1. **Basic UI mock (current)** — Contact hub, inbox, thread on mock data. `DEV_ROLE` session.
+2. Auth shell — better-auth + expo-secure-store.
 3. Realtime (socket.io) + REST (TanStack Query).
 4. Media, push, i18n, list virtualization.
 
 ## Dev role switch
 
-Phase 0 session is `DEV_ROLE` in `lib/mock-data.ts` (`'admin' | 'agent' | 'contact'`). Root `/` redirects to that role group.
+Session is `DEV_ROLE` in `lib/mock-data.ts` (`'admin' | 'agent' | 'contact'`). Root `/` redirects to that role group. Current user is the mock `Person` whose `role === DEV_ROLE`.

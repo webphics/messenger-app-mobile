@@ -1,14 +1,16 @@
 ---
-description: Product scope — SOW messenger, Expo-only, Phase 0 scaffold
+description: Product scope — SOW messenger, Expo-only, slim Admin, Offers ≠ stories
 alwaysApply: true
 ---
 
 # Project scope
 
-Internal Support Messenger. Roles: Admin, Agent, Contact.
+Internal Support Messenger. Roles: Admin, Agent, Contact. **This repo is Expo-only.** Next.js, NestJS, and Postgres live elsewhere.
 
-Do not build: Instagram stories, case-status rail, Casewire branding, Next.js, NestJS, or Postgres in this repo.
+Do not build: Instagram stories, case-status rail/stepper, Casewire branding.
 
-Phase 0 = runnable Expo scaffold + mock data + RBAC helpers + rules. No chat UI, no real auth, no sockets.
+Offers = in-app promo carousel + shared group chat `id: 'offers'`. `"Sponsored"` is a label. Not stories, not an ad SDK, not checkout.
 
 Slim Admin on mobile: overview / users / conversations / settings only. No analytics, audit log UI, or SLA config here.
+
+Current phase: `AGENTS.md` + `docs/scope.md`. Do not implement a later phase’s packages or screens just because they appear in the SOW.

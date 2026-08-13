@@ -18,3 +18,5 @@ Source of truth: `lib/rbac.ts`. Screens import those helpers; do not copy role c
 | Manage users | no | no | yes |
 
 Unknown role throws.
+
+Capability ≠ ship UI this phase. Phase 1: gate thread open with `canViewConversation` only. Do not render internal notes. Do not build assign / transfer / delete / broadcast / accept-from-pool UI until that phase’s spec.

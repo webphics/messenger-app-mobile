@@ -9,6 +9,12 @@ import type {
 
 export const DEV_ROLE: UserRole = 'agent'
 
+export const ROLE_HREF = {
+  contact: '/(contact)',
+  agent: '/(agent)',
+  admin: '/(admin)',
+} as const
+
 export const PEOPLE: Person[] = [
   { id: 'admin-1', displayName: 'Amina Okonkwo', role: 'admin', avatarUrl: null },
   { id: 'agent-1', displayName: 'Jonah Reed', role: 'agent', avatarUrl: null },
@@ -16,6 +22,14 @@ export const PEOPLE: Person[] = [
   { id: 'contact-1', displayName: 'Luis Ferreira', role: 'contact', avatarUrl: null },
   { id: 'contact-2', displayName: 'Elena Voss', role: 'contact', avatarUrl: null },
 ]
+
+export function getDevUser(): Person {
+  const person = PEOPLE.find((p) => p.role === DEV_ROLE)
+  if (!person) throw new Error(`No mock person for role ${DEV_ROLE}`)
+  return person
+}
+
+export const DEV_USER_ID = getDevUser().id
 
 export const LABELS: Label[] = [
   { id: 'label-urgent', name: 'Urgent', color: '#d64545' },
@@ -52,6 +66,16 @@ export const CONVERSATIONS: Conversation[] = [
     labelIds: [],
     lastMessagePreview: 'Sharing the access checklist here.',
     updatedAt: '2026-08-12T16:05:00.000Z',
+  },
+  {
+    id: 'offers',
+    kind: 'group',
+    subject: 'Offers',
+    participantIds: ['contact-1', 'contact-2', 'agent-1', 'agent-2', 'admin-1'],
+    assigneeId: 'agent-1',
+    labelIds: [],
+    lastMessagePreview: 'This week’s offers are live.',
+    updatedAt: '2026-08-13T10:00:00.000Z',
   },
 ]
 
@@ -95,6 +119,14 @@ export const MESSAGES: Message[] = [
     body: 'Sharing the access checklist here.',
     createdAt: '2026-08-12T16:05:00.000Z',
     status: 'read',
+  },
+  {
+    id: 'msg-6',
+    conversationId: 'offers',
+    senderId: 'admin-1',
+    body: 'This week’s offers are live.',
+    createdAt: '2026-08-13T10:00:00.000Z',
+    status: 'sent',
   },
 ]
 

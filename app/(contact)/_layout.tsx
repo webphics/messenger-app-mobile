@@ -1,19 +1,16 @@
-import { MessageCircle, Settings } from 'lucide-react-native'
+import { House, Settings } from 'lucide-react-native'
 import { Tabs } from 'expo-router'
+
+import { tabChrome } from '@/lib/tokens'
 
 export default function ContactLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: true,
-        tabBarActiveTintColor: '#3452d9',
-      }}
-    >
+    <Tabs screenOptions={tabChrome}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Chats',
-          tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
+          title: 'Home',
+          tabBarIcon: ({ color, size }) => <House color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -23,6 +20,8 @@ export default function ContactLayout() {
           tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
         }}
       />
+      <Tabs.Screen name="messages" options={{ href: null, title: 'Messages' }} />
+      <Tabs.Screen name="help" options={{ href: null, title: 'Help' }} />
     </Tabs>
   )
 }

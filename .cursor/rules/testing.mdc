@@ -1,0 +1,19 @@
+---
+description: One small test beside non-trivial lib helpers. No screen snapshots.
+globs:
+  - lib/**/*.ts
+  - "**/*.{test,spec}.{ts,tsx}"
+alwaysApply: false
+---
+
+# Testing
+
+Non-trivial `lib/` logic (filters, RBAC, title rules) gets **one** test file beside it. Pattern: `lib/rbac.ts` + `lib/rbac.test.ts`. Run with `pnpm test`.
+
+No test frameworks beyond what the repo already uses. No fixture factories, MSW, or screen snapshot tests this phase.
+
+Do not put tests under `app/`. Trivial one-liners need no test. UI screens need no required test file unless a helper was extracted.
+
+Unknown role must throw — do not add a test that swallows it.
+
+When extending `Conversation` / `Person`, update RBAC tests that construct those objects in the same change (`unreadCount`, `isOnline`, etc.).

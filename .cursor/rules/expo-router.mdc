@@ -1,15 +1,29 @@
 ---
-description: Expo Router role groups and shared chat route
+description: Expo Router role groups, Contact hub stacks, shared chat route
 globs: app/**
 alwaysApply: false
 ---
 
 # Expo Router
 
-Role groups: `(auth)`, `(contact)`, `(agent)`, `(admin)`. Shared thread: `app/chat/[id].tsx` → `/chat/:id`.
+Role groups: `(auth)`, `(contact)`, `(agent)`, `(admin)`.
 
-Root `app/index.tsx` redirects from `DEV_ROLE`. No auth gate in Phase 0.
+Shared thread: `app/chat/[id].tsx` → `/chat/:id`. Offers group id is literally `'offers'` → `/chat/offers`. Opening a thread is full-screen (no tab bar). That is intentional.
+
+Chat and sign-in headers live on the **root** Stack only. Do not add a nested `chat/_layout` or auth Stack header — double navigators cause layout jump. Root `animation: 'slide_from_right'`. Sign out `router.replace('/(auth)/sign-in')`. Continue `router.replace(ROLE_HREF[DEV_ROLE])` — never bounce through `/`.
+
+Contact tabs: **Home | Settings**. Inbox/Help are **hidden tab screens** (`href: null`) at `app/(contact)/messages.tsx` and `help.tsx` — tab bar stays. Do not nest `home/` under contact (Tabs without `index` hang Expo Router). Do not put messages/help on the root stack.
+
+Agent tabs: **Chats | Unassigned | Settings**. Chats header title: **Messages**. Unassigned = `assigneeId === null` only; hide Open/Resolved chips.
+
+Admin: slim tabs. Conversations = inbox over all threads (header **Messages**). Users / Overview stay shells until their phase.
+
+Root `app/index.tsx` redirects from `DEV_ROLE` via `ROLE_HREF`. No auth gate until the auth phase.
+
+Never gate `_layout` on `useFonts` / `SplashScreen.preventAutoHideAsync`. Hide splash once on mount; fonts load in the background.
 
 Import navigation only from `expo-router`. Never `@react-navigation/*` (SDK 56+).
+
+`id` param: `const id = Array.isArray(raw) ? raw[0] : raw`. Do not `Redirect` until params have hydrated.
 
 Do not put test files under `app/`.

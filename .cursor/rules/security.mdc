@@ -1,0 +1,16 @@
+---
+description: Secrets, PII, and token storage — messenger guardrails. Always apply.
+alwaysApply: true
+---
+
+# Security
+
+Never edit `.env`. Never commit secrets, API keys, or JWTs.
+
+Do not `console.log` message bodies, tokens, or PII.
+
+No SecureStore / AsyncStorage for session or tokens until the auth phase. No fake JWT.
+
+No `fetch` to arbitrary or missing APIs. `avatarUrl` is mock-only (`null` → initials); do not load random remote images.
+
+Phase 1 has no auth gate — that is intentional. Do not invent client-side “security” that hides routes without a real session.

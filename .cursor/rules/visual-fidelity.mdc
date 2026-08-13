@@ -1,0 +1,23 @@
+---
+description: Locked Phase 1 chrome — hub, inbox, thread. No invented palettes or Messenger clones.
+globs:
+  - app/**/*.tsx
+  - components/**/*.tsx
+alwaysApply: false
+---
+
+# Visual fidelity
+
+Pixel target = locked mocks in the current phase spec. Structure + tokens, not photography.
+
+Light chrome only. Screen `bg`, cards/header/composer `surface`. Incoming bubble ≈ `#F2F2F2`; outgoing = `primary` `#3452D9`. Radius: hub cards ~16, bubbles ~18–20.
+
+Do not follow system dark mode. Headers + tab bars must use `@/lib/tokens` (`tabChrome` / `stackChrome`). Placeholder shells: `bg-bg` + `bg-surface` card + `border-line` + `text-ink`.
+
+Forbidden looks: nsave maroon, Messenger dark, red outgoing, GIF/mic/camera/thumbs-up composer, in-bubble identity block on every 1:1 message, case-status stepper.
+
+Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Compose icon visible, **dead**. Unassigned tab: hide chips.
+
+Offers promo: full-bleed gradient from local `visual` key, white CTA. `"Sponsored"` is a label. Initials if `avatarUrl` is null.
+
+Use RN `Image` until the expo-image phase. Do not rewrite `components/ui/*` class strings to chase a mock.

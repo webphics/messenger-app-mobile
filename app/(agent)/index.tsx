@@ -1,5 +1,5 @@
 import { PlaceholderScreen } from '@/components/placeholder-screen'
 
-export default function AgentAssignedScreen() {
-  return <PlaceholderScreen title="Assigned" role="agent" chatHref="/chat/conv-assigned" />
+export default function AgentChatsScreen() {
+  return <PlaceholderScreen chatHref="/chat/conv-assigned" />
 }
