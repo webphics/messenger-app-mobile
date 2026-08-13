@@ -198,7 +198,7 @@ Simple Messenger-like pills on **light** chrome. Rejected: old generated thread 
 
 **List:** inverted FlatList. Date divider when day changes. Incoming left grey pills; outgoing right primary pills + **ticks only** from `Message.status` (Check / CheckCheck; no Sent/Delivered/Read words). 1:1: no per-bubble name. Group/Offers: small `displayName` above incoming only. Reply chrome: “You replied to {name}” + smaller grey pill **above** (fused), not a quote block inside the bubble. Reactions: one overlapping badge on the bubble corner. Mock fixtures include a few `reactions` and `replyToId`s.
 
-**Swipe right** on a bubble → quick reply (composer “Replying to” bar). **Long-press:** emoji pill on the bubble + Reply below (`❤️😆😮😢😡👎`, absolute, no list jump); composer stays. One reaction per user (picking another replaces). Tap a badge emoji to toggle. Optimistic local state only.
+**Swipe right** on a bubble → quick reply (composer “Replying to” bar). **Long-press:** Meta-style tray — ZoomIn spring + staggered emojis on the bubble, Reply below; focused bubble tints + micro-bounce; incoming inset right / outgoing inset left. Composer stays. One reaction per user (picking another replaces). Tap a badge emoji to toggle. Optimistic local state only.
 
 **Composer:** one pill `Message…`, `+` attach **dead**, send → append local `Message` with `status: 'sending'` then immediately `'sent'` (mock). Body required non-empty. Reply banner = thin “Replying to {name}” + snippet + X. Send copies `replyToId`. Composer `bg-surface` goes to the screen edge. Android: **no** bottom inset / wrapper pad. iOS: home-indicator pad **inside** the composer. Keyboard: `softwareKeyboardLayoutMode: resize`.
 

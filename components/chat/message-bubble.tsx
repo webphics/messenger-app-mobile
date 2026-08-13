@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Check, CheckCheck, CornerUpLeft, Reply } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -8,7 +9,9 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 
 import { MessageActions } from "@/components/chat/message-actions";
@@ -161,6 +164,21 @@ export function MessageBubble({
   onToggleReaction,
 }: MessageBubbleProps) {
   const x = useSharedValue(0);
+  const pop = useSharedValue(1);
+  const tint = useSharedValue(0);
+
+  useEffect(() => {
+    tint.value = withTiming(selected ? 1 : 0, { duration: 140 });
+    if (selected) {
+      pop.value = withSequence(
+        withSpring(1.06, { damping: 11, stiffness: 420, mass: 0.35 }),
+        withSpring(1, { damping: 16, stiffness: 280, mass: 0.45 }),
+      );
+    } else {
+      pop.value = withSpring(1, { damping: 16, stiffness: 280 });
+    }
+  }, [selected, pop, tint]);
+
   const gesture = Gesture.Pan()
     .activeOffsetX(18)
     .failOffsetY([-18, 18])
@@ -172,8 +190,14 @@ export function MessageBubble({
       x.value = withSpring(0, { damping: 18, stiffness: 260, mass: 0.55 });
     });
 
-  const bubbleStyle = useAnimatedStyle(() => ({
+  const swipeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }],
+  }));
+  const popStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pop.value }],
+  }));
+  const tintStyle = useAnimatedStyle(() => ({
+    opacity: tint.value,
   }));
   const iconStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
@@ -207,7 +231,7 @@ export function MessageBubble({
         </Animated.View>
         <GestureDetector gesture={gesture}>
           <Animated.View
-            style={bubbleStyle}
+            style={swipeStyle}
             className={cn(
               "max-w-[78%]",
               outgoing ? "self-end items-end" : "self-start items-start",
@@ -240,13 +264,14 @@ export function MessageBubble({
                 delayLongPress={250}
                 onLongPress={onLongPress}
               >
-                <View
+                <Animated.View
                   className={cn(
-                    "px-3.5 py-2.5 shadow-sm shadow-black/10",
+                    "overflow-hidden px-3.5 py-2.5 shadow-sm shadow-black/10",
                     outgoing
                       ? "rounded-[22px] rounded-br-md bg-primary"
                       : "rounded-[22px] rounded-bl-md bg-bubble-in",
                   )}
+                  style={popStyle}
                 >
                   <Text
                     className={cn(
@@ -256,7 +281,15 @@ export function MessageBubble({
                   >
                     {body}
                   </Text>
-                </View>
+                  <Animated.View
+                    pointerEvents="none"
+                    className={cn(
+                      "absolute inset-0",
+                      outgoing ? "bg-ink/25" : "bg-ink/12",
+                    )}
+                    style={tintStyle}
+                  />
+                </Animated.View>
               </Pressable>
               <ReactionBadge
                 reactions={reactions}
