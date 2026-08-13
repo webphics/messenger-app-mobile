@@ -1,0 +1,15 @@
+---
+description: Expo Router role groups and shared chat route
+globs: app/**
+alwaysApply: false
+---
+
+# Expo Router
+
+Role groups: `(auth)`, `(contact)`, `(agent)`, `(admin)`. Shared thread: `app/chat/[id].tsx` → `/chat/:id`.
+
+Root `app/index.tsx` redirects from `DEV_ROLE`. No auth gate in Phase 0.
+
+Import navigation only from `expo-router`. Never `@react-navigation/*` (SDK 56+).
+
+Do not put test files under `app/`.

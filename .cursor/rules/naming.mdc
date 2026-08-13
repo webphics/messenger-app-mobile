@@ -1,0 +1,20 @@
+---
+description: Kebab-case files, PascalCase components
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Naming
+
+- Files and folders: kebab-case (`sign-in.tsx`, `placeholder-screen.tsx`, `rbac.ts`).
+- Components: PascalCase (`export function PlaceholderScreen`).
+- Named exports preferred. Expo Router pages must default-export.
+
+```tsx
+// BAD
+components/PlaceholderScreen.tsx
+
+// GOOD
+components/placeholder-screen.tsx
+export function PlaceholderScreen() {}
+```

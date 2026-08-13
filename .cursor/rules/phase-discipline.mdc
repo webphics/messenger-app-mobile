@@ -1,0 +1,12 @@
+---
+description: Phase 0 — mock data only, no backend packages
+alwaysApply: true
+---
+
+# Phase discipline
+
+Mock data lives only in `lib/mock-data.ts`. `DEV_ROLE` is the session. Sign-in does not authenticate.
+
+Do not install or wire: TanStack Query, socket.io-client, expo-sqlite, Drizzle, better-auth, expo-secure-store, expo-image, react-native-keyboard-controller, i18next, FlashList, LegendList.
+
+No fake JWT. No `fetch` to a missing API. No SecureStore.

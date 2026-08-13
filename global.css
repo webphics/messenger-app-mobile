@@ -1,0 +1,88 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+@theme {
+  --font-sans: 'Manrope';
+  --font-mono: 'JetBrains Mono';
+
+  --color-bg: #f5f6f9;
+  --color-surface: #ffffff;
+  --color-ink: #14161f;
+  --color-ink-soft: #3a3d4a;
+  --color-muted: #6b7280;
+  --color-line: #e4e6ec;
+  --color-primary: #3452d9;
+  --color-success: #1f9d6c;
+  --color-danger: #d64545;
+  --color-amber: #e2831c;
+
+  /* RNR/shadcn aliases → messenger hexes (do not rename tokens above) */
+  --color-background: #ffffff;
+  --color-foreground: #14161f;
+  --color-muted-foreground: #6b7280;
+  --color-destructive: #d64545;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #e4e6ec;
+  --color-secondary-foreground: #14161f;
+  --color-accent: #e4e6ec;
+  --color-accent-foreground: #14161f;
+  --color-border: #e4e6ec;
+  --color-input: #e4e6ec;
+  --color-ring: #3452d9;
+}
+
+@layer theme {
+  :root {
+    @variant light {
+      --color-bg: #f5f6f9;
+      --color-surface: #ffffff;
+      --color-ink: #14161f;
+      --color-ink-soft: #3a3d4a;
+      --color-muted: #6b7280;
+      --color-line: #e4e6ec;
+      --color-primary: #3452d9;
+      --color-success: #1f9d6c;
+      --color-danger: #d64545;
+      --color-amber: #e2831c;
+
+      --color-background: #ffffff;
+      --color-foreground: #14161f;
+      --color-muted-foreground: #6b7280;
+      --color-destructive: #d64545;
+      --color-primary-foreground: #ffffff;
+      --color-secondary: #e4e6ec;
+      --color-secondary-foreground: #14161f;
+      --color-accent: #e4e6ec;
+      --color-accent-foreground: #14161f;
+      --color-border: #e4e6ec;
+      --color-input: #e4e6ec;
+      --color-ring: #3452d9;
+    }
+
+    @variant dark {
+      --color-bg: #0f1117;
+      --color-surface: #1a1d27;
+      --color-ink: #f4f5f8;
+      --color-ink-soft: #c5c8d4;
+      --color-muted: #8b90a0;
+      --color-line: #2a2e3b;
+      --color-primary: #6b82f0;
+      --color-success: #3cbb88;
+      --color-danger: #e06b6b;
+      --color-amber: #f0a04a;
+
+      --color-background: #1a1d27;
+      --color-foreground: #f4f5f8;
+      --color-muted-foreground: #8b90a0;
+      --color-destructive: #e06b6b;
+      --color-primary-foreground: #ffffff;
+      --color-secondary: #2a2e3b;
+      --color-secondary-foreground: #f4f5f8;
+      --color-accent: #2a2e3b;
+      --color-accent-foreground: #f4f5f8;
+      --color-border: #2a2e3b;
+      --color-input: #2a2e3b;
+      --color-ring: #6b82f0;
+    }
+  }
+}

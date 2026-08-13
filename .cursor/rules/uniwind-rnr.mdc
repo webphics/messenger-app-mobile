@@ -1,0 +1,21 @@
+---
+description: Uniwind + RNR styling rules
+globs: "**/*.{ts,tsx,css}"
+alwaysApply: false
+---
+
+# Uniwind + RNR
+
+Use `className` + `cn()` from `@/lib/cn`. Tokens: `bg`, `surface`, `ink`, `ink-soft`, `muted`, `line`, `primary`, `success`, `danger`, `amber`.
+
+Forbidden: NativeWind, `cssInterop`, `remapProps`, `nativewind/babel`, wrapping RN core views with `withUniwind`.
+
+RNR copies: `components/ui/` only. Future app UI: `components/chat/`, `components/inbox/` — do not create empty dirs now.
+
+```tsx
+// BAD
+import { cssInterop } from 'nativewind'
+
+// GOOD
+<View className={cn('bg-bg', className)} />
+```

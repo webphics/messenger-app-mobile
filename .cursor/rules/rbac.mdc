@@ -1,0 +1,20 @@
+---
+description: RBAC visibility matrix for Admin, Agent, Contact
+alwaysApply: true
+---
+
+# RBAC
+
+Source of truth: `lib/rbac.ts`. Screens import those helpers; do not copy role checks.
+
+| Capability | Contact | Agent | Admin |
+|---|---|---|---|
+| View thread | participant only | assignee, participant, or unassigned | all |
+| Unassigned pool | no | yes | yes |
+| Internal notes | no | yes | yes |
+| Delete message / conversation | no | no | yes |
+| Assign / transfer | no | no (accept-from-pool is a later phase) | yes |
+| Broadcast | no | no | yes |
+| Manage users | no | no | yes |
+
+Unknown role throws.

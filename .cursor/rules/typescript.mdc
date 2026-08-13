@@ -1,0 +1,13 @@
+---
+description: TypeScript strict, domain types from lib/types.ts
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# TypeScript
+
+`strict` is on. No `any`. No `as unknown as` to silence errors.
+
+Domain models come from `@/lib/types`. Do not declare parallel `UserRole` / `Conversation` types in screens.
+
+RBAC returns booleans or throws on unknown role. Do not swallow that throw.
