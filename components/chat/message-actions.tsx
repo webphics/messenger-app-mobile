@@ -36,32 +36,24 @@ export function MessageActions({
         }}
       >
         <Animated.View
-          entering={ZoomIn.springify().damping(15).stiffness(260).mass(0.55)}
+          entering={ZoomIn.springify().damping(14).stiffness(340).mass(0.4)}
           className="flex-row rounded-full border border-line bg-surface px-1.5 py-1 shadow-md shadow-black/15"
         >
-          {REACT_EMOJIS.map((emoji, i) => (
-            <Animated.View
+          {REACT_EMOJIS.map((emoji) => (
+            <Pressable
               key={emoji}
-              entering={ZoomIn.springify()
-                .damping(12)
-                .stiffness(320)
-                .mass(0.4)
-                .delay(30 + i * 28)}
+              accessibilityRole="button"
+              accessibilityLabel={`React ${emoji}`}
+              onPress={() => onReact(emoji)}
+              className="size-9 items-center justify-center"
             >
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`React ${emoji}`}
-                onPress={() => onReact(emoji)}
-                className="size-9 items-center justify-center"
-              >
-                <Text className="font-sans text-xl leading-6">{emoji}</Text>
-              </Pressable>
-            </Animated.View>
+              <Text className="font-sans text-xl leading-6">{emoji}</Text>
+            </Pressable>
           ))}
         </Animated.View>
       </View>
       <Animated.View
-        entering={FadeIn.delay(90).springify().damping(18).stiffness(240)}
+        entering={FadeIn.duration(80)}
         style={{
           position: "absolute",
           top: "100%",

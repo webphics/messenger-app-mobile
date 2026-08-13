@@ -9,7 +9,6 @@ import Animated, {
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -39,11 +38,13 @@ type MessageBubbleProps = {
   selected?: boolean;
   enter?: boolean;
   onLongPress: () => void;
+  onDismiss?: () => void;
   onReply: () => void;
   onToggleReaction: (emoji: string) => void;
 };
 
 const SWIPE_REPLY = 56;
+const LONG_PRESS_MS = 130;
 
 function Receipt({
   status,
@@ -160,26 +161,18 @@ export function MessageBubble({
   selected,
   enter,
   onLongPress,
+  onDismiss,
   onReply,
   onToggleReaction,
 }: MessageBubbleProps) {
   const x = useSharedValue(0);
-  const pop = useSharedValue(1);
   const tint = useSharedValue(0);
 
   useEffect(() => {
-    tint.value = withTiming(selected ? 1 : 0, { duration: 140 });
-    if (selected) {
-      pop.value = withSequence(
-        withSpring(1.06, { damping: 11, stiffness: 420, mass: 0.35 }),
-        withSpring(1, { damping: 16, stiffness: 280, mass: 0.45 }),
-      );
-    } else {
-      pop.value = withSpring(1, { damping: 16, stiffness: 280 });
-    }
-  }, [selected, pop, tint]);
+    if (!selected) tint.value = withTiming(0, { duration: 60 });
+  }, [selected, tint]);
 
-  const gesture = Gesture.Pan()
+  const swipe = Gesture.Pan()
     .activeOffsetX(18)
     .failOffsetY([-18, 18])
     .onUpdate((e) => {
@@ -190,11 +183,18 @@ export function MessageBubble({
       x.value = withSpring(0, { damping: 18, stiffness: 260, mass: 0.55 });
     });
 
+  const openMenu = Gesture.LongPress()
+    .minDuration(LONG_PRESS_MS)
+    .maxDistance(16)
+    .onStart(() => {
+      tint.value = 1;
+      runOnJS(onLongPress)();
+    });
+
+  const gesture = Gesture.Exclusive(openMenu, swipe);
+
   const swipeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }],
-  }));
-  const popStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pop.value }],
   }));
   const tintStyle = useAnimatedStyle(() => ({
     opacity: tint.value,
@@ -221,9 +221,10 @@ export function MessageBubble({
   return (
     <Animated.View
       entering={enter ? FadeIn.springify().damping(20).stiffness(220) : undefined}
-      className={cn("mb-4", selected && "z-20")}
+      className={cn(selected && "z-20")}
     >
-      <View className="justify-center">
+    <Pressable onPressIn={onDismiss} className="pb-4">
+      <View className="justify-center" pointerEvents="box-none">
         <Animated.View style={iconStyle} className="absolute left-1 z-0">
           <View className="size-8 items-center justify-center rounded-full bg-primary-soft">
             <Reply color={colors.primary} size={16} />
@@ -261,17 +262,15 @@ export function MessageBubble({
                 accessibilityLabel={
                   outgoing ? "Outgoing message" : "Incoming message"
                 }
-                delayLongPress={250}
-                onLongPress={onLongPress}
+                onPressIn={onDismiss}
               >
-                <Animated.View
+                <View
                   className={cn(
                     "overflow-hidden px-3.5 py-2.5 shadow-sm shadow-black/10",
                     outgoing
                       ? "rounded-[22px] rounded-br-md bg-primary"
                       : "rounded-[22px] rounded-bl-md bg-bubble-in",
                   )}
-                  style={popStyle}
                 >
                   <Text
                     className={cn(
@@ -289,7 +288,7 @@ export function MessageBubble({
                     )}
                     style={tintStyle}
                   />
-                </Animated.View>
+                </View>
               </Pressable>
               <ReactionBadge
                 reactions={reactions}
@@ -309,6 +308,7 @@ export function MessageBubble({
           </Animated.View>
         </GestureDetector>
       </View>
+    </Pressable>
     </Animated.View>
   );
 }

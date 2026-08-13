@@ -1,5 +1,12 @@
-import { useMemo, useState } from "react";
-import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import {
+    BackHandler,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    View,
+} from "react-native";
 
 import { Composer } from "@/components/chat/composer";
 import {
@@ -83,6 +90,19 @@ export function ThreadScreen({
     ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
     : null;
 
+  useEffect(() => {
+    if (!menuForId) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setMenuForId(null);
+      return true;
+    });
+    return () => sub.remove();
+  }, [menuForId]);
+
+  function dismissMenu() {
+    setMenuForId(null);
+  }
+
   function react(messageId: string, emoji: string) {
     setMessages((prev) =>
       prev.map((m) =>
@@ -121,76 +141,109 @@ export function ThreadScreen({
     );
   }
 
+  const menuOpen = menuForId !== null;
+
   const list = (
     <>
-      <FlatList
-        inverted
-        className="flex-1"
-        contentInsetAdjustmentBehavior="never"
-        contentContainerClassName="px-4 py-2"
-        data={rows}
-        keyExtractor={(item) => item.id}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={false}
-        onScrollBeginDrag={() => setMenuForId(null)}
-        CellRendererComponent={({ item, children, style, ...rest }) => {
-          const row = item as Row;
-          const raised =
-            row.type === "message" && row.message.id === menuForId;
-          return (
-            <View
-              {...rest}
-              collapsable={false}
-              style={[
-                style,
-                { overflow: "visible" },
-                raised ? { zIndex: 100, elevation: 24 } : null,
-              ]}
-            >
-              {children}
-            </View>
-          );
-        }}
-        renderItem={({ item }) => {
-          if (item.type === "day") {
+      <View className="flex-1">
+        {menuOpen ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss reactions"
+            onPressIn={dismissMenu}
+            className="absolute inset-0"
+          />
+        ) : null}
+        <FlatList
+          inverted
+          className="flex-1"
+          pointerEvents={menuOpen ? "box-none" : "auto"}
+          scrollEnabled={!menuOpen}
+          contentInsetAdjustmentBehavior="never"
+          contentContainerClassName="px-4 py-2"
+          contentContainerStyle={
+            menuOpen ? { pointerEvents: "box-none" } : undefined
+          }
+          data={rows}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={false}
+          onScrollBeginDrag={dismissMenu}
+          CellRendererComponent={({ item, children, style, ...rest }) => {
+            const row = item as Row;
+            const raised =
+              row.type === "message" && row.message.id === menuForId;
             return (
-              <View className="my-2 items-center">
-                <Text className="font-sans text-xs font-medium text-muted">
-                  {item.label}
-                </Text>
+              <View
+                {...rest}
+                collapsable={false}
+                style={[
+                  style,
+                  { overflow: "visible" },
+                  raised ? { zIndex: 100, elevation: 24 } : null,
+                ]}
+              >
+                {children}
               </View>
             );
-          }
-          return (
-            <MessageBubble
-              body={item.message.body}
-              outgoing={item.message.senderId === DEV_USER_ID}
-              status={item.message.status}
-              senderName={item.senderName}
-              quoted={quotedOf(messages, item.message.replyToId)}
-              reactions={item.message.reactions}
-              currentUserId={me.id}
-              selected={menuForId === item.message.id}
-              enter={item.message.id.startsWith("local-")}
-              onLongPress={() =>
-                setMenuForId((id) =>
-                  id === item.message.id ? null : item.message.id,
-                )
-              }
-              onReply={() => startReply(item.message)}
-              onToggleReaction={(emoji) => react(item.message.id, emoji)}
-            />
-          );
-        }}
-      />
-      <Composer
-        value={draft}
-        onChangeText={setDraft}
-        onSend={send}
-        replyTo={replyQuote}
-        onCancelReply={() => setReplyTo(null)}
-      />
+          }}
+          renderItem={({ item }) => {
+            if (item.type === "day") {
+              return (
+                <Pressable
+                  onPressIn={menuOpen ? dismissMenu : undefined}
+                  className="my-2 items-center"
+                >
+                  <Text className="font-sans text-xs font-medium text-muted">
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            }
+            return (
+              <MessageBubble
+                body={item.message.body}
+                outgoing={item.message.senderId === DEV_USER_ID}
+                status={item.message.status}
+                senderName={item.senderName}
+                quoted={quotedOf(messages, item.message.replyToId)}
+                reactions={item.message.reactions}
+                currentUserId={me.id}
+                selected={menuForId === item.message.id}
+                enter={item.message.id.startsWith("local-")}
+                onLongPress={() =>
+                  setMenuForId((id) =>
+                    id === item.message.id ? null : item.message.id,
+                  )
+                }
+                onDismiss={menuOpen ? dismissMenu : undefined}
+                onReply={() => startReply(item.message)}
+                onToggleReaction={(emoji) => react(item.message.id, emoji)}
+              />
+            );
+          }}
+        />
+      </View>
+      {menuOpen ? (
+        <Pressable onPressIn={dismissMenu}>
+          <Composer
+            value={draft}
+            onChangeText={setDraft}
+            onSend={send}
+            replyTo={replyQuote}
+            onCancelReply={() => setReplyTo(null)}
+          />
+        </Pressable>
+      ) : (
+        <Composer
+          value={draft}
+          onChangeText={setDraft}
+          onSend={send}
+          replyTo={replyQuote}
+          onCancelReply={() => setReplyTo(null)}
+        />
+      )}
     </>
   );
 
@@ -203,7 +256,11 @@ export function ThreadScreen({
   if (Platform.OS === "android") {
     return (
       <View className="flex-1 bg-bg">
-        {header}
+        {menuOpen ? (
+          <Pressable onPressIn={dismissMenu}>{header}</Pressable>
+        ) : (
+          header
+        )}
         {list}
       </View>
     );
@@ -211,7 +268,11 @@ export function ThreadScreen({
 
   return (
     <View className="flex-1 bg-bg">
-      {header}
+      {menuOpen ? (
+        <Pressable onPressIn={dismissMenu}>{header}</Pressable>
+      ) : (
+        header
+      )}
       <KeyboardAvoidingView
         className="flex-1"
         behavior="padding"
