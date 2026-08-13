@@ -1,8 +1,17 @@
-import { Pressable, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import { router } from "expo-router";
+import { Check, ChevronDown, ChevronUp, Copy, Mail, MessageCircle } from "lucide-react-native";
+import { useState } from "react";
+import { View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { initials } from "@/lib/display";
+import { hapticSuccess } from "@/lib/haptics";
+import { CONVERSATIONS } from "@/lib/mock-data";
+import { colors } from "@/lib/tokens";
 import { mockEmail } from "@/lib/user-filter";
 import type { Person } from "@/lib/types";
 
@@ -19,19 +28,40 @@ type UserRowProps = {
 };
 
 export function UserRow({ person, open, onPress }: UserRowProps) {
+  const [copied, setCopied] = useState(false);
+  const email = mockEmail(person.displayName);
+
+  async function handleCopyEmail() {
+    await Clipboard.setStringAsync(email);
+    hapticSuccess();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  function handleMessage() {
+    const thread = CONVERSATIONS.find((c) =>
+      c.participantIds.includes(person.id),
+    );
+    if (thread) {
+      router.push(`/chat/${thread.id}`);
+    } else {
+      router.push("/(admin)/conversations");
+    }
+  }
+
   return (
-    <Pressable
+    <TactilePressable
       accessibilityRole="button"
       accessibilityLabel={person.displayName}
       accessibilityState={{ expanded: open }}
       onPress={onPress}
-      className="rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
+      className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
     >
-      <View className="flex-row items-center gap-3">
+      <View className="flex-row items-center gap-3.5">
         <View className="relative">
-          <Avatar alt={person.displayName} className="size-12">
+          <Avatar alt={person.displayName} className="size-13">
             <AvatarFallback className="bg-primary-soft">
-              <Text className="font-sans text-sm font-semibold text-primary">
+              <Text className="font-sans text-base font-bold text-primary">
                 {initials(person.displayName)}
               </Text>
             </AvatarFallback>
@@ -39,26 +69,93 @@ export function UserRow({ person, open, onPress }: UserRowProps) {
           {person.isOnline ? (
             <View
               accessibilityLabel="Online"
-              className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-surface bg-success"
+              className="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-surface bg-success"
             />
           ) : null}
         </View>
+
         <View className="min-w-0 flex-1">
-          <Text className="font-sans text-base font-medium text-ink" numberOfLines={1}>
-            {person.displayName}
-          </Text>
-          <Text className="mt-0.5 font-sans text-sm font-normal text-muted" numberOfLines={1}>
-            {ROLE_LABEL[person.role]} · {person.lastActiveLabel}
+          <View className="flex-row items-center gap-2">
+            <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+              {person.displayName}
+            </Text>
+            <View
+              className={`rounded-md px-2 py-0.5 ${
+                person.role === "admin"
+                  ? "bg-primary-soft text-primary"
+                  : person.role === "agent"
+                    ? "bg-amber/15 text-amber"
+                    : "bg-line/70 text-muted"
+              }`}
+            >
+              <Text
+                className={`font-sans text-[11px] font-bold ${
+                  person.role === "admin"
+                    ? "text-primary"
+                    : person.role === "agent"
+                      ? "text-amber"
+                      : "text-ink-soft"
+                }`}
+              >
+                {ROLE_LABEL[person.role]}
+              </Text>
+            </View>
+          </View>
+          <Text className="mt-0.5 font-sans text-xs font-normal text-muted" numberOfLines={1}>
+            {person.isOnline ? "Active now" : `Last seen ${person.lastActiveLabel}`}
           </Text>
         </View>
+
+        {open ? (
+          <ChevronUp color={colors.primary} size={20} />
+        ) : (
+          <ChevronDown color={colors.muted} size={20} />
+        )}
       </View>
+
       {open ? (
-        <View className="mt-3 border-t border-line pt-3">
-          <Text className="font-sans text-sm font-normal text-ink-soft" selectable>
-            {mockEmail(person.displayName)}
-          </Text>
-        </View>
+        <Animated.View
+          entering={FadeIn.springify().damping(20).stiffness(220)}
+          className="mt-3.5 border-t border-line/60 pt-3.5"
+        >
+          <View className="flex-row items-center gap-2">
+            <Mail color={colors.muted} size={15} />
+            <Text className="flex-1 font-sans text-sm font-normal text-ink-soft" selectable>
+              {email}
+            </Text>
+          </View>
+
+          <View className="mt-3 flex-row gap-2">
+            <TactilePressable
+              accessibilityRole="button"
+              accessibilityLabel="Copy email"
+              onPress={handleCopyEmail}
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-line bg-bg py-2.5"
+            >
+              {copied ? (
+                <Check color={colors.success} size={16} />
+              ) : (
+                <Copy color={colors.ink} size={16} />
+              )}
+              <Text className="font-sans text-xs font-semibold text-ink">
+                {copied ? "Copied" : "Copy Email"}
+              </Text>
+            </TactilePressable>
+
+            <TactilePressable
+              accessibilityRole="button"
+              accessibilityLabel="Direct message"
+              onPress={handleMessage}
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5"
+            >
+              <MessageCircle color={colors.primaryForeground} size={16} />
+              <Text className="font-sans text-xs font-semibold text-primary-foreground">
+                Message
+              </Text>
+            </TactilePressable>
+          </View>
+        </Animated.View>
       ) : null}
-    </Pressable>
+    </TactilePressable>
   );
 }

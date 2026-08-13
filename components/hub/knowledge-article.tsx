@@ -1,8 +1,11 @@
 import * as Clipboard from "expo-clipboard";
+import { Check, Copy } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 
+import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { hapticSuccess } from "@/lib/haptics";
 import type { KnowledgeArticle } from "@/lib/types";
 
 type KnowledgeArticleViewProps = {
@@ -14,8 +17,9 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
 
   async function onCopy() {
     await Clipboard.setStringAsync(article.body);
+    hapticSuccess();
     setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+    setTimeout(() => setCopied(false), 1800);
   }
 
   return (
@@ -24,30 +28,45 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
       showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
     >
-      <View className="rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10">
-        <Text className="font-sans text-xl font-bold text-ink">{article.title}</Text>
+      <View className="rounded-3xl border border-line bg-surface p-5 shadow-md shadow-black/5">
+        <Text className="font-sans text-2xl font-bold leading-tight text-ink">
+          {article.title}
+        </Text>
         {article.tags.length > 0 ? (
-          <Text className="mt-1 font-sans text-sm font-normal text-muted">
-            {article.tags.join(" · ")}
-          </Text>
+          <View className="mt-2.5 flex-row flex-wrap gap-1.5">
+            {article.tags.map((tag) => (
+              <View
+                key={tag}
+                className="rounded-lg bg-primary-soft/80 px-2.5 py-1"
+              >
+                <Text className="font-sans text-xs font-semibold text-primary">
+                  #{tag}
+                </Text>
+              </View>
+            ))}
+          </View>
         ) : null}
+
+        <View className="my-4 h-px bg-line/60" />
+
         <Text
           selectable
-          className="mt-4 font-sans text-base font-normal leading-6 text-ink-soft"
+          className="font-sans text-base font-normal leading-7 text-ink-soft"
         >
           {article.body}
         </Text>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Copy"
-        onPress={() => void onCopy()}
-        className="mt-4 min-h-12 items-center justify-center rounded-2xl bg-primary px-4"
-      >
-        <Text className="font-sans font-semibold text-primary-foreground">
-          {copied ? "Copied" : "Copy"}
-        </Text>
-      </Pressable>
+
+      <View className="mt-4">
+        <Button
+          onPress={() => void onCopy()}
+          variant={copied ? "secondary" : "default"}
+          className="min-h-12"
+        >
+          {copied ? <Check size={18} /> : <Copy size={18} />}
+          <Text>{copied ? "Copied to clipboard" : "Copy article text"}</Text>
+        </Button>
+      </View>
     </ScrollView>
   );
 }

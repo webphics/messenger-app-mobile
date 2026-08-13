@@ -1,15 +1,19 @@
-import { InboxScreen } from '@/components/inbox/inbox-screen'
-import { getDevUserId } from '@/lib/dev-user'
-import { listInboxConversations } from '@/lib/inbox-filter'
-import { CONVERSATIONS } from '@/lib/mock-data'
-import { getSession } from '@/lib/session'
+import { useMemo } from "react";
+
+import { InboxScreen } from "@/components/inbox/inbox-screen";
+import { getDevUserId } from "@/lib/dev-user";
+import { listInboxConversations } from "@/lib/inbox-filter";
+import { CONVERSATIONS } from "@/lib/mock-data";
+import { getSession } from "@/lib/session";
 
 export default function ContactMessagesScreen() {
-  const conversations = listInboxConversations(
-    getSession().role,
-    getDevUserId(),
-    CONVERSATIONS,
-  )
+  const role = getSession().role;
+  const selfId = getDevUserId();
+
+  const conversations = useMemo(
+    () => listInboxConversations(role, selfId, CONVERSATIONS),
+    [role, selfId],
+  );
 
   return (
     <InboxScreen
@@ -18,5 +22,5 @@ export default function ContactMessagesScreen() {
       showCompose
       title="Messages"
     />
-  )
+  );
 }

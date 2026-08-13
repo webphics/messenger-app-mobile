@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BackHandler,
   Dimensions,
+  FlatList,
   KeyboardAvoidingView,
   Platform,
   View,
 } from "react-native";
-import { FlatList } from "react-native-gesture-handler";
 
 import { Composer } from "@/components/chat/composer";
 import { MessageActions } from "@/components/chat/message-actions";
@@ -84,6 +84,7 @@ export function ThreadScreen({
   const [menu, setMenu] = useState<ReactionAnchor | null>(null);
   const isGroup = conversation.kind === "group" || conversation.id === "offers";
   const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup]);
+
   const quotedById = useMemo(() => {
     const byId = new Map(messages.map((m) => [m.id, m]));
     const out = new Map<string, QuotedMessage>();
@@ -99,6 +100,7 @@ export function ThreadScreen({
     }
     return out;
   }, [messages]);
+
   const replyQuote = replyTo
     ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
     : null;
@@ -207,23 +209,17 @@ export function ThreadScreen({
         className="flex-1"
         scrollEnabled={!menuOpen}
         extraData={menuId}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
         contentInsetAdjustmentBehavior="never"
         contentContainerClassName="px-4 py-2"
         data={rows}
         keyExtractor={keyExtractor}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews={false}
+        removeClippedSubviews={Platform.OS === "android"}
         renderItem={renderItem}
-        CellRendererComponent={({ children, style, ...rest }) => (
-          <View
-            {...rest}
-            collapsable={false}
-            style={[style, { overflow: "visible" }]}
-          >
-            {children}
-          </View>
-        )}
       />
       <Composer
         value={draft}

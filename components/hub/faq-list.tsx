@@ -1,9 +1,10 @@
 import { useFocusEffect } from "expo-router";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useCallback, useState } from "react";
-import { FlatList, Pressable, View } from "react-native";
+import { FlatList, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { listFaqs } from "@/lib/mock-catalog";
 import { colors } from "@/lib/tokens";
@@ -37,18 +38,18 @@ export function FaqList() {
       renderItem={({ item }) => {
         const open = item.id === openId;
         return (
-          <Pressable
+          <TactilePressable
             accessibilityRole="button"
             accessibilityState={{ expanded: open }}
             onPress={() => setOpenId(open ? null : item.id)}
-            className="rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
+            className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
           >
             <View className="flex-row items-start justify-between gap-3">
-              <Text className="flex-1 font-sans text-base font-medium text-ink">
+              <Text className="flex-1 font-sans text-base font-semibold text-ink">
                 {item.question}
               </Text>
               {open ? (
-                <ChevronUp color={colors.muted} size={20} />
+                <ChevronUp color={colors.primary} size={20} />
               ) : (
                 <ChevronDown color={colors.muted} size={20} />
               )}
@@ -57,12 +58,12 @@ export function FaqList() {
               <Animated.View
                 entering={FadeIn.springify().damping(20).stiffness(220)}
               >
-                <Text className="mt-2 font-sans text-sm font-normal leading-5 text-ink-soft">
+                <Text className="mt-2.5 border-t border-line/60 pt-2.5 font-sans text-sm font-normal leading-6 text-ink-soft">
                   {item.answer}
                 </Text>
               </Animated.View>
             ) : null}
-          </Pressable>
+          </TactilePressable>
         );
       }}
     />

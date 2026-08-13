@@ -61,8 +61,7 @@ export default function RootLayout() {
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: "ios_from_right",
-          animationDuration: 320,
+          animation: "default",
           gestureEnabled: true,
         }}
       >

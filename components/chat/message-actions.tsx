@@ -8,7 +8,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { hapticMedium, hapticSelection } from "@/lib/haptics";
 import { REACT_EMOJIS } from "@/lib/message-react";
 import {
   replyStyle,
@@ -70,20 +72,25 @@ export function MessageActions({
           },
           trayAnim,
         ]}
-        className="flex-row rounded-full border border-line bg-surface px-1.5 py-1 shadow-md shadow-black/15"
+        className="flex-row rounded-full border border-line bg-surface px-2 py-1 shadow-lg shadow-black/20"
       >
         {REACT_EMOJIS.map((emoji) => (
-          <Pressable
+          <TactilePressable
             key={emoji}
+            haptic="medium"
             accessibilityRole="button"
             accessibilityLabel={`React ${emoji}`}
-            onPress={() => onReact(emoji)}
-            className="size-9 items-center justify-center"
+            onPress={() => {
+              hapticMedium();
+              onReact(emoji);
+            }}
+            className="size-10 items-center justify-center rounded-full"
           >
-            <Text className="font-sans text-xl leading-6">{emoji}</Text>
-          </Pressable>
+            <Text className="font-sans text-2xl leading-7">{emoji}</Text>
+          </TactilePressable>
         ))}
       </Animated.View>
+
       <Animated.View
         pointerEvents="auto"
         style={[
@@ -96,17 +103,21 @@ export function MessageActions({
           replyAnim,
         ]}
       >
-        <Pressable
+        <TactilePressable
+          haptic="selection"
           accessibilityRole="button"
           accessibilityLabel="Reply"
-          onPress={onReply}
-          className="mt-2 min-h-10 flex-row items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 shadow-md shadow-black/15"
+          onPress={() => {
+            hapticSelection();
+            onReply();
+          }}
+          className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line bg-surface px-5 py-2 shadow-lg shadow-black/20"
         >
           <Reply color={colors.primary} size={18} />
-          <Text className="font-sans text-sm font-medium text-primary">
+          <Text className="font-sans text-sm font-semibold text-primary">
             Reply
           </Text>
-        </Pressable>
+        </TactilePressable>
       </Animated.View>
     </View>
   );

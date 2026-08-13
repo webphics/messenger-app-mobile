@@ -1,9 +1,10 @@
 import { router, useFocusEffect } from "expo-router";
-import { MessageCircle } from "lucide-react-native";
+import { MessageCircle, Sparkles } from "lucide-react-native";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
+import { ScrollView, useWindowDimensions, View } from "react-native";
 
 import { OfferCard } from "@/components/hub/offer-card";
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { cn } from "@/lib/cn";
@@ -32,21 +33,25 @@ export function OffersCarousel() {
     <View className="mt-6">
       <View className="flex-row items-center justify-between px-4">
         <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          <Text className="font-sans text-base font-semibold text-ink">
-            Offers you may like
+          <Text className="font-sans text-base font-bold text-ink">
+            Featured Offers
           </Text>
-          <Text className="font-sans text-xs font-normal text-muted">Sponsored</Text>
+          <View className="rounded-md bg-line/80 px-2 py-0.5">
+            <Text className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted">
+              Sponsored
+            </Text>
+          </View>
         </View>
-        <Pressable
+        <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="See all offers"
           onPress={openOffers}
-          className="min-h-11 justify-center pl-2"
+          className="min-h-9 justify-center pl-2"
         >
-          <Text className="font-sans text-sm font-medium text-primary">
+          <Text className="font-sans text-sm font-semibold text-primary">
             See all
           </Text>
-        </Pressable>
+        </TactilePressable>
       </View>
 
       <ScrollView
@@ -83,24 +88,27 @@ export function OffersCarousel() {
           <View
             key={offer.id}
             className={cn(
-              "size-2 rounded-full",
-              i === index ? "bg-primary" : "bg-line",
+              "h-1.5 rounded-full transition-all",
+              i === index ? "w-6 bg-primary" : "w-1.5 bg-line",
             )}
           />
         ))}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Join Offers chat"
-        onPress={openOffers}
-        className="mx-4 mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-full bg-primary px-4 shadow-md shadow-black/15"
-      >
-        <MessageCircle color={colors.primaryForeground} size={18} />
-        <Text className="font-sans font-semibold text-primary-foreground">
-          Join Offers chat
-        </Text>
-      </Pressable>
+      <View className="px-4">
+        <TactilePressable
+          haptic="medium"
+          accessibilityRole="button"
+          accessibilityLabel="Join Offers chat"
+          onPress={openOffers}
+          className="mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary px-4 shadow-md shadow-black/10"
+        >
+          <MessageCircle color={colors.primaryForeground} size={18} />
+          <Text className="font-sans font-semibold text-primary-foreground">
+            Join Offers Group Chat
+          </Text>
+        </TactilePressable>
+      </View>
     </View>
   );
 }

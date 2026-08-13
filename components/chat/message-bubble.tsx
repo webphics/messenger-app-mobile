@@ -14,8 +14,10 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
+import { hapticLight, hapticMedium } from "@/lib/haptics";
 import { replyCaption } from "@/lib/message-react";
 import { messageStatusLabel } from "@/lib/message-status";
 import {
@@ -95,7 +97,7 @@ function QuoteChrome({
           })}
         </Text>
       </View>
-      <View className="max-w-[92%] rounded-[18px] border border-line bg-bubble-in px-3 py-1.5 opacity-80">
+      <View className="max-w-[92%] rounded-[18px] border border-line bg-bubble-in px-3 py-1.5 opacity-85 shadow-sm shadow-black/5">
         <Text
           className="font-sans text-xs font-normal leading-4 text-muted"
           numberOfLines={2}
@@ -123,13 +125,14 @@ function ReactionBadge({
   return (
     <View
       className={cn(
-        "absolute -bottom-3 z-10 flex-row items-center rounded-full border border-line bg-surface px-1.5 py-0.5 shadow-sm shadow-black/10",
+        "absolute -bottom-3.5 z-10 flex-row items-center rounded-full border border-line bg-surface px-2 py-0.5 shadow-md shadow-black/10",
         outgoing ? "right-2" : "left-2",
       )}
     >
       {reactions.map((reaction) => (
-        <Pressable
+        <TactilePressable
           key={reaction.emoji}
+          haptic="selection"
           accessibilityRole="button"
           accessibilityLabel={`React ${reaction.emoji}`}
           onPress={() => onToggleReaction(reaction.emoji)}
@@ -138,12 +141,12 @@ function ReactionBadge({
           <Text className="font-sans text-[13px] leading-4">
             {reaction.emoji}
           </Text>
-        </Pressable>
+        </TactilePressable>
       ))}
       {total > 1 ? (
         <Text
           className={cn(
-            "ml-0.5 font-sans text-[11px]",
+            "ml-1 font-sans text-[11px] font-bold",
             reactions.some((r) => r.userIds.includes(currentUserId))
               ? "text-primary"
               : "text-muted",
@@ -173,18 +176,27 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const bubbleRef = useRef<View>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
+  const isFirstMount = useRef(true);
   const x = useSharedValue(0);
   const tint = useSharedValue(0);
+  const swipedHaptic = useSharedValue(false);
 
   useEffect(() => {
-    if (!selected) tint.value = withTiming(0, { duration: 60 });
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+    if (!selected && tint.value !== 0) {
+      tint.value = withTiming(0, { duration: 60 });
+    }
   }, [selected, tint]);
 
   useEffect(() => {
     return () => {
       cancelAnimation(tint);
+      cancelAnimation(x);
     };
-  }, [tint]);
+  }, [tint, x]);
 
   const reportOpen = useCallback(
     (absX: number, absY: number) => {
@@ -229,6 +241,7 @@ export const MessageBubble = memo(function MessageBubble({
           })
           .onStart((e) => {
             tint.value = 1;
+            runOnJS(hapticMedium)();
             runOnJS(reportOpen)(e.absoluteX, e.absoluteY);
           })
           .onFinalize((_, ok) => {
@@ -239,13 +252,20 @@ export const MessageBubble = memo(function MessageBubble({
           .failOffsetY([-18, 18])
           .onUpdate((e) => {
             x.value = Math.max(0, Math.min(e.translationX, 80));
+            if (x.value >= SWIPE_REPLY && !swipedHaptic.value) {
+              swipedHaptic.value = true;
+              runOnJS(hapticLight)();
+            } else if (x.value < SWIPE_REPLY) {
+              swipedHaptic.value = false;
+            }
           })
           .onEnd(() => {
             if (x.value >= SWIPE_REPLY) runOnJS(onReply)();
             x.value = withSpring(0, { damping: 18, stiffness: 260, mass: 0.55 });
+            swipedHaptic.value = false;
           }),
       ),
-    [onReply, reportOpen, tint, x],
+    [onReply, reportOpen, swipedHaptic, tint, x],
   );
 
   const swipeStyle = useAnimatedStyle(() => ({
@@ -276,7 +296,7 @@ export const MessageBubble = memo(function MessageBubble({
   return (
     <Animated.View
       entering={enter ? FadeIn.springify().damping(20).stiffness(220) : undefined}
-      className="pb-4"
+      className="pb-3.5"
     >
       <View className="justify-center" pointerEvents="box-none">
         <Animated.View style={iconStyle} className="absolute left-1 z-0">
@@ -325,7 +345,7 @@ export const MessageBubble = memo(function MessageBubble({
                   };
                 }}
                 className={cn(
-                  "overflow-hidden px-3.5 py-2.5 shadow-sm shadow-black/10",
+                  "overflow-hidden px-4 py-2.5 shadow-sm shadow-black/10",
                   outgoing
                     ? "rounded-[22px] rounded-br-md bg-primary"
                     : "rounded-[22px] rounded-bl-md border border-line bg-bubble-in",

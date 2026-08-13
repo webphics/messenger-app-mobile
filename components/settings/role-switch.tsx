@@ -1,29 +1,56 @@
 import { router } from "expo-router";
-import { Pressable, View } from "react-native";
+import { Check, Headphones, ShieldCheck, User } from "lucide-react-native";
+import { View } from "react-native";
 
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { getSession, setSessionRole } from "@/lib/session";
+import { colors } from "@/lib/tokens";
 import type { UserRole } from "@/lib/types";
 
-const ROLES: { id: UserRole; label: string }[] = [
-  { id: "contact", label: "Contact" },
-  { id: "agent", label: "Agent" },
-  { id: "admin", label: "Admin" },
+const ROLES: {
+  id: UserRole;
+  label: string;
+  desc: string;
+  icon: typeof User;
+}[] = [
+  {
+    id: "contact",
+    label: "Contact",
+    desc: "Customer view — access personal messages & help center",
+    icon: User,
+  },
+  {
+    id: "agent",
+    label: "Agent",
+    desc: "Support view — manage your assigned queue & unassigned pool",
+    icon: Headphones,
+  },
+  {
+    id: "admin",
+    label: "Admin",
+    desc: "Executive view — global oversight, user management & charts",
+    icon: ShieldCheck,
+  },
 ];
 
 export function RoleSwitch() {
   const selected = getSession().role;
 
   return (
-    <View className="mt-4 gap-2">
-      <Text className="font-sans text-sm font-semibold text-ink">Role</Text>
+    <View className="mt-2 gap-2.5">
+      <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+        Select Active Role (Mock Switcher)
+      </Text>
       {ROLES.map((item) => {
         const active = item.id === selected;
+        const Icon = item.icon;
         return (
-          <Pressable
+          <TactilePressable
             key={item.id}
+            haptic="selection"
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             accessibilityLabel={item.label}
@@ -33,21 +60,46 @@ export function RoleSwitch() {
               });
             }}
             className={cn(
-              "min-h-11 justify-center rounded-xl border px-4",
+              "flex-row items-center gap-3.5 rounded-2xl border p-3.5",
               active
-                ? "border-transparent bg-primary-soft"
+                ? "border-primary bg-primary-soft/50 shadow-sm shadow-black/5"
                 : "border-line bg-bg",
             )}
           >
-            <Text
-              className={cn(
-                "font-sans text-base font-medium",
-                active ? "text-primary" : "text-ink",
-              )}
+            <View
+              className={`size-10 items-center justify-center rounded-xl ${
+                active ? "bg-primary" : "bg-surface border border-line"
+              }`}
             >
-              {item.label}
-            </Text>
-          </Pressable>
+              <Icon
+                color={active ? colors.primaryForeground : colors.inkSoft}
+                size={20}
+              />
+            </View>
+
+            <View className="min-w-0 flex-1">
+              <Text
+                className={cn(
+                  "font-sans text-base font-bold",
+                  active ? "text-primary" : "text-ink",
+                )}
+              >
+                {item.label}
+              </Text>
+              <Text
+                className="mt-0.5 font-sans text-xs font-normal text-muted"
+                numberOfLines={2}
+              >
+                {item.desc}
+              </Text>
+            </View>
+
+            {active ? (
+              <View className="size-6 items-center justify-center rounded-full bg-primary">
+                <Check color={colors.primaryForeground} size={14} />
+              </View>
+            ) : null}
+          </TactilePressable>
         );
       })}
     </View>

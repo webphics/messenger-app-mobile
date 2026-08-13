@@ -1,9 +1,10 @@
 import { router } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import type { ReactNode } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { colors, screenTopPad } from "@/lib/tokens";
 
 type InScreenHeaderProps = {
@@ -15,18 +16,18 @@ export function InScreenHeader({ children }: InScreenHeaderProps) {
 
   return (
     <View
-      className="bg-surface"
+      className="border-b border-line/40 bg-surface"
       style={{ paddingTop: screenTopPad(insets.top) }}
     >
       <View className="h-12 flex-row items-center px-1">
-        <Pressable
+        <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Back"
           onPress={() => router.back()}
-          className="size-11 items-center justify-center"
+          className="size-11 items-center justify-center rounded-full"
         >
-          <ChevronLeft color={colors.ink} size={26} />
-        </Pressable>
+          <ChevronLeft color={colors.ink} size={24} />
+        </TactilePressable>
         {children}
       </View>
     </View>
