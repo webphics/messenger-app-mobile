@@ -1,15 +1,19 @@
 import { cn } from '@/lib/cn';
+import * as React from 'react';
 import { Platform, TextInput } from 'react-native';
 
-type InputProps = React.ComponentProps<typeof TextInput> &
-  React.RefAttributes<TextInput> & {
-    /** RNR registry leftover (NativeWind). Not a Uniwind TextInput prop — stripped. */
-    placeholderClassName?: string;
-  };
+type InputProps = React.ComponentProps<typeof TextInput> & {
+  /** RNR registry leftover (NativeWind). Not a Uniwind TextInput prop — stripped. */
+  placeholderClassName?: string;
+};
 
-function Input({ className, placeholderClassName, ...props }: InputProps) {
+const Input = React.forwardRef(function Input(
+  { className, placeholderClassName, ...props }: InputProps,
+  ref: React.Ref<TextInput>,
+) {
   return (
     <TextInput
+      ref={ref}
       className={cn(
         'dark:bg-input/30 border-input bg-background text-foreground flex h-10 w-full min-w-0 flex-row items-center rounded-md border px-3 py-1 text-base leading-5 shadow-sm shadow-black/5 sm:h-9',
         props.editable === false &&
@@ -30,6 +34,6 @@ function Input({ className, placeholderClassName, ...props }: InputProps) {
       {...props}
     />
   );
-}
+});
 
 export { Input };

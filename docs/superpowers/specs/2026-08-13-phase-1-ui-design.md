@@ -63,7 +63,7 @@ Still `DEV_ROLE` session. Still `lib/mock-data.ts` + `lib/rbac.ts`.
 | Messages card                                         | `/(contact)/messages` (stack, back) |
 | Recent message                                        | `/chat/[id]` of that thread         |
 | Help / FAQ card                                       | `/(contact)/help` (stack, back)     |
-| Search for help                                       | `/(contact)/search` (autofocus input in header, filter FAQ mock) |
+| Search for help                                       | `/(contact)/search` (in-screen back + autofocus “Search for help”, filter FAQ mock) |
 | Offer **View offer** / See all / **Join Offers chat** | `/chat/offers`                      |
 | Header gear                                           | `/(contact)/settings` (stack, back) |
 
