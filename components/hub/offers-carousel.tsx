@@ -1,13 +1,17 @@
 import { router, useFocusEffect } from "expo-router";
 import { ChevronRight, MessageCircle } from "lucide-react-native";
 import { useCallback, useState } from "react";
-import { ScrollView, useWindowDimensions, View } from "react-native";
+import { useWindowDimensions, View } from "react-native";
+import Animated, {
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from "react-native-reanimated";
 
+import { CarouselPagination } from "@/components/hub/carousel-pagination";
 import { OfferCard } from "@/components/hub/offer-card";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
-import { cn } from "@/lib/cn";
 import { listOffers } from "@/lib/mock-catalog";
 import { offerCardMetrics } from "@/lib/offer-metrics";
 import { colors } from "@/lib/tokens";
@@ -15,9 +19,15 @@ import type { Offer } from "@/lib/types";
 
 export function OffersCarousel() {
   const { width } = useWindowDimensions();
-  const [index, setIndex] = useState(0);
   const [offers, setOffers] = useState<Offer[]>(listOffers);
   const { cardWidth, snap, gap, edgePad } = offerCardMetrics(width);
+  const scrollX = useSharedValue(0);
+
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -55,11 +65,13 @@ export function OffersCarousel() {
         </TactilePressable>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         horizontal
         pagingEnabled={false}
         snapToInterval={snap}
         decelerationRate="fast"
+        scrollEventThrottle={16}
+        onScroll={onScroll}
         showsHorizontalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
@@ -67,10 +79,6 @@ export function OffersCarousel() {
           paddingStart: edgePad,
           paddingEnd: edgePad,
           gap,
-        }}
-        onMomentumScrollEnd={(e) => {
-          const next = Math.round(e.nativeEvent.contentOffset.x / snap);
-          setIndex(Math.min(Math.max(next, 0), offers.length - 1));
         }}
       >
         {offers.map((offer, i) => (
@@ -82,19 +90,13 @@ export function OffersCarousel() {
             onPress={openOffers}
           />
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
 
-      <View className="mt-3 flex-row justify-center gap-1.5">
-        {offers.map((offer, i) => (
-          <View
-            key={offer.id}
-            className={cn(
-              "h-1.5 rounded-full transition-all",
-              i === index ? "w-6 bg-primary" : "w-1.5 bg-line",
-            )}
-          />
-        ))}
-      </View>
+      <CarouselPagination
+        count={offers.length}
+        scrollX={scrollX}
+        snap={snap}
+      />
 
       <View className="px-4">
         <TactilePressable
