@@ -7,7 +7,7 @@ describe("offerCardMetrics", () => {
 
   test("left edge pad 16, card ~78% width, snap includes gap", () => {
     const m = offerCardMetrics(400);
-    expect(m.edgePad).toBe(16);
+    expect(m.edgePad).toBe(16); // start + end inset
     expect(m.cardWidth).toBe(312);
     expect(m.gap).toBe(12);
     expect(m.snap).toBe(324);

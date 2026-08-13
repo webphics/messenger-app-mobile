@@ -103,7 +103,7 @@ Keep Phase 0 tokens. Do not switch to nsave maroon or Messenger black.
 | `primary` `#3452D9`          | actions, outgoing bubbles, active tab, unread pill, Join Offers chat |
 | `success`                    | online dot                                                           |
 
-Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: gradient (local `visual` key), white CTA, carousel `edgePad` 16 on the left. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill = white (`#FFFFFF`) light / gray (`#2A2E3B`) dark; outgoing = `primary`; radius ~18–20. Type weight: titles `font-bold`, sections `font-semibold`, cards/rows `font-medium`, body `font-normal` (Manrope faces via `global.css` utilities). Hub title **SUPPORT** uppercase.
+Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: gradient (local `visual` key), white CTA, carousel `edgePad` 16 on start and end. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill = white (`#FFFFFF`) light / gray (`#2A2E3B`) dark; outgoing = `primary`; radius ~18–20. Type weight: titles `font-bold`, sections `font-semibold`, cards/rows `font-medium`, body `font-normal` (Manrope faces via `global.css` utilities). Hub title **SUPPORT** uppercase.
 
 Compose icon on inbox: visible, **dead** (no new-thread flow).
 

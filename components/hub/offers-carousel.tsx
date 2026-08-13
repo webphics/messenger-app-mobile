@@ -51,7 +51,7 @@ export function OffersCarousel() {
         contentContainerStyle={{
           marginTop: 12,
           paddingStart: edgePad,
-          paddingEnd: 0,
+          paddingEnd: edgePad,
           gap,
         }}
         onMomentumScrollEnd={(e) => {
