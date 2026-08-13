@@ -113,7 +113,7 @@ Compose icon on inbox: visible, **dead** (no new-thread flow).
 
 ScrollView, pixel target = locked hub mock.
 
-1. Header: **SUPPORT** (uppercase), overlapping avatars (assigned agents from mock, fallback initials), gear → settings. Hub `paddingTop` = safe inset + 12.
+1. Header: **SUPPORT** (uppercase), overlapping avatars (assigned agents from mock, fallback initials), gear → settings. Headerless top = `screenTopPad(insets.top)` (`insets.top + 12`) — hub, search, and chat share this. Help / FAQ / Messages keep native `stackChrome`.
 2. `Hi {firstName}` + **How can we help?**
 3. Nav card: Messages → `/(contact)/messages`; Help → `/(contact)/help`
 4. Recent message: latest own non-Offers thread; tap → `/chat/[id]`
@@ -194,7 +194,7 @@ Agent Unassigned tab: same row component, `assigneeId === null`, ignore Open/Res
 
 Simple Messenger-like pills on **light** chrome. Rejected: old generated thread mock, dark Messenger theme, red outgoing, GIF/mic/camera/thumbs-up, in-bubble identity block on every 1:1 message, mono `conv-assigned` in header.
 
-**Header:** back, avatar, **name** (direct: other person; group/Offers: subject), grey subtitle (`Person.lastActiveLabel` e.g. `Active now` / `Active 12h ago` for 1:1; `{n} participants` for groups). Optional tiny status pill (Assigned / Unassigned / Resolved) — not a stepper.
+**Header:** in-screen back (`InScreenHeader` + `screenTopPad`, same top as hub/search), avatar, **name** (direct: other person; group/Offers: subject), grey subtitle (`Person.lastActiveLabel` e.g. `Active now` / `Active 12h ago` for 1:1; `{n} participants` for groups). Optional tiny status pill (Assigned / Unassigned / Resolved) — not a stepper.
 
 **List:** inverted FlatList. Date divider when day changes. Incoming left grey pills; outgoing right primary pills + **ticks only** from `Message.status` (Check / CheckCheck; no Sent/Delivered/Read words). 1:1: no per-bubble name. Group/Offers: small `displayName` above incoming only. Reply chrome: “You replied to {name}” + smaller grey pill **above** (fused), not a quote block inside the bubble. Reactions: one overlapping badge on the bubble corner. Mock fixtures include a few `reactions` and `replyToId`s.
 

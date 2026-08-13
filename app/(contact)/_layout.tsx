@@ -9,7 +9,7 @@ export default function ContactLayout() {
       <Stack.Screen name="messages" options={{ title: "Messages" }} />
       <Stack.Screen name="help" options={{ title: "Help" }} />
       <Stack.Screen name="faq" options={{ title: "FAQ" }} />
-      <Stack.Screen name="search" options={{ title: "" }} />
+      <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
     </Stack>
   );

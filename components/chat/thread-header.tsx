@@ -32,7 +32,7 @@ export function ThreadHeader({ conversation }: ThreadHeaderProps) {
   const pill = statusPill(conversation)
 
   return (
-    <View className="h-11 min-w-0 flex-1 flex-row items-center gap-2 pr-2">
+    <View className="h-12 min-w-0 flex-1 flex-row items-center gap-2 pr-2">
       <Avatar alt={title} className="size-8">
         <AvatarFallback className="bg-primary-soft">
           <Text className="font-sans text-[11px] font-semibold text-primary">

@@ -69,9 +69,7 @@ export default function RootLayout() {
         <Stack.Screen
           name="chat/[id]"
           options={{
-            ...stackChrome,
             headerShown: false,
-            title: "",
             contentStyle: { backgroundColor: colors.bg },
           }}
         />

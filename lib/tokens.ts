@@ -1,5 +1,12 @@
 import { Platform } from "react-native";
 
+/** Gap below the status bar on headerless screens (hub, search, chat). */
+export const SCREEN_TOP_EXTRA = 12;
+
+export function screenTopPad(insetTop: number) {
+  return insetTop + SCREEN_TOP_EXTRA;
+}
+
 /** Hex copies of `global.css` @theme. Native headers/tabs cannot use className. */
 export const colors = {
   bg: "#F5F6F9",

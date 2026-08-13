@@ -12,7 +12,7 @@ Pixel target = locked mocks in the current phase spec. Structure + tokens, not p
 
 Light chrome only. Screen `bg`, cards/header/composer `surface`. Incoming bubble = white (`#FFFFFF`) on light / gray (`#2A2E3B`) on dark; outgoing = `primary` `#3452D9`. Radius: hub cards ~16, bubbles ~18–20. Type: page titles `font-bold`, section labels `font-semibold`, card/row titles `font-medium`, body/muted `font-normal`. Hub title is **SUPPORT** (uppercase).
 
-Do not follow system dark mode. React Navigation chrome (`headerStyle`, `tabBarStyle`) uses `@/lib/tokens`. App UI is Uniwind `className`. Chat: `headerShown: false` until `ThreadScreen` `setOptions` (`stackChrome` + Uniwind `ThreadHeader` in `headerTitle`, native back). Do not leave a default title “Chat” on the Stack.Screen. Do not StyleSheet the thread. Placeholder shells: `bg-bg` + `bg-surface` card + `border-line` + `text-ink`.
+Do not follow system dark mode. React Navigation chrome (`headerStyle`, `tabBarStyle`) uses `@/lib/tokens`. App UI is Uniwind `className`. Headerless screens (hub, search, chat) share `screenTopPad(insets.top)` via `InScreenHeader` / hub `paddingTop`. Do not `setOptions` a native chat header. Do not StyleSheet the thread. Placeholder shells: `bg-bg` + `bg-surface` card + `border-line` + `text-ink`.
 
 Forbidden looks: nsave maroon, Messenger dark, red outgoing, GIF/mic/camera/thumbs-up composer, in-bubble identity block on every 1:1 message, case-status stepper.
 

@@ -22,7 +22,7 @@
 - Do not import `@react-navigation/*`. `useNavigation` / `Redirect` / `useLocalSearchParams` from `expo-router` only.
 - Do not install keyboard-controller or FlashList. Inverted `FlatList` is enough.
 - pnpm only. Never edit `.env`. No commits unless asked. No `console.log` of message bodies.
-- Root `app/_layout.tsx`: `chat/[id]` defaults to `headerShown: false`. `ThreadScreen` turns on `stackChrome` + native back via `setOptions` only when a conversation is loaded. Do not leave `title: 'Chat'` on the Stack.Screen — Expo Go often mounts this route first, then Redirect to hub, which flashes an empty “Chat” header.
+- Root `app/_layout.tsx`: `chat/[id]` stays `headerShown: false`. Thread chrome is `InScreenHeader` + `ThreadHeader` with `screenTopPad` (same top as hub/search). Do not `setOptions` a native chat header. Do not leave `title: 'Chat'` on the Stack.Screen.
 
 ## Amendments (runtime — write here, do not freelance)
 
@@ -30,12 +30,12 @@
 2. **Chat `id`:** open threads with `chatHref(id)` → `{ pathname: '/chat/[id]', params: { id } }`. String `/chat/${id}` fills params on **web**; native Expo Go often mounts `chat/[id]` with empty params (header stays “Chat”). After Metro reload, still fall back to `chatIdFromRoute` + `chatIdFromSegments`. If `id` still cannot be resolved → `Redirect` to `ROLE_HREF[DEV_ROLE]` (no infinite “Opening conversation…”). Never `return null`.
 3. **Android KAV:** do not wrap inverted `FlatList` in `KeyboardAvoidingView` on Android (zero-height list). iOS keeps KAV as in Task 3.
 4. **Avatar `alt`:** RNR Avatar requires `alt`. Pass `alt={title}` on `ThreadHeader`.
-5. **Blocked ≠ rewrite:** native `headerTitle` still uses Uniwind. If it clips, keep `stackChrome` + `setOptions` only. Do not StyleSheet the thread. Do not invent a custom in-screen back.
-6. **Empty “Chat” flash:** Stack.Screen `chat/[id]` must not use `title: 'Chat'` / `headerShown: true` by default. Header on only from `ThreadScreen` after a valid conversation. Unresolved id → `Redirect` with no native “Chat” chrome.
+5. **In-screen chat chrome:** `InScreenHeader` (back + `screenTopPad`) + `ThreadHeader`. Same top inset as hub/search. Do not StyleSheet the thread. Do not `setOptions` native headerTitle.
+6. **Empty “Chat” flash:** Stack.Screen `chat/[id]` stays `headerShown: false`, no `title: 'Chat'`. Unresolved id → `Redirect` with no native “Chat” chrome.
 7. **Receipts outside the bubble:** ticks only under the pill (Check = sent/sending, CheckCheck = delivered, primary CheckCheck = read). No Sent/Delivered/Read labels. Outgoing bubble `rounded-[22px] rounded-br-md`; incoming `rounded-bl-md`. Mock thread includes emoji + mixed statuses so receipts can be previewed.
 8. **Reactions + reply (Messenger chrome, light theme):** `Message.replyToId?` + `Message.reactions?`. Swipe right → quick reply. Long-press → emoji pill on the bubble + bottom Reply. Quote is a fused grey pill **above** the message (“You replied to …”), not an in-bubble accent block. Reaction badge overlaps the bubble corner. Toggle via `lib/message-react.ts` (one emoji per user). Optimistic local state — do not mutate exported `MESSAGES`. Attach stays dead. Not Messenger dark, not call/video, not thumbs-up composer.
 9. **Chat chrome tightness:** Native-stack ignores JS `headerStatusBarHeight`. Android: `disableTopInsetApplication` only (do not stack a second status inset). Keep system 3-button / gesture bar visible (`NavigationBar hidden={false}`, `style="dark"` = dark icons on white chin). Composer sits above it — no extra Android `paddingBottom`. iOS home-indicator pad lives **inside** `bg-surface`. Root stack `ios_from_right`.
-10. **Thread open jitter:** `setOptions` stays in `useLayoutEffect` (Expo Router throws if called during render). Do **not** spread `stackChrome` into `setOptions` (`unstable_nativeProps` belongs on `Stack.Screen` only). Existing bubbles do **not** use Reanimated `entering`; only optimistic `local-*` sends fade in. Incoming token light `#FFFFFF` / dark `#2A2E3B` vs `bg` `#F5F6F9`.
+10. **Thread open jitter:** no `setOptions` on ThreadScreen (Expo Router throws if called during render; native headerTitle also used a different top inset than hub/search). Existing bubbles do **not** use Reanimated `entering`; only optimistic `local-*` sends fade in. Incoming token light `#FFFFFF` / dark `#2A2E3B` vs `bg` `#F5F6F9`.
 
 ## File map
 

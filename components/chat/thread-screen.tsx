@@ -1,5 +1,4 @@
-import { useNavigation } from "expo-router";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
 
 import { Composer } from "@/components/chat/composer";
@@ -9,6 +8,7 @@ import {
     type QuotedMessage,
 } from "@/components/chat/message-bubble";
 import { ThreadHeader } from "@/components/chat/thread-header";
+import { InScreenHeader } from "@/components/in-screen-header";
 import { Text } from "@/components/ui/text";
 import { formatDayLabel, shouldShowDayDivider } from "@/lib/message-day";
 import { quotePreview, toggleReaction } from "@/lib/message-react";
@@ -73,7 +73,6 @@ export function ThreadScreen({
   conversation,
   initialMessages,
 }: ThreadScreenProps) {
-  const navigation = useNavigation();
   const me = getDevUser();
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState(initialMessages);
@@ -84,14 +83,6 @@ export function ThreadScreen({
   const replyQuote = replyTo
     ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
     : null;
-
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerShown: true,
-      headerTitle: () => <ThreadHeader conversation={conversation} />,
-      title: "",
-    });
-  }, [navigation, conversation]);
 
   function react(messageId: string, emoji: string) {
     setMessages((prev) =>
@@ -185,17 +176,31 @@ export function ThreadScreen({
     </>
   );
 
+  const header = (
+    <InScreenHeader>
+      <ThreadHeader conversation={conversation} />
+    </InScreenHeader>
+  );
+
   if (Platform.OS === "android") {
-    return <View className="flex-1 bg-bg">{list}</View>;
+    return (
+      <View className="flex-1 bg-bg">
+        {header}
+        {list}
+      </View>
+    );
   }
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-bg"
-      behavior="padding"
-      keyboardVerticalOffset={72}
-    >
-      {list}
-    </KeyboardAvoidingView>
+    <View className="flex-1 bg-bg">
+      {header}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
+        {list}
+      </KeyboardAvoidingView>
+    </View>
   );
 }

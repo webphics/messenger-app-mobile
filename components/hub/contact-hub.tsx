@@ -16,7 +16,7 @@ import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { firstName, formatRelativeTime, initials } from "@/lib/display";
 import { CONVERSATIONS, getDevUser, PEOPLE } from "@/lib/mock-data";
-import { colors } from "@/lib/tokens";
+import { colors, screenTopPad } from "@/lib/tokens";
 
 function assignedAgents() {
   return PEOPLE.filter((p) => p.role === "agent");
@@ -44,7 +44,7 @@ export function ContactHub() {
       showsVerticalScrollIndicator={false}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{
-        paddingTop: insets.top + 12,
+        paddingTop: screenTopPad(insets.top),
         paddingBottom: bottomPad,
       }}
     >
