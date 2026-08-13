@@ -101,9 +101,11 @@ export function ThreadScreen({
     return out;
   }, [messages]);
 
-  const replyQuote = replyTo
-    ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
-    : null;
+  const replyQuote = useMemo(() => {
+    if (!replyTo) return null;
+    return { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) };
+  }, [replyTo]);
+
   const menuOpen = menu !== null;
   const menuId = menu?.messageId ?? null;
 
@@ -134,19 +136,26 @@ export function ThreadScreen({
     });
   }, []);
 
-  const react = useCallback((messageId: string, emoji: string) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === messageId
-          ? { ...m, reactions: toggleReaction(m.reactions, emoji, me.id) }
-          : m,
-      ),
-    );
-    setMenu(null);
-  }, [me.id]);
+  const handleToggleReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, reactions: toggleReaction(m.reactions, emoji, me.id) }
+            : m,
+        ),
+      );
+      setMenu(null);
+    },
+    [me.id],
+  );
 
-  const startReply = useCallback((message: Message) => {
-    setReplyTo(message);
+  const handleReply = useCallback((messageId: string) => {
+    setMessages((prev) => {
+      const target = prev.find((m) => m.id === messageId);
+      if (target) setReplyTo(target);
+      return prev;
+    });
     setMenu(null);
   }, []);
 
@@ -194,12 +203,12 @@ export function ThreadScreen({
           selected={menuId === item.message.id}
           enter={item.message.id.startsWith("local-")}
           onOpenMenu={openMenu}
-          onReply={() => startReply(item.message)}
-          onToggleReaction={(emoji) => react(item.message.id, emoji)}
+          onReply={handleReply}
+          onToggleReaction={handleToggleReaction}
         />
       );
     },
-    [me.id, menuId, openMenu, quotedById, react, startReply],
+    [handleReply, handleToggleReaction, me.id, menuId, openMenu, quotedById],
   );
 
   const host = (
@@ -232,11 +241,8 @@ export function ThreadScreen({
         <MessageActions
           anchor={menu}
           onDismiss={dismissMenu}
-          onReact={(emoji) => react(menu.messageId, emoji)}
-          onReply={() => {
-            const target = messages.find((m) => m.id === menu.messageId);
-            if (target) startReply(target);
-          }}
+          onReact={(emoji) => handleToggleReaction(menu.messageId, emoji)}
+          onReply={() => handleReply(menu.messageId)}
         />
       ) : null}
     </View>

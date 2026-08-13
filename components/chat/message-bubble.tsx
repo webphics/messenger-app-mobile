@@ -14,10 +14,9 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
-import { hapticLight, hapticMedium } from "@/lib/haptics";
+import { hapticLight, hapticMedium, hapticSelection } from "@/lib/haptics";
 import { replyCaption } from "@/lib/message-react";
 import { messageStatusLabel } from "@/lib/message-status";
 import {
@@ -47,8 +46,8 @@ type MessageBubbleProps = {
   selected?: boolean;
   enter?: boolean;
   onOpenMenu: (payload: OpenMenuPayload) => void;
-  onReply: () => void;
-  onToggleReaction: (emoji: string) => void;
+  onReply: (messageId: string) => void;
+  onToggleReaction: (messageId: string, emoji: string) => void;
 };
 
 const SWIPE_REPLY = 56;
@@ -75,7 +74,7 @@ function Receipt({
   );
 }
 
-function QuoteChrome({
+const QuoteChrome = memo(function QuoteChrome({
   quoted,
   outgoing,
   senderName,
@@ -107,9 +106,9 @@ function QuoteChrome({
       </View>
     </View>
   );
-}
+});
 
-function ReactionBadge({
+const ReactionBadge = memo(function ReactionBadge({
   reactions,
   outgoing,
   currentUserId,
@@ -130,18 +129,20 @@ function ReactionBadge({
       )}
     >
       {reactions.map((reaction) => (
-        <TactilePressable
+        <Pressable
           key={reaction.emoji}
-          haptic="selection"
           accessibilityRole="button"
           accessibilityLabel={`React ${reaction.emoji}`}
-          onPress={() => onToggleReaction(reaction.emoji)}
-          className="px-0.5"
+          onPress={() => {
+            hapticSelection();
+            onToggleReaction(reaction.emoji);
+          }}
+          className="px-0.5 active:opacity-60"
         >
           <Text className="font-sans text-[13px] leading-4">
             {reaction.emoji}
           </Text>
-        </TactilePressable>
+        </Pressable>
       ))}
       {total > 1 ? (
         <Text
@@ -157,7 +158,7 @@ function ReactionBadge({
       ) : null}
     </View>
   );
-}
+});
 
 export const MessageBubble = memo(function MessageBubble({
   messageId,
@@ -230,6 +231,17 @@ export const MessageBubble = memo(function MessageBubble({
     [messageId, onOpenMenu, outgoing],
   );
 
+  const handleReply = useCallback(() => {
+    onReply(messageId);
+  }, [messageId, onReply]);
+
+  const handleToggleReaction = useCallback(
+    (emoji: string) => {
+      onToggleReaction(messageId, emoji);
+    },
+    [messageId, onToggleReaction],
+  );
+
   const gesture = useMemo(
     () =>
       Gesture.Race(
@@ -260,12 +272,12 @@ export const MessageBubble = memo(function MessageBubble({
             }
           })
           .onEnd(() => {
-            if (x.value >= SWIPE_REPLY) runOnJS(onReply)();
+            if (x.value >= SWIPE_REPLY) runOnJS(handleReply)();
             x.value = withSpring(0, { damping: 18, stiffness: 260, mass: 0.55 });
             swipedHaptic.value = false;
           }),
       ),
-    [onReply, reportOpen, swipedHaptic, tint, x],
+    [handleReply, reportOpen, swipedHaptic, tint, x],
   );
 
   const swipeStyle = useAnimatedStyle(() => ({
@@ -372,7 +384,7 @@ export const MessageBubble = memo(function MessageBubble({
                 reactions={reactions}
                 outgoing={outgoing}
                 currentUserId={currentUserId}
-                onToggleReaction={onToggleReaction}
+                onToggleReaction={handleToggleReaction}
               />
             </View>
             <Receipt status={status} outgoing={outgoing} />
