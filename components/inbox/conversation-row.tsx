@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Text } from "@/components/ui/text";
 import { conversationTitle, otherParticipant } from "@/lib/conversation-title";
 import { formatRelativeTime, initials } from "@/lib/display";
-import { DEV_USER_ID, PEOPLE } from "@/lib/mock-data";
+import { getDevUserId } from "@/lib/dev-user";
+import { PEOPLE } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
 
@@ -18,9 +19,9 @@ export function ConversationRow({
   conversation,
   onPress,
 }: ConversationRowProps) {
-  const title = conversationTitle(conversation, PEOPLE, DEV_USER_ID);
+  const title = conversationTitle(conversation, PEOPLE, getDevUserId());
   const isOffers = conversation.id === "offers";
-  const other = otherParticipant(conversation, PEOPLE, DEV_USER_ID);
+  const other = otherParticipant(conversation, PEOPLE, getDevUserId());
   const online = isOffers ? false : Boolean(other?.isOnline);
 
   return (

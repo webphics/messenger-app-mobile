@@ -21,7 +21,7 @@ import { Appearance, AppState, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
-import { colors, stackChrome } from "@/lib/tokens";
+import { colors } from "@/lib/tokens";
 
 Uniwind.setTheme("light");
 Appearance.setColorScheme("light");
@@ -75,7 +75,7 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="(auth)"
-          options={{ ...stackChrome, title: "Sign in" }}
+          options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
         />
       </Stack>
     </GestureHandlerRootView>

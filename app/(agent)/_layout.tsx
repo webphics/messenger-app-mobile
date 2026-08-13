@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Inbox, MessageCircle, Settings } from "lucide-react-native";
+import { House, Inbox, MessageCircle } from "lucide-react-native";
 
 import { tabChrome } from "@/lib/tokens";
 
@@ -7,13 +7,11 @@ export default function AgentLayout() {
   return (
     <Tabs screenOptions={tabChrome}>
       <Tabs.Screen
-        name="index"
+        name="(home)"
         options={{
-          title: "Messages",
-          tabBarLabel: "Chats",
-          tabBarIcon: ({ color, size }) => (
-            <MessageCircle color={color} size={size} />
-          ),
+          title: "Home",
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <House color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -24,11 +22,12 @@ export default function AgentLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="conversations"
         options={{
-          title: "Settings",
+          title: "Messages",
+          tabBarLabel: "Conversations",
           tabBarIcon: ({ color, size }) => (
-            <Settings color={color} size={size} />
+            <MessageCircle color={color} size={size} />
           ),
         }}
       />

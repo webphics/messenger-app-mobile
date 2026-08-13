@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 
@@ -6,13 +7,21 @@ import { HelpSearchField } from "@/components/hub/help-search-field";
 import { InScreenHeader } from "@/components/in-screen-header";
 import { Text } from "@/components/ui/text";
 import { filterFaq } from "@/lib/faq-filter";
-import { FAQ_ITEMS } from "@/lib/mock-data";
+import { listFaqs } from "@/lib/mock-catalog";
+import type { FaqItem } from "@/lib/types";
 
 export function HelpSearchScreen() {
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
-  const results = useMemo(() => filterFaq(FAQ_ITEMS, query), [query]);
+  const [faqs, setFaqs] = useState<FaqItem[]>(listFaqs);
+  const results = useMemo(() => filterFaq(faqs, query), [faqs, query]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setFaqs(listFaqs());
+    }, []),
+  );
 
   useEffect(() => {
     const id = setTimeout(() => inputRef.current?.focus(), 0);

@@ -2,8 +2,11 @@ import { Redirect, useGlobalSearchParams, useLocalSearchParams, usePathname, use
 
 import { ThreadScreen } from '@/components/chat/thread-screen'
 import { chatIdFromRoute, chatIdFromSegments } from '@/lib/chat-route-id'
-import { CONVERSATIONS, DEV_ROLE, DEV_USER_ID, MESSAGES, ROLE_HREF } from '@/lib/mock-data'
+import { getDevUserId } from '@/lib/dev-user'
+import { ROLE_HREF } from '@/lib/hub-routes'
+import { CONVERSATIONS, MESSAGES } from '@/lib/mock-data'
 import { canViewConversation } from '@/lib/rbac'
+import { getSession } from '@/lib/session'
 
 export default function ChatScreen() {
   const local = useLocalSearchParams<{ id?: string | string[] }>().id
@@ -15,8 +18,9 @@ export default function ChatScreen() {
     chatIdFromSegments(useSegments())
   const conversation = id ? CONVERSATIONS.find((c) => c.id === id) : undefined
 
-  if (!id || !conversation || !canViewConversation(DEV_ROLE, DEV_USER_ID, conversation)) {
-    return <Redirect href={ROLE_HREF[DEV_ROLE]} />
+  const role = getSession().role
+  if (!id || !conversation || !canViewConversation(role, getDevUserId(), conversation)) {
+    return <Redirect href={ROLE_HREF[role]} />
   }
 
   const initialMessages = MESSAGES.filter((m) => m.conversationId === conversation.id)

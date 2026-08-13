@@ -11,8 +11,8 @@ Do not build: Instagram stories, case-status rail/stepper, Casewire branding.
 
 Offers = in-app promo carousel + shared group chat `id: 'offers'`. `"Sponsored"` is a label. Not stories, not an ad SDK, not checkout.
 
-Slim Admin on mobile: overview / users / conversations / settings only. No analytics, audit log UI, or SLA config here.
+Slim Admin on mobile: Home hub / users / unassigned / conversations / settings. Home hub may show **mock** charts + knowledge + add-offer. No real analytics, audit log UI, or SLA config here.
 
-Contact hub: **no tab bar**. Gear → settings. Messages/Help/Search/Settings are stack pushes with back. Search is its own screen (not Help FAQ). Agent/Admin keep tabs.
+Contact hub: **no tab bar**. Gear → settings. Messages/Help/Search/Settings are stack pushes with back. Search is its own screen (not Help FAQ). Agent tabs: Home | Unassigned | Conversations. Admin tabs: Home | Users | Unassigned | Conversations. Settings is hub gear only.
 
-Current phase: `AGENTS.md` + `docs/scope.md`. Do not implement a later phase’s packages or screens just because they appear in the SOW.
+Current phase: `AGENTS.md` + `docs/scope.md` (Phase 2 mock auth + role hubs). Do not implement a later phase’s packages or screens just because they appear in the SOW.

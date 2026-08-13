@@ -1,39 +1,24 @@
 import { router } from "expo-router";
-import {
-    ChevronRight,
-    HelpCircle,
-    MessageCircle,
-    Search,
-    Settings,
-} from "lucide-react-native";
+import { ChevronRight, HelpCircle, MessageCircle, Search } from "lucide-react-native";
 import { Pressable, ScrollView, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { HubHeader } from "@/components/hub/hub-header";
 import { OffersCarousel } from "@/components/hub/offers-carousel";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { Text } from "@/components/ui/text";
-import { chatHref } from "@/lib/chat-route-id";
-import { conversationTitle } from "@/lib/conversation-title";
-import { firstName, formatRelativeTime, initials } from "@/lib/display";
-import { listInboxConversations } from "@/lib/inbox-filter";
-import { CONVERSATIONS, DEV_ROLE, getDevUser, PEOPLE } from "@/lib/mock-data";
+import { firstName } from "@/lib/display";
+import { latestInboxThread } from "@/lib/inbox-filter";
+import { getDevUser } from "@/lib/dev-user";
+import { CONVERSATIONS } from "@/lib/mock-data";
+import { getSession } from "@/lib/session";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
-
-function assignedAgents() {
-  return PEOPLE.filter((p) => p.role === "agent");
-}
 
 export function ContactHub() {
   const insets = useSafeAreaInsets();
   const me = getDevUser();
-  const agents = assignedAgents();
-  const recent = listInboxConversations(DEV_ROLE, me.id, CONVERSATIONS)
-    .filter((c) => c.id !== "offers")
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
-  const recentTitle = recent
-    ? conversationTitle(recent, PEOPLE, me.id)
-    : "";
+  const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
   const bottomPad = screenBottomPad(insets.bottom, 24);
 
   return (
@@ -48,37 +33,7 @@ export function ContactHub() {
       }}
     >
       <View className="px-4">
-        <View className="flex-row items-center justify-between">
-          <Text className="font-sans text-2xl font-bold uppercase tracking-wide text-ink">
-            Support
-          </Text>
-          <View className="flex-row items-center gap-3">
-            <View className="flex-row">
-              {agents.map((agent, i) => (
-                <Avatar
-                  key={agent.id}
-                  alt={agent.displayName}
-                  className="size-9 border-2 border-bg"
-                  style={{ marginLeft: i === 0 ? 0 : -10 }}
-                >
-                  <AvatarFallback className="bg-primary-soft">
-                    <Text className="font-sans text-xs font-semibold text-primary">
-                      {initials(agent.displayName)}
-                    </Text>
-                  </AvatarFallback>
-                </Avatar>
-              ))}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Settings"
-              onPress={() => router.push("/(contact)/settings")}
-              className="size-11 items-center justify-center"
-            >
-              <Settings color={colors.ink} size={22} />
-            </Pressable>
-          </View>
-        </View>
+        <HubHeader title="Support" settingsHref="/(contact)/settings" />
 
         <Text className="mt-6 font-sans text-base font-normal text-ink-soft">
           Hi {firstName(me.displayName)}
@@ -115,38 +70,7 @@ export function ContactHub() {
           </Pressable>
         </Animated.View>
 
-        {recent ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open recent message"
-            onPress={() => router.push(chatHref(recent.id))}
-            className="mt-4 flex-row items-center gap-3 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/10"
-          >
-            <Avatar alt={recentTitle} className="size-11">
-              <AvatarFallback className="bg-primary-soft">
-                <Text className="font-sans text-sm font-semibold text-primary">
-                  {initials(recentTitle)}
-                </Text>
-              </AvatarFallback>
-            </Avatar>
-            <View className="min-w-0 flex-1">
-              <Text
-                className="font-sans text-base font-medium text-ink"
-                numberOfLines={1}
-              >
-                {recentTitle}
-              </Text>
-              <Text
-                className="mt-0.5 font-sans text-sm font-normal text-muted"
-                numberOfLines={1}
-              >
-                {recent.lastMessagePreview} ·{" "}
-                {formatRelativeTime(recent.updatedAt)}
-              </Text>
-            </View>
-            <ChevronRight color={colors.muted} size={18} />
-          </Pressable>
-        ) : null}
+        {recent ? <RecentThreadCard conversation={recent} selfId={me.id} /> : null}
 
         <Pressable
           accessibilityRole="button"

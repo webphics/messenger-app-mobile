@@ -10,21 +10,21 @@ Role groups: `(auth)`, `(contact)`, `(agent)`, `(admin)`.
 
 Shared thread: `app/chat/[id].tsx` → `/chat/:id`. Offers group id is literally `'offers'` → `/chat/offers`. Opening a thread is full-screen (no tab bar). That is intentional.
 
-Sign-in header: root Stack `stackChrome`. Android: `disableTopInsetApplication` (MainActivity already pads status inset). Chat + search: `headerShown: false` + `InScreenHeader` (`screenTopPad` = inset + 12). Do not `setOptions` the chat header. Do not default the chat screen to `title: 'Chat'`. Do not add a nested `chat/_layout`. Root `animation: 'ios_from_right'` (not linear `slide_from_right`). Sign out `router.replace('/(auth)/sign-in')`. Continue `router.replace(ROLE_HREF[DEV_ROLE])` — never bounce through `/`.
+Android: `disableTopInsetApplication` (MainActivity already pads status inset). Chat + search: `headerShown: false` + `InScreenHeader` (`screenTopPad` = inset + 12). Do not `setOptions` the chat header. Do not default the chat screen to `title: 'Chat'`. Do not add a nested `chat/_layout`. Root `animation: 'ios_from_right'` (not linear `slide_from_right`). Sign out `signOutSession()` then `router.replace('/(auth)/sign-in')`. Login/register `loginSession(email)` then `router.replace(ROLE_HREF[role])`. Root `/` hydrates session then Redirect to login or `ROLE_HREF[role]` — do not hardcode `DEV_ROLE`.
 
 Contact: **Stack, no tab bar.** Hub gear → settings. `messages` / `help` / `faq` / `settings` use native `stackChrome` back. `search` is in-screen header (autofocus). Search ≠ Help ≠ FAQ. Do not nest `home/` under contact. Do not put messages/help on the root stack. Do not bring back Home \| Settings tabs.
 
-Agent tabs: **Chats | Unassigned | Settings**. Chats header title: **Messages**. Unassigned = `assigneeId === null` only; hide Open/Resolved chips.
+Agent tabs: **Home | Unassigned | Conversations**. Home = one `(home)` Stack (hub `headerShown: false`). Settings / `knowledge` / `article/[id]` / search / FAQ are **sibling** stack screens (`stackChrome` native back). Do not nest `knowledge/_layout` or fake `headerLeft` back. Conversations = inbox (header **Messages**). Unassigned = `assigneeId === null` only; hide Open/Resolved chips. Hub gear → settings. Search stays `InScreenHeader`.
 
-Admin: slim tabs. Conversations = inbox over all threads (header **Messages**). Users / Overview stay shells until their phase.
+Admin tabs: **Home | Users | Unassigned | Conversations**. Home = one `(home)` Stack. Conversations = inbox over all threads (header **Messages**). Users = mock directory (search + role/online chips). Unassigned same as agent. Settings / FAQ / add / `knowledge` / `article/[id]` / `chart/[id]` are siblings on that stack (native back). No nested knowledge/chart stacks. Hub gear → settings.
 
-Root `app/index.tsx` redirects from `DEV_ROLE` via `ROLE_HREF`. No auth gate until the auth phase.
+Root `app/index.tsx` hydrates `lib/session.ts` then Redirect: no email → `/(auth)/sign-in`, else `ROLE_HREF[role]`. Auth stack `headerShown: false`.
 
 Never gate `_layout` on `useFonts` / `SplashScreen.preventAutoHideAsync`. Hide splash once on mount; fonts load in the background.
 
 Import navigation only from `expo-router`. Never `@react-navigation/*` (SDK 56+).
 
-Open chat with `chatHref(id)` (`lib/chat-route-id.ts`) — `{ pathname: '/chat/[id]', params: { id } }`. Do not `router.push(\`/chat/${id}\`)`(web-only param fill). Resolve`id`with`chatIdFromRoute`+`chatIdFromSegments`. Unresolved / unauthorized → `Redirect`to`ROLE_HREF[DEV_ROLE]`. Never `return null`.
+Open chat with `chatHref(id)` (`lib/chat-route-id.ts`) — `{ pathname: '/chat/[id]', params: { id } }`. Do not `router.push(\`/chat/${id}\`)`(web-only param fill). Resolve`id`with`chatIdFromRoute`+`chatIdFromSegments`. Unresolved / unauthorized → `Redirect` to `ROLE_HREF[getSession().role]`. Never `return null`.
 
 Expo Go: `pnpm start` = local CLI + `-c` (LAN). `pnpm expo start` skips the script. **Do not tap Expo Go Recents** — it replays the last `exp://` and hangs if that URL is stale or unreachable. Scan the QR from the current Metro session. LAN blocked (Windows firewall / different Wi-Fi) → `pnpm start:tunnel`. `@expo/ngrok` must be a **project** devDependency; Expo’s `npm i -g` does not work with pnpm ([SO](https://stackoverflow.com/questions/75865574/expo-tunnel-not-working-commanderror-please-install-expo-ngrok4-1-0-and-try), [expo#24627](https://github.com/expo/expo/issues/24627)). `updates.enabled: false` ([expo#17461](https://github.com/expo/expo/issues/17461)). Do not treat Expo Go spinner as Uniwind.
 

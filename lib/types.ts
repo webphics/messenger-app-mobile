@@ -71,3 +71,28 @@ export type FaqItem = {
   question: string
   answer: string
 }
+
+export type KnowledgeArticle = {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+}
+
+export type ChartKind = 'bar' | 'line' | 'pie' | 'donut'
+
+export type ChartSlice = {
+  label: string
+  value: number
+}
+
+export type ChartMetric = {
+  id: string
+  title: string
+  hint: string
+  value: string
+  deltaLabel: string
+  kind: ChartKind
+  series: number[]
+  slices?: ChartSlice[]
+}

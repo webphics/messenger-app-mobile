@@ -1,20 +1,28 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { MessageCircle } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 
 import { OfferCard } from "@/components/hub/offer-card";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { cn } from "@/lib/cn";
-import { OFFERS } from "@/lib/mock-data";
+import { listOffers } from "@/lib/mock-catalog";
 import { offerCardMetrics } from "@/lib/offer-metrics";
 import { colors } from "@/lib/tokens";
+import type { Offer } from "@/lib/types";
 
 export function OffersCarousel() {
   const { width } = useWindowDimensions();
   const [index, setIndex] = useState(0);
+  const [offers, setOffers] = useState<Offer[]>(listOffers);
   const { cardWidth, snap, gap, edgePad } = offerCardMetrics(width);
+
+  useFocusEffect(
+    useCallback(() => {
+      setOffers(listOffers());
+    }, []),
+  );
 
   function openOffers() {
     router.push(chatHref("offers"));
@@ -56,10 +64,10 @@ export function OffersCarousel() {
         }}
         onMomentumScrollEnd={(e) => {
           const next = Math.round(e.nativeEvent.contentOffset.x / snap);
-          setIndex(Math.min(Math.max(next, 0), OFFERS.length - 1));
+          setIndex(Math.min(Math.max(next, 0), offers.length - 1));
         }}
       >
-        {OFFERS.map((offer, i) => (
+        {offers.map((offer, i) => (
           <OfferCard
             key={offer.id}
             offer={offer}
@@ -71,7 +79,7 @@ export function OffersCarousel() {
       </ScrollView>
 
       <View className="mt-3 flex-row justify-center gap-1.5">
-        {OFFERS.map((offer, i) => (
+        {offers.map((offer, i) => (
           <View
             key={offer.id}
             className={cn(

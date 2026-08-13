@@ -19,7 +19,8 @@ import { InScreenHeader } from "@/components/in-screen-header";
 import { Text } from "@/components/ui/text";
 import { formatDayLabel, shouldShowDayDivider } from "@/lib/message-day";
 import { quotePreview, toggleReaction } from "@/lib/message-react";
-import { DEV_USER_ID, PEOPLE, getDevUser } from "@/lib/mock-data";
+import { getDevUser, getDevUserId } from "@/lib/dev-user";
+import { PEOPLE } from "@/lib/mock-data";
 import {
   anchorFromPayload,
   type OpenMenuPayload,
@@ -55,7 +56,7 @@ function buildRows(messages: Message[], isGroup: boolean): Row[] {
         label: formatDayLabel(message.createdAt),
       });
     }
-    const outgoing = message.senderId === DEV_USER_ID;
+    const outgoing = message.senderId === getDevUserId();
     const sender = PEOPLE.find((p) => p.id === message.senderId);
     rows.push({
       type: "message",
@@ -93,7 +94,7 @@ export function ThreadScreen({
       out.set(message.id, {
         name: personName(quoted.senderId),
         body: quotePreview(quoted.body),
-        isMe: quoted.senderId === DEV_USER_ID,
+        isMe: quoted.senderId === getDevUserId(),
       });
     }
     return out;
@@ -182,7 +183,7 @@ export function ThreadScreen({
         <MessageBubble
           messageId={item.message.id}
           body={item.message.body}
-          outgoing={item.message.senderId === DEV_USER_ID}
+          outgoing={item.message.senderId === getDevUserId()}
           status={item.message.status}
           senderName={item.senderName}
           quoted={quotedById.get(item.message.id)}

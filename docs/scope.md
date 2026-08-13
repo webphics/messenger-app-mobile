@@ -24,12 +24,13 @@ Broadcasts are in-inbox announcements (later), not stories.
 
 ## Phases
 
-0. Scaffold (done) — Expo SDK 57, Uniwind, RNR primitives, role shells, mock data, RBAC helpers, AI rules.
-1. **Basic UI mock (current)** — Contact hub, inbox, thread on mock data. `DEV_ROLE` session.
-2. Auth shell — better-auth + expo-secure-store.
-3. Realtime (socket.io) + REST (TanStack Query).
-4. Media, push, i18n, list virtualization.
+0. Scaffold (done)
+1. Basic UI mock (done) — Contact hub, inbox, thread on mock data.
+2. **Mock auth shell + role hubs (current)** — login/register, AsyncStorage `{ email, role }`, splash/icon. Agent/Admin hub variants (mock knowledge / charts / add offer). Not better-auth.
+3. Real auth — better-auth + expo-secure-store.
+4. Realtime (socket.io) + REST (TanStack Query).
+5. Media, push, i18n, list virtualization.
 
-## Dev role switch
+## Session
 
-Session is `DEV_ROLE` in `lib/mock-data.ts` (`'admin' | 'agent' | 'contact'`). Root `/` redirects to that role group. Current user is the mock `Person` whose `role === DEV_ROLE`.
+Logged in = non-empty `email` in AsyncStorage key `ism.session`. Role defaults to `contact` on first login; Settings can switch Contact / Agent / Admin. Sign-out clears email and **keeps role**. Current user = mock `Person` whose `role === getSession().role` (`getDevUser()`).

@@ -4,11 +4,13 @@ Expo iOS/Android client for an internal support messenger (Admin / Agent / Conta
 
 **Source of truth:** Project Plan & Scope of Work PDF + `docs/scope.md` + current phase spec. This repo is Expo-only. Next.js web and NestJS/Postgres/better-auth live elsewhere.
 
-## Now (Phase 1)
+## Now (Phase 2 — mock auth + role hubs)
 
-Basic UI mock on `lib/mock-data.ts`. `DEV_ROLE` is the only session. No real auth, network, or persistence.
+Login/register UI + AsyncStorage session blob `{ email, role }`. No better-auth, no SecureStore, no JWT. `getDevUser()` follows stored role.
 
-Spec: `docs/superpowers/specs/2026-08-13-phase-1-ui-design.md`
+After login: Contact hub unchanged. Agent / Admin get hub variants (knowledge, mock charts, add offer). Mock catalog only.
+
+Specs: `docs/superpowers/specs/2026-08-14-mock-auth-shell-design.md` + `docs/superpowers/specs/2026-08-14-role-hubs-design.md`
 
 ## Hard rules
 

@@ -1,9 +1,15 @@
 import { InboxScreen } from '@/components/inbox/inbox-screen'
+import { getDevUserId } from '@/lib/dev-user'
 import { listInboxConversations } from '@/lib/inbox-filter'
-import { CONVERSATIONS, DEV_ROLE, DEV_USER_ID } from '@/lib/mock-data'
+import { CONVERSATIONS } from '@/lib/mock-data'
+import { getSession } from '@/lib/session'
 
 export default function ContactMessagesScreen() {
-  const conversations = listInboxConversations(DEV_ROLE, DEV_USER_ID, CONVERSATIONS)
+  const conversations = listInboxConversations(
+    getSession().role,
+    getDevUserId(),
+    CONVERSATIONS,
+  )
 
   return (
     <InboxScreen

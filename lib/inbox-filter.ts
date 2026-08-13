@@ -28,6 +28,16 @@ export function listUnassignedConversations(list: Conversation[]): Conversation[
   return list.filter((c) => c.assigneeId === null)
 }
 
+export function latestInboxThread(
+  role: UserRole,
+  userId: string,
+  conversations: Conversation[],
+): Conversation | undefined {
+  return listInboxConversations(role, userId, conversations)
+    .filter((c) => c.id !== 'offers')
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0]
+}
+
 export function filterConversations(
   list: Conversation[],
   query: string,

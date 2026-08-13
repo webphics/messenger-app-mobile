@@ -4,7 +4,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Text } from '@/components/ui/text'
 import { conversationTitle } from '@/lib/conversation-title'
 import { initials } from '@/lib/display'
-import { DEV_USER_ID, LABELS, PEOPLE } from '@/lib/mock-data'
+import { getDevUserId } from '@/lib/dev-user'
+import { LABELS, PEOPLE } from '@/lib/mock-data'
 import type { Conversation } from '@/lib/types'
 
 type ThreadHeaderProps = {
@@ -22,8 +23,8 @@ function statusPill(conversation: Conversation): string | null {
 }
 
 export function ThreadHeader({ conversation }: ThreadHeaderProps) {
-  const title = conversationTitle(conversation, PEOPLE, DEV_USER_ID)
-  const otherId = conversation.participantIds.find((id) => id !== DEV_USER_ID)
+  const title = conversationTitle(conversation, PEOPLE, getDevUserId())
+  const otherId = conversation.participantIds.find((id) => id !== getDevUserId())
   const other = PEOPLE.find((p) => p.id === otherId)
   const isGroup = conversation.kind === 'group' || conversation.id === 'offers'
   const subtitle = isGroup

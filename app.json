@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Internal Support Messenger",
+    "name": "Messenger Chat",
     "slug": "internal-support-messenger",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,7 @@
       "enabled": false
     },
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {

@@ -9,7 +9,8 @@ import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { cn } from "@/lib/cn";
 import { filterConversations, type InboxChip } from "@/lib/inbox-filter";
-import { DEV_USER_ID, LABELS, PEOPLE } from "@/lib/mock-data";
+import { getDevUserId } from "@/lib/dev-user";
+import { LABELS, PEOPLE } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
 
@@ -63,7 +64,7 @@ export function InboxScreen({
         showChips ? chip : "all",
         LABELS,
         PEOPLE,
-        DEV_USER_ID,
+        getDevUserId(),
       ),
     [conversations, query, chip, showChips],
   );

@@ -1,21 +1,14 @@
 import type {
+  ChartMetric,
   Conversation,
   FaqItem,
   InternalNote,
+  KnowledgeArticle,
   Label,
   Message,
   Offer,
   Person,
-  UserRole,
 } from '@/lib/types'
-
-export const DEV_ROLE: UserRole = 'contact'
-
-export const ROLE_HREF = {
-  contact: '/(contact)',
-  agent: '/(agent)',
-  admin: '/(admin)',
-} as const
 
 export const PEOPLE: Person[] = [
   {
@@ -58,15 +51,31 @@ export const PEOPLE: Person[] = [
     isOnline: true,
     lastActiveLabel: 'Active now',
   },
+  {
+    id: 'agent-3',
+    displayName: 'Kenji Ito',
+    role: 'agent',
+    avatarUrl: null,
+    isOnline: true,
+    lastActiveLabel: 'Active now',
+  },
+  {
+    id: 'contact-3',
+    displayName: 'Maya Chen',
+    role: 'contact',
+    avatarUrl: null,
+    isOnline: false,
+    lastActiveLabel: 'Active 2d ago',
+  },
+  {
+    id: 'contact-4',
+    displayName: 'Omar Haddad',
+    role: 'contact',
+    avatarUrl: null,
+    isOnline: false,
+    lastActiveLabel: 'Active 6h ago',
+  },
 ]
-
-export function getDevUser(): Person {
-  const person = PEOPLE.find((p) => p.role === DEV_ROLE)
-  if (!person) throw new Error(`No mock person for role ${DEV_ROLE}`)
-  return person
-}
-
-export const DEV_USER_ID = getDevUser().id
 
 export const LABELS: Label[] = [
   { id: 'label-urgent', name: 'Urgent', color: '#D64545' },
@@ -287,5 +296,104 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: 'faq-lock',
     question: 'Why is my account locked?',
     answer: 'Too many failed sign-in attempts. Open Messages and an agent can unlock after they verify you.',
+  },
+]
+
+export const KNOWLEDGE: KnowledgeArticle[] = [
+  {
+    id: 'kb-reset',
+    title: 'Password reset script',
+    tags: ['password', 'access'],
+    body: '1. Confirm the email on file.\n2. Send a reset link from Messages.\n3. Ask them to check spam.\n4. If it still fails, unlock after verifying last invoice digits.',
+  },
+  {
+    id: 'kb-billing',
+    title: 'Billing update script',
+    tags: ['billing'],
+    body: 'Ask for the last four digits of the invoice only. Send the secure billing form. Never collect full card numbers in chat. Note the thread id in the reply.',
+  },
+  {
+    id: 'kb-unlock',
+    title: 'Unlock checklist',
+    tags: ['access', 'security'],
+    body: 'Confirm display name + last invoice. Check failed sign-in count. Unlock after verification. Tell them to change password immediately.',
+  },
+  {
+    id: 'kb-access',
+    title: 'Teammate access',
+    tags: ['access', 'admin'],
+    body: 'Agents cannot create accounts. Ask an Admin to invite from Users. Until then they can sit in Offers chat as a contact.',
+  },
+  {
+    id: 'kb-offers',
+    title: 'Offers announcement template',
+    tags: ['offers'],
+    body: 'This week’s offers are live in Offers chat. Tap Join Offers chat on Home. Sponsored is a label — not checkout.',
+  },
+]
+
+export const CHART_METRICS: ChartMetric[] = [
+  {
+    id: 'open-threads',
+    title: 'Open threads',
+    hint: 'Assigned + unassigned, last 7 days',
+    value: '12',
+    deltaLabel: '+3 vs last week',
+    kind: 'bar',
+    series: [6, 8, 7, 9, 11, 10, 12],
+  },
+  {
+    id: 'unassigned',
+    title: 'Unassigned',
+    hint: 'Pool size by day',
+    value: '1',
+    deltaLabel: '−2 vs last week',
+    kind: 'line',
+    series: [4, 3, 5, 3, 2, 2, 1],
+  },
+  {
+    id: 'messages',
+    title: 'Messages',
+    hint: 'Sent + received, last 7 days',
+    value: '84',
+    deltaLabel: '+12 vs last week',
+    kind: 'line',
+    series: [48, 52, 61, 55, 70, 76, 84],
+  },
+  {
+    id: 'offers-taps',
+    title: 'Offer taps',
+    hint: 'Promo card opens, last 7 days',
+    value: '31',
+    deltaLabel: '+5 vs last week',
+    kind: 'bar',
+    series: [18, 20, 22, 19, 24, 28, 31],
+  },
+  {
+    id: 'thread-mix',
+    title: 'Thread mix',
+    hint: 'Open threads by kind',
+    value: '4',
+    deltaLabel: 'Direct · group · offers',
+    kind: 'pie',
+    series: [2, 1, 1],
+    slices: [
+      { label: 'Direct', value: 2 },
+      { label: 'Group', value: 1 },
+      { label: 'Offers', value: 1 },
+    ],
+  },
+  {
+    id: 'desk-load',
+    title: 'Desk load',
+    hint: 'Who is carrying open work',
+    value: '100%',
+    deltaLabel: 'Assigned vs pool',
+    kind: 'donut',
+    series: [3, 1],
+    slices: [
+      { label: 'Assigned', value: 3 },
+      { label: 'Unassigned', value: 1 },
+    ],
   },
 ]

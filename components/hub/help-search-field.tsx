@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input'
 
 type HelpSearchFieldProps = {
   onQuery: (query: string) => void
+  placeholder?: string
 }
 
 export const HelpSearchField = forwardRef(function HelpSearchField(
-  { onQuery }: HelpSearchFieldProps,
+  { onQuery, placeholder = 'Search for help' }: HelpSearchFieldProps,
   ref: Ref<TextInput>,
 ) {
   const [value, setValue] = useState('')
@@ -23,8 +24,8 @@ export const HelpSearchField = forwardRef(function HelpSearchField(
         setValue(text)
         onQuery(text)
       }}
-      placeholder="Search for help"
-      accessibilityLabel="Search for help"
+      placeholder={placeholder}
+      accessibilityLabel={placeholder}
       returnKeyType="search"
       className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none"
     />

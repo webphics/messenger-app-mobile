@@ -7,19 +7,19 @@ alwaysApply: true
 
 Current phase is `AGENTS.md` + `docs/scope.md`. Do not install or wire the next phase’s stack.
 
-## Now (Phase 1 — UI mock)
+## Now (Phase 2 — mock auth + role hubs)
 
-Mock data only in `lib/mock-data.ts`. `DEV_ROLE` is the session role. Current user = the `Person` whose `role === DEV_ROLE` (`getDevUser()` / `DEV_USER_ID` once added). Sign-in does not authenticate.
+Mock data still in `lib/mock-data.ts`. In-memory extras in `lib/mock-catalog.ts` (FAQ / knowledge / offers adds). Session = AsyncStorage blob `{ email, role }` via `lib/session.ts` (`ism.session`). Current user = `getDevUser()` (`lib/dev-user.ts`) from `getSession().role`. Login/register validate locally then persist. No `fetch`. No fake JWT. No SecureStore. No better-auth.
 
-Optimistic send / react / reply = local component state (including swipe-to-reply). No Zustand/Redux/global message store. No `fetch` to a missing API. No fake JWT. No SecureStore.
+Contact hub stays Phase 1. Agent Home + Admin Home are hub variants. Charts are mock series, not analytics product.
 
-Dead controls stay dead: inbox compose, thread attach. No `Alert('coming soon')` fake flows.
+Optimistic send / react / reply = local component state. Dead controls stay dead: inbox compose, thread attach.
 
-RBAC capability ≠ UI this phase. Do not render internal notes. Do not build accept-from-pool, assign/transfer, delete, or broadcast screens.
+RBAC capability ≠ UI: do not render internal notes / accept-from-pool / assign / delete / broadcast.
 
-Do not install: TanStack Query, socket.io-client, expo-sqlite, Drizzle, better-auth, expo-secure-store, expo-image, react-native-keyboard-controller, i18next, FlashList, LegendList.
+Do not install: TanStack Query, socket.io-client, expo-sqlite, Drizzle, better-auth, expo-secure-store, expo-image, react-native-keyboard-controller, i18next, FlashList, LegendList. `expo-clipboard` is allowed for knowledge Copy only.
 
-Never edit `.env`. Never commit secrets. Do not log message bodies or PII.
+Never edit `.env`. Do not log message bodies, email, password, or PII.
 
 ## Phase bump
 

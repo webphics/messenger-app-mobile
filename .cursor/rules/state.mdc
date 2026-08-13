@@ -1,5 +1,5 @@
 ---
-description: Phase 1 state — mock data + local useState only. No stores or fake APIs.
+description: Phase 2 state — mock data + session blob + local useState. No stores or fake APIs.
 globs:
   - app/**/*.{ts,tsx}
   - components/**/*.{ts,tsx}
@@ -9,13 +9,13 @@ alwaysApply: false
 
 # State
 
-This phase: `lib/mock-data.ts` is the only data source. Session is `DEV_ROLE` + `getDevUser()`. Import them. Do not put session in React Context.
+Mock seed: `lib/mock-data.ts`. In-memory FAQ/knowledge/offer extras: `lib/mock-catalog.ts`. Session: `lib/session.ts` (`{ email, role }` in AsyncStorage). Current user: `getDevUser()` / `getDevUserId()` in `lib/dev-user.ts`. Do not put session in React Context.
 
 UI state (`search`, chips, FAQ expand, composer text, optimistic messages) = `useState` on the screen or feature component that owns it.
 
-Optimistic send: append a local `Message` (`status: 'sending'` → `'sent'`). Do not mutate exported mock arrays; overlay in component state.
+Optimistic send: append a local `Message` (`status: 'sending'` → `'sent'`). Do not mutate exported mock arrays; overlay in component state. Catalog adds go through `addFaq` / `addKnowledge` / `addOffer` only.
 
-Forbidden until a later phase: Zustand, Redux, Jotai, global message Context, TanStack Query, `fetch` to a missing API, fake JWT, SecureStore, AsyncStorage as a database.
+Forbidden until a later phase: Zustand, Redux, Jotai, global message Context, TanStack Query, `fetch` to a missing API, fake JWT, SecureStore. AsyncStorage is only for the session blob.
 
 ```tsx
 // BAD

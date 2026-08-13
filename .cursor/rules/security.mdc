@@ -7,10 +7,10 @@ alwaysApply: true
 
 Never edit `.env`. Never commit secrets, API keys, or JWTs.
 
-Do not `console.log` message bodies, tokens, or PII.
+Do not `console.log` email, password, tokens, message bodies, or PII.
 
-No SecureStore / AsyncStorage for session or tokens until the auth phase. No fake JWT.
+AsyncStorage is allowed **only** for mock session blob `{ email, role }` key `ism.session` (`lib/session.ts`). No SecureStore. No fake JWT. No other session keys.
 
 No `fetch` to arbitrary or missing APIs. `avatarUrl` is mock-only (`null` → initials); do not load random remote images.
 
-Phase 1 has no auth gate — that is intentional. Do not invent client-side “security” that hides routes without a real session.
+Root hydrates that blob and Redirects. This is not real auth — do not treat it as security.

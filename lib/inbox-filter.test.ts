@@ -1,6 +1,7 @@
 import {
   filterConversations,
   isResolved,
+  latestInboxThread,
   listInboxConversations,
   listUnassignedConversations,
 } from '@/lib/inbox-filter'
@@ -33,6 +34,16 @@ describe('listInboxConversations', () => {
   test('admin sees all', () => {
     expect(listInboxConversations('admin', 'admin-1', CONVERSATIONS)).toHaveLength(
       CONVERSATIONS.length,
+    )
+  })
+})
+
+describe('latestInboxThread', () => {
+  test('skips offers and returns newest visible', () => {
+    const latest = latestInboxThread('contact', 'contact-1', CONVERSATIONS)
+    expect(latest?.id).toBe('conv-assigned')
+    expect(latestInboxThread('admin', 'admin-1', CONVERSATIONS)?.id).toBe(
+      'conv-unassigned',
     )
   })
 })

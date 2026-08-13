@@ -1,18 +1,29 @@
+import { useFocusEffect } from "expo-router";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 
 import { Text } from "@/components/ui/text";
-import { FAQ_ITEMS } from "@/lib/mock-data";
+import { listFaqs } from "@/lib/mock-catalog";
 import { colors } from "@/lib/tokens";
+import type { FaqItem } from "@/lib/types";
 
 function FaqSeparator() {
   return <View className="h-3" />;
 }
 
 export function FaqList() {
-  const [openId, setOpenId] = useState<string | null>(FAQ_ITEMS[0]?.id ?? null);
+  const [items, setItems] = useState<FaqItem[]>(listFaqs);
+  const [openId, setOpenId] = useState<string | null>(listFaqs()[0]?.id ?? null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const next = listFaqs();
+      setItems(next);
+      setOpenId((id) => (id && next.some((item) => item.id === id) ? id : next[0]?.id ?? null));
+    }, []),
+  );
 
   return (
     <FlatList
@@ -20,7 +31,7 @@ export function FaqList() {
       extraData={openId}
       showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
-      data={FAQ_ITEMS}
+      data={items}
       keyExtractor={(item) => item.id}
       ItemSeparatorComponent={FaqSeparator}
       renderItem={({ item }) => {
