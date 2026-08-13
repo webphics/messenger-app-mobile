@@ -3,10 +3,6 @@ import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
 
 import { Composer } from "@/components/chat/composer";
 import {
-    MessageActions,
-    type BubbleAnchor,
-} from "@/components/chat/message-actions";
-import {
     MessageBubble,
     type QuotedMessage,
 } from "@/components/chat/message-bubble";
@@ -80,10 +76,7 @@ export function ThreadScreen({
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState(initialMessages);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [menu, setMenu] = useState<{
-    message: Message;
-    anchor: BubbleAnchor;
-  } | null>(null);
+  const [menuForId, setMenuForId] = useState<string | null>(null);
   const isGroup = conversation.kind === "group" || conversation.id === "offers";
   const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup]);
   const replyQuote = replyTo
@@ -98,12 +91,12 @@ export function ThreadScreen({
           : m,
       ),
     );
-    setMenu(null);
+    setMenuForId(null);
   }
 
   function startReply(message: Message) {
     setReplyTo(message);
-    setMenu(null);
+    setMenuForId(null);
   }
 
   function send() {
@@ -139,7 +132,26 @@ export function ThreadScreen({
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        onScrollBeginDrag={() => setMenu(null)}
+        removeClippedSubviews={false}
+        onScrollBeginDrag={() => setMenuForId(null)}
+        CellRendererComponent={({ item, children, style, ...rest }) => {
+          const row = item as Row;
+          const raised =
+            row.type === "message" && row.message.id === menuForId;
+          return (
+            <View
+              {...rest}
+              collapsable={false}
+              style={[
+                style,
+                { overflow: "visible" },
+                raised ? { zIndex: 100, elevation: 24 } : null,
+              ]}
+            >
+              {children}
+            </View>
+          );
+        }}
         renderItem={({ item }) => {
           if (item.type === "day") {
             return (
@@ -159,9 +171,12 @@ export function ThreadScreen({
               quoted={quotedOf(messages, item.message.replyToId)}
               reactions={item.message.reactions}
               currentUserId={me.id}
+              selected={menuForId === item.message.id}
               enter={item.message.id.startsWith("local-")}
-              onLongPress={(anchor) =>
-                setMenu({ message: item.message, anchor })
+              onLongPress={() =>
+                setMenuForId((id) =>
+                  id === item.message.id ? null : item.message.id,
+                )
               }
               onReply={() => startReply(item.message)}
               onToggleReaction={(emoji) => react(item.message.id, emoji)}
@@ -176,14 +191,6 @@ export function ThreadScreen({
         replyTo={replyQuote}
         onCancelReply={() => setReplyTo(null)}
       />
-      {menu ? (
-        <MessageActions
-          anchor={menu.anchor}
-          onReact={(emoji) => react(menu.message.id, emoji)}
-          onReply={() => startReply(menu.message)}
-          onDismiss={() => setMenu(null)}
-        />
-      ) : null}
     </>
   );
 

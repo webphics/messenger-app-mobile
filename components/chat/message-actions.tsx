@@ -1,98 +1,63 @@
 import { Reply } from "lucide-react-native";
-import { Modal, Pressable, useWindowDimensions, View } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pressable, View } from "react-native";
 
 import { Text } from "@/components/ui/text";
-import { cn } from "@/lib/cn";
 import { REACT_EMOJIS } from "@/lib/message-react";
 import { colors } from "@/lib/tokens";
 
-export type BubbleAnchor = {
-  pageX: number;
-  pageY: number;
-  outgoing: boolean;
-};
-
 type MessageActionsProps = {
-  anchor: BubbleAnchor;
+  outgoing: boolean;
   onReact: (emoji: string) => void;
   onReply: () => void;
-  onDismiss: () => void;
 };
 
-const PILL_H = 48;
-const REPLY_H = 40;
-const GAP = 8;
+/** Toward center: incoming right, outgoing left. */
+const X_INSET = 12;
 
 export function MessageActions({
-  anchor,
+  outgoing,
   onReact,
   onReply,
-  onDismiss,
 }: MessageActionsProps) {
-  const { width: winW, height: winH } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const pillW = Math.min(252, winW - 24);
-  const menuH = PILL_H + GAP + REPLY_H;
-
-  let left = anchor.outgoing ? anchor.pageX - pillW + 24 : anchor.pageX - 24;
-  left = Math.max(12, Math.min(left, winW - pillW - 12));
-
-  let top = anchor.pageY - menuH - GAP;
-  if (top < insets.top + 8) {
-    top = Math.min(
-      anchor.pageY + GAP,
-      winH - menuH - insets.bottom - 12,
-    );
-  }
-
   return (
-    <Modal
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={onDismiss}
-    >
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <View className="flex-1">
+    <>
+      <View
+        className="absolute z-20 flex-row rounded-full border border-line bg-surface px-1.5 py-1 shadow-md shadow-black/15"
+        style={{
+          top: "50%",
+          transform: [{ translateY: -24 }],
+          elevation: 24,
+          zIndex: 30,
+          ...(outgoing ? { right: X_INSET } : { left: X_INSET }),
+        }}
+      >
+        {REACT_EMOJIS.map((emoji) => (
           <Pressable
+            key={emoji}
             accessibilityRole="button"
-            accessibilityLabel="Dismiss reactions"
-            className="absolute inset-0 bg-ink/20"
-            onPress={onDismiss}
-          />
-          <View className="absolute" style={{ top, left, width: pillW }}>
-            <View className="flex-row rounded-full border border-line bg-surface px-1.5 py-1 shadow-md shadow-black/15">
-              {REACT_EMOJIS.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  accessibilityRole="button"
-                  accessibilityLabel={`React ${emoji}`}
-                  onPress={() => onReact(emoji)}
-                  className="size-9 items-center justify-center"
-                >
-                  <Text className="font-sans text-xl leading-6">{emoji}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Reply"
-              onPress={onReply}
-              className={cn(
-                "mt-2 min-h-10 flex-row items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 shadow-md shadow-black/15",
-                anchor.outgoing ? "self-end" : "self-start",
-              )}
-            >
-              <Reply color={colors.primary} size={18} />
-              <Text className="font-sans text-sm font-medium text-primary">
-                Reply
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-      </GestureHandlerRootView>
-    </Modal>
+            accessibilityLabel={`React ${emoji}`}
+            onPress={() => onReact(emoji)}
+            className="size-9 items-center justify-center"
+          >
+            <Text className="font-sans text-xl leading-6">{emoji}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Reply"
+        onPress={onReply}
+        className="absolute z-20 mt-2 min-h-10 flex-row items-center gap-2 rounded-full border border-line bg-surface px-4 py-2 shadow-md shadow-black/15"
+        style={{
+          top: "100%",
+          elevation: 24,
+          zIndex: 30,
+          ...(outgoing ? { right: X_INSET } : { left: X_INSET }),
+        }}
+      >
+        <Reply color={colors.primary} size={18} />
+        <Text className="font-sans text-sm font-medium text-primary">Reply</Text>
+      </Pressable>
+    </>
   );
 }

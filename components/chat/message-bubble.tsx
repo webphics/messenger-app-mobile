@@ -1,5 +1,5 @@
 import { Check, CheckCheck, CornerUpLeft, Reply } from "lucide-react-native";
-import { Pressable, View, type GestureResponderEvent } from "react-native";
+import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 
-import type { BubbleAnchor } from "@/components/chat/message-actions";
+import { MessageActions } from "@/components/chat/message-actions";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { replyCaption } from "@/lib/message-react";
@@ -33,8 +33,9 @@ type MessageBubbleProps = {
   quoted?: QuotedMessage;
   reactions?: MessageReaction[];
   currentUserId: string;
+  selected?: boolean;
   enter?: boolean;
-  onLongPress: (anchor: BubbleAnchor) => void;
+  onLongPress: () => void;
   onReply: () => void;
   onToggleReaction: (emoji: string) => void;
 };
@@ -153,17 +154,13 @@ export function MessageBubble({
   quoted,
   reactions = [],
   currentUserId,
+  selected,
   enter,
   onLongPress,
   onReply,
   onToggleReaction,
 }: MessageBubbleProps) {
   const x = useSharedValue(0);
-
-  function openMenu(event: GestureResponderEvent) {
-    const { pageX, pageY } = event.nativeEvent;
-    onLongPress({ pageX, pageY, outgoing });
-  }
   const gesture = Gesture.Pan()
     .activeOffsetX(18)
     .failOffsetY([-18, 18])
@@ -200,7 +197,7 @@ export function MessageBubble({
   return (
     <Animated.View
       entering={enter ? FadeIn.springify().damping(20).stiffness(220) : undefined}
-      className="mb-4"
+      className={cn("mb-4", selected && "z-20")}
     >
       <View className="justify-center">
         <Animated.View style={iconStyle} className="absolute left-1 z-0">
@@ -211,7 +208,10 @@ export function MessageBubble({
         <GestureDetector gesture={gesture}>
           <Animated.View
             style={bubbleStyle}
-            className={cn("max-w-[78%]", outgoing ? "self-end" : "self-start")}
+            className={cn(
+              "max-w-[78%]",
+              outgoing ? "self-end items-end" : "self-start items-start",
+            )}
           >
             {senderName ? (
               <Text className="mb-1 px-1 font-sans text-xs text-muted">
@@ -225,14 +225,20 @@ export function MessageBubble({
                 senderName={senderName}
               />
             ) : null}
-            <View className={cn("relative", reactions.length > 0 && "mb-2")}>
+            <View
+              className={cn(
+                "relative overflow-visible",
+                outgoing ? "self-end" : "self-start",
+                reactions.length > 0 && "mb-2",
+              )}
+            >
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={
                   outgoing ? "Outgoing message" : "Incoming message"
                 }
                 delayLongPress={250}
-                onLongPress={openMenu}
+                onLongPress={onLongPress}
               >
                 <View
                   className={cn(
@@ -258,6 +264,13 @@ export function MessageBubble({
                 currentUserId={currentUserId}
                 onToggleReaction={onToggleReaction}
               />
+              {selected ? (
+                <MessageActions
+                  outgoing={outgoing}
+                  onReact={onToggleReaction}
+                  onReply={onReply}
+                />
+              ) : null}
             </View>
             <Receipt status={status} outgoing={outgoing} />
           </Animated.View>
