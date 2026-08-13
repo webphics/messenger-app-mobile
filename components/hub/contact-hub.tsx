@@ -44,13 +44,15 @@ export function ContactHub() {
       showsVerticalScrollIndicator={false}
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{
-        paddingTop: insets.top,
+        paddingTop: insets.top + 12,
         paddingBottom: bottomPad,
       }}
     >
       <View className="px-4">
         <View className="flex-row items-center justify-between">
-          <Text className="font-sans text-2xl font-bold text-ink">Support</Text>
+          <Text className="font-sans text-2xl font-bold uppercase tracking-wide text-ink">
+            Support
+          </Text>
           <View className="flex-row items-center gap-3">
             <View className="flex-row">
               {agents.map((agent, i) => (
@@ -78,7 +80,7 @@ export function ContactHub() {
           </View>
         </View>
 
-        <Text className="mt-6 font-sans text-base text-ink-soft">
+        <Text className="mt-6 font-sans text-base font-normal text-ink-soft">
           Hi {firstName(me.displayName)}
         </Text>
         <Text className="mt-1 font-sans text-2xl font-bold text-ink">
@@ -96,7 +98,7 @@ export function ContactHub() {
             className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
           >
             <MessageCircle color={colors.primary} size={22} />
-            <Text className="mt-3 font-sans text-base font-semibold text-ink">
+            <Text className="mt-3 font-sans text-base font-medium text-ink">
               Messages
             </Text>
           </Pressable>
@@ -107,7 +109,7 @@ export function ContactHub() {
             className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
           >
             <HelpCircle color={colors.primary} size={22} />
-            <Text className="mt-3 font-sans text-base font-semibold text-ink">
+            <Text className="mt-3 font-sans text-base font-medium text-ink">
               Help
             </Text>
           </Pressable>
@@ -129,13 +131,13 @@ export function ContactHub() {
             </Avatar>
             <View className="min-w-0 flex-1">
               <Text
-                className="font-sans text-base font-semibold text-ink"
+                className="font-sans text-base font-medium text-ink"
                 numberOfLines={1}
               >
                 {other?.displayName ?? recent.subject ?? "Support"}
               </Text>
               <Text
-                className="mt-0.5 font-sans text-sm text-muted"
+                className="mt-0.5 font-sans text-sm font-normal text-muted"
                 numberOfLines={1}
               >
                 {recent.lastMessagePreview} ·{" "}
@@ -153,7 +155,7 @@ export function ContactHub() {
           className="mt-4 min-h-11 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-md shadow-black/10"
         >
           <Search color={colors.muted} size={20} />
-          <Text className="font-sans text-base text-muted">
+          <Text className="font-sans text-base font-normal text-muted">
             Search for help
           </Text>
         </Pressable>
@@ -165,14 +167,14 @@ export function ContactHub() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Frequently asked questions"
-          onPress={() => router.push("/(contact)/help")}
+          onPress={() => router.push("/(contact)/faq")}
           className="mt-6 min-h-11 flex-row items-center justify-between rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
         >
           <View className="min-w-0 flex-1 pr-2">
-            <Text className="font-sans text-base font-semibold text-ink">
+            <Text className="font-sans text-base font-medium text-ink">
               Frequently Asked Questions
             </Text>
-            <Text className="mt-1 font-sans text-sm text-muted">
+            <Text className="mt-1 font-sans text-sm font-normal text-muted">
               Common questions — passwords, billing, access…
             </Text>
           </View>

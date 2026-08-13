@@ -58,12 +58,12 @@ export function ConversationRow({
 
       <View className="min-w-0 flex-1">
         <Text
-          className="font-sans text-base font-semibold text-ink"
+          className="font-sans text-base font-medium text-ink"
           numberOfLines={1}
         >
           {title}
         </Text>
-        <Text className="mt-0.5 font-sans text-sm text-muted" numberOfLines={1}>
+        <Text className="mt-0.5 font-sans text-sm font-normal text-muted" numberOfLines={1}>
           {conversation.lastMessagePreview} ·{" "}
           {formatRelativeTime(conversation.updatedAt)}
         </Text>
@@ -71,7 +71,7 @@ export function ConversationRow({
 
       {conversation.unreadCount > 0 ? (
         <View className="min-h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5">
-          <Text className="font-sans text-xs font-semibold text-white">
+          <Text className="font-sans text-xs font-bold text-white">
             {conversation.unreadCount}
           </Text>
         </View>

@@ -50,7 +50,7 @@ export function HelpSearchScreen() {
         contentContainerClassName="px-4 py-2"
         ListEmptyComponent={
           query.trim() ? (
-            <Text className="px-1 py-8 text-center font-sans text-sm text-muted">No results</Text>
+            <Text className="px-1 py-8 text-center font-sans text-sm font-normal text-muted">No results</Text>
           ) : null
         }
         renderItem={({ item }) => {
@@ -62,10 +62,10 @@ export function HelpSearchScreen() {
               onPress={() => setOpenId(open ? null : item.id)}
               className="border-b border-line py-3"
             >
-              <Text className="font-sans text-base font-semibold text-ink">{item.question}</Text>
+              <Text className="font-sans text-base font-medium text-ink">{item.question}</Text>
               {open ? (
                 <Animated.View entering={FadeIn.springify().damping(20).stiffness(220)}>
-                  <Text className="mt-2 font-sans text-sm leading-5 text-ink-soft">{item.answer}</Text>
+                  <Text className="mt-2 font-sans text-sm font-normal leading-5 text-ink-soft">{item.answer}</Text>
                 </Animated.View>
               ) : null}
             </Pressable>

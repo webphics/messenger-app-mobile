@@ -33,10 +33,10 @@ export function Composer({
       {replyTo ? (
         <View className="flex-row items-center gap-2 px-4 pb-1 pt-2">
           <View className="min-w-0 flex-1">
-            <Text className="font-sans text-xs text-muted" numberOfLines={1}>
+            <Text className="font-sans text-xs font-medium text-muted" numberOfLines={1}>
               Replying to {replyTo.name}
             </Text>
-            <Text className="font-sans text-xs text-ink-soft" numberOfLines={1}>
+            <Text className="font-sans text-xs font-normal text-ink-soft" numberOfLines={1}>
               {replyTo.body}
             </Text>
           </View>

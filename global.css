@@ -25,7 +25,7 @@
   --color-line: #e4e6ec;
   --color-primary: #3452d9;
   --color-primary-soft: #e8edfb;
-  --color-bubble-in: #e4e7f0;
+  --color-bubble-in: #ffffff;
   --color-success: #1f9d6c;
   --color-danger: #d64545;
   --color-amber: #e2831c;
@@ -56,7 +56,7 @@
       --color-line: #e4e6ec;
       --color-primary: #3452d9;
       --color-primary-soft: #e8edfb;
-      --color-bubble-in: #e4e7f0;
+      --color-bubble-in: #ffffff;
       --color-success: #1f9d6c;
       --color-danger: #d64545;
       --color-amber: #e2831c;
@@ -103,4 +103,26 @@
       --color-ring: #6b82f0;
     }
   }
+}
+
+/* RN ignores fontWeight on a single Manrope face — map utilities to loaded keys. */
+@utility font-normal {
+  font-family: Manrope;
+  font-weight: 400;
+}
+@utility font-medium {
+  font-family: Manrope-Medium;
+  font-weight: 500;
+}
+@utility font-semibold {
+  font-family: Manrope-SemiBold;
+  font-weight: 600;
+}
+@utility font-bold {
+  font-family: Manrope-Bold;
+  font-weight: 700;
+}
+@utility font-extrabold {
+  font-family: Manrope-Bold;
+  font-weight: 800;
 }

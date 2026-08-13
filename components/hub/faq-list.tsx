@@ -28,7 +28,7 @@ export function FaqList() {
             className="rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
           >
             <View className="flex-row items-start justify-between gap-3">
-              <Text className="flex-1 font-sans text-base font-semibold text-ink">
+              <Text className="flex-1 font-sans text-base font-medium text-ink">
                 {item.question}
               </Text>
               {open ? (
@@ -41,7 +41,7 @@ export function FaqList() {
               <Animated.View
                 entering={FadeIn.springify().damping(20).stiffness(220)}
               >
-                <Text className="mt-2 font-sans text-sm leading-5 text-ink-soft">
+                <Text className="mt-2 font-sans text-sm font-normal leading-5 text-ink-soft">
                   {item.answer}
                 </Text>
               </Animated.View>

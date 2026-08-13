@@ -124,7 +124,7 @@ export function InboxScreen({
           />
         )}
         ListEmptyComponent={
-          <Text className="px-4 py-8 text-center font-sans text-sm text-muted">
+          <Text className="px-4 py-8 text-center font-sans text-sm font-normal text-muted">
             No conversations
           </Text>
         }

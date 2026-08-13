@@ -27,7 +27,7 @@ export function OffersCarousel() {
           <Text className="font-sans text-base font-semibold text-ink">
             Offers you may like
           </Text>
-          <Text className="font-sans text-xs text-muted">Sponsored</Text>
+          <Text className="font-sans text-xs font-normal text-muted">Sponsored</Text>
         </View>
         <Pressable
           accessibilityRole="button"

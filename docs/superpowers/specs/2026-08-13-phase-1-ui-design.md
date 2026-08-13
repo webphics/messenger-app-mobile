@@ -13,7 +13,7 @@ Visual source of truth (locked):
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Contact hub | nsave-style hub mock (Support / How can we help / Messages+Help / Recent / Search / Offers ads carousel / FAQ). **No Contact tab bar** — header gear + stack back. |
 | Inbox       | Messenger-style light list (Messages / search / All·Open·Resolved / rows + unread pills / Offers megaphone row)                                                    |
-| Thread      | Simple modern bubbles (light grey in, primary blue out, pill composer). Not the earlier “old tool” thread mock. Not Messenger dark. Not red outgoing.              |
+| Thread      | Simple modern bubbles (white in on light / gray in on dark, primary blue out, pill composer). Not the earlier “old tool” thread mock. Not Messenger dark. Not red outgoing.              |
 
 ---
 
@@ -21,7 +21,7 @@ Visual source of truth (locked):
 
 Replace Phase 0 labeled shells with real mock UI:
 
-1. Contact **Home hub** + Help FAQ list
+1. Contact **Home hub** + Help landing + FAQ list (separate routes)
 2. **Inbox** list (Contact stack + Agent Chats + Admin conversations)
 3. **Thread** (`/chat/[id]`) with bubbles + optimistic send
 
@@ -55,14 +55,15 @@ Still `DEV_ROLE` session. Still `lib/mock-data.ts` + `lib/rbac.ts`.
 
 ### 3.1 Contact
 
-**Stack, no tab bar.** Hub gear → settings. Messages / Help / Settings push with native back. Agent/Admin keep their tabs.
+**Stack, no tab bar.** Hub gear → settings. Messages / Help / FAQ / Search / Settings push with native back. Agent/Admin keep their tabs.
 
 | From                                                  | To                                  |
 | ----------------------------------------------------- | ----------------------------------- |
 | Home (index)                                          | Hub (`headerShown: false`)          |
 | Messages card                                         | `/(contact)/messages` (stack, back) |
 | Recent message                                        | `/chat/[id]` of that thread         |
-| Help / FAQ card                                       | `/(contact)/help` (stack, back)     |
+| Help card                                             | `/(contact)/help` (hours + links)   |
+| FAQ card                                              | `/(contact)/faq` (expandable list)  |
 | Search for help                                       | `/(contact)/search` (in-screen back + autofocus “Search for help”, filter FAQ mock) |
 | Offer **View offer** / See all / **Join Offers chat** | `/chat/offers`                      |
 | Header gear                                           | `/(contact)/settings` (stack, back) |
@@ -102,7 +103,7 @@ Keep Phase 0 tokens. Do not switch to nsave maroon or Messenger black.
 | `primary` `#3452D9`          | actions, outgoing bubbles, active tab, unread pill, Join Offers chat |
 | `success`                    | online dot                                                           |
 
-Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: gradient (local `visual` key), white CTA, carousel `edgePad` 16 on the left. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill ≈ `#E4E7F0`; outgoing = `primary`; radius ~18–20.
+Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: gradient (local `visual` key), white CTA, carousel `edgePad` 16 on the left. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill = white (`#FFFFFF`) light / gray (`#2A2E3B`) dark; outgoing = `primary`; radius ~18–20. Type weight: titles `font-bold`, sections `font-semibold`, cards/rows `font-medium`, body `font-normal` (Manrope faces via `global.css` utilities). Hub title **SUPPORT** uppercase.
 
 Compose icon on inbox: visible, **dead** (no new-thread flow).
 
@@ -112,14 +113,18 @@ Compose icon on inbox: visible, **dead** (no new-thread flow).
 
 ScrollView, pixel target = locked hub mock.
 
-1. Header: “Support”, overlapping avatars (assigned agents from mock, fallback initials), gear → settings
+1. Header: **SUPPORT** (uppercase), overlapping avatars (assigned agents from mock, fallback initials), gear → settings. Hub `paddingTop` = safe inset + 12.
 2. `Hi {firstName}` + **How can we help?**
 3. Nav card: Messages → `/(contact)/messages`; Help → `/(contact)/help`
 4. Recent message: latest own non-Offers thread; tap → `/chat/[id]`
-5. Search card: “Search for help” → `/(contact)/help` (no live search)
+5. Search card: “Search for help” → `/(contact)/search` (autofocus FAQ filter)
 6. Offers ads block: title + `Sponsored` (label only) + See all → `/chat/offers`; horizontal paging carousel; dots; **Join Offers chat** → `/chat/offers`
-7. FAQ card → `/(contact)/help`
-8. Tab bar Home (active) \| Settings
+7. FAQ card → `/(contact)/faq`
+8. No Contact tab bar — header gear + stack back
+
+**Help (`/(contact)/help`):** hours copy + links to Messages / Search / FAQ. Not the FAQ list.
+
+**FAQ (`/(contact)/faq`):** FlatList of FAQ items (`FaqItem`: `id`, `question`, `answer`). Tap a question to expand/collapse the answer under it. No CMS, no new RNR primitive.
 
 **Offer type:**
 
@@ -138,8 +143,6 @@ export type Offer = {
 
 Fixtures: 3 offers. All `chatId: 'offers'`. No ad SDK. No commerce checkout.
 
-**Help (`/(contact)/help`):** FlatList of FAQ items (`FaqItem`: `id`, `question`, `answer`). Tap a question to expand/collapse the answer under it. No extra screen, no CMS, no new RNR primitive.
-
 ---
 
 ## 6. Inbox (Plan 2)
@@ -148,7 +151,7 @@ Pixel target = locked inbox mock.
 
 Chrome: title “Messages”, dead compose icon, search (client filter on name/subject/preview), chips **All | Open | Resolved**.
 
-**Row:** avatar, green online dot if `Person.isOnline`, bold title (displayName or subject or `Offers`), grey `preview · relativeTime`, blue unread count if `unreadCount > 0`. Offers row: megaphone-in-circle avatar, title `Offers`, always shown to Contact.
+**Row:** avatar, green online dot if `Person.isOnline`, medium title (displayName or subject or `Offers`), grey `preview · relativeTime`, blue unread count if `unreadCount > 0`. Offers row: megaphone-in-circle avatar, title `Offers`, always shown to Contact.
 
 **Title rule:**
 
@@ -228,10 +231,11 @@ Current user for Contact hub greeting: `getDevUser().displayName` first token �
 ## 9. Files (kebab-case)
 
 ```
-app/(contact)/_layout.tsx          # Stack — hub + messages/help/search/settings (no tab bar)
+app/(contact)/_layout.tsx          # Stack — hub + messages/help/faq/search/settings (no tab bar)
 app/(contact)/index.tsx            # hub
 app/(contact)/messages.tsx         # inbox push
-app/(contact)/help.tsx             # FAQ push
+app/(contact)/help.tsx             # Help landing
+app/(contact)/faq.tsx              # FAQ list
 app/(contact)/search.tsx           # help search push
 app/(agent)/index.tsx              # inbox
 app/(agent)/unassigned.tsx         # unassigned list

@@ -75,7 +75,7 @@ function QuoteChrome({
     <View className={cn("mb-0.5", outgoing ? "items-end" : "items-start")}>
       <View className="mb-0.5 flex-row items-center gap-1 px-1">
         <CornerUpLeft color={colors.muted} size={12} />
-        <Text className="font-sans text-[11px] text-muted" numberOfLines={1}>
+        <Text className="font-sans text-[11px] font-medium text-muted" numberOfLines={1}>
           {replyCaption({
             outgoing,
             senderName,
@@ -86,7 +86,7 @@ function QuoteChrome({
       </View>
       <View className="max-w-[92%] rounded-[18px] bg-bubble-in px-3 py-1.5 opacity-80">
         <Text
-          className="font-sans text-xs leading-4 text-muted"
+          className="font-sans text-xs font-normal leading-4 text-muted"
           numberOfLines={2}
         >
           {quoted.body}
@@ -269,7 +269,7 @@ export function MessageBubble({
                 >
                   <Text
                     className={cn(
-                      "font-sans text-[15px] leading-5",
+                      "font-sans text-[15px] font-normal leading-5",
                       outgoing ? "text-primary-foreground" : "text-ink",
                     )}
                   >

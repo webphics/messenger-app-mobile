@@ -1,5 +1,5 @@
-import { FaqList } from '@/components/hub/faq-list'
+import { HelpHome } from "@/components/hub/help-home";
 
 export default function ContactHelpScreen() {
-  return <FaqList />
+  return <HelpHome />;
 }

@@ -12,7 +12,7 @@
 
 - Spec: `docs/superpowers/specs/2026-08-13-phase-1-ui-design.md` §7. Depends on Plan 1 types/mock + Plan 2 `conversationTitle` + `lib/display.ts`.
 - Rejected looks: old “tool” thread mock, Messenger dark, red outgoing, GIF/mic/camera/thumbs-up, in-bubble identity on every 1:1 message, mono `conv-assigned` in header.
-- Incoming fill ≈ `#E4E7F0`; outgoing = `primary` `#3452D9`; bubble radius ~18–20. Light `bg` + `surface` composer.
+- Incoming fill = white `#FFFFFF` (light) / gray `#2A2E3B` (dark); outgoing = `primary` `#3452D9`; bubble radius ~18–20. Light `bg` + `surface` composer.
 - Attach `+` is **dead**. Send requires non-empty body. Optimistic: append `status: 'sending'` then immediately `'sent'`. Do not `fetch`. Do not mutate `MESSAGES`.
 - `id` param: `const id = Array.isArray(raw) ? raw[0] : raw`. Do not `Redirect` until params have hydrated (`raw !== undefined`).
 - `canViewConversation(DEV_ROLE, DEV_USER_ID, conversation)` — else `Redirect` to `ROLE_HREF[DEV_ROLE]`.
@@ -35,7 +35,7 @@
 7. **Receipts outside the bubble:** ticks only under the pill (Check = sent/sending, CheckCheck = delivered, primary CheckCheck = read). No Sent/Delivered/Read labels. Outgoing bubble `rounded-[22px] rounded-br-md`; incoming `rounded-bl-md`. Mock thread includes emoji + mixed statuses so receipts can be previewed.
 8. **Reactions + reply (Messenger chrome, light theme):** `Message.replyToId?` + `Message.reactions?`. Swipe right → quick reply. Long-press → emoji pill on the bubble + bottom Reply. Quote is a fused grey pill **above** the message (“You replied to …”), not an in-bubble accent block. Reaction badge overlaps the bubble corner. Toggle via `lib/message-react.ts` (one emoji per user). Optimistic local state — do not mutate exported `MESSAGES`. Attach stays dead. Not Messenger dark, not call/video, not thumbs-up composer.
 9. **Chat chrome tightness:** Native-stack ignores JS `headerStatusBarHeight`. Android: `disableTopInsetApplication` only (do not stack a second status inset). Keep system 3-button / gesture bar visible (`NavigationBar hidden={false}`, `style="dark"` = dark icons on white chin). Composer sits above it — no extra Android `paddingBottom`. iOS home-indicator pad lives **inside** `bg-surface`. Root stack `ios_from_right`.
-10. **Thread open jitter:** `setOptions` stays in `useLayoutEffect` (Expo Router throws if called during render). Do **not** spread `stackChrome` into `setOptions` (`unstable_nativeProps` belongs on `Stack.Screen` only). Existing bubbles do **not** use Reanimated `entering`; only optimistic `local-*` sends fade in. Incoming token `#E4E7F0` vs `bg` `#F5F6F9`.
+10. **Thread open jitter:** `setOptions` stays in `useLayoutEffect` (Expo Router throws if called during render). Do **not** spread `stackChrome` into `setOptions` (`unstable_nativeProps` belongs on `Stack.Screen` only). Existing bubbles do **not** use Reanimated `entering`; only optimistic `local-*` sends fade in. Incoming token light `#FFFFFF` / dark `#2A2E3B` vs `bg` `#F5F6F9`.
 
 ## File map
 

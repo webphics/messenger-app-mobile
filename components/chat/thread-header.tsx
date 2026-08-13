@@ -44,13 +44,13 @@ export function ThreadHeader({ conversation }: ThreadHeaderProps) {
         <Text className="font-sans text-[15px] font-semibold leading-5 text-ink" numberOfLines={1}>
           {title}
         </Text>
-        <Text className="font-sans text-[11px] leading-4 text-muted" numberOfLines={1}>
+        <Text className="font-sans text-[11px] font-normal leading-4 text-muted" numberOfLines={1}>
           {subtitle}
         </Text>
       </View>
       {pill ? (
         <View className="rounded-full bg-bg px-2 py-0.5">
-          <Text className="font-sans text-[10px] text-ink-soft">{pill}</Text>
+          <Text className="font-sans text-[10px] font-medium text-ink-soft">{pill}</Text>
         </View>
       ) : null}
     </View>

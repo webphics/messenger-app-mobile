@@ -42,7 +42,7 @@ export function OfferCard({ offer, cardWidth, index, onPress }: OfferCardProps) 
             style={{ minHeight: 196, justifyContent: 'flex-end', paddingHorizontal: 20, paddingVertical: 20 }}
           >
             <Text className="font-sans text-xl font-bold text-white">{offer.title}</Text>
-            <Text className="mt-1.5 font-sans text-sm leading-5 text-white/90">{offer.subtitle}</Text>
+            <Text className="mt-1.5 font-sans text-sm font-normal leading-5 text-white/90">{offer.subtitle}</Text>
             <View className="mt-5 self-start rounded-full bg-white px-5 py-2.5">
               <Text className="font-sans text-sm font-semibold text-primary">{offer.ctaLabel}</Text>
             </View>

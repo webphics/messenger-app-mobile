@@ -19,7 +19,11 @@ const headerChrome = {
   headerShown: true,
   headerStyle: { backgroundColor: colors.surface },
   headerTintColor: colors.ink,
-  headerTitleStyle: { color: colors.ink, fontWeight: "600" as const },
+  headerTitleStyle: {
+    color: colors.ink,
+    fontFamily: "Manrope-SemiBold",
+    fontWeight: "600" as const,
+  },
   headerShadowVisible: false,
 } as const;
 
