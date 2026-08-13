@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { AlertCircle, CheckCircle, KeyRound, Sparkles } from "lucide-react-native";
+import { AlertCircle, Sparkles } from "lucide-react-native";
 import { useState } from "react";
 import { Image, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -69,8 +69,10 @@ export function AuthForm({ mode }: AuthFormProps) {
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
-        paddingTop: screenTopPad(insets.top),
-        paddingBottom: insets.bottom + 32,
+        flexGrow: 1,
+        justifyContent: "center",
+        paddingTop: Math.max(screenTopPad(insets.top), 24),
+        paddingBottom: insets.bottom + 24,
       }}
     >
       <View className="items-center">
