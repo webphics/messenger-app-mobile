@@ -38,59 +38,77 @@
 
 ## File map
 
-| Path | Responsibility |
-|---|---|
-| `lib/message-day.ts` | Date divider key + label |
-| `lib/message-day.test.ts` | Day-change cases |
-| `components/chat/message-bubble.tsx` | Pill + quote + reaction chips + ticks |
-| `components/chat/message-actions.tsx` | Long-press emoji row + Reply |
-| `components/chat/composer.tsx` | Pill input + dead attach + send + reply banner |
-| `lib/message-react.ts` | toggleReaction + quotePreview |
-| `components/chat/thread-header.tsx` | Back is native; custom title block |
-| `components/chat/thread-screen.tsx` | List + optimistic send + header options |
-| `app/chat/[id].tsx` | Hydrate + RBAC gate + compose `ThreadScreen` |
+| Path                                  | Responsibility                                 |
+| ------------------------------------- | ---------------------------------------------- |
+| `lib/message-day.ts`                  | Date divider key + label                       |
+| `lib/message-day.test.ts`             | Day-change cases                               |
+| `components/chat/message-bubble.tsx`  | Pill + quote + reaction chips + ticks          |
+| `components/chat/message-actions.tsx` | Long-press emoji row + Reply                   |
+| `components/chat/composer.tsx`        | Pill input + dead attach + send + reply banner |
+| `lib/message-react.ts`                | toggleReaction + quotePreview                  |
+| `components/chat/thread-header.tsx`   | Back is native; custom title block             |
+| `components/chat/thread-screen.tsx`   | List + optimistic send + header options        |
+| `app/chat/[id].tsx`                   | Hydrate + RBAC gate + compose `ThreadScreen`   |
 
 ---
 
 ### Task 1: Day divider helper (TDD)
 
 **Files:**
+
 - Create: `lib/message-day.ts`
 - Create: `lib/message-day.test.ts`
 
 **Interfaces:**
+
 - Consumes: ISO `createdAt`
 - Produces: `dayKey(iso)`, `formatDayLabel(iso, nowMs?)`, `shouldShowDayDivider(currentIso, previousIso)`
 
 - [ ] **Step 1: Write failing tests**
 
 ```ts
-import { dayKey, formatDayLabel, shouldShowDayDivider } from '@/lib/message-day'
+import {
+  dayKey,
+  formatDayLabel,
+  shouldShowDayDivider,
+} from "@/lib/message-day";
 
-describe('dayKey', () => {
-  test('UTC calendar day', () => {
-    expect(dayKey('2026-08-13T08:00:00.000Z')).toBe('2026-08-13')
-    expect(dayKey('2026-08-12T16:05:00.000Z')).toBe('2026-08-12')
-  })
-})
+describe("dayKey", () => {
+  test("UTC calendar day", () => {
+    expect(dayKey("2026-08-13T08:00:00.000Z")).toBe("2026-08-13");
+    expect(dayKey("2026-08-12T16:05:00.000Z")).toBe("2026-08-12");
+  });
+});
 
-describe('shouldShowDayDivider', () => {
-  test('true when previous is missing or different day', () => {
-    expect(shouldShowDayDivider('2026-08-13T08:00:00.000Z', undefined)).toBe(true)
-    expect(shouldShowDayDivider('2026-08-13T08:12:00.000Z', '2026-08-13T08:00:00.000Z')).toBe(false)
-    expect(shouldShowDayDivider('2026-08-13T08:00:00.000Z', '2026-08-12T16:05:00.000Z')).toBe(true)
-  })
-})
+describe("shouldShowDayDivider", () => {
+  test("true when previous is missing or different day", () => {
+    expect(shouldShowDayDivider("2026-08-13T08:00:00.000Z", undefined)).toBe(
+      true,
+    );
+    expect(
+      shouldShowDayDivider(
+        "2026-08-13T08:12:00.000Z",
+        "2026-08-13T08:00:00.000Z",
+      ),
+    ).toBe(false);
+    expect(
+      shouldShowDayDivider(
+        "2026-08-13T08:00:00.000Z",
+        "2026-08-12T16:05:00.000Z",
+      ),
+    ).toBe(true);
+  });
+});
 
-describe('formatDayLabel', () => {
-  const now = Date.parse('2026-08-13T12:00:00.000Z')
+describe("formatDayLabel", () => {
+  const now = Date.parse("2026-08-13T12:00:00.000Z");
 
-  test('today / yesterday / date', () => {
-    expect(formatDayLabel('2026-08-13T08:00:00.000Z', now)).toBe('Today')
-    expect(formatDayLabel('2026-08-12T16:05:00.000Z', now)).toBe('Yesterday')
-    expect(formatDayLabel('2026-08-10T10:00:00.000Z', now)).toBe('Aug 10')
-  })
-})
+  test("today / yesterday / date", () => {
+    expect(formatDayLabel("2026-08-13T08:00:00.000Z", now)).toBe("Today");
+    expect(formatDayLabel("2026-08-12T16:05:00.000Z", now)).toBe("Yesterday");
+    expect(formatDayLabel("2026-08-10T10:00:00.000Z", now)).toBe("Aug 10");
+  });
+});
 ```
 
 - [ ] **Step 2: Run — expect FAIL**
@@ -104,31 +122,48 @@ Expected: FAIL — module missing.
 - [ ] **Step 3: Implement `lib/message-day.ts`**
 
 ```ts
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 export function dayKey(iso: string): string {
-  return iso.slice(0, 10)
+  return iso.slice(0, 10);
 }
 
-export function shouldShowDayDivider(currentIso: string, previousIso?: string): boolean {
-  if (!previousIso) return true
-  return dayKey(currentIso) !== dayKey(previousIso)
+export function shouldShowDayDivider(
+  currentIso: string,
+  previousIso?: string,
+): boolean {
+  if (!previousIso) return true;
+  return dayKey(currentIso) !== dayKey(previousIso);
 }
 
 function utcYmd(ms: number): { y: number; m: number; d: number } {
-  const dt = new Date(ms)
-  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth(), d: dt.getUTCDate() }
+  const dt = new Date(ms);
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth(), d: dt.getUTCDate() };
 }
 
 export function formatDayLabel(iso: string, nowMs = Date.now()): string {
-  const then = Date.parse(iso)
-  if (Number.isNaN(then)) return ''
-  const a = utcYmd(then)
-  const b = utcYmd(nowMs)
-  if (a.y === b.y && a.m === b.m && a.d === b.d) return 'Today'
-  const yesterday = utcYmd(nowMs - 86_400_000)
-  if (a.y === yesterday.y && a.m === yesterday.m && a.d === yesterday.d) return 'Yesterday'
-  return `${MONTHS[a.m]} ${a.d}`
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return "";
+  const a = utcYmd(then);
+  const b = utcYmd(nowMs);
+  if (a.y === b.y && a.m === b.m && a.d === b.d) return "Today";
+  const yesterday = utcYmd(nowMs - 86_400_000);
+  if (a.y === yesterday.y && a.m === yesterday.m && a.d === yesterday.d)
+    return "Yesterday";
+  return `${MONTHS[a.m]} ${a.d}`;
 }
 ```
 
@@ -147,64 +182,90 @@ Expected: PASS.
 ### Task 2: Bubble + composer
 
 **Files:**
+
 - Create: `components/chat/message-bubble.tsx`
 - Create: `components/chat/composer.tsx`
 
 **Interfaces:**
+
 - Consumes: `Message`, `Person`, `initials` not needed on 1:1; `Check` / `CheckCheck` from lucide
 - Produces: `MessageBubble`, `Composer`
 
 - [ ] **Step 1: Create `components/chat/message-bubble.tsx`**
 
 ```tsx
-import { Check, CheckCheck } from 'lucide-react-native'
-import { View } from 'react-native'
+import { Check, CheckCheck } from "lucide-react-native";
+import { View } from "react-native";
 
-import { Text } from '@/components/ui/text'
-import { cn } from '@/lib/cn'
-import type { Message, MessageStatus } from '@/lib/types'
+import { Text } from "@/components/ui/text";
+import { cn } from "@/lib/cn";
+import type { Message, MessageStatus } from "@/lib/types";
 
 type MessageBubbleProps = {
-  body: string
-  outgoing: boolean
-  status: MessageStatus
-  senderName?: string
-}
+  body: string;
+  outgoing: boolean;
+  status: MessageStatus;
+  senderName?: string;
+};
 
-function Ticks({ status, outgoing }: { status: MessageStatus; outgoing: boolean }) {
-  if (!outgoing) return null
-  if (status === 'sending') {
-    return <Text className="mt-1 text-right font-sans text-[10px] text-primary-foreground/80">Sending</Text>
+function Ticks({
+  status,
+  outgoing,
+}: {
+  status: MessageStatus;
+  outgoing: boolean;
+}) {
+  if (!outgoing) return null;
+  if (status === "sending") {
+    return (
+      <Text className="mt-1 text-right font-sans text-[10px] text-primary-foreground/80">
+        Sending
+      </Text>
+    );
   }
-  const color = status === 'read' ? '#FFFFFF' : 'rgba(255,255,255,0.85)'
-  const Icon = status === 'sent' ? Check : CheckCheck
+  const color = status === "read" ? "#FFFFFF" : "rgba(255,255,255,0.85)";
+  const Icon = status === "sent" ? Check : CheckCheck;
   return (
     <View className="mt-1 items-end">
       <Icon color={color} size={12} />
     </View>
-  )
+  );
 }
 
-export function MessageBubble({ body, outgoing, status, senderName }: MessageBubbleProps) {
+export function MessageBubble({
+  body,
+  outgoing,
+  status,
+  senderName,
+}: MessageBubbleProps) {
   return (
-    <View className={cn('mb-2 max-w-[78%]', outgoing ? 'self-end' : 'self-start')}>
+    <View
+      className={cn("mb-2 max-w-[78%]", outgoing ? "self-end" : "self-start")}
+    >
       {senderName ? (
-        <Text className="mb-1 px-1 font-sans text-xs text-muted">{senderName}</Text>
+        <Text className="mb-1 px-1 font-sans text-xs text-muted">
+          {senderName}
+        </Text>
       ) : null}
       <View
         className={cn(
-          'px-3.5 py-2.5',
-          outgoing ? 'bg-primary' : 'bg-bubble-in',
+          "px-3.5 py-2.5",
+          outgoing ? "bg-primary" : "bg-bubble-in",
         )}
         style={{ borderRadius: 18 }}
       >
-        <Text className={cn('font-sans text-[15px] leading-5', outgoing ? 'text-primary-foreground' : 'text-ink')}>
+        <Text
+          className={cn(
+            "font-sans text-[15px] leading-5",
+            outgoing ? "text-primary-foreground" : "text-ink",
+          )}
+        >
           {body}
         </Text>
         <Ticks status={status} outgoing={outgoing} />
       </View>
     </View>
-  )
+  );
 }
 ```
 
@@ -213,20 +274,20 @@ No identity block inside 1:1 bubbles. `senderName` only when the parent passes i
 - [ ] **Step 2: Create `components/chat/composer.tsx`**
 
 ```tsx
-import { Plus, Send } from 'lucide-react-native'
-import { Pressable, View } from 'react-native'
+import { Plus, Send } from "lucide-react-native";
+import { Pressable, View } from "react-native";
 
-import { Input } from '@/components/ui/input'
-import { colors } from '@/lib/tokens'
+import { Input } from "@/components/ui/input";
+import { colors } from "@/lib/tokens";
 
 type ComposerProps = {
-  value: string
-  onChangeText: (text: string) => void
-  onSend: () => void
-}
+  value: string;
+  onChangeText: (text: string) => void;
+  onSend: () => void;
+};
 
 export function Composer({ value, onChangeText, onSend }: ComposerProps) {
-  const canSend = value.trim().length > 0
+  const canSend = value.trim().length > 0;
 
   return (
     <View className="flex-row items-end gap-2 border-t border-line bg-surface px-3 py-2">
@@ -257,7 +318,7 @@ export function Composer({ value, onChangeText, onSend }: ComposerProps) {
         <Send color="#FFFFFF" size={18} />
       </Pressable>
     </View>
-  )
+  );
 }
 ```
 
@@ -268,56 +329,67 @@ No GIF, mic, camera, or thumbs-up. Attach stays dead.
 ### Task 3: Thread header + thread screen
 
 **Files:**
+
 - Create: `components/chat/thread-header.tsx`
 - Create: `components/chat/thread-screen.tsx`
 
 **Interfaces:**
+
 - Consumes: `Conversation`, `Message`, `Person`, `conversationTitle`, `LABELS`, `PEOPLE`, `DEV_USER_ID`, `getDevUser`, `formatDayLabel`, `shouldShowDayDivider`, `MessageBubble`, `Composer`
 - Produces: `ThreadHeader`, `ThreadScreen` (`conversation: Conversation`, `initialMessages: Message[]`)
 
 - [ ] **Step 1: Create `components/chat/thread-header.tsx`**
 
 ```tsx
-import { View } from 'react-native'
+import { View } from "react-native";
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Text } from '@/components/ui/text'
-import { conversationTitle } from '@/lib/conversation-title'
-import { initials } from '@/lib/display'
-import { DEV_USER_ID, LABELS, PEOPLE } from '@/lib/mock-data'
-import type { Conversation } from '@/lib/types'
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Text } from "@/components/ui/text";
+import { conversationTitle } from "@/lib/conversation-title";
+import { initials } from "@/lib/display";
+import { DEV_USER_ID, LABELS, PEOPLE } from "@/lib/mock-data";
+import type { Conversation } from "@/lib/types";
 
 type ThreadHeaderProps = {
-  conversation: Conversation
-}
+  conversation: Conversation;
+};
 
 function statusPill(conversation: Conversation): string | null {
-  if (conversation.labelIds.some((id) => LABELS.find((l) => l.id === id)?.name === 'Resolved')) {
-    return 'Resolved'
+  if (
+    conversation.labelIds.some(
+      (id) => LABELS.find((l) => l.id === id)?.name === "Resolved",
+    )
+  ) {
+    return "Resolved";
   }
-  if (conversation.assigneeId === null) return 'Unassigned'
-  return 'Assigned'
+  if (conversation.assigneeId === null) return "Unassigned";
+  return "Assigned";
 }
 
 export function ThreadHeader({ conversation }: ThreadHeaderProps) {
-  const title = conversationTitle(conversation, PEOPLE, DEV_USER_ID)
-  const otherId = conversation.participantIds.find((id) => id !== DEV_USER_ID)
-  const other = PEOPLE.find((p) => p.id === otherId)
-  const isGroup = conversation.kind === 'group' || conversation.id === 'offers'
+  const title = conversationTitle(conversation, PEOPLE, DEV_USER_ID);
+  const otherId = conversation.participantIds.find((id) => id !== DEV_USER_ID);
+  const other = PEOPLE.find((p) => p.id === otherId);
+  const isGroup = conversation.kind === "group" || conversation.id === "offers";
   const subtitle = isGroup
     ? `${conversation.participantIds.length} participants`
-    : (other?.lastActiveLabel ?? '')
-  const pill = statusPill(conversation)
+    : (other?.lastActiveLabel ?? "");
+  const pill = statusPill(conversation);
 
   return (
     <View className="min-w-0 flex-1 flex-row items-center gap-2 pr-3">
       <Avatar alt={title} className="size-9">
         <AvatarFallback className="bg-primary-soft">
-          <Text className="font-sans text-xs font-semibold text-primary">{initials(title)}</Text>
+          <Text className="font-sans text-xs font-semibold text-primary">
+            {initials(title)}
+          </Text>
         </AvatarFallback>
       </Avatar>
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+        <Text
+          className="font-sans text-base font-semibold text-ink"
+          numberOfLines={1}
+        >
           {title}
         </Text>
         <Text className="font-sans text-xs text-muted" numberOfLines={1}>
@@ -330,7 +402,7 @@ export function ThreadHeader({ conversation }: ThreadHeaderProps) {
         </View>
       ) : null}
     </View>
-  )
+  );
 }
 ```
 
@@ -339,89 +411,92 @@ This is a header **title** slot, not a second back button. Native stack keeps ba
 - [ ] **Step 2: Create `components/chat/thread-screen.tsx`**
 
 ```tsx
-import { useNavigation } from 'expo-router'
-import { useLayoutEffect, useMemo, useState } from 'react'
-import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useNavigation } from "expo-router";
+import { useLayoutEffect, useMemo, useState } from "react";
+import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Composer } from '@/components/chat/composer'
-import { MessageBubble } from '@/components/chat/message-bubble'
-import { ThreadHeader } from '@/components/chat/thread-header'
-import { Text } from '@/components/ui/text'
-import { formatDayLabel, shouldShowDayDivider } from '@/lib/message-day'
-import { DEV_USER_ID, PEOPLE, getDevUser } from '@/lib/mock-data'
-import type { Conversation, Message } from '@/lib/types'
+import { Composer } from "@/components/chat/composer";
+import { MessageBubble } from "@/components/chat/message-bubble";
+import { ThreadHeader } from "@/components/chat/thread-header";
+import { Text } from "@/components/ui/text";
+import { formatDayLabel, shouldShowDayDivider } from "@/lib/message-day";
+import { DEV_USER_ID, PEOPLE, getDevUser } from "@/lib/mock-data";
+import type { Conversation, Message } from "@/lib/types";
 
 type ThreadScreenProps = {
-  conversation: Conversation
-  initialMessages: Message[]
-}
+  conversation: Conversation;
+  initialMessages: Message[];
+};
 
 type Row =
-  | { type: 'day'; id: string; label: string }
-  | { type: 'message'; id: string; message: Message; senderName?: string }
+  | { type: "day"; id: string; label: string }
+  | { type: "message"; id: string; message: Message; senderName?: string };
 
 function buildRows(messages: Message[], isGroup: boolean): Row[] {
   const chronological = [...messages].sort(
     (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
-  )
-  const rows: Row[] = []
+  );
+  const rows: Row[] = [];
   for (let i = 0; i < chronological.length; i++) {
-    const message = chronological[i]!
-    const previous = chronological[i - 1]
+    const message = chronological[i]!;
+    const previous = chronological[i - 1];
     if (shouldShowDayDivider(message.createdAt, previous?.createdAt)) {
       rows.push({
-        type: 'day',
+        type: "day",
         id: `day-${message.id}`,
         label: formatDayLabel(message.createdAt),
-      })
+      });
     }
-    const outgoing = message.senderId === DEV_USER_ID
-    const sender = PEOPLE.find((p) => p.id === message.senderId)
+    const outgoing = message.senderId === DEV_USER_ID;
+    const sender = PEOPLE.find((p) => p.id === message.senderId);
     rows.push({
-      type: 'message',
+      type: "message",
       id: message.id,
       message,
       senderName: isGroup && !outgoing ? sender?.displayName : undefined,
-    })
+    });
   }
-  return rows.reverse()
+  return rows.reverse();
 }
 
-export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProps) {
-  const navigation = useNavigation()
-  const insets = useSafeAreaInsets()
-  const me = getDevUser()
-  const [draft, setDraft] = useState('')
-  const [messages, setMessages] = useState(initialMessages)
-  const isGroup = conversation.kind === 'group' || conversation.id === 'offers'
-  const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup])
+export function ThreadScreen({
+  conversation,
+  initialMessages,
+}: ThreadScreenProps) {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const me = getDevUser();
+  const [draft, setDraft] = useState("");
+  const [messages, setMessages] = useState(initialMessages);
+  const isGroup = conversation.kind === "group" || conversation.id === "offers";
+  const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: () => <ThreadHeader conversation={conversation} />,
-      title: '',
-    })
-  }, [navigation, conversation])
+      title: "",
+    });
+  }, [navigation, conversation]);
 
   function send() {
-    const body = draft.trim()
-    if (!body) return
-    const id = `local-${Date.now()}`
-    const createdAt = new Date().toISOString()
+    const body = draft.trim();
+    if (!body) return;
+    const id = `local-${Date.now()}`;
+    const createdAt = new Date().toISOString();
     const base: Message = {
       id,
       conversationId: conversation.id,
       senderId: me.id,
       body,
       createdAt,
-      status: 'sending',
-    }
-    setDraft('')
-    setMessages((prev) => [...prev, base])
+      status: "sending",
+    };
+    setDraft("");
+    setMessages((prev) => [...prev, base]);
     setMessages((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, status: 'sent' } : m)),
-    )
+      prev.map((m) => (m.id === id ? { ...m, status: "sent" } : m)),
+    );
   }
 
   const list = (
@@ -434,12 +509,14 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => {
-          if (item.type === 'day') {
+          if (item.type === "day") {
             return (
               <View className="my-3 items-center">
-                <Text className="font-sans text-xs text-muted">{item.label}</Text>
+                <Text className="font-sans text-xs text-muted">
+                  {item.label}
+                </Text>
               </View>
-            )
+            );
           }
           return (
             <MessageBubble
@@ -448,24 +525,28 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
               status={item.message.status}
               senderName={item.senderName}
             />
-          )
+          );
         }}
       />
       <View style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
         <Composer value={draft} onChangeText={setDraft} onSend={send} />
       </View>
     </>
-  )
+  );
 
-  if (Platform.OS === 'android') {
-    return <View className="flex-1 bg-bg">{list}</View>
+  if (Platform.OS === "android") {
+    return <View className="flex-1 bg-bg">{list}</View>;
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-bg" behavior="padding" keyboardVerticalOffset={88}>
+    <KeyboardAvoidingView
+      className="flex-1 bg-bg"
+      behavior="padding"
+      keyboardVerticalOffset={88}
+    >
       {list}
     </KeyboardAvoidingView>
-  )
+  );
 }
 ```
 
@@ -478,39 +559,64 @@ Do not import or render `INTERNAL_NOTES`.
 ### Task 4: Thin chat route
 
 **Files:**
+
 - Modify: `app/chat/[id].tsx`
 
 **Interfaces:**
+
 - Consumes: `ThreadScreen`, `CONVERSATIONS`, `MESSAGES`, `canViewConversation`, `DEV_ROLE`, `DEV_USER_ID`, `ROLE_HREF`
 - Produces: gated `/chat/[id]` including `/chat/offers`
 
 - [ ] **Step 1: Replace `app/chat/[id].tsx`**
 
 ```tsx
-import { Redirect, useGlobalSearchParams, useLocalSearchParams, usePathname, useSegments } from 'expo-router'
+import {
+  Redirect,
+  useGlobalSearchParams,
+  useLocalSearchParams,
+  usePathname,
+  useSegments,
+} from "expo-router";
 
-import { ThreadScreen } from '@/components/chat/thread-screen'
-import { chatIdFromRoute, chatIdFromSegments } from '@/lib/chat-route-id'
-import { CONVERSATIONS, DEV_ROLE, DEV_USER_ID, MESSAGES, ROLE_HREF } from '@/lib/mock-data'
-import { canViewConversation } from '@/lib/rbac'
+import { ThreadScreen } from "@/components/chat/thread-screen";
+import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
+import {
+  CONVERSATIONS,
+  DEV_ROLE,
+  DEV_USER_ID,
+  MESSAGES,
+  ROLE_HREF,
+} from "@/lib/mock-data";
+import { canViewConversation } from "@/lib/rbac";
 
 export default function ChatScreen() {
-  const local = useLocalSearchParams<{ id?: string | string[] }>().id
-  const global = useGlobalSearchParams<{ id?: string | string[] }>().id
-  const pathname = usePathname()
+  const local = useLocalSearchParams<{ id?: string | string[] }>().id;
+  const global = useGlobalSearchParams<{ id?: string | string[] }>().id;
+  const pathname = usePathname();
   const id =
     chatIdFromRoute(local, pathname) ??
     chatIdFromRoute(global, pathname) ??
-    chatIdFromSegments(useSegments())
-  const conversation = id ? CONVERSATIONS.find((c) => c.id === id) : undefined
+    chatIdFromSegments(useSegments());
+  const conversation = id ? CONVERSATIONS.find((c) => c.id === id) : undefined;
 
-  if (!id || !conversation || !canViewConversation(DEV_ROLE, DEV_USER_ID, conversation)) {
-    return <Redirect href={ROLE_HREF[DEV_ROLE]} />
+  if (
+    !id ||
+    !conversation ||
+    !canViewConversation(DEV_ROLE, DEV_USER_ID, conversation)
+  ) {
+    return <Redirect href={ROLE_HREF[DEV_ROLE]} />;
   }
 
-  const initialMessages = MESSAGES.filter((m) => m.conversationId === conversation.id)
+  const initialMessages = MESSAGES.filter(
+    (m) => m.conversationId === conversation.id,
+  );
 
-  return <ThreadScreen conversation={conversation} initialMessages={initialMessages} />
+  return (
+    <ThreadScreen
+      conversation={conversation}
+      initialMessages={initialMessages}
+    />
+  );
 }
 ```
 

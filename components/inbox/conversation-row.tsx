@@ -1,28 +1,31 @@
-import { Megaphone } from 'lucide-react-native'
-import { Pressable, View } from 'react-native'
+import { Megaphone } from "lucide-react-native";
+import { Pressable, View } from "react-native";
 
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Text } from '@/components/ui/text'
-import { conversationTitle } from '@/lib/conversation-title'
-import { formatRelativeTime, initials } from '@/lib/display'
-import { DEV_USER_ID, PEOPLE } from '@/lib/mock-data'
-import type { Conversation } from '@/lib/types'
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Text } from "@/components/ui/text";
+import { conversationTitle } from "@/lib/conversation-title";
+import { formatRelativeTime, initials } from "@/lib/display";
+import { DEV_USER_ID, PEOPLE } from "@/lib/mock-data";
+import type { Conversation } from "@/lib/types";
 
 type ConversationRowProps = {
-  conversation: Conversation
-  onPress: () => void
-}
+  conversation: Conversation;
+  onPress: () => void;
+};
 
 function otherPerson(conversation: Conversation) {
-  const otherId = conversation.participantIds.find((id) => id !== DEV_USER_ID)
-  return PEOPLE.find((p) => p.id === otherId)
+  const otherId = conversation.participantIds.find((id) => id !== DEV_USER_ID);
+  return PEOPLE.find((p) => p.id === otherId);
 }
 
-export function ConversationRow({ conversation, onPress }: ConversationRowProps) {
-  const title = conversationTitle(conversation, PEOPLE, DEV_USER_ID)
-  const isOffers = conversation.id === 'offers'
-  const other = otherPerson(conversation)
-  const online = isOffers ? false : Boolean(other?.isOnline)
+export function ConversationRow({
+  conversation,
+  onPress,
+}: ConversationRowProps) {
+  const title = conversationTitle(conversation, PEOPLE, DEV_USER_ID);
+  const isOffers = conversation.id === "offers";
+  const other = otherPerson(conversation);
+  const online = isOffers ? false : Boolean(other?.isOnline);
 
   return (
     <Pressable
@@ -54,11 +57,15 @@ export function ConversationRow({ conversation, onPress }: ConversationRowProps)
       </View>
 
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+        <Text
+          className="font-sans text-base font-semibold text-ink"
+          numberOfLines={1}
+        >
           {title}
         </Text>
         <Text className="mt-0.5 font-sans text-sm text-muted" numberOfLines={1}>
-          {conversation.lastMessagePreview} · {formatRelativeTime(conversation.updatedAt)}
+          {conversation.lastMessagePreview} ·{" "}
+          {formatRelativeTime(conversation.updatedAt)}
         </Text>
       </View>
 
@@ -70,5 +77,5 @@ export function ConversationRow({ conversation, onPress }: ConversationRowProps)
         </View>
       ) : null}
     </Pressable>
-  )
+  );
 }

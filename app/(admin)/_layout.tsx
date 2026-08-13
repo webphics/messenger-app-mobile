@@ -1,7 +1,12 @@
-import { LayoutDashboard, MessageCircle, Settings, Users } from 'lucide-react-native'
-import { Tabs } from 'expo-router'
+import { Tabs } from "expo-router";
+import {
+    LayoutDashboard,
+    MessageCircle,
+    Settings,
+    Users,
+} from "lucide-react-native";
 
-import { tabChrome } from '@/lib/tokens'
+import { tabChrome } from "@/lib/tokens";
 
 export default function AdminLayout() {
   return (
@@ -9,32 +14,38 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Overview',
-          tabBarIcon: ({ color, size }) => <LayoutDashboard color={color} size={size} />,
+          title: "Overview",
+          tabBarIcon: ({ color, size }) => (
+            <LayoutDashboard color={color} size={size} />
+          ),
         }}
       />
       <Tabs.Screen
         name="users"
         options={{
-          title: 'Users',
+          title: "Users",
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="conversations"
         options={{
-          title: 'Messages',
-          tabBarLabel: 'Conversations',
-          tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
+          title: "Messages",
+          tabBarLabel: "Conversations",
+          tabBarIcon: ({ color, size }) => (
+            <MessageCircle color={color} size={size} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Settings color={color} size={size} />
+          ),
         }}
       />
     </Tabs>
-  )
+  );
 }

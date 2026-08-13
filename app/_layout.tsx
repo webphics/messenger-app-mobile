@@ -1,75 +1,83 @@
-import '../global.css'
-import 'react-native-gesture-handler'
+import "react-native-gesture-handler";
+import "../global.css";
 
 import {
-  JetBrainsMono_500Medium,
-  JetBrainsMono_700Bold,
-} from '@expo-google-fonts/jetbrains-mono'
+    JetBrainsMono_500Medium,
+    JetBrainsMono_700Bold,
+} from "@expo-google-fonts/jetbrains-mono";
 import {
-  Manrope_400Regular,
-  Manrope_500Medium,
-  Manrope_600SemiBold,
-  Manrope_700Bold,
-  useFonts,
-} from '@expo-google-fonts/manrope'
-import { NavigationBar } from 'expo-navigation-bar'
-import { Stack } from 'expo-router'
-import * as SplashScreen from 'expo-splash-screen'
-import { StatusBar } from 'expo-status-bar'
-import { useEffect } from 'react'
-import { Appearance, AppState, Platform } from 'react-native'
-import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { Uniwind } from 'uniwind'
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    useFonts,
+} from "@expo-google-fonts/manrope";
+import { NavigationBar } from "expo-navigation-bar";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
+import { useEffect } from "react";
+import { Appearance, AppState, Platform } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { Uniwind } from "uniwind";
 
-import { colors, stackChrome } from '@/lib/tokens'
+import { colors, stackChrome } from "@/lib/tokens";
 
-Uniwind.setTheme('light')
-Appearance.setColorScheme('light')
+Uniwind.setTheme("light");
+Appearance.setColorScheme("light");
 
 function applyAndroidNavChrome() {
-  NavigationBar.setHidden(false)
-  NavigationBar.setStyle('dark')
+  NavigationBar.setHidden(false);
+  NavigationBar.setStyle("dark");
 }
 
 export default function RootLayout() {
   useFonts({
     Manrope: Manrope_400Regular,
-    'Manrope-Medium': Manrope_500Medium,
-    'Manrope-SemiBold': Manrope_600SemiBold,
-    'Manrope-Bold': Manrope_700Bold,
-    'JetBrains Mono': JetBrainsMono_500Medium,
-    'JetBrains Mono-Bold': JetBrainsMono_700Bold,
-  })
+    "Manrope-Medium": Manrope_500Medium,
+    "Manrope-SemiBold": Manrope_600SemiBold,
+    "Manrope-Bold": Manrope_700Bold,
+    "JetBrains Mono": JetBrainsMono_500Medium,
+    "JetBrains Mono-Bold": JetBrainsMono_700Bold,
+  });
 
   useEffect(() => {
-    void SplashScreen.hideAsync()
-    if (Platform.OS !== 'android') return
-    applyAndroidNavChrome()
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') applyAndroidNavChrome()
-    })
-    return () => sub.remove()
-  }, [])
+    void SplashScreen.hideAsync();
+    if (Platform.OS !== "android") return;
+    applyAndroidNavChrome();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") applyAndroidNavChrome();
+    });
+    return () => sub.remove();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style="dark" backgroundColor={colors.surface} />
-      {Platform.OS === 'android' ? <NavigationBar hidden={false} style="dark" /> : null}
+      {Platform.OS === "android" ? (
+        <NavigationBar hidden={false} style="dark" />
+      ) : null}
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: 'ios_from_right',
+          animation: "ios_from_right",
           animationDuration: 320,
           gestureEnabled: true,
         }}
       >
         <Stack.Screen
           name="chat/[id]"
-          options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+          options={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.bg },
+          }}
         />
-        <Stack.Screen name="(auth)" options={{ ...stackChrome, title: 'Sign in' }} />
+        <Stack.Screen
+          name="(auth)"
+          options={{ ...stackChrome, title: "Sign in" }}
+        />
       </Stack>
     </GestureHandlerRootView>
-  )
+  );
 }

@@ -9,11 +9,11 @@ Mock data only. No auth, sockets, uploads, or ad network. Stories remain forbidd
 
 Visual source of truth (locked):
 
-| Screen | Mock |
-|---|---|
+| Screen      | Mock                                                                                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Contact hub | nsave-style hub mock (Support / How can we help / Messages+Help / Recent / Search / Offers ads carousel / FAQ). **No Contact tab bar** — header gear + stack back. |
-| Inbox | Messenger-style light list (Messages / search / All·Open·Resolved / rows + unread pills / Offers megaphone row) |
-| Thread | Simple modern bubbles (light grey in, primary blue out, pill composer). Not the earlier “old tool” thread mock. Not Messenger dark. Not red outgoing. |
+| Inbox       | Messenger-style light list (Messages / search / All·Open·Resolved / rows + unread pills / Offers megaphone row)                                                    |
+| Thread      | Simple modern bubbles (light grey in, primary blue out, pill composer). Not the earlier “old tool” thread mock. Not Messenger dark. Not red outgoing.              |
 
 ---
 
@@ -21,9 +21,9 @@ Visual source of truth (locked):
 
 Replace Phase 0 labeled shells with real mock UI:
 
-1. Contact **Home hub** + Help FAQ list  
-2. **Inbox** list (Contact stack + Agent Chats + Admin conversations)  
-3. **Thread** (`/chat/[id]`) with bubbles + optimistic send  
+1. Contact **Home hub** + Help FAQ list
+2. **Inbox** list (Contact stack + Agent Chats + Admin conversations)
+3. **Thread** (`/chat/[id]`) with bubbles + optimistic send
 
 Still `DEV_ROLE` session. Still `lib/mock-data.ts` + `lib/rbac.ts`.
 
@@ -43,11 +43,11 @@ Still `DEV_ROLE` session. Still `lib/mock-data.ts` + `lib/rbac.ts`.
 
 `docs/scope.md` today says Phase 1 = auth, Phase 2 = inbox/chat mock. **Wrong order.** Update to:
 
-0. Scaffold (done)  
-1. **Basic UI mock (this spec)**  
-2. Auth shell (better-auth + secure store)  
-3. Realtime + REST  
-4. Media, push, i18n, list virtualization  
+0. Scaffold (done)
+1. **Basic UI mock (this spec)**
+2. Auth shell (better-auth + secure store)
+3. Realtime + REST
+4. Media, push, i18n, list virtualization
 
 ---
 
@@ -57,14 +57,14 @@ Still `DEV_ROLE` session. Still `lib/mock-data.ts` + `lib/rbac.ts`.
 
 **Stack, no tab bar.** Hub gear → settings. Messages / Help / Settings push with native back. Agent/Admin keep their tabs.
 
-| From | To |
-|---|---|
-| Home (index) | Hub (`headerShown: false`) |
-| Messages card | `/(contact)/messages` (stack, back) |
-| Recent message | `/chat/[id]` of that thread |
-| Help / Search for help / FAQ card | `/(contact)/help` (stack, back) |
-| Offer **View offer** / See all / **Join Offers chat** | `/chat/offers` |
-| Header gear | `/(contact)/settings` (stack, back) |
+| From                                                  | To                                  |
+| ----------------------------------------------------- | ----------------------------------- |
+| Home (index)                                          | Hub (`headerShown: false`)          |
+| Messages card                                         | `/(contact)/messages` (stack, back) |
+| Recent message                                        | `/chat/[id]` of that thread         |
+| Help / Search for help / FAQ card                     | `/(contact)/help` (stack, back)     |
+| Offer **View offer** / See all / **Join Offers chat** | `/chat/offers`                      |
+| Header gear                                           | `/(contact)/settings` (stack, back) |
 
 Inbox is a **push**, not a tab. Contact inbox must **not** show a Chats tab or a Home/Settings tab bar.
 
@@ -72,8 +72,8 @@ Inbox is a **push**, not a tab. Contact inbox must **not** show a Chats tab or a
 
 Tabs: **Chats | Unassigned | Settings** (rename today’s Assigned tab label to **Chats**). Screen header title on Chats is **Messages** (locked mock).
 
-- Chats = inbox mock (assigned + participant + Offers if in group). Chips All \| Open \| Resolved.  
-- Unassigned = `assigneeId === null` list only. Same row component. **Not** a chip. Hide filter chips on Unassigned.  
+- Chats = inbox mock (assigned + participant + Offers if in group). Chips All \| Open \| Resolved.
+- Unassigned = `assigneeId === null` list only. Same row component. **Not** a chip. Hide filter chips on Unassigned.
 - Row tap → `/chat/[id]` if `canViewConversation`.
 
 ### 3.3 Admin
@@ -92,14 +92,14 @@ Do not import `@react-navigation/*`.
 
 Keep Phase 0 tokens. Do not switch to nsave maroon or Messenger black.
 
-| Token | Use |
-|---|---|
-| `bg` `#F5F6F9` | screen |
-| `surface` `#FFFFFF` | cards, header, bubbles in, composer |
-| `ink` / `ink-soft` / `muted` | text |
-| `line` | dividers, chip idle, search border |
-| `primary` `#3452D9` | actions, outgoing bubbles, active tab, unread pill, Join Offers chat |
-| `success` | online dot |
+| Token                        | Use                                                                  |
+| ---------------------------- | -------------------------------------------------------------------- |
+| `bg` `#F5F6F9`               | screen                                                               |
+| `surface` `#FFFFFF`          | cards, header, bubbles in, composer                                  |
+| `ink` / `ink-soft` / `muted` | text                                                                 |
+| `line`                       | dividers, chip idle, search border                                   |
+| `primary` `#3452D9`          | actions, outgoing bubbles, active tab, unread pill, Join Offers chat |
+| `success`                    | online dot                                                           |
 
 Hub cards: ~16 radius, light shadow, white on `bg`. Offers promo cards: full-bleed gradient (local `visual` key), white CTA. Inbox chips: selected = primary-soft bg + primary text; idle = line/grey. Thread incoming bubble fill ≈ `#F2F2F2`; outgoing = `primary`; radius ~18–20.
 
@@ -111,28 +111,28 @@ Compose icon on inbox: visible, **dead** (no new-thread flow).
 
 ScrollView, pixel target = locked hub mock.
 
-1. Header: “Support”, overlapping avatars (assigned agents from mock, fallback initials), gear → settings  
-2. `Hi {firstName}` + **How can we help?**  
-3. Nav card: Messages → `/(contact)/messages`; Help → `/(contact)/help`  
-4. Recent message: latest own non-Offers thread; tap → `/chat/[id]`  
-5. Search card: “Search for help” → `/(contact)/help` (no live search)  
-6. Offers ads block: title + `Sponsored` (label only) + See all → `/chat/offers`; horizontal paging carousel; dots; **Join Offers chat** → `/chat/offers`  
-7. FAQ card → `/(contact)/help`  
-8. Tab bar Home (active) \| Settings  
+1. Header: “Support”, overlapping avatars (assigned agents from mock, fallback initials), gear → settings
+2. `Hi {firstName}` + **How can we help?**
+3. Nav card: Messages → `/(contact)/messages`; Help → `/(contact)/help`
+4. Recent message: latest own non-Offers thread; tap → `/chat/[id]`
+5. Search card: “Search for help” → `/(contact)/help` (no live search)
+6. Offers ads block: title + `Sponsored` (label only) + See all → `/chat/offers`; horizontal paging carousel; dots; **Join Offers chat** → `/chat/offers`
+7. FAQ card → `/(contact)/help`
+8. Tab bar Home (active) \| Settings
 
 **Offer type:**
 
 ```ts
-export type OfferVisual = 'payouts' | 'zero-fee' | 'verify'
+export type OfferVisual = "payouts" | "zero-fee" | "verify";
 
 export type Offer = {
-  id: string
-  title: string
-  subtitle: string
-  ctaLabel: string
-  visual: OfferVisual
-  chatId: 'offers'
-}
+  id: string;
+  title: string;
+  subtitle: string;
+  ctaLabel: string;
+  visual: OfferVisual;
+  chatId: "offers";
+};
 ```
 
 Fixtures: 3 offers. All `chatId: 'offers'`. No ad SDK. No commerce checkout.
@@ -151,15 +151,15 @@ Chrome: title “Messages”, dead compose icon, search (client filter on name/s
 
 **Title rule:**
 
-- `id === 'offers'` → `Offers`  
-- `kind === 'direct'` → other participant `displayName`  
-- `kind === 'group'` → `subject` ?? `'Group'`  
+- `id === 'offers'` → `Offers`
+- `kind === 'direct'` → other participant `displayName`
+- `kind === 'group'` → `subject` ?? `'Group'`
 
 **Filters (no CaseStatus type):**
 
-- Open = conversation does **not** include label named `Resolved`  
-- Resolved = includes label `Resolved`  
-- All = none  
+- Open = conversation does **not** include label named `Resolved`
+- Resolved = includes label `Resolved`
+- All = none
 
 Add mock label `Resolved` and put it on at least one thread so the chip does something.
 
@@ -167,17 +167,17 @@ Add mock label `Resolved` and put it on at least one thread so the chip does som
 
 ```ts
 export type Person = {
-  id: string
-  displayName: string
-  role: UserRole
-  avatarUrl: string | null
-  isOnline: boolean
-}
+  id: string;
+  displayName: string;
+  role: UserRole;
+  avatarUrl: string | null;
+  isOnline: boolean;
+};
 
 export type Conversation = {
   // ...existing fields
-  unreadCount: number
-}
+  unreadCount: number;
+};
 ```
 
 Update all mock people/conversations. RBAC tests that construct conversations must include `unreadCount` (default `0` in tests or update fixtures).
@@ -212,12 +212,12 @@ Simple Messenger-like pills on **light** chrome. Rejected: old generated thread 
 
 ## 8. Mock data additions
 
-- `DEV_USER_ID`: id of the person whose `role === DEV_ROLE` (helper `getDevUser(): Person`).  
-- Label `Resolved` + at least one resolved conversation.  
-- Conversation `offers`: `kind: 'group'`, `subject: 'Offers'`, all contact ids (+ optionally agents), `unreadCount > 0`.  
-- Messages in `offers` (broadcast-style).  
-- `OFFERS: Offer[]` (3).  
-- `FAQ_ITEMS: { id, question, answer }[]` (≥3).  
+- `DEV_USER_ID`: id of the person whose `role === DEV_ROLE` (helper `getDevUser(): Person`).
+- Label `Resolved` + at least one resolved conversation.
+- Conversation `offers`: `kind: 'group'`, `subject: 'Offers'`, all contact ids (+ optionally agents), `unreadCount > 0`.
+- Messages in `offers` (broadcast-style).
+- `OFFERS: Offer[]` (3).
+- `FAQ_ITEMS: { id, question, answer }[]` (≥3).
 - `Person.isOnline`, `Person.lastActiveLabel: string`, `Conversation.unreadCount`.
 
 Current user for Contact hub greeting: `getDevUser().displayName` first token → “Hi Luis”.
@@ -260,8 +260,8 @@ Auth, sockets, sqlite, TanStack Query, better-auth, real uploads, voice/video, i
 
 ## 11. Three implementation plans (after spec approval)
 
-1. **Hub + offers + help + types/mock extensions** — Contact Home looks like locked mock; FAQ + Offers chat deep link.  
-2. **Inbox** — shared `InboxScreen` + row; wire Contact `/messages`, Agent Chats/Unassigned, Admin conversations; filter helper + test.  
+1. **Hub + offers + help + types/mock extensions** — Contact Home looks like locked mock; FAQ + Offers chat deep link.
+2. **Inbox** — shared `InboxScreen` + row; wire Contact `/messages`, Agent Chats/Unassigned, Admin conversations; filter helper + test.
 3. **Thread** — simple bubbles + composer optimistic send; gate with rbac; Offers chat works.
 
 Do not start Plan 2 until Plan 1 hub is tappable into `/(contact)/messages` (can be a stub route that Plan 2 fills). Plan 1 may `router.push('/(contact)/messages')` to an empty screen titled Messages.

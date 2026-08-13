@@ -1,9 +1,9 @@
-@import 'tailwindcss';
-@import 'uniwind';
+@import "tailwindcss";
+@import "uniwind";
 
 @theme {
-  --font-sans: 'Manrope';
-  --font-mono: 'JetBrains Mono';
+  --font-sans: "Manrope";
+  --font-mono: "JetBrains Mono";
 
   --color-bg: #f5f6f9;
   --color-surface: #ffffff;

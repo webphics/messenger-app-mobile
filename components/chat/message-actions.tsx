@@ -1,17 +1,17 @@
-import { Reply } from 'lucide-react-native'
-import { Platform, Pressable, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Reply } from "lucide-react-native";
+import { Platform, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Text } from '@/components/ui/text'
-import { colors } from '@/lib/tokens'
+import { Text } from "@/components/ui/text";
+import { colors } from "@/lib/tokens";
 
 type MessageActionsProps = {
-  onReply: () => void
-}
+  onReply: () => void;
+};
 
 export function MessageActions({ onReply }: MessageActionsProps) {
-  const insets = useSafeAreaInsets()
-  const bottom = Platform.OS === 'ios' ? insets.bottom : 0
+  const insets = useSafeAreaInsets();
+  const bottom = Platform.OS === "ios" ? insets.bottom : 0;
 
   return (
     <View
@@ -25,8 +25,10 @@ export function MessageActions({ onReply }: MessageActionsProps) {
         className="items-center gap-1 px-6 py-1"
       >
         <Reply color={colors.primary} size={22} />
-        <Text className="font-sans text-xs font-medium text-primary">Reply</Text>
+        <Text className="font-sans text-xs font-medium text-primary">
+          Reply
+        </Text>
       </Pressable>
     </View>
-  )
+  );
 }

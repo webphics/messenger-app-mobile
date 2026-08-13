@@ -20,8 +20,8 @@ RNR copies: `components/ui/` only. App UI: `components/hub/`, `components/inbox/
 
 ```tsx
 // BAD
-import { cssInterop } from 'nativewind'
+import { cssInterop } from "nativewind";
 
 // GOOD
-<View className={cn('bg-bg', className)} />
+<View className={cn("bg-bg", className)} />;
 ```

@@ -1,36 +1,41 @@
-import { useNavigation, useRouter } from 'expo-router'
-import { SquarePen } from 'lucide-react-native'
-import { useLayoutEffect, useMemo, useState } from 'react'
-import { FlatList, Pressable, View } from 'react-native'
+import { useNavigation, useRouter } from "expo-router";
+import { SquarePen } from "lucide-react-native";
+import { useLayoutEffect, useMemo, useState } from "react";
+import { FlatList, Pressable, View } from "react-native";
 
-import { ConversationRow } from '@/components/inbox/conversation-row'
-import { Input } from '@/components/ui/input'
-import { Text } from '@/components/ui/text'
-import { cn } from '@/lib/cn'
-import { chatHref } from '@/lib/chat-route-id'
-import { filterConversations, type InboxChip } from '@/lib/inbox-filter'
-import { DEV_USER_ID, LABELS, PEOPLE } from '@/lib/mock-data'
-import { colors } from '@/lib/tokens'
-import type { Conversation } from '@/lib/types'
+import { ConversationRow } from "@/components/inbox/conversation-row";
+import { Input } from "@/components/ui/input";
+import { Text } from "@/components/ui/text";
+import { chatHref } from "@/lib/chat-route-id";
+import { cn } from "@/lib/cn";
+import { filterConversations, type InboxChip } from "@/lib/inbox-filter";
+import { DEV_USER_ID, LABELS, PEOPLE } from "@/lib/mock-data";
+import { colors } from "@/lib/tokens";
+import type { Conversation } from "@/lib/types";
 
 const CHIPS: { id: InboxChip; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'open', label: 'Open' },
-  { id: 'resolved', label: 'Resolved' },
-]
+  { id: "all", label: "All" },
+  { id: "open", label: "Open" },
+  { id: "resolved", label: "Resolved" },
+];
 
 type InboxScreenProps = {
-  conversations: Conversation[]
-  showChips: boolean
-  showCompose: boolean
-  title: string
-}
+  conversations: Conversation[];
+  showChips: boolean;
+  showCompose: boolean;
+  title: string;
+};
 
-export function InboxScreen({ conversations, showChips, showCompose, title }: InboxScreenProps) {
-  const router = useRouter()
-  const navigation = useNavigation()
-  const [query, setQuery] = useState('')
-  const [chip, setChip] = useState<InboxChip>('all')
+export function InboxScreen({
+  conversations,
+  showChips,
+  showCompose,
+  title,
+}: InboxScreenProps) {
+  const router = useRouter();
+  const navigation = useNavigation();
+  const [query, setQuery] = useState("");
+  const [chip, setChip] = useState<InboxChip>("all");
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -47,13 +52,21 @@ export function InboxScreen({ conversations, showChips, showCompose, title }: In
             </Pressable>
           )
         : undefined,
-    })
-  }, [navigation, showCompose, title])
+    });
+  }, [navigation, showCompose, title]);
 
   const visible = useMemo(
-    () => filterConversations(conversations, query, showChips ? chip : 'all', LABELS, PEOPLE, DEV_USER_ID),
+    () =>
+      filterConversations(
+        conversations,
+        query,
+        showChips ? chip : "all",
+        LABELS,
+        PEOPLE,
+        DEV_USER_ID,
+      ),
     [conversations, query, chip, showChips],
-  )
+  );
 
   return (
     <View className="flex-1 bg-bg">
@@ -68,7 +81,7 @@ export function InboxScreen({ conversations, showChips, showCompose, title }: In
         {showChips ? (
           <View className="mt-3 flex-row gap-2">
             {CHIPS.map((item) => {
-              const selected = item.id === chip
+              const selected = item.id === chip;
               return (
                 <Pressable
                   key={item.id}
@@ -77,20 +90,22 @@ export function InboxScreen({ conversations, showChips, showCompose, title }: In
                   accessibilityState={{ selected }}
                   onPress={() => setChip(item.id)}
                   className={cn(
-                    'min-h-11 justify-center rounded-full border px-4',
-                    selected ? 'border-transparent bg-primary-soft' : 'border-line bg-bg',
+                    "min-h-11 justify-center rounded-full border px-4",
+                    selected
+                      ? "border-transparent bg-primary-soft"
+                      : "border-line bg-bg",
                   )}
                 >
                   <Text
                     className={cn(
-                      'font-sans text-sm font-medium',
-                      selected ? 'text-primary' : 'text-ink-soft',
+                      "font-sans text-sm font-medium",
+                      selected ? "text-primary" : "text-ink-soft",
                     )}
                   >
                     {item.label}
                   </Text>
                 </Pressable>
-              )
+              );
             })}
           </View>
         ) : null}
@@ -108,9 +123,11 @@ export function InboxScreen({ conversations, showChips, showCompose, title }: In
           />
         )}
         ListEmptyComponent={
-          <Text className="px-4 py-8 text-center font-sans text-sm text-muted">No conversations</Text>
+          <Text className="px-4 py-8 text-center font-sans text-sm text-muted">
+            No conversations
+          </Text>
         }
       />
     </View>
-  )
+  );
 }
