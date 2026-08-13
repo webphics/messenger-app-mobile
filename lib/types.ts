@@ -31,6 +31,11 @@ export type Conversation = {
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read'
 
+export type MessageReaction = {
+  emoji: string
+  userIds: string[]
+}
+
 export type Message = {
   id: string
   conversationId: string
@@ -38,6 +43,8 @@ export type Message = {
   body: string
   createdAt: string
   status: MessageStatus
+  replyToId?: string
+  reactions?: MessageReaction[]
 }
 
 export type InternalNote = {

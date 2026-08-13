@@ -12,7 +12,9 @@ type ThreadHeaderProps = {
 }
 
 function statusPill(conversation: Conversation): string | null {
-  if (conversation.labelIds.some((id) => LABELS.find((l) => l.id === id)?.name === 'Resolved')) {
+  if (
+    conversation.labelIds.some((id) => LABELS.find((l) => l.id === id)?.name === 'Resolved')
+  ) {
     return 'Resolved'
   }
   if (conversation.assigneeId === null) return 'Unassigned'
@@ -30,23 +32,25 @@ export function ThreadHeader({ conversation }: ThreadHeaderProps) {
   const pill = statusPill(conversation)
 
   return (
-    <View className="min-w-0 flex-1 flex-row items-center gap-2 pr-3">
-      <Avatar alt={title} className="size-9">
+    <View className="h-10 min-w-0 flex-1 flex-row items-center gap-2 pr-2">
+      <Avatar alt={title} className="size-8">
         <AvatarFallback className="bg-primary-soft">
-          <Text className="font-sans text-xs font-semibold text-primary">{initials(title)}</Text>
+          <Text className="font-sans text-[11px] font-semibold text-primary">
+            {initials(title)}
+          </Text>
         </AvatarFallback>
       </Avatar>
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+        <Text className="font-sans text-[15px] font-semibold leading-5 text-ink" numberOfLines={1}>
           {title}
         </Text>
-        <Text className="font-sans text-xs text-muted" numberOfLines={1}>
+        <Text className="font-sans text-[11px] leading-4 text-muted" numberOfLines={1}>
           {subtitle}
         </Text>
       </View>
       {pill ? (
-        <View className="rounded-full bg-bg px-2 py-1">
-          <Text className="font-sans text-[11px] text-ink-soft">{pill}</Text>
+        <View className="rounded-full bg-bg px-2 py-0.5">
+          <Text className="font-sans text-[10px] text-ink-soft">{pill}</Text>
         </View>
       ) : null}
     </View>

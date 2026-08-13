@@ -192,9 +192,15 @@ Simple Messenger-like pills on **light** chrome. Rejected: old generated thread 
 
 **Header:** back, avatar, **name** (direct: other person; group/Offers: subject), grey subtitle (`Person.lastActiveLabel` e.g. `Active now` / `Active 12h ago` for 1:1; `{n} participants` for groups). Optional tiny status pill (Assigned / Unassigned / Resolved) — not a stepper.
 
-**List:** inverted FlatList. Date divider when day changes. Incoming left grey pills; outgoing right primary pills + ticks from `Message.status`. 1:1: no per-bubble name. Group/Offers: small `displayName` above incoming only.
+**List:** inverted FlatList. Date divider when day changes. Incoming left grey pills; outgoing right primary pills + ticks from `Message.status`. 1:1: no per-bubble name. Group/Offers: small `displayName` above incoming only. Reply chrome: “You replied to {name}” + smaller grey pill **above** (fused), not a quote block inside the bubble. Reactions: one overlapping badge on the bubble corner. Mock fixtures include a few `reactions` and `replyToId`s.
 
-**Composer:** one pill `Message…`, `+` attach **dead**, send → append local `Message` with `status: 'sending'` then immediately `'sent'` (mock). Body required non-empty.
+**Swipe right** on a bubble → quick reply (composer “Replying to” bar). **Long-press:** emoji pill on the message (`❤️😆😮😢😡👎`) + bottom Reply. One reaction per user (picking another replaces). Tap a badge emoji to toggle. Optimistic local state only.
+
+**Composer:** one pill `Message…`, `+` attach **dead**, send → append local `Message` with `status: 'sending'` then immediately `'sent'` (mock). Body required non-empty. Reply banner = thin “Replying to {name}” + snippet + X. Send copies `replyToId`. Android composer does **not** add `insets.bottom` (that double-pads the 3-button nav). Keyboard: `softwareKeyboardLayoutMode: resize`.
+
+**System nav (Android):** `expo-navigation-bar` `<NavigationBar hidden />` + re-hide on AppState active. Swipe from the bottom edge to reveal 3-button / gesture nav. Not our tab bar.
+
+**Stack motion:** root `animation: 'ios_from_right'` (not linear `slide_from_right`). Hub/thread entering uses Reanimated spring, not linear FadeIn duration.
 
 **RBAC:** if `!canViewConversation(DEV_ROLE, currentUserId, conversation)` → Redirect back. Contact current user = `contact-1` (or first person in mock with `role === DEV_ROLE`). Internal notes: **do not render**.
 
@@ -232,10 +238,12 @@ components/inbox/inbox-screen.tsx  # shared list chrome (search, chips, rows)
 components/hub/offer-card.tsx
 components/hub/offers-carousel.tsx
 components/chat/message-bubble.tsx
+components/chat/message-actions.tsx
 components/chat/composer.tsx
 lib/types.ts                       # extend
 lib/mock-data.ts                   # extend
 lib/inbox-filter.ts                # filterConversations(list, query, chip) + test
+lib/message-react.ts               # toggleReaction + quotePreview + replyCaption + test
 ```
 
 Prefer **one** `InboxScreen` used by Contact messages, Agent chats, Admin conversations (props: `conversations`, `showChips`, `showCompose`, `title`). Contact Messages/Help are **hidden tab screens** (`href: null`) next to Home. Hub `router.push('/(contact)/messages')`. Tab bar stays Home \| Settings. Do **not** nest `app/(contact)/home/` (Tabs without `index` hang the router). Do **not** use root `app/messages.tsx`. Chat stays `app/chat/[id].tsx` (full-screen, no tab bar).

@@ -1,6 +1,7 @@
 import { router } from 'expo-router'
 import { ChevronRight, HelpCircle, MessageCircle, Search, Settings } from 'lucide-react-native'
 import { Pressable, ScrollView, View } from 'react-native'
+import Animated, { FadeInDown } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { OffersCarousel } from '@/components/hub/offers-carousel'
@@ -67,12 +68,12 @@ export function ContactHub() {
       <Text className="mt-6 font-sans text-base text-ink-soft">Hi {firstName(me.displayName)}</Text>
       <Text className="mt-1 font-sans text-2xl font-bold text-ink">How can we help?</Text>
 
-      <View className="mt-5 flex-row gap-3">
+      <Animated.View entering={FadeInDown.springify().damping(18).stiffness(180).delay(40)} className="mt-5 flex-row gap-3">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Messages"
           onPress={() => router.push('/(contact)/messages')}
-          className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-sm shadow-black/5"
+          className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
         >
           <MessageCircle color={colors.primary} size={22} />
           <Text className="mt-3 font-sans text-base font-semibold text-ink">Messages</Text>
@@ -81,19 +82,19 @@ export function ContactHub() {
           accessibilityRole="button"
           accessibilityLabel="Help"
           onPress={() => router.push('/(contact)/help')}
-          className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-sm shadow-black/5"
+          className="min-h-24 flex-1 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
         >
           <HelpCircle color={colors.primary} size={22} />
           <Text className="mt-3 font-sans text-base font-semibold text-ink">Help</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       {recent ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open recent message"
           onPress={() => router.push(chatHref(recent.id))}
-          className="mt-4 flex-row items-center gap-3 rounded-2xl bg-surface p-4 shadow-sm shadow-black/5"
+          className="mt-4 flex-row items-center gap-3 rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
         >
           <Avatar className="size-11">
             <AvatarFallback className="bg-primary-soft">
@@ -118,7 +119,7 @@ export function ContactHub() {
         accessibilityRole="button"
         accessibilityLabel="Search for help"
         onPress={() => router.push('/(contact)/help')}
-        className="mt-4 min-h-11 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-sm shadow-black/5"
+        className="mt-4 min-h-11 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-md shadow-black/10"
       >
         <Search color={colors.muted} size={20} />
         <Text className="font-sans text-base text-muted">Search for help</Text>
@@ -130,11 +131,13 @@ export function ContactHub() {
         accessibilityRole="button"
         accessibilityLabel="Frequently asked questions"
         onPress={() => router.push('/(contact)/help')}
-        className="mt-6 min-h-11 flex-row items-center justify-between rounded-2xl bg-surface p-4 shadow-sm shadow-black/5"
+        className="mt-6 min-h-11 flex-row items-center justify-between rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
       >
-        <View>
-          <Text className="font-sans text-base font-semibold text-ink">FAQ</Text>
-          <Text className="mt-1 font-sans text-sm text-muted">Common questions</Text>
+        <View className="min-w-0 flex-1 pr-2">
+          <Text className="font-sans text-base font-semibold text-ink">Frequently Asked Questions</Text>
+          <Text className="mt-1 font-sans text-sm text-muted">
+            Common questions — passwords, billing, access…
+          </Text>
         </View>
         <ChevronRight color={colors.muted} size={18} />
       </Pressable>

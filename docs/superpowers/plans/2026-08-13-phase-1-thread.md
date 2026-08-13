@@ -32,6 +32,9 @@
 4. **Avatar `alt`:** RNR Avatar requires `alt`. Pass `alt={title}` on `ThreadHeader`.
 5. **Blocked ≠ rewrite:** native `headerTitle` still uses Uniwind. If it clips, keep `stackChrome` + `setOptions` only. Do not StyleSheet the thread. Do not invent a custom in-screen back.
 6. **Empty “Chat” flash:** Stack.Screen `chat/[id]` must not use `title: 'Chat'` / `headerShown: true` by default. Header on only from `ThreadScreen` after a valid conversation. Unresolved id → `Redirect` with no native “Chat” chrome.
+7. **Receipts outside the bubble:** Sent / Delivered / Read (+ ticks) sit under the pill, not inside. Outgoing bubble `rounded-[22px] rounded-br-md`; incoming `rounded-bl-md`. Mock thread includes emoji + mixed statuses so receipts can be previewed.
+8. **Reactions + reply (Messenger chrome, light theme):** `Message.replyToId?` + `Message.reactions?`. Swipe right → quick reply. Long-press → emoji pill on the bubble + bottom Reply. Quote is a fused grey pill **above** the message (“You replied to …”), not an in-bubble accent block. Reaction badge overlaps the bubble corner. Toggle via `lib/message-react.ts` (one emoji per user). Optimistic local state — do not mutate exported `MESSAGES`. Attach stays dead. Not Messenger dark, not call/video, not thumbs-up composer.
+9. **Chat chrome tightness:** compact `ThreadHeader` (`h-10`, `size-8` avatar) + `headerTitleAlign: 'left'` + zero title container padding. Android composer `paddingBottom: 8` only — do not add `insets.bottom` (3-button nav was already taking that space). Root stack `ios_from_right`. Android system 3-button: `NavigationBar.setHidden(true)` (SDK 57), re-apply on AppState `active`.
 
 ## File map
 
@@ -39,8 +42,10 @@
 |---|---|
 | `lib/message-day.ts` | Date divider key + label |
 | `lib/message-day.test.ts` | Day-change cases |
-| `components/chat/message-bubble.tsx` | One pill + optional name + ticks |
-| `components/chat/composer.tsx` | Pill input + dead attach + send |
+| `components/chat/message-bubble.tsx` | Pill + quote + reaction chips + ticks |
+| `components/chat/message-actions.tsx` | Long-press emoji row + Reply |
+| `components/chat/composer.tsx` | Pill input + dead attach + send + reply banner |
+| `lib/message-react.ts` | toggleReaction + quotePreview |
 | `components/chat/thread-header.tsx` | Back is native; custom title block |
 | `components/chat/thread-screen.tsx` | List + optimistic send + header options |
 | `app/chat/[id].tsx` | Hydrate + RBAC gate + compose `ThreadScreen` |

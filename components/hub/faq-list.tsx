@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp } from 'lucide-react-native'
 import { useState } from 'react'
 import { FlatList, Pressable, View } from 'react-native'
+import Animated, { FadeIn } from 'react-native-reanimated'
 
 import { Text } from '@/components/ui/text'
 import { FAQ_ITEMS } from '@/lib/mock-data'
@@ -23,7 +24,7 @@ export function FaqList() {
             accessibilityRole="button"
             accessibilityState={{ expanded: open }}
             onPress={() => setOpenId(open ? null : item.id)}
-            className="rounded-2xl bg-surface p-4 shadow-sm shadow-black/5"
+            className="rounded-2xl bg-surface p-4 shadow-md shadow-black/10"
           >
             <View className="flex-row items-start justify-between gap-3">
               <Text className="flex-1 font-sans text-base font-semibold text-ink">
@@ -36,7 +37,9 @@ export function FaqList() {
               )}
             </View>
             {open ? (
-              <Text className="mt-2 font-sans text-sm leading-5 text-ink-soft">{item.answer}</Text>
+              <Animated.View entering={FadeIn.springify().damping(20).stiffness(220)}>
+                <Text className="mt-2 font-sans text-sm leading-5 text-ink-soft">{item.answer}</Text>
+              </Animated.View>
             ) : null}
           </Pressable>
         )

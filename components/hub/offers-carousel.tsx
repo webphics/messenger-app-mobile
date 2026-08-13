@@ -48,8 +48,14 @@ export function OffersCarousel() {
           setIndex(Math.min(Math.max(next, 0), OFFERS.length - 1))
         }}
       >
-        {OFFERS.map((offer) => (
-          <OfferCard key={offer.id} offer={offer} cardWidth={cardWidth} onPress={openOffers} />
+        {OFFERS.map((offer, i) => (
+          <OfferCard
+            key={offer.id}
+            offer={offer}
+            cardWidth={cardWidth}
+            index={i}
+            onPress={openOffers}
+          />
         ))}
       </ScrollView>
 
@@ -66,7 +72,7 @@ export function OffersCarousel() {
         accessibilityRole="button"
         accessibilityLabel="Join Offers chat"
         onPress={openOffers}
-        className="mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-full bg-primary px-4"
+        className="mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-full bg-primary px-4 shadow-md shadow-black/15"
       >
         <MessageCircle color={colors.primaryForeground} size={18} />
         <Text className="font-sans font-semibold text-white">Join Offers chat</Text>

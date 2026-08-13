@@ -11,7 +11,7 @@ Current phase is `AGENTS.md` + `docs/scope.md`. Do not install or wire the next 
 
 Mock data only in `lib/mock-data.ts`. `DEV_ROLE` is the session role. Current user = the `Person` whose `role === DEV_ROLE` (`getDevUser()` / `DEV_USER_ID` once added). Sign-in does not authenticate.
 
-Optimistic send = local component state. No Zustand/Redux/global message store. No `fetch` to a missing API. No fake JWT. No SecureStore.
+Optimistic send / react / reply = local component state (including swipe-to-reply). No Zustand/Redux/global message store. No `fetch` to a missing API. No fake JWT. No SecureStore.
 
 Dead controls stay dead: inbox compose, thread attach. No `Alert('coming soon')` fake flows.
 

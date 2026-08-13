@@ -12,10 +12,12 @@ import {
   Manrope_700Bold,
   useFonts,
 } from '@expo-google-fonts/manrope'
+import { NavigationBar } from 'expo-navigation-bar'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
+import { AppState, Platform } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { Uniwind } from 'uniwind'
 
@@ -35,16 +37,25 @@ export default function RootLayout() {
 
   useEffect(() => {
     void SplashScreen.hideAsync()
+    if (Platform.OS !== 'android') return
+    NavigationBar.setHidden(true)
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') NavigationBar.setHidden(true)
+    })
+    return () => sub.remove()
   }, [])
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
       <StatusBar style="dark" backgroundColor={colors.surface} />
+      {Platform.OS === 'android' ? <NavigationBar hidden style="light" /> : null}
       <Stack
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },
-          animation: 'slide_from_right',
+          animation: 'ios_from_right',
+          animationDuration: 320,
+          gestureEnabled: true,
         }}
       >
         <Stack.Screen

@@ -1,3 +1,5 @@
+import { Platform } from 'react-native'
+
 /** Hex copies of `global.css` @theme. Native headers/tabs cannot use className. */
 export const colors = {
   bg: '#F5F6F9',
@@ -28,6 +30,7 @@ export const tabChrome = {
   tabBarStyle: {
     backgroundColor: colors.surface,
     borderTopColor: colors.line,
+    ...(Platform.OS === 'android' ? { paddingBottom: 8, height: 56 } : null),
   },
   sceneStyle: { backgroundColor: colors.bg },
 } as const
@@ -35,5 +38,10 @@ export const tabChrome = {
 export const stackChrome = {
   ...headerChrome,
   headerBackTitleVisible: false,
+  headerTitleAlign: 'left' as const,
+  headerTitleContainerStyle: {
+    paddingVertical: 0,
+    marginHorizontal: 0,
+  },
   contentStyle: { backgroundColor: colors.bg },
 } as const

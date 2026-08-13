@@ -4,10 +4,12 @@ import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Composer } from '@/components/chat/composer'
-import { MessageBubble } from '@/components/chat/message-bubble'
+import { MessageActions } from '@/components/chat/message-actions'
+import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
 import { ThreadHeader } from '@/components/chat/thread-header'
 import { Text } from '@/components/ui/text'
 import { formatDayLabel, shouldShowDayDivider } from '@/lib/message-day'
+import { quotePreview, toggleReaction } from '@/lib/message-react'
 import { DEV_USER_ID, PEOPLE, getDevUser } from '@/lib/mock-data'
 import { stackChrome } from '@/lib/tokens'
 import type { Conversation, Message } from '@/lib/types'
@@ -20,6 +22,21 @@ type ThreadScreenProps = {
 type Row =
   | { type: 'day'; id: string; label: string }
   | { type: 'message'; id: string; message: Message; senderName?: string }
+
+function personName(id: string): string {
+  return PEOPLE.find((p) => p.id === id)?.displayName ?? 'Unknown'
+}
+
+function quotedOf(messages: Message[], replyToId?: string): QuotedMessage | undefined {
+  if (!replyToId) return undefined
+  const quoted = messages.find((m) => m.id === replyToId)
+  if (!quoted) return undefined
+  return {
+    name: personName(quoted.senderId),
+    body: quotePreview(quoted.body),
+    isMe: quoted.senderId === DEV_USER_ID,
+  }
+}
 
 function buildRows(messages: Message[], isGroup: boolean): Row[] {
   const chronological = [...messages].sort(
@@ -54,8 +71,14 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
   const me = getDevUser()
   const [draft, setDraft] = useState('')
   const [messages, setMessages] = useState(initialMessages)
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const [actionFor, setActionFor] = useState<Message | null>(null)
   const isGroup = conversation.kind === 'group' || conversation.id === 'offers'
   const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup])
+  const replyQuote = replyTo
+    ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
+    : null
+  const composerPad = Platform.OS === 'android' ? 8 : Math.max(insets.bottom, 8)
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -65,6 +88,20 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
       title: '',
     })
   }, [navigation, conversation])
+
+  function react(messageId: string, emoji: string) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, reactions: toggleReaction(m.reactions, emoji, me.id) } : m,
+      ),
+    )
+    setActionFor(null)
+  }
+
+  function startReply(message: Message) {
+    setReplyTo(message)
+    setActionFor(null)
+  }
 
   function send() {
     const body = draft.trim()
@@ -78,8 +115,10 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
       body,
       createdAt,
       status: 'sending',
+      replyToId: replyTo?.id,
     }
     setDraft('')
+    setReplyTo(null)
     setMessages((prev) => [...prev, base])
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, status: 'sent' } : m)))
   }
@@ -89,14 +128,15 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
       <FlatList
         inverted
         className="flex-1"
-        contentContainerClassName="px-4 py-3"
+        contentContainerClassName="px-4 py-2"
         data={rows}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"
+        onScrollBeginDrag={() => setActionFor(null)}
         renderItem={({ item }) => {
           if (item.type === 'day') {
             return (
-              <View className="my-3 items-center">
+              <View className="my-2 items-center">
                 <Text className="font-sans text-xs text-muted">{item.label}</Text>
               </View>
             )
@@ -107,12 +147,29 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
               outgoing={item.message.senderId === DEV_USER_ID}
               status={item.message.status}
               senderName={item.senderName}
+              quoted={quotedOf(messages, item.message.replyToId)}
+              reactions={item.message.reactions}
+              currentUserId={me.id}
+              selected={actionFor?.id === item.message.id}
+              onLongPress={() => setActionFor(item.message)}
+              onReply={() => startReply(item.message)}
+              onToggleReaction={(emoji) => react(item.message.id, emoji)}
             />
           )
         }}
       />
-      <View style={{ paddingBottom: Math.max(insets.bottom, 8) }}>
-        <Composer value={draft} onChangeText={setDraft} onSend={send} />
+      <View style={{ paddingBottom: composerPad }}>
+        {actionFor ? (
+          <MessageActions onReply={() => startReply(actionFor)} />
+        ) : (
+          <Composer
+            value={draft}
+            onChangeText={setDraft}
+            onSend={send}
+            replyTo={replyQuote}
+            onCancelReply={() => setReplyTo(null)}
+          />
+        )}
       </View>
     </>
   )
@@ -122,7 +179,7 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
   }
 
   return (
-    <KeyboardAvoidingView className="flex-1 bg-bg" behavior="padding" keyboardVerticalOffset={88}>
+    <KeyboardAvoidingView className="flex-1 bg-bg" behavior="padding" keyboardVerticalOffset={72}>
       {list}
     </KeyboardAvoidingView>
   )
