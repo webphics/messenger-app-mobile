@@ -7,6 +7,11 @@ export function screenTopPad(insetTop: number) {
   return insetTop + SCREEN_TOP_EXTRA;
 }
 
+/** System nav / home-indicator inset, plus optional extra content gap. */
+export function screenBottomPad(insetBottom: number, extra = 0) {
+  return insetBottom + extra;
+}
+
 /** Hex copies of `global.css` @theme. Native headers/tabs cannot use className. */
 export const colors = {
   bg: "#F5F6F9",
@@ -34,19 +39,6 @@ const headerChrome = {
   headerShadowVisible: false,
 } as const;
 
-/** Android edge-to-edge: native-stack ignores `headerStatusBarHeight` (JS stack only). */
-const androidStackChrome =
-  Platform.OS === "android"
-    ? {
-        headerStatusBarHeight: 0,
-        unstable_nativeProps: {
-          headerConfig: {
-            disableTopInsetApplication: true,
-          },
-        },
-      }
-    : null;
-
 export const tabChrome = {
   ...headerChrome,
   tabBarActiveTintColor: colors.primary,
@@ -62,15 +54,13 @@ export const stackChrome = {
   ...headerChrome,
   headerBackTitleVisible: false,
   headerTitleAlign: "left" as const,
-  ...androidStackChrome,
   headerStyle: {
     backgroundColor: colors.surface,
-    ...(Platform.OS === "android" ? { height: 48, elevation: 0 } : null),
+    ...(Platform.OS === "android" ? { elevation: 0 } : null),
   },
   headerTitleContainerStyle: {
     paddingVertical: 0,
     marginHorizontal: 0,
-    ...(Platform.OS === "android" ? { height: 48 } : null),
   },
   headerLeftContainerStyle: { paddingVertical: 0 },
   headerRightContainerStyle: { paddingVertical: 0 },

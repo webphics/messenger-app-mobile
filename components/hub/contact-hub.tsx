@@ -6,7 +6,7 @@ import {
     Search,
     Settings,
 } from "lucide-react-native";
-import { Platform, Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,7 +18,7 @@ import { conversationTitle } from "@/lib/conversation-title";
 import { firstName, formatRelativeTime, initials } from "@/lib/display";
 import { listInboxConversations } from "@/lib/inbox-filter";
 import { CONVERSATIONS, DEV_ROLE, getDevUser, PEOPLE } from "@/lib/mock-data";
-import { colors, screenTopPad } from "@/lib/tokens";
+import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
 
 function assignedAgents() {
   return PEOPLE.filter((p) => p.role === "agent");
@@ -34,7 +34,7 @@ export function ContactHub() {
   const recentTitle = recent
     ? conversationTitle(recent, PEOPLE, me.id)
     : "";
-  const bottomPad = Platform.OS === "ios" ? insets.bottom + 24 : 24;
+  const bottomPad = screenBottomPad(insets.bottom, 24);
 
   return (
     <ScrollView

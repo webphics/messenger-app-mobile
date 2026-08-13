@@ -53,7 +53,7 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <StatusBar style="dark" backgroundColor={colors.surface} />
+      <StatusBar style="dark" />
       {Platform.OS === "android" ? (
         <NavigationBar hidden={false} style="dark" />
       ) : null}

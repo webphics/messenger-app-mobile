@@ -1,10 +1,10 @@
 import { Plus, Send, X } from "lucide-react-native";
-import { Platform, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
-import { colors } from "@/lib/tokens";
+import { colors, screenBottomPad } from "@/lib/tokens";
 
 type ComposerProps = {
   value: string;
@@ -23,7 +23,7 @@ export function Composer({
 }: ComposerProps) {
   const insets = useSafeAreaInsets();
   const canSend = value.trim().length > 0;
-  const bottom = Platform.OS === "ios" ? insets.bottom : 0;
+  const bottom = screenBottomPad(insets.bottom);
 
   return (
     <View

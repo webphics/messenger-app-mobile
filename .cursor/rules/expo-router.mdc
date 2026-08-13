@@ -10,7 +10,7 @@ Role groups: `(auth)`, `(contact)`, `(agent)`, `(admin)`.
 
 Shared thread: `app/chat/[id].tsx` → `/chat/:id`. Offers group id is literally `'offers'` → `/chat/offers`. Opening a thread is full-screen (no tab bar). That is intentional.
 
-Sign-in header: root Stack `stackChrome`. Chat + search: `headerShown: false` + `InScreenHeader` (`screenTopPad` = inset + 12). Do not `setOptions` the chat header. Do not default the chat screen to `title: 'Chat'`. Do not add a nested `chat/_layout`. Root `animation: 'ios_from_right'` (not linear `slide_from_right`). Sign out `router.replace('/(auth)/sign-in')`. Continue `router.replace(ROLE_HREF[DEV_ROLE])` — never bounce through `/`.
+Sign-in header: root Stack `stackChrome` (native-stack applies status inset; do not `disableTopInsetApplication`). Chat + search: `headerShown: false` + `InScreenHeader` (`screenTopPad` = inset + 12). Do not `setOptions` the chat header. Do not default the chat screen to `title: 'Chat'`. Do not add a nested `chat/_layout`. Root `animation: 'ios_from_right'` (not linear `slide_from_right`). Sign out `router.replace('/(auth)/sign-in')`. Continue `router.replace(ROLE_HREF[DEV_ROLE])` — never bounce through `/`.
 
 Contact: **Stack, no tab bar.** Hub gear → settings. `messages` / `help` / `faq` / `settings` use native `stackChrome` back. `search` is in-screen header (autofocus). Search ≠ Help ≠ FAQ. Do not nest `home/` under contact. Do not put messages/help on the root stack. Do not bring back Home \| Settings tabs.
 

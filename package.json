@@ -57,7 +57,7 @@
     "start:tunnel": "pnpm exec expo start -c --tunnel",
     "lint": "expo lint",
     "test": "jest --watchAll=false",
-    "build:apk": "cd android && gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a"
+    "build:apk": "node scripts/build-apk.mjs"
   },
   "jest": {
     "preset": "jest-expo",
