@@ -62,7 +62,8 @@ Still `DEV_ROLE` session. Still `lib/mock-data.ts` + `lib/rbac.ts`.
 | Home (index)                                          | Hub (`headerShown: false`)          |
 | Messages card                                         | `/(contact)/messages` (stack, back) |
 | Recent message                                        | `/chat/[id]` of that thread         |
-| Help / Search for help / FAQ card                     | `/(contact)/help` (stack, back)     |
+| Help / FAQ card                                       | `/(contact)/help` (stack, back)     |
+| Search for help                                       | `/(contact)/search` (autofocus input in header, filter FAQ mock) |
 | Offer **View offer** / See all / **Join Offers chat** | `/chat/offers`                      |
 | Header gear                                           | `/(contact)/settings` (stack, back) |
 
@@ -227,10 +228,11 @@ Current user for Contact hub greeting: `getDevUser().displayName` first token �
 ## 9. Files (kebab-case)
 
 ```
-app/(contact)/_layout.tsx          # Stack — hub + messages/help/settings (no tab bar)
+app/(contact)/_layout.tsx          # Stack — hub + messages/help/search/settings (no tab bar)
 app/(contact)/index.tsx            # hub
 app/(contact)/messages.tsx         # inbox push
 app/(contact)/help.tsx             # FAQ push
+app/(contact)/search.tsx           # help search push
 app/(agent)/index.tsx              # inbox
 app/(agent)/unassigned.tsx         # unassigned list
 app/(admin)/conversations.tsx      # inbox all
@@ -245,6 +247,7 @@ components/chat/composer.tsx
 lib/types.ts                       # extend
 lib/mock-data.ts                   # extend
 lib/inbox-filter.ts                # filterConversations(list, query, chip) + test
+lib/faq-filter.ts                  # filterFaq + test
 lib/message-react.ts               # toggleReaction + quotePreview + replyCaption + test
 ```
 

@@ -13,6 +13,6 @@ Offers = in-app promo carousel + shared group chat `id: 'offers'`. `"Sponsored"`
 
 Slim Admin on mobile: overview / users / conversations / settings only. No analytics, audit log UI, or SLA config here.
 
-Contact hub: **no tab bar**. Gear → settings. Messages/Help/Settings are stack pushes with back. Agent/Admin keep tabs.
+Contact hub: **no tab bar**. Gear → settings. Messages/Help/Search/Settings are stack pushes with back. Search is its own screen (not Help FAQ). Agent/Admin keep tabs.
 
 Current phase: `AGENTS.md` + `docs/scope.md`. Do not implement a later phase’s packages or screens just because they appear in the SOW.

@@ -149,7 +149,7 @@ export function ContactHub() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Search for help"
-          onPress={() => router.push("/(contact)/help")}
+          onPress={() => router.push("/(contact)/search")}
           className="mt-4 min-h-11 flex-row items-center gap-3 rounded-2xl bg-surface px-4 py-3.5 shadow-md shadow-black/10"
         >
           <Search color={colors.muted} size={20} />
