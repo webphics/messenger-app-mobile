@@ -30,8 +30,10 @@ export const tabChrome = {
   tabBarStyle: {
     backgroundColor: colors.surface,
     borderTopColor: colors.line,
-    ...(Platform.OS === 'android' ? { paddingBottom: 8, height: 56 } : null),
   },
+  ...(Platform.OS === 'android'
+    ? { safeAreaInsets: { bottom: 0, left: 0, right: 0 } }
+    : null),
   sceneStyle: { backgroundColor: colors.bg },
 } as const
 
@@ -39,9 +41,17 @@ export const stackChrome = {
   ...headerChrome,
   headerBackTitleVisible: false,
   headerTitleAlign: 'left' as const,
+  headerStatusBarHeight: Platform.OS === 'android' ? 0 : undefined,
+  headerStyle: {
+    backgroundColor: colors.surface,
+    ...(Platform.OS === 'android' ? { height: 48, elevation: 0 } : null),
+  },
   headerTitleContainerStyle: {
     paddingVertical: 0,
     marginHorizontal: 0,
+    ...(Platform.OS === 'android' ? { height: 48 } : null),
   },
+  headerLeftContainerStyle: { paddingVertical: 0 },
+  headerRightContainerStyle: { paddingVertical: 0 },
   contentStyle: { backgroundColor: colors.bg },
 } as const

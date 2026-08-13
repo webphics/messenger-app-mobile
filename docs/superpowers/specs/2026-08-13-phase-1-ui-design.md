@@ -11,7 +11,7 @@ Visual source of truth (locked):
 
 | Screen | Mock |
 |---|---|
-| Contact hub | nsave-style hub mock (Support / How can we help / Messages+Help / Recent / Search / Offers ads carousel / FAQ / Home+Settings tabs) |
+| Contact hub | nsave-style hub mock (Support / How can we help / Messages+Help / Recent / Search / Offers ads carousel / FAQ). **No Contact tab bar** — header gear + stack back. |
 | Inbox | Messenger-style light list (Messages / search / All·Open·Resolved / rows + unread pills / Offers megaphone row) |
 | Thread | Simple modern bubbles (light grey in, primary blue out, pill composer). Not the earlier “old tool” thread mock. Not Messenger dark. Not red outgoing. |
 
@@ -55,18 +55,18 @@ Still `DEV_ROLE` session. Still `lib/mock-data.ts` + `lib/rbac.ts`.
 
 ### 3.1 Contact
 
-Tabs: **Home | Settings** (not Chats | Settings).
+**Stack, no tab bar.** Hub gear → settings. Messages / Help / Settings push with native back. Agent/Admin keep their tabs.
 
 | From | To |
 |---|---|
-| Home (index) | Hub |
-| Messages card | `/(contact)/messages` (hidden tab, `href: null`). Tab bar remains Home \| Settings. |
+| Home (index) | Hub (`headerShown: false`) |
+| Messages card | `/(contact)/messages` (stack, back) |
 | Recent message | `/chat/[id]` of that thread |
-| Help / Search for help / FAQ card | `/(contact)/help` (hidden tab, `href: null`) |
+| Help / Search for help / FAQ card | `/(contact)/help` (stack, back) |
 | Offer **View offer** / See all / **Join Offers chat** | `/chat/offers` |
-| Header gear or Settings tab | existing settings |
+| Header gear | `/(contact)/settings` (stack, back) |
 
-Inbox is a **push**, not a tab. Contact inbox must **not** show a Chats tab.
+Inbox is a **push**, not a tab. Contact inbox must **not** show a Chats tab or a Home/Settings tab bar.
 
 ### 3.2 Agent
 
@@ -192,11 +192,13 @@ Simple Messenger-like pills on **light** chrome. Rejected: old generated thread 
 
 **Header:** back, avatar, **name** (direct: other person; group/Offers: subject), grey subtitle (`Person.lastActiveLabel` e.g. `Active now` / `Active 12h ago` for 1:1; `{n} participants` for groups). Optional tiny status pill (Assigned / Unassigned / Resolved) — not a stepper.
 
-**List:** inverted FlatList. Date divider when day changes. Incoming left grey pills; outgoing right primary pills + ticks from `Message.status`. 1:1: no per-bubble name. Group/Offers: small `displayName` above incoming only. Reply chrome: “You replied to {name}” + smaller grey pill **above** (fused), not a quote block inside the bubble. Reactions: one overlapping badge on the bubble corner. Mock fixtures include a few `reactions` and `replyToId`s.
+**List:** inverted FlatList. Date divider when day changes. Incoming left grey pills; outgoing right primary pills + **ticks only** from `Message.status` (Check / CheckCheck; no Sent/Delivered/Read words). 1:1: no per-bubble name. Group/Offers: small `displayName` above incoming only. Reply chrome: “You replied to {name}” + smaller grey pill **above** (fused), not a quote block inside the bubble. Reactions: one overlapping badge on the bubble corner. Mock fixtures include a few `reactions` and `replyToId`s.
 
 **Swipe right** on a bubble → quick reply (composer “Replying to” bar). **Long-press:** emoji pill on the message (`❤️😆😮😢😡👎`) + bottom Reply. One reaction per user (picking another replaces). Tap a badge emoji to toggle. Optimistic local state only.
 
-**Composer:** one pill `Message…`, `+` attach **dead**, send → append local `Message` with `status: 'sending'` then immediately `'sent'` (mock). Body required non-empty. Reply banner = thin “Replying to {name}” + snippet + X. Send copies `replyToId`. Android composer does **not** add `insets.bottom` (that double-pads the 3-button nav). Keyboard: `softwareKeyboardLayoutMode: resize`.
+**Composer:** one pill `Message…`, `+` attach **dead**, send → append local `Message` with `status: 'sending'` then immediately `'sent'` (mock). Body required non-empty. Reply banner = thin “Replying to {name}” + snippet + X. Send copies `replyToId`. Composer `bg-surface` goes to the screen edge. Android: **no** bottom inset / wrapper pad. iOS: home-indicator pad **inside** the composer. Keyboard: `softwareKeyboardLayoutMode: resize`.
+
+**Header:** Android `headerStatusBarHeight: 0` + `headerStyle.height: 48` (opaque StatusBar already sits above the header — a second status inset is the top chin). iOS keeps default status inset.
 
 **System nav (Android):** `expo-navigation-bar` `<NavigationBar hidden />` + re-hide on AppState active. Swipe from the bottom edge to reveal 3-button / gesture nav. Not our tab bar.
 
@@ -225,10 +227,10 @@ Current user for Contact hub greeting: `getDevUser().displayName` first token �
 ## 9. Files (kebab-case)
 
 ```
-app/(contact)/_layout.tsx          # Home | Settings tabs (+ hidden messages/help)
+app/(contact)/_layout.tsx          # Stack — hub + messages/help/settings (no tab bar)
 app/(contact)/index.tsx            # hub
-app/(contact)/messages.tsx         # inbox, href: null (not a tab)
-app/(contact)/help.tsx             # FAQ, href: null
+app/(contact)/messages.tsx         # inbox push
+app/(contact)/help.tsx             # FAQ push
 app/(agent)/index.tsx              # inbox
 app/(agent)/unassigned.tsx         # unassigned list
 app/(admin)/conversations.tsx      # inbox all
@@ -246,9 +248,7 @@ lib/inbox-filter.ts                # filterConversations(list, query, chip) + te
 lib/message-react.ts               # toggleReaction + quotePreview + replyCaption + test
 ```
 
-Prefer **one** `InboxScreen` used by Contact messages, Agent chats, Admin conversations (props: `conversations`, `showChips`, `showCompose`, `title`). Contact Messages/Help are **hidden tab screens** (`href: null`) next to Home. Hub `router.push('/(contact)/messages')`. Tab bar stays Home \| Settings. Do **not** nest `app/(contact)/home/` (Tabs without `index` hang the router). Do **not** use root `app/messages.tsx`. Chat stays `app/chat/[id].tsx` (full-screen, no tab bar).
-
-`(contact)/messages` must not appear as a third tab.
+Prefer **one** `InboxScreen` used by Contact messages, Agent chats, Admin conversations (props: `conversations`, `showChips`, `showCompose`, `title`). Contact is a **Stack** (no tab bar). Hub `router.push('/(contact)/messages')`. Do **not** nest `app/(contact)/home/`. Do **not** use root `app/messages.tsx`. Chat stays `app/chat/[id].tsx` (full-screen). Offers carousel is **full-bleed** (cards start at the screen edge, ~78% width peek). Other hub blocks keep `px-4`.
 
 ---
 

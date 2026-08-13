@@ -15,7 +15,7 @@
 - Agent Unassigned: `assigneeId === null` only. **Hide chips.** Hide compose.
 - Agent Chats: assigned **or** participant (includes Offers if in group). **Not** the unassigned pool. Header title already **Messages** via `(agent)/_layout.tsx`. Tab label **Chats**.
 - Admin Conversations: all threads. Header title already **Messages**. Tab label **Conversations**.
-- Contact Messages: `canViewConversation` list (offers already includes `contact-1`). Hidden tab, `href: null`. Tab bar stays Home | Settings.
+- Contact Messages: `canViewConversation` list (offers already includes `contact-1`). Stack push from hub with native back. No Contact tab bar.
 - Compose icon visible + **dead** on Contact / Agent Chats / Admin Conversations. No `Alert('coming soon')`. No new-thread flow.
 - Do not import `@react-navigation/*`. Navigation only from `expo-router` (`useNavigation` from `expo-router` is OK).
 - pnpm only. Never edit `.env`. No commits unless asked. No screen snapshot tests.

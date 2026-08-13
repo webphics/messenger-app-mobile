@@ -1,5 +1,6 @@
 import { Plus, Send, X } from 'lucide-react-native'
-import { Pressable, View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Input } from '@/components/ui/input'
 import { Text } from '@/components/ui/text'
@@ -20,10 +21,12 @@ export function Composer({
   replyTo,
   onCancelReply,
 }: ComposerProps) {
+  const insets = useSafeAreaInsets()
   const canSend = value.trim().length > 0
+  const bottom = Platform.OS === 'ios' ? insets.bottom : 0
 
   return (
-    <View className="border-t border-line bg-surface">
+    <View className="border-t border-line bg-surface" style={{ paddingBottom: bottom }}>
       {replyTo ? (
         <View className="flex-row items-center gap-2 px-4 pb-1 pt-2">
           <View className="min-w-0 flex-1">

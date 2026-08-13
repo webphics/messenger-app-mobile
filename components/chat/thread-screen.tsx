@@ -1,7 +1,6 @@
 import { useNavigation } from 'expo-router'
 import { useLayoutEffect, useMemo, useState } from 'react'
 import { FlatList, KeyboardAvoidingView, Platform, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Composer } from '@/components/chat/composer'
 import { MessageActions } from '@/components/chat/message-actions'
@@ -67,7 +66,6 @@ function buildRows(messages: Message[], isGroup: boolean): Row[] {
 
 export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProps) {
   const navigation = useNavigation()
-  const insets = useSafeAreaInsets()
   const me = getDevUser()
   const [draft, setDraft] = useState('')
   const [messages, setMessages] = useState(initialMessages)
@@ -78,7 +76,6 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
   const replyQuote = replyTo
     ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
     : null
-  const composerPad = Platform.OS === 'android' ? 8 : Math.max(insets.bottom, 8)
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -158,19 +155,17 @@ export function ThreadScreen({ conversation, initialMessages }: ThreadScreenProp
           )
         }}
       />
-      <View style={{ paddingBottom: composerPad }}>
-        {actionFor ? (
-          <MessageActions onReply={() => startReply(actionFor)} />
-        ) : (
-          <Composer
-            value={draft}
-            onChangeText={setDraft}
-            onSend={send}
-            replyTo={replyQuote}
-            onCancelReply={() => setReplyTo(null)}
-          />
-        )}
-      </View>
+      {actionFor ? (
+        <MessageActions onReply={() => startReply(actionFor)} />
+      ) : (
+        <Composer
+          value={draft}
+          onChangeText={setDraft}
+          onSend={send}
+          replyTo={replyQuote}
+          onCancelReply={() => setReplyTo(null)}
+        />
+      )}
     </>
   )
 

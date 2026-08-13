@@ -12,7 +12,7 @@ Shared thread: `app/chat/[id].tsx` → `/chat/:id`. Offers group id is literally
 
 Sign-in header: root Stack `stackChrome`. Chat: `headerShown: false` until `ThreadScreen` `setOptions` (`stackChrome` + `ThreadHeader`; native back). Do not default the chat screen to `title: 'Chat'` (Expo Go flash → hub). Do not add a nested `chat/_layout`. Root `animation: 'ios_from_right'` (not linear `slide_from_right`). Sign out `router.replace('/(auth)/sign-in')`. Continue `router.replace(ROLE_HREF[DEV_ROLE])` — never bounce through `/`.
 
-Contact tabs: **Home | Settings**. Inbox/Help are **hidden tab screens** (`href: null`) at `app/(contact)/messages.tsx` and `help.tsx` — tab bar stays. Do not nest `home/` under contact (Tabs without `index` hang Expo Router). Do not put messages/help on the root stack.
+Contact: **Stack, no tab bar.** Hub gear → settings. `messages` / `help` / `settings` push with native back. Do not nest `home/` under contact. Do not put messages/help on the root stack. Do not bring back Home \| Settings tabs.
 
 Agent tabs: **Chats | Unassigned | Settings**. Chats header title: **Messages**. Unassigned = `assigneeId === null` only; hide Open/Resolved chips.
 

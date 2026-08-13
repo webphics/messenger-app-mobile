@@ -21,7 +21,7 @@ export function OffersCarousel() {
 
   return (
     <View className="mt-6">
-      <View className="flex-row items-center justify-between px-1">
+      <View className="flex-row items-center justify-between px-4">
         <View className="min-w-0 flex-1 flex-row items-center gap-2">
           <Text className="font-sans text-base font-semibold text-ink">Offers you may like</Text>
           <Text className="font-sans text-xs text-muted">Sponsored</Text>
@@ -42,7 +42,7 @@ export function OffersCarousel() {
         snapToInterval={snap}
         decelerationRate="fast"
         showsHorizontalScrollIndicator={false}
-        contentContainerClassName="mt-3 gap-3 pr-4"
+        contentContainerClassName="mt-3 gap-3"
         onMomentumScrollEnd={(e) => {
           const next = Math.round(e.nativeEvent.contentOffset.x / snap)
           setIndex(Math.min(Math.max(next, 0), OFFERS.length - 1))
@@ -72,7 +72,7 @@ export function OffersCarousel() {
         accessibilityRole="button"
         accessibilityLabel="Join Offers chat"
         onPress={openOffers}
-        className="mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-full bg-primary px-4 shadow-md shadow-black/15"
+        className="mx-4 mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-full bg-primary px-4 shadow-md shadow-black/15"
       >
         <MessageCircle color={colors.primaryForeground} size={18} />
         <Text className="font-sans font-semibold text-white">Join Offers chat</Text>

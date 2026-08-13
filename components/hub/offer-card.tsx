@@ -12,7 +12,7 @@ const OFFER_IMAGES: Record<OfferVisual, ImageSourcePropType> = {
 }
 
 export function offerCardMetrics(screenWidth: number) {
-  const cardWidth = Math.round((screenWidth - 32) * 0.78)
+  const cardWidth = Math.round(screenWidth * 0.78)
   const gap = 12
   return { cardWidth, gap, snap: cardWidth + gap }
 }

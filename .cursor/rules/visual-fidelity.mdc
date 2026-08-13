@@ -16,10 +16,10 @@ Do not follow system dark mode. React Navigation chrome (`headerStyle`, `tabBarS
 
 Forbidden looks: nsave maroon, Messenger dark, red outgoing, GIF/mic/camera/thumbs-up composer, in-bubble identity block on every 1:1 message, case-status stepper.
 
-Thread reactions + reply: light Messenger chrome — swipe right to reply, emoji pill on long-press, fused quote pill above the bubble, overlapping reaction badge, thin “Replying to” composer banner. Compact header. Android composer ignores `insets.bottom`. Not Messenger dark, not call/video, not thumbs-up composer.
+Thread reactions + reply: light Messenger chrome — swipe right to reply, emoji pill on long-press, fused quote pill above the bubble, overlapping reaction badge, thin “Replying to” composer banner. Receipts = ticks only. Android header `headerStatusBarHeight: 0`. Composer/tab flush to screen bottom (no chin). Not Messenger dark, not call/video, not thumbs-up composer.
 
 Inbox chips: selected = `bg-primary-soft` + primary text; idle = line/grey. Compose icon visible, **dead**. Unassigned tab: hide chips.
 
-Offers promo: locked hub mock. `"Sponsored"` is the section label only. Cards peek (~78% width). Background = local `assets/offers/*.png` + dark gradient overlay + white **View offer**. **Join Offers chat** = primary pill + message icon. RN `Image` only (no expo-image).
+Offers promo: locked hub mock. `"Sponsored"` is the section label only. Carousel is **full-bleed** (first card flush to the left edge, next slide peeks, ~78% of screen width). Title + Join Offers stay `px-4`. Background = local `assets/offers/*.png` + dark gradient overlay + white **View offer**. **Join Offers chat** = primary pill + message icon. RN `Image` only (no expo-image). Contact hub has **no tab bar**.
 
 Use RN `Image` until the expo-image phase. Do not rewrite `components/ui/*` class strings to chase a mock.

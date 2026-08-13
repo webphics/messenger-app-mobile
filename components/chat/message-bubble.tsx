@@ -42,21 +42,15 @@ const SWIPE_REPLY = 56
 
 function Receipt({ status, outgoing }: { status: MessageStatus; outgoing: boolean }) {
   if (!outgoing) return null
-  if (status === 'sending') {
-    return (
-      <Text className="mt-1 pr-1 text-right font-sans text-[11px] text-muted">
-        {messageStatusLabel(status)}
-      </Text>
-    )
-  }
   const read = status === 'read'
-  const Icon = status === 'sent' ? Check : CheckCheck
+  const Icon = status === 'sent' || status === 'sending' ? Check : CheckCheck
   return (
-    <View className="mt-1 flex-row items-center justify-end gap-1 pr-1">
+    <View
+      accessibilityLabel={messageStatusLabel(status)}
+      className="mt-1 items-end pr-1"
+      style={{ opacity: status === 'sending' ? 0.4 : 1 }}
+    >
       <Icon color={read ? colors.primary : colors.muted} size={13} />
-      <Text className={cn('font-sans text-[11px]', read ? 'text-primary' : 'text-muted')}>
-        {messageStatusLabel(status)}
-      </Text>
     </View>
   )
 }

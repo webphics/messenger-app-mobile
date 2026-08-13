@@ -1,5 +1,6 @@
 import { Reply } from 'lucide-react-native'
-import { Pressable, View } from 'react-native'
+import { Platform, Pressable, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Text } from '@/components/ui/text'
 import { colors } from '@/lib/tokens'
@@ -9,8 +10,14 @@ type MessageActionsProps = {
 }
 
 export function MessageActions({ onReply }: MessageActionsProps) {
+  const insets = useSafeAreaInsets()
+  const bottom = Platform.OS === 'ios' ? insets.bottom : 0
+
   return (
-    <View className="flex-row items-center justify-around border-t border-line bg-surface px-4 py-2">
+    <View
+      className="flex-row items-center justify-around border-t border-line bg-surface px-4 py-2"
+      style={{ paddingBottom: bottom }}
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Reply"
