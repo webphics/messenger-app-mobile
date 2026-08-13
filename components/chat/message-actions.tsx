@@ -1,66 +1,102 @@
+import { useLayoutEffect } from "react";
 import { Reply } from "lucide-react-native";
 import { Pressable, View } from "react-native";
-import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 import { Text } from "@/components/ui/text";
 import { REACT_EMOJIS } from "@/lib/message-react";
+import { replyStyle, trayStyle, type OverlayRect } from "@/lib/overlay-frame";
 import { colors } from "@/lib/tokens";
 
-type MessageActionsProps = {
+export type ReactionAnchor = OverlayRect & {
+  messageId: string;
   outgoing: boolean;
+  hostWidth: number;
+};
+
+type MessageActionsProps = {
+  anchor: ReactionAnchor;
+  onDismiss: () => void;
   onReact: (emoji: string) => void;
   onReply: () => void;
 };
 
-/** Incoming → right, outgoing → left (toward bubble center). */
-const X_INSET = 22;
-
 export function MessageActions({
-  outgoing,
+  anchor,
+  onDismiss,
   onReact,
   onReply,
 }: MessageActionsProps) {
-  const xStyle = outgoing ? { right: X_INSET } : { left: X_INSET };
+  const scale = useSharedValue(0.85);
+  const opacity = useSharedValue(0);
+  const replyOpacity = useSharedValue(0);
+
+  useLayoutEffect(() => {
+    scale.value = withSpring(1, { damping: 14, stiffness: 340, mass: 0.4 });
+    opacity.value = withTiming(1, { duration: 80 });
+    replyOpacity.value = withTiming(1, { duration: 80 });
+  }, [opacity, replyOpacity, scale]);
+
+  const trayAnim = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+  const replyAnim = useAnimatedStyle(() => ({
+    opacity: replyOpacity.value,
+  }));
+
+  const trayPos = trayStyle(anchor, anchor.outgoing, anchor.hostWidth);
+  const replyPos = replyStyle(anchor, anchor.outgoing, anchor.hostWidth);
 
   return (
-    <>
-      <View
-        pointerEvents="box-none"
-        style={{
-          position: "absolute",
-          top: "50%",
-          transform: [{ translateY: -24 }],
-          elevation: 24,
-          zIndex: 30,
-          ...xStyle,
-        }}
-      >
-        <Animated.View
-          entering={ZoomIn.springify().damping(14).stiffness(340).mass(0.4)}
-          className="flex-row rounded-full border border-line bg-surface px-1.5 py-1 shadow-md shadow-black/15"
-        >
-          {REACT_EMOJIS.map((emoji) => (
-            <Pressable
-              key={emoji}
-              accessibilityRole="button"
-              accessibilityLabel={`React ${emoji}`}
-              onPress={() => onReact(emoji)}
-              className="size-9 items-center justify-center"
-            >
-              <Text className="font-sans text-xl leading-6">{emoji}</Text>
-            </Pressable>
-          ))}
-        </Animated.View>
-      </View>
+    <View className="absolute inset-0">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss reactions"
+        onPressIn={onDismiss}
+        className="absolute inset-0"
+      />
       <Animated.View
-        entering={FadeIn.duration(80)}
-        style={{
-          position: "absolute",
-          top: "100%",
-          elevation: 24,
-          zIndex: 30,
-          ...xStyle,
-        }}
+        pointerEvents="auto"
+        style={[
+          {
+            position: "absolute",
+            elevation: 24,
+            zIndex: 30,
+            ...trayPos,
+          },
+          trayAnim,
+        ]}
+        className="flex-row rounded-full border border-line bg-surface px-1.5 py-1 shadow-md shadow-black/15"
+      >
+        {REACT_EMOJIS.map((emoji) => (
+          <Pressable
+            key={emoji}
+            accessibilityRole="button"
+            accessibilityLabel={`React ${emoji}`}
+            onPress={() => onReact(emoji)}
+            className="size-9 items-center justify-center"
+          >
+            <Text className="font-sans text-xl leading-6">{emoji}</Text>
+          </Pressable>
+        ))}
+      </Animated.View>
+      <Animated.View
+        pointerEvents="auto"
+        style={[
+          {
+            position: "absolute",
+            elevation: 24,
+            zIndex: 30,
+            ...replyPos,
+          },
+          replyAnim,
+        ]}
       >
         <Pressable
           accessibilityRole="button"
@@ -74,6 +110,6 @@ export function MessageActions({
           </Text>
         </Pressable>
       </Animated.View>
-    </>
+    </View>
   );
 }

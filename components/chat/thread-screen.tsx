@@ -1,17 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    BackHandler,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    View,
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
+  View,
 } from "react-native";
+import { FlatList } from "react-native-gesture-handler";
 
 import { Composer } from "@/components/chat/composer";
 import {
-    MessageBubble,
-    type QuotedMessage,
+  MessageActions,
+  type ReactionAnchor,
+} from "@/components/chat/message-actions";
+import {
+  MessageBubble,
+  type OpenMenuPayload,
+  type QuotedMessage,
 } from "@/components/chat/message-bubble";
 import { ThreadHeader } from "@/components/chat/thread-header";
 import { InScreenHeader } from "@/components/in-screen-header";
@@ -19,6 +23,7 @@ import { Text } from "@/components/ui/text";
 import { formatDayLabel, shouldShowDayDivider } from "@/lib/message-day";
 import { quotePreview, toggleReaction } from "@/lib/message-react";
 import { DEV_USER_ID, PEOPLE, getDevUser } from "@/lib/mock-data";
+import { overlayFrame, overlayFrameFromPoint } from "@/lib/overlay-frame";
 import type { Conversation, Message } from "@/lib/types";
 
 type ThreadScreenProps = {
@@ -80,27 +85,60 @@ export function ThreadScreen({
   initialMessages,
 }: ThreadScreenProps) {
   const me = getDevUser();
+  const hostRef = useRef<View>(null);
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState(initialMessages);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [menuForId, setMenuForId] = useState<string | null>(null);
+  const [menu, setMenu] = useState<ReactionAnchor | null>(null);
   const isGroup = conversation.kind === "group" || conversation.id === "offers";
   const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup]);
   const replyQuote = replyTo
     ? { name: personName(replyTo.senderId), body: quotePreview(replyTo.body) }
     : null;
+  const menuOpen = menu !== null;
 
   useEffect(() => {
-    if (!menuForId) return;
+    if (!menuOpen) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      setMenuForId(null);
+      setMenu(null);
       return true;
     });
     return () => sub.remove();
-  }, [menuForId]);
+  }, [menuOpen]);
 
   function dismissMenu() {
-    setMenuForId(null);
+    setMenu(null);
+  }
+
+  function openMenu(payload: OpenMenuPayload) {
+    const host = hostRef.current;
+    if (!host) return;
+    host.measureInWindow((hx, hy, hw, hh) => {
+      const hostFrame = { x: hx, y: hy, width: hw, height: hh };
+      const rect =
+        payload.width > 0 && payload.height > 0
+          ? overlayFrame(
+              {
+                x: payload.pageX,
+                y: payload.pageY,
+                width: payload.width,
+                height: payload.height,
+              },
+              hostFrame,
+            )
+          : overlayFrameFromPoint(
+              payload.pageX,
+              payload.pageY,
+              { width: 120, height: 40 },
+              hostFrame,
+            );
+      setMenu({
+        messageId: payload.messageId,
+        outgoing: payload.outgoing,
+        ...rect,
+        hostWidth: hw,
+      });
+    });
   }
 
   function react(messageId: string, emoji: string) {
@@ -111,12 +149,12 @@ export function ThreadScreen({
           : m,
       ),
     );
-    setMenuForId(null);
+    setMenu(null);
   }
 
   function startReply(message: Message) {
     setReplyTo(message);
-    setMenuForId(null);
+    setMenu(null);
   }
 
   function send() {
@@ -141,110 +179,76 @@ export function ThreadScreen({
     );
   }
 
-  const menuOpen = menuForId !== null;
-
-  const list = (
-    <>
-      <View className="flex-1">
-        {menuOpen ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Dismiss reactions"
-            onPressIn={dismissMenu}
-            className="absolute inset-0"
-          />
-        ) : null}
-        <FlatList
-          inverted
-          className="flex-1"
-          pointerEvents={menuOpen ? "box-none" : "auto"}
-          scrollEnabled={!menuOpen}
-          contentInsetAdjustmentBehavior="never"
-          contentContainerClassName="px-4 py-2"
-          contentContainerStyle={
-            menuOpen ? { pointerEvents: "box-none" } : undefined
-          }
-          data={rows}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={false}
-          onScrollBeginDrag={dismissMenu}
-          CellRendererComponent={({ item, children, style, ...rest }) => {
-            const row = item as Row;
-            const raised =
-              row.type === "message" && row.message.id === menuForId;
+  const host = (
+    <View ref={hostRef} collapsable={false} className="flex-1">
+      <FlatList
+        inverted
+        className="flex-1"
+        scrollEnabled={!menuOpen}
+        contentInsetAdjustmentBehavior="never"
+        contentContainerClassName="px-4 py-2"
+        data={rows}
+        keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={false}
+        CellRendererComponent={({ children, style, ...rest }) => (
+          <View
+            {...rest}
+            collapsable={false}
+            style={[style, { overflow: "visible" }]}
+          >
+            {children}
+          </View>
+        )}
+        renderItem={({ item }) => {
+          if (item.type === "day") {
             return (
-              <View
-                {...rest}
-                collapsable={false}
-                style={[
-                  style,
-                  { overflow: "visible" },
-                  raised ? { zIndex: 100, elevation: 24 } : null,
-                ]}
-              >
-                {children}
+              <View className="my-2 items-center">
+                <Text className="font-sans text-xs font-medium text-muted">
+                  {item.label}
+                </Text>
               </View>
             );
-          }}
-          renderItem={({ item }) => {
-            if (item.type === "day") {
-              return (
-                <Pressable
-                  onPressIn={menuOpen ? dismissMenu : undefined}
-                  className="my-2 items-center"
-                >
-                  <Text className="font-sans text-xs font-medium text-muted">
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            }
-            return (
-              <MessageBubble
-                body={item.message.body}
-                outgoing={item.message.senderId === DEV_USER_ID}
-                status={item.message.status}
-                senderName={item.senderName}
-                quoted={quotedOf(messages, item.message.replyToId)}
-                reactions={item.message.reactions}
-                currentUserId={me.id}
-                selected={menuForId === item.message.id}
-                enter={item.message.id.startsWith("local-")}
-                onLongPress={() =>
-                  setMenuForId((id) =>
-                    id === item.message.id ? null : item.message.id,
-                  )
-                }
-                onDismiss={menuOpen ? dismissMenu : undefined}
-                onReply={() => startReply(item.message)}
-                onToggleReaction={(emoji) => react(item.message.id, emoji)}
-              />
-            );
+          }
+          return (
+            <MessageBubble
+              messageId={item.message.id}
+              body={item.message.body}
+              outgoing={item.message.senderId === DEV_USER_ID}
+              status={item.message.status}
+              senderName={item.senderName}
+              quoted={quotedOf(messages, item.message.replyToId)}
+              reactions={item.message.reactions}
+              currentUserId={me.id}
+              selected={menu?.messageId === item.message.id}
+              enter={item.message.id.startsWith("local-")}
+              onOpenMenu={openMenu}
+              onReply={() => startReply(item.message)}
+              onToggleReaction={(emoji) => react(item.message.id, emoji)}
+            />
+          );
+        }}
+      />
+      <Composer
+        value={draft}
+        onChangeText={setDraft}
+        onSend={send}
+        replyTo={replyQuote}
+        onCancelReply={() => setReplyTo(null)}
+      />
+      {menu ? (
+        <MessageActions
+          anchor={menu}
+          onDismiss={dismissMenu}
+          onReact={(emoji) => react(menu.messageId, emoji)}
+          onReply={() => {
+            const target = messages.find((m) => m.id === menu.messageId);
+            if (target) startReply(target);
           }}
         />
-      </View>
-      {menuOpen ? (
-        <Pressable onPressIn={dismissMenu}>
-          <Composer
-            value={draft}
-            onChangeText={setDraft}
-            onSend={send}
-            replyTo={replyQuote}
-            onCancelReply={() => setReplyTo(null)}
-          />
-        </Pressable>
-      ) : (
-        <Composer
-          value={draft}
-          onChangeText={setDraft}
-          onSend={send}
-          replyTo={replyQuote}
-          onCancelReply={() => setReplyTo(null)}
-        />
-      )}
-    </>
+      ) : null}
+    </View>
   );
 
   const header = (
@@ -256,29 +260,21 @@ export function ThreadScreen({
   if (Platform.OS === "android") {
     return (
       <View className="flex-1 bg-bg">
-        {menuOpen ? (
-          <Pressable onPressIn={dismissMenu}>{header}</Pressable>
-        ) : (
-          header
-        )}
-        {list}
+        {header}
+        {host}
       </View>
     );
   }
 
   return (
     <View className="flex-1 bg-bg">
-      {menuOpen ? (
-        <Pressable onPressIn={dismissMenu}>{header}</Pressable>
-      ) : (
-        header
-      )}
+      {header}
       <KeyboardAvoidingView
         className="flex-1"
         behavior="padding"
         keyboardVerticalOffset={0}
       >
-        {list}
+        {host}
       </KeyboardAvoidingView>
     </View>
   );

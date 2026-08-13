@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Check, CheckCheck, CornerUpLeft, Reply } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
@@ -13,7 +13,6 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { MessageActions } from "@/components/chat/message-actions";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { replyCaption } from "@/lib/message-react";
@@ -27,7 +26,17 @@ export type QuotedMessage = {
   isMe: boolean;
 };
 
+export type OpenMenuPayload = {
+  messageId: string;
+  outgoing: boolean;
+  pageX: number;
+  pageY: number;
+  width: number;
+  height: number;
+};
+
 type MessageBubbleProps = {
+  messageId: string;
   body: string;
   outgoing: boolean;
   status: MessageStatus;
@@ -37,14 +46,13 @@ type MessageBubbleProps = {
   currentUserId: string;
   selected?: boolean;
   enter?: boolean;
-  onLongPress: () => void;
-  onDismiss?: () => void;
+  onOpenMenu: (payload: OpenMenuPayload) => void;
   onReply: () => void;
   onToggleReaction: (emoji: string) => void;
 };
 
 const SWIPE_REPLY = 56;
-const LONG_PRESS_MS = 130;
+const LONG_PRESS_MS = 150;
 
 function Receipt({
   status,
@@ -151,6 +159,7 @@ function ReactionBadge({
 }
 
 export function MessageBubble({
+  messageId,
   body,
   outgoing,
   status,
@@ -160,17 +169,44 @@ export function MessageBubble({
   currentUserId,
   selected,
   enter,
-  onLongPress,
-  onDismiss,
+  onOpenMenu,
   onReply,
   onToggleReaction,
 }: MessageBubbleProps) {
+  const bubbleRef = useRef<View>(null);
+  const sizeRef = useRef({ width: 0, height: 0 });
   const x = useSharedValue(0);
   const tint = useSharedValue(0);
 
   useEffect(() => {
     if (!selected) tint.value = withTiming(0, { duration: 60 });
   }, [selected, tint]);
+
+  function reportOpen(absX: number, absY: number) {
+    const size = sizeRef.current;
+    const fallback = () => {
+      onOpenMenu({
+        messageId,
+        outgoing,
+        pageX: absX - size.width / 2,
+        pageY: absY - size.height / 2,
+        width: size.width,
+        height: size.height,
+      });
+    };
+    const node = bubbleRef.current;
+    if (!node) {
+      fallback();
+      return;
+    }
+    node.measureInWindow((pageX, pageY, width, height) => {
+      if (width <= 0 || height <= 0) {
+        fallback();
+        return;
+      }
+      onOpenMenu({ messageId, outgoing, pageX, pageY, width, height });
+    });
+  }
 
   const swipe = Gesture.Pan()
     .activeOffsetX(18)
@@ -185,13 +221,19 @@ export function MessageBubble({
 
   const openMenu = Gesture.LongPress()
     .minDuration(LONG_PRESS_MS)
-    .maxDistance(16)
-    .onStart(() => {
+    .maxDistance(12)
+    .onBegin(() => {
+      tint.value = withTiming(0.55, { duration: 80 });
+    })
+    .onStart((e) => {
       tint.value = 1;
-      runOnJS(onLongPress)();
+      runOnJS(reportOpen)(e.absoluteX, e.absoluteY);
+    })
+    .onFinalize((_, success) => {
+      if (!success) tint.value = withTiming(0, { duration: 60 });
     });
 
-  const gesture = Gesture.Exclusive(openMenu, swipe);
+  const gesture = Gesture.Race(openMenu, swipe);
 
   const swipeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }],
@@ -221,9 +263,8 @@ export function MessageBubble({
   return (
     <Animated.View
       entering={enter ? FadeIn.springify().damping(20).stiffness(220) : undefined}
-      className={cn(selected && "z-20")}
+      className="pb-4"
     >
-    <Pressable onPressIn={onDismiss} className="pb-4">
       <View className="justify-center" pointerEvents="box-none">
         <Animated.View style={iconStyle} className="absolute left-1 z-0">
           <View className="size-8 items-center justify-center rounded-full bg-primary-soft">
@@ -257,58 +298,54 @@ export function MessageBubble({
                 reactions.length > 0 && "mb-2",
               )}
             >
-              <Pressable
+              <View
+                ref={bubbleRef}
+                collapsable={false}
                 accessibilityRole="button"
                 accessibilityLabel={
                   outgoing ? "Outgoing message" : "Incoming message"
                 }
-                onPressIn={onDismiss}
+                onLayout={(e) => {
+                  sizeRef.current = {
+                    width: e.nativeEvent.layout.width,
+                    height: e.nativeEvent.layout.height,
+                  };
+                }}
+                className={cn(
+                  "overflow-hidden px-3.5 py-2.5 shadow-sm shadow-black/10",
+                  outgoing
+                    ? "rounded-[22px] rounded-br-md bg-primary"
+                    : "rounded-[22px] rounded-bl-md bg-bubble-in",
+                )}
               >
-                <View
+                <Text
                   className={cn(
-                    "overflow-hidden px-3.5 py-2.5 shadow-sm shadow-black/10",
-                    outgoing
-                      ? "rounded-[22px] rounded-br-md bg-primary"
-                      : "rounded-[22px] rounded-bl-md bg-bubble-in",
+                    "font-sans text-[15px] font-normal leading-5",
+                    outgoing ? "text-primary-foreground" : "text-ink",
                   )}
                 >
-                  <Text
-                    className={cn(
-                      "font-sans text-[15px] font-normal leading-5",
-                      outgoing ? "text-primary-foreground" : "text-ink",
-                    )}
-                  >
-                    {body}
-                  </Text>
-                  <Animated.View
-                    pointerEvents="none"
-                    className={cn(
-                      "absolute inset-0",
-                      outgoing ? "bg-ink/25" : "bg-ink/12",
-                    )}
-                    style={tintStyle}
-                  />
-                </View>
-              </Pressable>
+                  {body}
+                </Text>
+                <Animated.View
+                  pointerEvents="none"
+                  className={cn(
+                    "absolute inset-0",
+                    outgoing ? "bg-ink/25" : "bg-ink/12",
+                  )}
+                  style={tintStyle}
+                />
+              </View>
               <ReactionBadge
                 reactions={reactions}
                 outgoing={outgoing}
                 currentUserId={currentUserId}
                 onToggleReaction={onToggleReaction}
               />
-              {selected ? (
-                <MessageActions
-                  outgoing={outgoing}
-                  onReact={onToggleReaction}
-                  onReply={onReply}
-                />
-              ) : null}
             </View>
             <Receipt status={status} outgoing={outgoing} />
           </Animated.View>
         </GestureDetector>
       </View>
-    </Pressable>
     </Animated.View>
   );
 }
