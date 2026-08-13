@@ -37,6 +37,15 @@ const headerChrome = {
     fontWeight: "600" as const,
   },
   headerShadowVisible: false,
+  // MainActivity already pads android.R.id.content by statusBarHeight.
+  // CustomToolbar would add the same inset again → double chin + back.
+  ...(Platform.OS === "android"
+    ? {
+        unstable_nativeProps: {
+          headerConfig: { disableTopInsetApplication: true },
+        },
+      }
+    : null),
 } as const;
 
 export const tabChrome = {

@@ -202,7 +202,7 @@ Simple Messenger-like pills on **light** chrome. Rejected: old generated thread 
 
 **Composer:** one pill `Message…`, `+` attach **dead**, send → append local `Message` with `status: 'sending'` then immediately `'sent'` (mock). Body required non-empty. Reply banner = thin “Replying to {name}” + snippet + X. Send copies `replyToId`. Composer `bg-surface` goes to the screen edge. `paddingBottom: screenBottomPad(insets.bottom)` on **all** platforms (Android 3-button / gesture + iOS home indicator). Keyboard: `softwareKeyboardLayoutMode: resize`.
 
-**Header:** Native-stack consumes the status inset (React Navigation default). Do **not** `disableTopInsetApplication` or fake `headerStyle.height: 48`. Headerless screens (hub, search, chat) use `screenTopPad(insets.top)`.
+**Header:** `MainActivity` pads `android.R.id.content` by status bar height. Android native-stack: `disableTopInsetApplication` so CustomToolbar does not add a second inset. Do not fake `headerStyle.height: 48`. Headerless screens (hub, search, chat) use `screenTopPad(insets.top)`.
 
 **System nav (Android):** `android.edgeToEdgeEnabled: true` (rebuild APK after changing it). `MainActivity` applies system-bar + cutout WindowInsets as padding on `android.R.id.content` after `super.onCreate` (do not call `WindowCompat` before splash). Keep the 3-button / gesture bar **visible**. Status + nav bar color = `bg` `#F5F6F9` (native, after `enableEdgeToEdge`); dark icons. Lock light UI (`Appearance.setColorScheme('light')` + `AppCompatDelegate.MODE_NIGHT_NO`). `<StatusBar style="dark" />` only (no JS `backgroundColor`). `<NavigationBar hidden={false} style="dark" />` + re-apply on AppState `active`. Composer/hub/tabs also use `useSafeAreaInsets` (Expo Go). Not our tab bar.
 
