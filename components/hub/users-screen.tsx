@@ -48,6 +48,7 @@ export function UsersScreen() {
             <TactilePressable
               accessibilityRole="button"
               accessibilityLabel="Clear search"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={() => setQuery("")}
               className="absolute right-2 size-7 items-center justify-center rounded-full bg-line/80"
             >

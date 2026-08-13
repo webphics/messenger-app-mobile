@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 
 import { ConversationRow } from "@/components/inbox/conversation-row";
+import { NewChatModal } from "@/components/inbox/new-chat-modal";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
@@ -38,6 +39,7 @@ export function InboxScreen({
   const navigation = useNavigation();
   const [query, setQuery] = useState("");
   const [chip, setChip] = useState<InboxChip>("all");
+  const [composeOpen, setComposeOpen] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
@@ -47,8 +49,9 @@ export function InboxScreen({
             <TactilePressable
               accessibilityRole="button"
               accessibilityLabel="New conversation"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               className="mr-2 size-10 items-center justify-center rounded-full bg-primary-soft/80"
-              onPress={() => undefined}
+              onPress={() => setComposeOpen(true)}
             >
               <SquarePen color={colors.primary} size={20} />
             </TactilePressable>
@@ -88,6 +91,7 @@ export function InboxScreen({
             <TactilePressable
               accessibilityRole="button"
               accessibilityLabel="Clear search"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               onPress={() => setQuery("")}
               className="absolute right-2 size-7 items-center justify-center rounded-full bg-line/80"
             >
@@ -165,6 +169,12 @@ export function InboxScreen({
             </Text>
           </View>
         }
+      />
+
+      <NewChatModal
+        visible={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        onSelectChat={(href) => router.push(href as any)}
       />
     </View>
   );

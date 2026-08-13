@@ -12,7 +12,9 @@
       "enabled": false
     },
     "ios": {
-      "icon": "./assets/images/icon.png"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.anonymous.internalsupportmessenger",
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {

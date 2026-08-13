@@ -1,7 +1,9 @@
 import { Plus, Send, X } from "lucide-react-native";
+import { useState } from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AttachmentSheet } from "@/components/chat/attachment-sheet";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
@@ -23,8 +25,17 @@ export function Composer({
   onCancelReply,
 }: ComposerProps) {
   const insets = useSafeAreaInsets();
+  const [attachOpen, setAttachOpen] = useState(false);
   const canSend = value.trim().length > 0;
   const bottom = screenBottomPad(insets.bottom);
+
+  function handleAttach(text: string) {
+    if (!value.trim()) {
+      onChangeText(text);
+    } else {
+      onChangeText(`${value} ${text}`);
+    }
+  }
 
   return (
     <View
@@ -45,6 +56,7 @@ export function Composer({
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Cancel reply"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             onPress={onCancelReply}
             className="size-8 items-center justify-center rounded-full bg-surface"
           >
@@ -57,7 +69,8 @@ export function Composer({
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Attach"
-          onPress={() => undefined}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          onPress={() => setAttachOpen(true)}
           className="mb-0.5 size-11 items-center justify-center rounded-full bg-bg border border-line/60"
         >
           <Plus color={colors.inkSoft} size={20} />
@@ -85,6 +98,12 @@ export function Composer({
           <Send color="#FFFFFF" size={17} />
         </TactilePressable>
       </View>
+
+      <AttachmentSheet
+        visible={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        onSelectAction={handleAttach}
+      />
     </View>
   );
 }

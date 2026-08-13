@@ -289,8 +289,8 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   {
     id: 'faq-attach',
-    question: 'Can I attach screenshots?',
-    answer: 'Not in this mock. The + on the composer is visible and dead until the media phase.',
+    question: 'Can I attach screenshots or templates?',
+    answer: 'Yes. Tap the + icon in the message composer to open the attachment menu, insert quick templates, or select media items.',
   },
   {
     id: 'faq-lock',

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
-import { LogOut, Shield } from "lucide-react-native";
-import { ScrollView, View } from "react-native";
+import { LogOut, Shield, Trash2 } from "lucide-react-native";
+import { Alert, ScrollView, View } from "react-native";
 
 import { RoleSwitch } from "@/components/settings/role-switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,6 +14,25 @@ import { colors } from "@/lib/tokens";
 export function SettingsScreen() {
   const me = getDevUser();
   const session = getSession();
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete your account? All messages, active queue assignments, and stored profile data will be permanently removed.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            void signOutSession().then(() => {
+              router.replace("/(auth)/sign-in");
+            });
+          },
+        },
+      ],
+    );
+  }
 
   return (
     <ScrollView
@@ -72,6 +91,15 @@ export function SettingsScreen() {
         >
           <LogOut color={colors.danger} size={18} />
           <Text className="text-danger">Sign out</Text>
+        </Button>
+
+        <Button
+          variant="ghost"
+          className="mt-2.5 min-h-11"
+          onPress={handleDeleteAccount}
+        >
+          <Trash2 color={colors.muted} size={16} />
+          <Text className="text-muted text-xs font-semibold">Delete Account & Data</Text>
         </Button>
       </View>
     </ScrollView>
