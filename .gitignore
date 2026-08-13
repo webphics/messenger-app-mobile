@@ -44,3 +44,7 @@ example
 # generated native folders
 /ios
 /android
+
+# local agent scratch
+.claude/
+.superpowers/
