@@ -10,7 +10,6 @@ import Animated, {
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { hapticMedium, hapticSelection } from "@/lib/haptics";
 import { REACT_EMOJIS } from "@/lib/message-react";
 import {
   replyStyle,
@@ -77,11 +76,10 @@ export function MessageActions({
         {REACT_EMOJIS.map((emoji) => (
           <TactilePressable
             key={emoji}
-            haptic="medium"
+            haptic="selection"
             accessibilityRole="button"
             accessibilityLabel={`React ${emoji}`}
             onPress={() => {
-              hapticMedium();
               onReact(emoji);
             }}
             className="size-10 items-center justify-center rounded-full"
@@ -108,7 +106,6 @@ export function MessageActions({
           accessibilityRole="button"
           accessibilityLabel="Reply"
           onPress={() => {
-            hapticSelection();
             onReply();
           }}
           className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line bg-surface px-5 py-2 shadow-lg shadow-black/20"

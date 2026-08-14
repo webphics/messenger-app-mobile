@@ -47,6 +47,7 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
       <FlatList
         className="flex-1 bg-bg"
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         data={results}
         keyExtractor={(item) => item.id}

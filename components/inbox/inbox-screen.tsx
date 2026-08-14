@@ -107,7 +107,6 @@ export function InboxScreen({
               return (
                 <TactilePressable
                   key={item.id}
-                  haptic="selection"
                   accessibilityRole="button"
                   accessibilityLabel={item.label}
                   accessibilityState={{ selected }}

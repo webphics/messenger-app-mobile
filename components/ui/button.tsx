@@ -101,7 +101,7 @@ function Button({
   variant,
   size,
   activeScale = 0.97,
-  haptic = "light",
+  haptic = "none",
   ...props
 }: ButtonProps) {
   return (

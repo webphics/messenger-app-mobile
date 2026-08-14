@@ -119,6 +119,7 @@ export function NewChatModal({
           className="flex-1 bg-bg"
           data={filteredPeople}
           keyExtractor={(item) => item.id}
+          keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           contentContainerClassName="px-4 py-3"
           ItemSeparatorComponent={() => <View className="h-2.5" />}

@@ -63,7 +63,6 @@ export function UsersScreen() {
             return (
               <TactilePressable
                 key={item.id}
-                haptic="selection"
                 accessibilityRole="button"
                 accessibilityLabel={item.label}
                 accessibilityState={{ selected }}
@@ -88,7 +87,6 @@ export function UsersScreen() {
           })}
 
           <TactilePressable
-            haptic="selection"
             accessibilityRole="button"
             accessibilityLabel="Online only"
             accessibilityState={{ selected: onlineOnly }}
@@ -123,6 +121,8 @@ export function UsersScreen() {
         className="flex-1 bg-bg"
         extraData={openId}
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         data={visible}
         keyExtractor={(item) => item.id}
         contentContainerClassName="px-4 py-3"

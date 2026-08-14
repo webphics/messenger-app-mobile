@@ -100,7 +100,6 @@ export function OffersCarousel() {
 
       <View className="px-4">
         <TactilePressable
-          haptic="medium"
           accessibilityRole="button"
           accessibilityLabel="Join Offers chat"
           onPress={openOffers}

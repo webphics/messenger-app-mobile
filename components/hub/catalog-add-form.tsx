@@ -1,12 +1,18 @@
 import { AlertCircle } from "lucide-react-native";
 import { useState } from "react";
-import { ScrollView, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
-import { colors } from "@/lib/tokens";
+import { colors, screenBottomPad } from "@/lib/tokens";
 
 export type CatalogAddField = {
   key: string;
@@ -23,6 +29,7 @@ type CatalogAddFormProps = {
 };
 
 export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddFormProps) {
+  const insets = useSafeAreaInsets();
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f.key, ""])),
   );
@@ -43,12 +50,22 @@ export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddForm
   }
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-bg"
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      contentContainerClassName="px-4 py-4"
     >
+      <ScrollView
+        className="flex-1 bg-bg"
+        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: screenBottomPad(insets.bottom) + 24,
+        }}
+      >
       <View className="rounded-3xl border border-line bg-surface p-5 shadow-md shadow-black/5">
         {fields.map((field, i) => (
           <View key={field.key} className={i === 0 ? "" : "mt-4"}>
@@ -96,5 +113,6 @@ export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddForm
         </Button>
       </View>
     </ScrollView>
+  </KeyboardAvoidingView>
   );
 }

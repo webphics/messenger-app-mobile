@@ -31,7 +31,7 @@ export const TactilePressable = React.forwardRef<
 >(function TactilePressable(
   {
     activeScale = 0.97,
-    haptic = "light",
+    haptic = "none",
     style,
     disabled,
     onPressIn,

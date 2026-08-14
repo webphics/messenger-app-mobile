@@ -40,6 +40,7 @@ export function HelpSearchScreen() {
         className="flex-1 bg-bg"
         extraData={openId}
         showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         data={results}
         keyExtractor={(item) => item.id}
