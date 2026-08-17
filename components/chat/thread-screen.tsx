@@ -4,7 +4,6 @@ import {
   Dimensions,
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   View,
 } from "react-native";
 
@@ -150,14 +149,17 @@ export function ThreadScreen({
     [me.id],
   );
 
-  const handleReply = useCallback((messageId: string) => {
-    setMessages((prev) => {
-      const target = prev.find((m) => m.id === messageId);
+  const handleReply = useCallback(
+    (messageId: string) => {
+      // Reading `messages` directly: setting state from inside a setMessages
+      // updater made the updater impure, so React (StrictMode + the compiler)
+      // re-ran it and queued a second render — a visible extra layout pass.
+      const target = messages.find((m) => m.id === messageId);
       if (target) setReplyTo(target);
-      return prev;
-    });
-    setMenu(null);
-  }, []);
+      setMenu(null);
+    },
+    [messages],
+  );
 
   function send() {
     const body = draft.trim();
@@ -227,7 +229,11 @@ export function ThreadScreen({
         keyExtractor={keyExtractor}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews={Platform.OS === "android"}
+        // Anchor whatever is on screen. Without this the list re-anchors to
+        // offset 0 — the newest message — every time the composer changes
+        // height (reply banner appearing, keyboard opening), yanking you away
+        // from the message you were replying to.
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         renderItem={renderItem}
       />
       <Composer
@@ -253,17 +259,21 @@ export function ThreadScreen({
       <InScreenHeader>
         <ThreadHeader conversation={conversation} />
       </InScreenHeader>
-      {Platform.OS === "android" ? (
-        host
-      ) : (
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior="padding"
-          keyboardVerticalOffset={0}
-        >
-          {host}
-        </KeyboardAvoidingView>
-      )}
+      {/*
+        Android too: edge-to-edge sets `setDecorFitsSystemWindows(false)`, which
+        makes `softwareKeyboardLayoutMode: "resize"` a no-op — the window never
+        resizes and MainActivity pads only for system bars, so the composer and
+        its reply banner sat behind the IME. `padding` measures this view's own
+        on-screen frame, so it nets out the nav-bar padding already applied to
+        android.R.id.content instead of double-counting it.
+      */}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
+        {host}
+      </KeyboardAvoidingView>
     </View>
   );
 }
