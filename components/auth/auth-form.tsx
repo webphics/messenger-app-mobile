@@ -1,13 +1,7 @@
 import { router } from "expo-router";
 import { AlertCircle, Eye, EyeOff, Sparkles } from "@/components/icons";
 import { useState } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  View,
-} from "react-native";
+import { Image, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +10,7 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { hapticSelection, hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { ROLE_HREF } from "@/lib/hub-routes";
+import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import {
   emailLooksValid,
   passwordIsValid,
@@ -31,6 +26,7 @@ type AuthFormProps = {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const insets = useSafeAreaInsets();
+  const { keyboardInset, scrollProps } = useKeyboardAwareScroll();
   const register = mode === "register";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -72,11 +68,11 @@ export function AuthForm({ mode }: AuthFormProps) {
   const scoreLevel = score === "strong" ? 3 : score === "fair" ? 2 : score === "weak" ? 1 : 0;
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-bg"
-    >
+    // Shrinking the scroll viewport is what keeps a focused field above the
+    // Android IME; iOS does the same natively via automaticallyAdjustKeyboardInsets.
+    <View className="flex-1 bg-bg" style={{ paddingBottom: keyboardInset }}>
       <ScrollView
+        {...scrollProps}
         className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="on-drag"
@@ -92,12 +88,12 @@ export function AuthForm({ mode }: AuthFormProps) {
         <View className="items-center">
           <Image
             source={require("../../assets/images/splash-icon.png")}
-            accessibilityLabel="Messenger Chat"
-            className="mb-3 h-20 w-20 rounded-3xl shadow-md shadow-black/10"
-            resizeMode="cover"
+            accessibilityLabel="Enki"
+            className="mb-3 h-20 w-20"
+            resizeMode="contain"
           />
           <Text className="text-center font-sans text-2xl font-extrabold text-ink">
-            Messenger Chat
+            Enki
           </Text>
           <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
             Internal Support & Team Collaboration
@@ -309,6 +305,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           </Text>
         </TactilePressable>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

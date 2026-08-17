@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  BackHandler,
-  Dimensions,
-  FlatList,
-  KeyboardAvoidingView,
-  View,
-} from "react-native";
+import { BackHandler, Dimensions, FlatList, View } from "react-native";
 
 import { Composer } from "@/components/chat/composer";
 import { MessageActions } from "@/components/chat/message-actions";
@@ -16,6 +10,7 @@ import {
 import { ThreadHeader } from "@/components/chat/thread-header";
 import { InScreenHeader } from "@/components/in-screen-header";
 import { Text } from "@/components/ui/text";
+import { useKeyboardInset } from "@/lib/keyboard-inset";
 import { formatDayLabel, shouldShowDayDivider } from "@/lib/message-day";
 import { quotePreview, toggleReaction } from "@/lib/message-react";
 import { getDevUser, getDevUserId } from "@/lib/dev-user";
@@ -76,6 +71,7 @@ export function ThreadScreen({
   initialMessages,
 }: ThreadScreenProps) {
   const me = getDevUser();
+  const keyboardInset = useKeyboardInset();
   const hostRef = useRef<View>(null);
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState(initialMessages);
@@ -242,6 +238,7 @@ export function ThreadScreen({
         onSend={send}
         replyTo={replyQuote}
         onCancelReply={() => setReplyTo(null)}
+        keyboardInset={keyboardInset}
       />
       {menu ? (
         <MessageActions
@@ -263,17 +260,14 @@ export function ThreadScreen({
         Android too: edge-to-edge sets `setDecorFitsSystemWindows(false)`, which
         makes `softwareKeyboardLayoutMode: "resize"` a no-op — the window never
         resizes and MainActivity pads only for system bars, so the composer and
-        its reply banner sat behind the IME. `padding` measures this view's own
-        on-screen frame, so it nets out the nav-bar padding already applied to
-        android.R.id.content instead of double-counting it.
+        its reply banner sit behind the IME unless something lifts them.
+        `useKeyboardInset` reports the overlap with this padded content view;
+        KeyboardAvoidingView cannot, because it measures against a
+        parent-relative frame. See lib/keyboard-inset.ts.
       */}
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior="padding"
-        keyboardVerticalOffset={0}
-      >
+      <View className="flex-1" style={{ paddingBottom: keyboardInset }}>
         {host}
-      </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }
