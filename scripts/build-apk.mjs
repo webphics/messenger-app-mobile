@@ -27,6 +27,31 @@ function androidHome() {
   return existsSync(fallback) ? fallback : null;
 }
 
+// CMake mangles a C++ file's whole source path into its object name, on top of
+// an already deep `.cxx` directory. Past roughly 180 characters of prefix,
+// react-native-screens and react-native-worklets stop converging and the native
+// build spins on `ninja: error: manifest 'build.ninja' still dirty after 100
+// tries`. The repo root sits at 154 and builds; `.claude/worktrees/<branch>/`
+// adds ~59 and does not. Enabling long paths in the registry does not help —
+// ninja is not long-path aware — and neither does `subst`, because Expo's
+// autolinking hands Gradle the realpath of every module.
+const OBJECT_DIR_MAX = 180;
+const deepestObjectDir = join(
+  root, "node_modules", "react-native-worklets", "android",
+  ".cxx", "RelWithDebInfo", "xxxxxxxx", "arm64-v8a", "CMakeFiles", "worklets.dir",
+);
+if (win && deepestObjectDir.length > OBJECT_DIR_MAX && !process.env.ALLOW_DEEP_BUILD_PATH) {
+  console.error(
+    `Project path is too deep for the native build: the CMake object directory would be ` +
+      `${deepestObjectDir.length} characters (limit ${OBJECT_DIR_MAX}).\n` +
+      `  ${root}\n` +
+      `Build from the repo root instead of a nested worktree, or create the worktree at a ` +
+      `short path (git worktree add D:\\wt\\<name>).\n` +
+      `Set ALLOW_DEEP_BUILD_PATH=1 to try anyway.`,
+  );
+  process.exit(1);
+}
+
 const jdk = javaHome();
 const sdk = androidHome();
 if (!jdk) {
@@ -83,6 +108,6 @@ if (!existsSync(apk)) {
 }
 const dist = join(root, "dist");
 mkdirSync(dist, { recursive: true });
-const out = join(dist, "internal-support-messenger-release.apk");
+const out = join(dist, "enki-release.apk");
 copyFileSync(apk, out);
 console.log(`APK: ${out}`);

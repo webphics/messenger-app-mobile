@@ -15,6 +15,8 @@ type ComposerProps = {
   onSend: () => void;
   replyTo?: { name: string; body: string } | null;
   onCancelReply?: () => void;
+  /** Overlap the thread already lifted the composer by; see lib/keyboard-inset.ts. */
+  keyboardInset?: number;
 };
 
 export function Composer({
@@ -23,11 +25,14 @@ export function Composer({
   onSend,
   replyTo,
   onCancelReply,
+  keyboardInset = 0,
 }: ComposerProps) {
   const insets = useSafeAreaInsets();
   const [attachOpen, setAttachOpen] = useState(false);
   const canSend = value.trim().length > 0;
-  const bottom = screenBottomPad(insets.bottom);
+  // The keyboard covers the home indicator / nav bar, so once the thread has
+  // lifted the composer by that much, its own safe-area gap is redundant.
+  const bottom = Math.max(0, screenBottomPad(insets.bottom) - keyboardInset);
 
   function handleAttach(text: string) {
     if (!value.trim()) {

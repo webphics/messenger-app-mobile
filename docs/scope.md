@@ -1,4 +1,4 @@
-# Internal Support Messenger — scope
+# Enki (internal support messenger) — scope
 
 Self-contained internal chat for support. Users log in. Three roles:
 
