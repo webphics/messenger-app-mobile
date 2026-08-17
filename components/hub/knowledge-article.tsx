@@ -1,5 +1,5 @@
 import * as Clipboard from "expo-clipboard";
-import { Check, Copy } from "lucide-react-native";
+import { Check, Copy } from "@/components/icons";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 

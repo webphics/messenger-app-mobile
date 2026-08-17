@@ -1,17 +1,16 @@
 import "react-native-gesture-handler";
 import "../global.css";
 
-import {
-    JetBrainsMono_500Medium,
-    JetBrainsMono_700Bold,
-} from "@expo-google-fonts/jetbrains-mono";
-import {
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
-    useFonts,
-} from "@expo-google-fonts/manrope";
+// Per-face subpaths, never the package root: the root index `require()`s every
+// weight in the family, so a barrel import bundles all 7 Manrope and all 16
+// JetBrains Mono TTFs whether or not they are loaded here.
+import { JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono/500Medium";
+import { JetBrainsMono_700Bold } from "@expo-google-fonts/jetbrains-mono/700Bold";
+import { Manrope_400Regular } from "@expo-google-fonts/manrope/400Regular";
+import { Manrope_500Medium } from "@expo-google-fonts/manrope/500Medium";
+import { Manrope_600SemiBold } from "@expo-google-fonts/manrope/600SemiBold";
+import { Manrope_700Bold } from "@expo-google-fonts/manrope/700Bold";
+import { useFonts } from "expo-font";
 import { NavigationBar } from "expo-navigation-bar";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";

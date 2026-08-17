@@ -1,5 +1,5 @@
 import type { Href } from "expo-router";
-import { MessageSquare, Search, X } from "lucide-react-native";
+import { MessageSquare, Search, X } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { FlatList, Modal, View } from "react-native";
 import {

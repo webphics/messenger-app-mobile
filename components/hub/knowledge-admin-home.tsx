@@ -1,14 +1,15 @@
 import { router, useFocusEffect, type Href } from "expo-router";
-import { BookOpen, FileQuestion, HelpCircle, Plus } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 
+import { HelpCircle, Plus } from "@/components/icons";
+import { ActionRow } from "@/components/hub/action-row";
+import { ActionTile } from "@/components/hub/action-tile";
 import { KnowledgeRow } from "@/components/hub/knowledge-row";
-import { TactilePressable } from "@/components/ui/tactile-pressable";
+import { Pill } from "@/components/hub/pill";
 import { Text } from "@/components/ui/text";
 import { knowledgeHref } from "@/lib/hub-routes";
 import { listKnowledge } from "@/lib/mock-catalog";
-import { colors } from "@/lib/tokens";
 import type { KnowledgeArticle } from "@/lib/types";
 
 export function KnowledgeAdminHome() {
@@ -27,65 +28,36 @@ export function KnowledgeAdminHome() {
       contentContainerClassName="px-4 py-4"
     >
       <View className="flex-row gap-3">
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Add FAQ"
+        <ActionTile
+          className="min-h-24"
+          icon={Plus}
+          title="Add FAQ"
+          hint="New question"
           onPress={() => router.push("/(admin)/faq-add" as Href)}
-          className="min-h-24 flex-1 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
-        >
-          <View className="size-10 items-center justify-center rounded-2xl bg-primary-soft">
-            <Plus color={colors.primary} size={22} />
-          </View>
-          <Text className="mt-3 font-sans text-base font-semibold text-ink">Add FAQ</Text>
-          <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
-            New question
-          </Text>
-        </TactilePressable>
-
-        <TactilePressable
-          accessibilityRole="button"
+        />
+        <ActionTile
+          className="min-h-24"
+          icon={Plus}
+          title="Add Article"
+          hint="Knowledge guide"
           accessibilityLabel="Add knowledge"
           onPress={() => router.push("/(admin)/knowledge-add" as Href)}
-          className="min-h-24 flex-1 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
-        >
-          <View className="size-10 items-center justify-center rounded-2xl bg-primary-soft">
-            <Plus color={colors.primary} size={22} />
-          </View>
-          <Text className="mt-3 font-sans text-base font-semibold text-ink">
-            Add Article
-          </Text>
-          <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
-            Knowledge guide
-          </Text>
-        </TactilePressable>
+        />
       </View>
 
-      <TactilePressable
-        accessibilityRole="button"
+      <ActionRow
+        className="mt-3.5"
+        icon={HelpCircle}
+        title="Frequently Asked Questions"
+        hint="Browse and manage all published FAQ answers"
         accessibilityLabel="View FAQs"
+        chevron={false}
         onPress={() => router.push("/(admin)/faq" as Href)}
-        className="mt-3.5 flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/5"
-      >
-        <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
-          <HelpCircle color={colors.primary} size={22} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text className="font-sans text-base font-semibold text-ink">
-            Frequently Asked Questions
-          </Text>
-          <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
-            Browse and manage all published FAQ answers
-          </Text>
-        </View>
-      </TactilePressable>
+      />
 
       <View className="mt-6 flex-row items-center justify-between">
         <Text className="font-sans text-base font-bold text-ink">Knowledge Articles</Text>
-        <View className="rounded-full bg-primary-soft px-2.5 py-0.5">
-          <Text className="font-sans text-xs font-semibold text-primary">
-            {items.length} articles
-          </Text>
-        </View>
+        <Pill label={`${items.length} articles`} />
       </View>
 
       <View className="mt-3 gap-3">

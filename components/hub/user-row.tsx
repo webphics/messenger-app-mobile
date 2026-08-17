@@ -1,6 +1,6 @@
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
-import { Check, ChevronDown, ChevronUp, Copy, Mail, MessageCircle } from "lucide-react-native";
+import { Check, ChevronDown, ChevronUp, Copy, Mail, MessageCircle } from "@/components/icons";
 import { useState } from "react";
 import { View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";

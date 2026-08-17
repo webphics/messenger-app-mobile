@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { AlertCircle, Eye, EyeOff, Sparkles } from "lucide-react-native";
+import { AlertCircle, Eye, EyeOff, Sparkles } from "@/components/icons";
 import { useState } from "react";
 import {
   Image,

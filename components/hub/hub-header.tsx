@@ -1,5 +1,5 @@
 import { router, type Href } from "expo-router";
-import { Settings } from "lucide-react-native";
+import { Settings } from "@/components/icons";
 import { Image, View } from "react-native";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";

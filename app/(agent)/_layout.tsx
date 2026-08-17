@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { House, Inbox, MessageCircle } from "lucide-react-native";
+import { House, Inbox, MessageCircle } from "@/components/icons";
 
 import { tabChrome } from "@/lib/tokens";
 

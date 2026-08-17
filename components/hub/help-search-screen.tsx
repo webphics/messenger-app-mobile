@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { ChevronDown, ChevronUp, HelpCircle, Search } from "lucide-react-native";
+import { ChevronDown, ChevronUp, HelpCircle, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";

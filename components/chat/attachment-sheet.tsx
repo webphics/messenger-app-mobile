@@ -4,10 +4,12 @@ import {
   Image as ImageIcon,
   Sparkles,
   X,
-} from "lucide-react-native";
+} from "@/components/icons";
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Modal,
   PanResponder,
@@ -21,6 +23,13 @@ import {
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import {
+  capturePhoto,
+  describeAttachment,
+  pickDocument,
+  pickFromLibrary,
+  type AttachmentOutcome,
+} from "@/lib/attachments";
 import { hapticLight, hapticSelection } from "@/lib/haptics";
 import { colors, screenBottomPad } from "@/lib/tokens";
 
@@ -30,27 +39,50 @@ type AttachmentSheetProps = {
   onSelectAction: (textToInsert: string) => void;
 };
 
-const ATTACHMENT_OPTIONS = [
+/**
+ * `pick` options open a native picker and resolve to real file metadata;
+ * `insert` options are pure text. Keeping both in one list lets the sheet render
+ * a single row type.
+ */
+type AttachmentOption =
+  | {
+      id: string;
+      title: string;
+      subtitle: string;
+      icon: typeof ImageIcon;
+      pick: () => Promise<AttachmentOutcome>;
+      insertText?: never;
+    }
+  | {
+      id: string;
+      title: string;
+      subtitle: string;
+      icon: typeof ImageIcon;
+      pick?: never;
+      insertText: string;
+    };
+
+const ATTACHMENT_OPTIONS: AttachmentOption[] = [
   {
     id: "photo",
     title: "Photo & Video Library",
     subtitle: "Share images or screenshots",
     icon: ImageIcon,
-    insertText: "[Attached image: screenshot.png 📷]",
+    pick: pickFromLibrary,
   },
   {
     id: "camera",
     title: "Take Photo",
     subtitle: "Capture photo with camera",
     icon: Camera,
-    insertText: "[Attached photo: capture.jpg 📸]",
+    pick: capturePhoto,
   },
   {
     id: "document",
     title: "Document",
     subtitle: "Attach invoice or PDF",
     icon: FileText,
-    insertText: "[Attached document: invoice_receipt.pdf 📄]",
+    pick: pickDocument,
   },
   {
     id: "quick-reply",
@@ -60,6 +92,17 @@ const ATTACHMENT_OPTIONS = [
     insertText: "Hi there! Thanks for reaching out. How can I assist you today?",
   },
 ];
+
+const DENIED_COPY = {
+  camera: {
+    title: "Camera access needed",
+    body: "Enable camera access in Settings to take a photo from here.",
+  },
+  library: {
+    title: "Photo access needed",
+    body: "Enable photo access in Settings to attach images or video.",
+  },
+} as const;
 
 /**
  * The sheet surface. Must render inside the modal's own `SafeAreaProvider` —
@@ -93,6 +136,7 @@ export function AttachmentSheet({
   onSelectAction,
 }: AttachmentSheetProps) {
   const translateY = useRef(new Animated.Value(400)).current;
+  const [pendingId, setPendingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -121,6 +165,36 @@ export function AttachmentSheet({
     hapticSelection();
     onSelectAction(insertText);
     dismiss();
+  }
+
+  async function handleOption(option: AttachmentOption) {
+    if (pendingId) return;
+
+    if (option.insertText !== undefined) {
+      handleSelect(option.insertText);
+      return;
+    }
+
+    hapticSelection();
+    setPendingId(option.id);
+    try {
+      const outcome = await option.pick();
+      if (outcome.status === "picked") {
+        onSelectAction(describeAttachment(outcome.attachment));
+        dismiss();
+        return;
+      }
+      if (outcome.status === "denied") {
+        const copy = DENIED_COPY[outcome.scope];
+        Alert.alert(copy.title, copy.body);
+      }
+      // `cancelled` leaves the sheet open so another option can be chosen.
+    } catch {
+      // Never surface the picker's raw error — it can carry file paths.
+      Alert.alert("Could not attach", "Something went wrong opening that picker.");
+    } finally {
+      setPendingId(null);
+    }
   }
 
   // Dedicated PanResponder for the top grab handle + header area (circled section)
@@ -269,11 +343,20 @@ export function AttachmentSheet({
                   key={item.id}
                   accessibilityRole="button"
                   accessibilityLabel={item.title}
-                  onPress={() => handleSelect(item.insertText)}
+                  accessibilityState={{
+                    disabled: pendingId !== null,
+                    busy: pendingId === item.id,
+                  }}
+                  disabled={pendingId !== null}
+                  onPress={() => void handleOption(item)}
                   className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-bg p-3.5 shadow-sm shadow-black/5 active:bg-primary-soft/40"
                 >
                   <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
-                    <item.icon color={colors.primary} size={22} />
+                    {pendingId === item.id ? (
+                      <ActivityIndicator color={colors.primary} size="small" />
+                    ) : (
+                      <item.icon color={colors.primary} size={22} />
+                    )}
                   </View>
                   <View className="min-w-0 flex-1">
                     <Text className="font-sans text-sm font-semibold text-ink">

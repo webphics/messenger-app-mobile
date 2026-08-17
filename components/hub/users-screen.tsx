@@ -1,4 +1,4 @@
-import { Search, UserX, X } from "lucide-react-native";
+import { Search, UserX, X } from "@/components/icons";
 import { useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 

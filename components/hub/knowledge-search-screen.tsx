@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { BookOpen, Search } from "lucide-react-native";
+import { BookOpen, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, TextInput, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";

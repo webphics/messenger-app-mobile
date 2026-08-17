@@ -1,4 +1,4 @@
-import { Megaphone } from "lucide-react-native";
+import { Megaphone } from "@/components/icons";
 import { View } from "react-native";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
