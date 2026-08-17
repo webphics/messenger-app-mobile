@@ -38,6 +38,23 @@ if (!sdk) {
   process.exit(1);
 }
 
+// `android/` is gitignored and generated, so it is absent in a fresh clone or a
+// git worktree. Generate it rather than failing on a missing local.properties.
+// Config-plugin output (see plugins/with-system-bar-insets.js) lands here too,
+// so pass --prebuild after changing app.json or a plugin.
+function prebuild(reason) {
+  console.log(`expo prebuild --platform android (${reason})`);
+  const run = spawnSync(
+    win ? "npx.cmd" : "npx",
+    ["expo", "prebuild", "--platform", "android", "--no-install"],
+    { cwd: root, stdio: "inherit", shell: win },
+  );
+  if (run.status !== 0) process.exit(run.status ?? 1);
+}
+
+if (process.argv.includes("--prebuild")) prebuild("--prebuild requested");
+else if (!existsSync(android)) prebuild("android/ is missing");
+
 writeFileSync(join(android, "local.properties"), `sdk.dir=${sdk.replace(/\\/g, "/")}\n`);
 
 const env = {
@@ -48,9 +65,12 @@ const env = {
   PATH: `${join(jdk, "bin")}${win ? ";" : ":"}${join(sdk, "platform-tools")}${win ? ";" : ":"}${process.env.PATH ?? ""}`,
 };
 
-const gradle = win ? "gradlew.bat" : "./gradlew";
+// Absolute path, not a bare name: the .bat needs `shell: true` on Windows, and
+// cmd.exe skips the working directory when NoDefaultCurrentDirectoryInExePath
+// is set, so `gradlew.bat` alone is "not recognized" even from inside android/.
+const gradle = join(android, win ? "gradlew.bat" : "gradlew");
 const result = spawnSync(
-  gradle,
+  win ? `"${gradle}"` : gradle,
   ["assembleRelease", "-PreactNativeArchitectures=arm64-v8a"],
   { cwd: android, env, stdio: "inherit", shell: win },
 );
