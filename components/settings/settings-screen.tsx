@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { LogOut, Shield, Trash2 } from "lucide-react-native";
+import { LogOut, Shield, Trash2 } from "@/components/icons";
 import { Alert, ScrollView, View } from "react-native";
 
 import { RoleSwitch } from "@/components/settings/role-switch";

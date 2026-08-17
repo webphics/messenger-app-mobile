@@ -1,14 +1,14 @@
 import { router, type Href } from "expo-router";
+import { ScrollView, View } from "react-native";
+
 import {
-  ChevronRight,
   Clock,
   HelpCircle,
   MessageCircle,
   Search,
-} from "lucide-react-native";
-import { ScrollView, View } from "react-native";
-
-import { TactilePressable } from "@/components/ui/tactile-pressable";
+  type IconComponent,
+} from "@/components/icons";
+import { ActionRow } from "@/components/hub/action-row";
 import { Text } from "@/components/ui/text";
 import { colors } from "@/lib/tokens";
 
@@ -17,7 +17,7 @@ const LINKS: {
   label: string;
   hint: string;
   a11y: string;
-  Icon: typeof MessageCircle;
+  Icon: IconComponent;
 }[] = [
   {
     href: "/(contact)/messages",
@@ -58,26 +58,16 @@ export function HelpHome() {
 
       <View className="mt-4 gap-3">
         {LINKS.map((link) => (
-          <TactilePressable
+          <ActionRow
             key={link.label}
-            accessibilityRole="button"
+            className="rounded-3xl"
+            icon={link.Icon}
+            title={link.label}
+            hint={link.hint}
+            hintLines={1}
             accessibilityLabel={link.a11y}
             onPress={() => router.push(link.href)}
-            className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
-          >
-            <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
-              <link.Icon color={colors.primary} size={22} />
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text className="font-sans text-base font-semibold text-ink">
-                {link.label}
-              </Text>
-              <Text className="mt-0.5 font-sans text-xs font-normal text-muted" numberOfLines={1}>
-                {link.hint}
-              </Text>
-            </View>
-            <ChevronRight color={colors.muted} size={18} />
-          </TactilePressable>
+          />
         ))}
       </View>
     </ScrollView>

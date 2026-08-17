@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Reply } from "lucide-react-native";
+import { Reply } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
   useAnimatedStyle,

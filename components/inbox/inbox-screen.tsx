@@ -1,5 +1,5 @@
 import { useNavigation, useRouter } from "expo-router";
-import { Inbox, MessageCircle, Search, SquarePen, X } from "lucide-react-native";
+import { Inbox, MessageCircle, Search, SquarePen, X } from "@/components/icons";
 import { useEffect, useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 

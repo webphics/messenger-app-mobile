@@ -1,4 +1,4 @@
-import { Info } from "lucide-react-native";
+import { Info } from "@/components/icons";
 import { ScrollView, useWindowDimensions, View } from "react-native";
 
 import { MetricChart } from "@/components/hub/metric-chart";

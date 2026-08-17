@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Check, Headphones, ShieldCheck, User } from "lucide-react-native";
+import { Check, Headphones, ShieldCheck, User } from "@/components/icons";
 import { View } from "react-native";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";

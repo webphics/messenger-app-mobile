@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { ChevronRight } from "lucide-react-native";
+import { ChevronRight } from "@/components/icons";
 import { View } from "react-native";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";

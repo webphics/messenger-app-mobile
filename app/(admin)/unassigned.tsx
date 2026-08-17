@@ -1,14 +1,5 @@
-import { InboxScreen } from '@/components/inbox/inbox-screen'
-import { listUnassignedConversations } from '@/lib/inbox-filter'
-import { CONVERSATIONS } from '@/lib/mock-data'
+import { UnassignedScreen } from "@/components/inbox/unassigned-screen";
 
 export default function AdminUnassignedScreen() {
-  return (
-    <InboxScreen
-      conversations={listUnassignedConversations(CONVERSATIONS)}
-      showChips={false}
-      showCompose={false}
-      title="Unassigned"
-    />
-  )
+  return <UnassignedScreen />;
 }

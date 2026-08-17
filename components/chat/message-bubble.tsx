@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
-import { Check, CheckCheck, CornerUpLeft, Reply } from "lucide-react-native";
+import { Check, CheckCheck, CornerUpLeft, Reply } from "@/components/icons";
 import { Dimensions, Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {

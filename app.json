@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "internal-support-messenger",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "updates": {
       "enabled": false
     },
@@ -24,7 +23,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "edgeToEdgeEnabled": true,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.anonymous.internalsupportmessenger"
     },
@@ -48,6 +50,31 @@
         {
           "enforceContrast": false,
           "style": "dark"
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach screenshots to a support conversation.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "./plugins/with-system-bar-insets",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach them to a support conversation.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save attachments you receive to your photo library.",
+          "isAccessMediaLocationEnabled": false
         }
       ]
     ],

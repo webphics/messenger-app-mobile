@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { ChevronRight, MessageCircle } from "lucide-react-native";
+import { ChevronRight, MessageCircle } from "@/components/icons";
 import { useCallback, useState } from "react";
 import { useWindowDimensions, View } from "react-native";
 import Animated, {

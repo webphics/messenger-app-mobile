@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { BookOpen } from "lucide-react-native";
+import { BookOpen } from "@/components/icons";
 import { useCallback, useState } from "react";
 import { FlatList, View } from "react-native";
 

@@ -1,4 +1,4 @@
-import { BookOpen, ChevronRight } from "lucide-react-native";
+import { BookOpen, ChevronRight } from "@/components/icons";
 import { View } from "react-native";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";

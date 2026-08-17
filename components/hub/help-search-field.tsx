@@ -1,5 +1,5 @@
 import { forwardRef, useState, type Ref } from "react";
-import { X } from "lucide-react-native";
+import { X } from "@/components/icons";
 import { TextInput, View } from "react-native";
 
 import { Input } from "@/components/ui/input";

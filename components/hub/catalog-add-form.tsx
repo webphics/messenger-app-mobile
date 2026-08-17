@@ -1,4 +1,4 @@
-import { AlertCircle } from "lucide-react-native";
+import { AlertCircle } from "@/components/icons";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
