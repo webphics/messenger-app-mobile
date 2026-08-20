@@ -1,8 +1,8 @@
-import { Search, X } from "@/components/icons";
+import { Search } from "@/components/icons";
 import { View } from "react-native";
 
+import { SearchClearButton } from "@/components/search-clear-button";
 import { Input } from "@/components/ui/input";
-import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { colors } from "@/lib/tokens";
 
 type SearchFieldWithClearProps = {
@@ -32,15 +32,10 @@ export function SearchFieldWithClear({
         <Search color={colors.muted} size={18} />
       </View>
       {value.length > 0 ? (
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Clear search"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        <SearchClearButton
           onPress={() => onChangeText("")}
-          className="absolute right-2 size-7 items-center justify-center rounded-full bg-line/80"
-        >
-          <X color={colors.inkSoft} size={14} />
-        </TactilePressable>
+          className="absolute right-2"
+        />
       ) : null}
     </View>
   );

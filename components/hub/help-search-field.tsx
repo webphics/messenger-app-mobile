@@ -1,10 +1,8 @@
 import { forwardRef, useState, type Ref } from "react";
-import { X } from "@/components/icons";
 import { TextInput, View } from "react-native";
 
+import { SearchClearButton } from "@/components/search-clear-button";
 import { Input } from "@/components/ui/input";
-import { TactilePressable } from "@/components/ui/tactile-pressable";
-import { colors } from "@/lib/tokens";
 
 type HelpSearchFieldProps = {
   onQuery: (query: string) => void;
@@ -38,17 +36,7 @@ export const HelpSearchField = forwardRef(function HelpSearchField(
         returnKeyType="search"
         className="h-11 min-w-0 flex-1 border-0 bg-transparent px-2 shadow-none font-sans text-base text-ink"
       />
-      {value.length > 0 ? (
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Clear search"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={handleClear}
-          className="size-8 items-center justify-center rounded-full bg-line/80"
-        >
-          <X color={colors.inkSoft} size={16} />
-        </TactilePressable>
-      ) : null}
+      {value.length > 0 ? <SearchClearButton onPress={handleClear} /> : null}
     </View>
   );
 });
