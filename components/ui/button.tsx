@@ -1,8 +1,11 @@
 import { TextClassContext } from "@/components/ui/text";
-import { TactilePressable } from "@/components/ui/tactile-pressable";
+import {
+  TactilePressable,
+  type TactilePressableProps,
+} from "@/components/ui/tactile-pressable";
 import { cn } from "@/lib/cn";
 import { cva, type VariantProps } from "class-variance-authority";
-import { Platform, Pressable } from "react-native";
+import { Platform } from "react-native";
 
 const buttonVariants = cva(
   cn(
@@ -89,12 +92,8 @@ const buttonTextVariants = cva(
   },
 );
 
-type ButtonProps = React.ComponentProps<typeof Pressable> &
-  React.RefAttributes<typeof Pressable> &
-  VariantProps<typeof buttonVariants> & {
-    activeScale?: number;
-    haptic?: "light" | "medium" | "selection" | "none";
-  };
+type ButtonProps = TactilePressableProps &
+  VariantProps<typeof buttonVariants>;
 
 function Button({
   className,

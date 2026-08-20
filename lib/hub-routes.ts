@@ -21,7 +21,7 @@ export function knowledgeHref(group: "agent" | "admin", id: string): Href {
 }
 
 export function chartHref(id: string): Href {
-  return { pathname: "/(admin)/chart/[id]", params: { id } } as unknown as Href;
+  return { pathname: "/(admin)/(home)/chart/[id]", params: { id } } as Href;
 }
 
 export function dynamicRouteId(

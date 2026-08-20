@@ -1,6 +1,8 @@
+import type { Href } from 'expo-router'
+
 /** Native Expo Router needs the dynamic segment in `params`, not only a string path. */
-export function chatHref(id: string) {
-  return { pathname: '/chat/[id]' as const, params: { id } }
+export function chatHref(id: string): Href {
+  return { pathname: '/chat/[id]', params: { id } }
 }
 
 /** Resolve `/chat/:id` from search params, pathname, or segments (params often empty after Metro reload). */

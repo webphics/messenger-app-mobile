@@ -100,7 +100,7 @@ export function Composer({
             canSend ? "opacity-100" : "opacity-40"
           }`}
         >
-          <Send color="#FFFFFF" size={17} />
+          <Send color={colors.primaryForeground} size={17} />
         </TactilePressable>
       </View>
 

@@ -27,7 +27,7 @@ describe('hub-routes', () => {
 
   test('chartHref uses params', () => {
     expect(chartHref('open-threads')).toEqual({
-      pathname: '/(admin)/chart/[id]',
+      pathname: '/(admin)/(home)/chart/[id]',
       params: { id: 'open-threads' },
     })
   })
@@ -37,7 +37,7 @@ describe('hub-routes', () => {
     expect(dynamicRouteId(undefined, '/(agent)/article/kb-reset', 'article')).toBe(
       'kb-reset',
     )
-    expect(dynamicRouteId('[id]', '/(admin)/chart/open-threads', 'chart')).toBe(
+    expect(dynamicRouteId('[id]', '/(admin)/(home)/chart/open-threads', 'chart')).toBe(
       'open-threads',
     )
   })

@@ -51,7 +51,7 @@ export function LineChart({ series, width, height }: LineChartProps) {
           cy={p.y}
           r={i === points.length - 1 ? 4 : 2.5}
           fill={colors.primary}
-          stroke="#FFFFFF"
+          stroke={colors.surface}
           strokeWidth={1.5}
         />
       ))}

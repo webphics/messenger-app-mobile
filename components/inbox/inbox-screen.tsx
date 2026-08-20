@@ -190,7 +190,7 @@ export function InboxScreen({
       <NewChatModal
         visible={composeOpen}
         onClose={() => setComposeOpen(false)}
-        onSelectChat={(href) => router.push(href as any)}
+        onSelectChat={(href) => router.push(href)}
       />
     </View>
   );

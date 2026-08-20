@@ -3,6 +3,8 @@ import {
   GestureResponderEvent,
   Pressable,
   type PressableProps,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
@@ -20,9 +22,11 @@ const SPRING_CONFIG = {
   mass: 0.45,
 };
 
-export type TactilePressableProps = PressableProps & {
+export type TactilePressableProps = Omit<PressableProps, "style"> & {
   activeScale?: number;
   haptic?: "light" | "medium" | "selection" | "none";
+  /** Static styles only — Pressable state callbacks conflict with Reanimated style arrays. */
+  style?: StyleProp<ViewStyle>;
 };
 
 export const TactilePressable = React.forwardRef<
@@ -71,7 +75,7 @@ export const TactilePressable = React.forwardRef<
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       onPress={onPress}
-      style={[animatedStyle, style as any]}
+      style={[animatedStyle, style]}
       {...props}
     />
   );
