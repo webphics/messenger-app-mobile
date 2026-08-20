@@ -1,3 +1,4 @@
+import { memo, useCallback } from "react";
 import { Megaphone } from "@/components/icons";
 import { View } from "react-native";
 
@@ -13,10 +14,10 @@ import type { Conversation } from "@/lib/types";
 
 type ConversationRowProps = {
   conversation: Conversation;
-  onPress: () => void;
+  onPress: (conversationId: string) => void;
 };
 
-export function ConversationRow({
+export const ConversationRow = memo(function ConversationRow({
   conversation,
   onPress,
 }: ConversationRowProps) {
@@ -26,11 +27,15 @@ export function ConversationRow({
   const online = isOffers ? false : Boolean(other?.isOnline);
   const hasUnread = conversation.unreadCount > 0;
 
+  const handlePress = useCallback(() => {
+    onPress(conversation.id);
+  }, [conversation.id, onPress]);
+
   return (
     <TactilePressable
       accessibilityRole="button"
       accessibilityLabel={title}
-      onPress={onPress}
+      onPress={handlePress}
       className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
     >
       <View className="relative">
@@ -92,4 +97,4 @@ export function ConversationRow({
       ) : null}
     </TactilePressable>
   );
-}
+});

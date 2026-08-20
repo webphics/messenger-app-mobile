@@ -1,6 +1,6 @@
 import { useNavigation, useRouter } from "expo-router";
 import { Inbox, MessageCircle, Search, SquarePen, X } from "@/components/icons";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 
 import { ConversationRow } from "@/components/inbox/conversation-row";
@@ -21,6 +21,14 @@ const CHIPS: { id: InboxChip; label: string }[] = [
   { id: "open", label: "Open" },
   { id: "resolved", label: "Resolved" },
 ];
+
+function keyExtractor(item: Conversation) {
+  return item.id;
+}
+
+function InboxItemSeparator() {
+  return <View className="h-3" />;
+}
 
 type InboxScreenProps = {
   conversations: Conversation[];
@@ -71,6 +79,20 @@ export function InboxScreen({
         getDevUserId(),
       ),
     [conversations, query, chip, showChips],
+  );
+
+  const openConversation = useCallback(
+    (conversationId: string) => {
+      router.push(chatHref(conversationId));
+    },
+    [router],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Conversation }) => (
+      <ConversationRow conversation={item} onPress={openConversation} />
+    ),
+    [openConversation],
   );
 
   return (
@@ -137,18 +159,13 @@ export function InboxScreen({
         className="flex-1 bg-bg"
         showsVerticalScrollIndicator={false}
         data={visible}
-        keyExtractor={(item) => item.id}
-        initialNumToRender={12}
-        maxToRenderPerBatch={10}
+        keyExtractor={keyExtractor}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
         windowSize={5}
         contentContainerClassName="px-4 py-3"
-        ItemSeparatorComponent={() => <View className="h-3" />}
-        renderItem={({ item }) => (
-          <ConversationRow
-            conversation={item}
-            onPress={() => router.push(chatHref(item.id))}
-          />
-        )}
+        ItemSeparatorComponent={InboxItemSeparator}
+        renderItem={renderItem}
         ListEmptyComponent={
           <View className="items-center px-4 py-16">
             <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
