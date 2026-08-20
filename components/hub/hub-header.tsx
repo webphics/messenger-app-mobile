@@ -10,7 +10,6 @@ import { PEOPLE } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 
 type HubHeaderProps = {
-  title?: string;
   settingsHref: Href;
 };
 
@@ -23,12 +22,12 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
       <View className="flex-row items-center gap-2.5">
         <Image
           source={require("../../assets/images/icon.png")}
-          accessibilityLabel="Messenger Logo"
+          accessibilityLabel="Enki Logo"
           className="size-9 rounded-xl shadow-sm shadow-black/10"
           resizeMode="cover"
         />
         <Text className="font-sans text-xl font-extrabold tracking-tight text-ink">
-          Messenger
+          Enki
         </Text>
       </View>
 

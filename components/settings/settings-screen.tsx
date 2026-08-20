@@ -76,7 +76,7 @@ export function SettingsScreen() {
             Application
           </Text>
           <Text className="font-sans text-xs font-medium text-ink-soft">
-            Messenger v1.0.0
+            Enki v1.0.0
           </Text>
         </View>
 

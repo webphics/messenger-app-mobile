@@ -20,6 +20,7 @@ import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { firstName } from "@/lib/display";
+import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import {
   latestInboxThread,
   listUnassignedConversations,
@@ -39,14 +40,14 @@ export function AgentHub() {
   return (
     <HubScroll>
       <View className="px-4">
-        <HubHeader title="Agent" settingsHref={"/(agent)/settings" as Href} />
+        <HubHeader settingsHref={"/(agent)/settings" as Href} />
 
         <View className="mt-5">
           <Text className="font-sans text-sm font-semibold uppercase tracking-wider text-muted">
-            Agent Dashboard
+            {hubEyebrow(me.role)}
           </Text>
           <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
-            Hi, {firstName(me.displayName)} 👋
+            {hubGreeting(me.role, firstName(me.displayName))}
           </Text>
         </View>
 
