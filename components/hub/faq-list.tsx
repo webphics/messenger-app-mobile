@@ -2,11 +2,12 @@ import { useFocusEffect } from "expo-router";
 import { ChevronDown, ChevronUp } from "@/components/icons";
 import { useCallback, useState } from "react";
 import { FlatList, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { listFaqs } from "@/lib/mock-catalog";
+import { enteringAnimation } from "@/lib/reduced-motion";
 import { colors } from "@/lib/tokens";
 import type { FaqItem } from "@/lib/types";
 
@@ -15,6 +16,7 @@ function FaqSeparator() {
 }
 
 export function FaqList() {
+  const reduceMotion = useReducedMotion();
   const [items, setItems] = useState<FaqItem[]>(listFaqs);
   const [openId, setOpenId] = useState<string | null>(listFaqs()[0]?.id ?? null);
 
@@ -56,7 +58,10 @@ export function FaqList() {
             </View>
             {open ? (
               <Animated.View
-                entering={FadeIn.springify().damping(20).stiffness(220)}
+                entering={enteringAnimation(
+                  reduceMotion,
+                  FadeIn.springify().damping(20).stiffness(220),
+                )}
               >
                 <Text className="mt-2.5 border-t border-line/60 pt-2.5 font-sans text-sm font-normal leading-6 text-ink-soft">
                   {item.answer}

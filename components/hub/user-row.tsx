@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { Check, ChevronDown, ChevronUp, Copy, Mail, MessageCircle } from "@/components/icons";
 import { useState } from "react";
 import { View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
@@ -11,6 +11,7 @@ import { Text } from "@/components/ui/text";
 import { initials } from "@/lib/display";
 import { hapticSuccess } from "@/lib/haptics";
 import { CONVERSATIONS } from "@/lib/mock-data";
+import { enteringAnimation } from "@/lib/reduced-motion";
 import { colors } from "@/lib/tokens";
 import { mockEmail } from "@/lib/user-filter";
 import type { Person } from "@/lib/types";
@@ -28,6 +29,7 @@ type UserRowProps = {
 };
 
 export function UserRow({ person, open, onPress }: UserRowProps) {
+  const reduceMotion = useReducedMotion();
   const [copied, setCopied] = useState(false);
   const email = mockEmail(person.displayName);
 
@@ -115,7 +117,10 @@ export function UserRow({ person, open, onPress }: UserRowProps) {
 
       {open ? (
         <Animated.View
-          entering={FadeIn.springify().damping(20).stiffness(220)}
+          entering={enteringAnimation(
+            reduceMotion,
+            FadeIn.springify().damping(20).stiffness(220),
+          )}
           className="mt-3.5 border-t border-line/60 pt-3.5"
         >
           <View className="flex-row items-center gap-2">

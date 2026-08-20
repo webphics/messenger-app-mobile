@@ -2,7 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { BookOpen, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, TextInput, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { HelpSearchField } from "@/components/hub/help-search-field";
 import { InScreenHeader } from "@/components/in-screen-header";
@@ -11,6 +11,7 @@ import { Text } from "@/components/ui/text";
 import { knowledgeHref } from "@/lib/hub-routes";
 import { filterKnowledge } from "@/lib/knowledge-filter";
 import { listKnowledge } from "@/lib/mock-catalog";
+import { enteringAnimation } from "@/lib/reduced-motion";
 import { colors } from "@/lib/tokens";
 import type { KnowledgeArticle } from "@/lib/types";
 
@@ -19,6 +20,7 @@ type KnowledgeSearchScreenProps = {
 };
 
 export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
+  const reduceMotion = useReducedMotion();
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<KnowledgeArticle[]>(listKnowledge);
@@ -89,7 +91,12 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
             <Text className="font-sans text-base font-semibold text-ink">
               {item.title}
             </Text>
-            <Animated.View entering={FadeIn.springify().damping(20).stiffness(220)}>
+            <Animated.View
+              entering={enteringAnimation(
+                reduceMotion,
+                FadeIn.springify().damping(20).stiffness(220),
+              )}
+            >
               <Text
                 className="mt-1.5 font-sans text-sm font-normal leading-5 text-ink-soft"
                 numberOfLines={2}

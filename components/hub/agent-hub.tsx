@@ -1,6 +1,6 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 
 import {
   BookOpen,
@@ -28,11 +28,13 @@ import {
 import { getDevUser } from "@/lib/dev-user";
 import { knowledgeListHref } from "@/lib/hub-routes";
 import { CONVERSATIONS } from "@/lib/mock-data";
+import { enteringAnimation } from "@/lib/reduced-motion";
 import { getSession } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
 export function AgentHub() {
   const me = getDevUser();
+  const reduceMotion = useReducedMotion();
   const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
   const unassignedCount = listUnassignedConversations(CONVERSATIONS).length;
   const assignedCount = CONVERSATIONS.filter((c) => c.assigneeId === me.id).length;
@@ -53,7 +55,10 @@ export function AgentHub() {
 
         {/* Live Queue Overview Card */}
         <Animated.View
-          entering={FadeInDown.springify().damping(18).stiffness(180).delay(20)}
+          entering={enteringAnimation(
+            reduceMotion,
+            FadeInDown.springify().damping(18).stiffness(180).delay(20),
+          )}
           className="mt-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
@@ -85,7 +90,10 @@ export function AgentHub() {
 
         {/* Quick Actions */}
         <Animated.View
-          entering={FadeInDown.springify().damping(18).stiffness(180).delay(60)}
+          entering={enteringAnimation(
+            reduceMotion,
+            FadeInDown.springify().damping(18).stiffness(180).delay(60),
+          )}
           className="mt-4 flex-row gap-3"
         >
           <ActionTile

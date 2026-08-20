@@ -2,7 +2,7 @@ import { useFocusEffect } from "expo-router";
 import { ChevronDown, ChevronUp, HelpCircle, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, TextInput, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
 import { HelpSearchField } from "@/components/hub/help-search-field";
 import { InScreenHeader } from "@/components/in-screen-header";
@@ -10,10 +10,12 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { filterFaq } from "@/lib/faq-filter";
 import { listFaqs } from "@/lib/mock-catalog";
+import { enteringAnimation } from "@/lib/reduced-motion";
 import { colors } from "@/lib/tokens";
 import type { FaqItem } from "@/lib/types";
 
 export function HelpSearchScreen() {
+  const reduceMotion = useReducedMotion();
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -93,7 +95,10 @@ export function HelpSearchScreen() {
               </View>
               {open ? (
                 <Animated.View
-                  entering={FadeIn.springify().damping(20).stiffness(220)}
+                  entering={enteringAnimation(
+                    reduceMotion,
+                    FadeIn.springify().damping(20).stiffness(220),
+                  )}
                 >
                   <Text className="mt-2.5 border-t border-line/60 pt-2.5 font-sans text-sm font-normal leading-5 text-ink-soft">
                     {item.answer}

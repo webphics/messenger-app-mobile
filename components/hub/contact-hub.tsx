@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 
 import { HelpCircle, MessageCircle, Search } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
@@ -17,10 +17,12 @@ import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { latestInboxThread } from "@/lib/inbox-filter";
 import { getDevUser } from "@/lib/dev-user";
 import { CONVERSATIONS } from "@/lib/mock-data";
+import { enteringAnimation } from "@/lib/reduced-motion";
 import { getSession } from "@/lib/session";
 
 export function ContactHub() {
   const me = getDevUser();
+  const reduceMotion = useReducedMotion();
   const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
 
   return (
@@ -38,7 +40,10 @@ export function ContactHub() {
         </View>
 
         <Animated.View
-          entering={FadeInDown.springify().damping(18).stiffness(180).delay(40)}
+          entering={enteringAnimation(
+            reduceMotion,
+            FadeInDown.springify().damping(18).stiffness(180).delay(40),
+          )}
           className="mt-4 flex-row gap-3"
         >
           <ActionTile

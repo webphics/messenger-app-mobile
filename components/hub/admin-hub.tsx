@@ -1,6 +1,6 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
 
 import { BookOpen, MessageCircle, Plus, ShieldCheck } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
@@ -17,11 +17,13 @@ import { latestInboxThread } from "@/lib/inbox-filter";
 import { getDevUser } from "@/lib/dev-user";
 import { knowledgeListHref } from "@/lib/hub-routes";
 import { CONVERSATIONS, PEOPLE } from "@/lib/mock-data";
+import { enteringAnimation } from "@/lib/reduced-motion";
 import { getSession } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
 export function AdminHub() {
   const me = getDevUser();
+  const reduceMotion = useReducedMotion();
   const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
   const onlineCount = PEOPLE.filter((p) => p.isOnline).length;
   const totalUsers = PEOPLE.length;
@@ -42,7 +44,10 @@ export function AdminHub() {
 
         {/* System Health / Overview Stats */}
         <Animated.View
-          entering={FadeInDown.springify().damping(18).stiffness(180).delay(20)}
+          entering={enteringAnimation(
+            reduceMotion,
+            FadeInDown.springify().damping(18).stiffness(180).delay(20),
+          )}
           className="mt-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
@@ -75,7 +80,10 @@ export function AdminHub() {
 
         {/* Admin Navigation Quick Grid */}
         <Animated.View
-          entering={FadeInDown.springify().damping(18).stiffness(180).delay(60)}
+          entering={enteringAnimation(
+            reduceMotion,
+            FadeInDown.springify().damping(18).stiffness(180).delay(60),
+          )}
           className="mt-4 flex-row gap-3"
         >
           <ActionTile
