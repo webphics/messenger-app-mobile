@@ -1,11 +1,11 @@
 import { useNavigation, useRouter } from "expo-router";
-import { Inbox, MessageCircle, Search, SquarePen, X } from "@/components/icons";
+import { Inbox, MessageCircle, SquarePen } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 
 import { ConversationRow } from "@/components/inbox/conversation-row";
 import { NewChatModal } from "@/components/inbox/new-chat-modal";
-import { Input } from "@/components/ui/input";
+import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
@@ -98,29 +98,12 @@ export function InboxScreen({
   return (
     <View className="flex-1 bg-bg">
       <View className="border-b border-line/60 bg-surface px-4 pb-3.5 pt-2">
-        <View className="relative flex-row items-center">
-          <Input
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search conversations…"
-            accessibilityLabel="Search conversations"
-            className="h-11 flex-1 rounded-2xl border-line bg-bg pl-10 pr-10 shadow-none font-sans text-sm"
-          />
-          <View className="pointer-events-none absolute left-3">
-            <Search color={colors.muted} size={18} />
-          </View>
-          {query.length > 0 ? (
-            <TactilePressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => setQuery("")}
-              className="absolute right-2 size-7 items-center justify-center rounded-full bg-line/80"
-            >
-              <X color={colors.inkSoft} size={14} />
-            </TactilePressable>
-          ) : null}
-        </View>
+        <SearchFieldWithClear
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search conversations…"
+          accessibilityLabel="Search conversations"
+        />
 
         {showChips ? (
           <View className="mt-3 flex-row gap-2">

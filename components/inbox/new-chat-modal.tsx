@@ -1,5 +1,5 @@
 import type { Href } from "expo-router";
-import { MessageSquare, Search, X } from "@/components/icons";
+import { MessageSquare, X } from "@/components/icons";
 import { memo, useCallback, useMemo, useState } from "react";
 import { FlatList, Modal, View } from "react-native";
 import {
@@ -7,8 +7,8 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
+import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
@@ -200,29 +200,12 @@ function NewChatSheet({
 
       {/* Search */}
       <View className="border-b border-line/40 bg-surface px-4 py-3">
-        <View className="relative flex-row items-center">
-          <Input
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search people by name or role…"
-            accessibilityLabel="Search people"
-            className="h-11 flex-1 rounded-2xl border-line bg-bg pl-10 pr-10 shadow-none font-sans text-sm"
-          />
-          <View className="pointer-events-none absolute left-3">
-            <Search color={colors.muted} size={18} />
-          </View>
-          {query.length > 0 ? (
-            <TactilePressable
-              accessibilityRole="button"
-              accessibilityLabel="Clear search"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              onPress={() => setQuery("")}
-              className="absolute right-2.5 size-7 items-center justify-center rounded-full bg-line/80"
-            >
-              <X color={colors.inkSoft} size={14} />
-            </TactilePressable>
-          ) : null}
-        </View>
+        <SearchFieldWithClear
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search people by name or role…"
+          accessibilityLabel="Search people"
+        />
       </View>
 
       {/* Contacts List */}
