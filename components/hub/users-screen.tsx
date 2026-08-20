@@ -1,5 +1,5 @@
 import { Search, UserX, X } from "@/components/icons";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 
 import { UserRow } from "@/components/hub/user-row";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { PEOPLE } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 import { filterUsers, type UserRoleChip } from "@/lib/user-filter";
+import type { Person } from "@/lib/types";
 
 const CHIPS: { id: UserRoleChip; label: string }[] = [
   { id: "all", label: "All" },
@@ -17,6 +18,14 @@ const CHIPS: { id: UserRoleChip; label: string }[] = [
   { id: "agent", label: "Agent" },
   { id: "contact", label: "Contact" },
 ];
+
+function keyExtractor(item: Person) {
+  return item.id;
+}
+
+function UsersItemSeparator() {
+  return <View className="h-3" />;
+}
 
 export function UsersScreen() {
   const [query, setQuery] = useState("");
@@ -29,6 +38,17 @@ export function UsersScreen() {
     [query, chip, onlineOnly],
   );
   const onlineCount = PEOPLE.filter((p) => p.isOnline).length;
+
+  const toggleOpen = useCallback((personId: string) => {
+    setOpenId((current) => (current === personId ? null : personId));
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: Person }) => (
+      <UserRow person={item} open={item.id === openId} onPress={toggleOpen} />
+    ),
+    [openId, toggleOpen],
+  );
 
   return (
     <View className="flex-1 bg-bg">
@@ -124,16 +144,13 @@ export function UsersScreen() {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         data={visible}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
         contentContainerClassName="px-4 py-3"
-        ItemSeparatorComponent={() => <View className="h-3" />}
-        renderItem={({ item }) => (
-          <UserRow
-            person={item}
-            open={item.id === openId}
-            onPress={() => setOpenId(item.id === openId ? null : item.id)}
-          />
-        )}
+        ItemSeparatorComponent={UsersItemSeparator}
+        renderItem={renderItem}
         ListEmptyComponent={
           <View className="items-center px-4 py-16">
             <View className="size-14 items-center justify-center rounded-full bg-primary-soft">

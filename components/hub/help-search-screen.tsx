@@ -1,21 +1,22 @@
 import { useFocusEffect } from "expo-router";
-import { ChevronDown, ChevronUp, HelpCircle, Search } from "@/components/icons";
+import { HelpCircle, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, TextInput, View } from "react-native";
-import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
+import { FaqRow } from "@/components/hub/faq-row";
 import { HelpSearchField } from "@/components/hub/help-search-field";
 import { InScreenHeader } from "@/components/in-screen-header";
-import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { filterFaq } from "@/lib/faq-filter";
 import { listFaqs } from "@/lib/mock-catalog";
-import { enteringAnimation } from "@/lib/reduced-motion";
 import { colors } from "@/lib/tokens";
 import type { FaqItem } from "@/lib/types";
 
+function keyExtractor(item: FaqItem) {
+  return item.id;
+}
+
 export function HelpSearchScreen() {
-  const reduceMotion = useReducedMotion();
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -33,6 +34,17 @@ export function HelpSearchScreen() {
     return () => clearTimeout(id);
   }, []);
 
+  const toggleOpen = useCallback((id: string) => {
+    setOpenId((current) => (current === id ? null : id));
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: FaqItem }) => (
+      <FaqRow item={item} open={item.id === openId} onToggle={toggleOpen} chrome="search" />
+    ),
+    [openId, toggleOpen],
+  );
+
   return (
     <View className="flex-1 bg-bg">
       <InScreenHeader>
@@ -45,7 +57,10 @@ export function HelpSearchScreen() {
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         data={results}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
         contentContainerClassName="px-4 py-3 gap-3"
         ListEmptyComponent={
           query.trim() ? (
@@ -74,40 +89,7 @@ export function HelpSearchScreen() {
             </View>
           )
         }
-        renderItem={({ item }) => {
-          const open = item.id === openId;
-          return (
-            <TactilePressable
-              accessibilityRole="button"
-              accessibilityState={{ expanded: open }}
-              onPress={() => setOpenId(open ? null : item.id)}
-              className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-black/5"
-            >
-              <View className="flex-row items-start justify-between gap-3">
-                <Text className="flex-1 font-sans text-base font-semibold text-ink">
-                  {item.question}
-                </Text>
-                {open ? (
-                  <ChevronUp color={colors.primary} size={20} />
-                ) : (
-                  <ChevronDown color={colors.muted} size={20} />
-                )}
-              </View>
-              {open ? (
-                <Animated.View
-                  entering={enteringAnimation(
-                    reduceMotion,
-                    FadeIn.springify().damping(20).stiffness(220),
-                  )}
-                >
-                  <Text className="mt-2.5 border-t border-line/60 pt-2.5 font-sans text-sm font-normal leading-5 text-ink-soft">
-                    {item.answer}
-                  </Text>
-                </Animated.View>
-              ) : null}
-            </TactilePressable>
-          );
-        }}
+        renderItem={renderItem}
       />
     </View>
   );

@@ -1,7 +1,7 @@
 import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { Check, ChevronDown, ChevronUp, Copy, Mail, MessageCircle } from "@/components/icons";
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { View } from "react-native";
 import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
@@ -25,13 +25,17 @@ const ROLE_LABEL = {
 type UserRowProps = {
   person: Person;
   open: boolean;
-  onPress: () => void;
+  onPress: (personId: string) => void;
 };
 
-export function UserRow({ person, open, onPress }: UserRowProps) {
+export const UserRow = memo(function UserRow({ person, open, onPress }: UserRowProps) {
   const reduceMotion = useReducedMotion();
   const [copied, setCopied] = useState(false);
   const email = mockEmail(person.displayName);
+
+  const handlePress = useCallback(() => {
+    onPress(person.id);
+  }, [onPress, person.id]);
 
   async function handleCopyEmail() {
     await Clipboard.setStringAsync(email);
@@ -56,7 +60,7 @@ export function UserRow({ person, open, onPress }: UserRowProps) {
       accessibilityRole="button"
       accessibilityLabel={person.displayName}
       accessibilityState={{ expanded: open }}
-      onPress={onPress}
+      onPress={handlePress}
       className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
     >
       <View className="flex-row items-center gap-3.5">
@@ -163,4 +167,4 @@ export function UserRow({ person, open, onPress }: UserRowProps) {
       ) : null}
     </TactilePressable>
   );
-}
+});

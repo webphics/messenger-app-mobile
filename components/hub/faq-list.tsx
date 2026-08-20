@@ -1,22 +1,20 @@
 import { useFocusEffect } from "expo-router";
-import { ChevronDown, ChevronUp } from "@/components/icons";
 import { useCallback, useState } from "react";
 import { FlatList, View } from "react-native";
-import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
 
-import { TactilePressable } from "@/components/ui/tactile-pressable";
-import { Text } from "@/components/ui/text";
+import { FaqRow } from "@/components/hub/faq-row";
 import { listFaqs } from "@/lib/mock-catalog";
-import { enteringAnimation } from "@/lib/reduced-motion";
-import { colors } from "@/lib/tokens";
 import type { FaqItem } from "@/lib/types";
+
+function keyExtractor(item: FaqItem) {
+  return item.id;
+}
 
 function FaqSeparator() {
   return <View className="h-3" />;
 }
 
 export function FaqList() {
-  const reduceMotion = useReducedMotion();
   const [items, setItems] = useState<FaqItem[]>(listFaqs);
   const [openId, setOpenId] = useState<string | null>(listFaqs()[0]?.id ?? null);
 
@@ -28,49 +26,30 @@ export function FaqList() {
     }, []),
   );
 
+  const toggleOpen = useCallback((id: string) => {
+    setOpenId((current) => (current === id ? null : id));
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: FaqItem }) => (
+      <FaqRow item={item} open={item.id === openId} onToggle={toggleOpen} chrome="card" />
+    ),
+    [openId, toggleOpen],
+  );
+
   return (
     <FlatList
       className="flex-1 bg-bg"
       extraData={openId}
       showsVerticalScrollIndicator={false}
+      initialNumToRender={10}
+      maxToRenderPerBatch={8}
+      windowSize={5}
       contentContainerClassName="px-4 py-4"
       data={items}
-      keyExtractor={(item) => item.id}
+      keyExtractor={keyExtractor}
       ItemSeparatorComponent={FaqSeparator}
-      renderItem={({ item }) => {
-        const open = item.id === openId;
-        return (
-          <TactilePressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: open }}
-            onPress={() => setOpenId(open ? null : item.id)}
-            className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
-          >
-            <View className="flex-row items-start justify-between gap-3">
-              <Text className="flex-1 font-sans text-base font-semibold text-ink">
-                {item.question}
-              </Text>
-              {open ? (
-                <ChevronUp color={colors.primary} size={20} />
-              ) : (
-                <ChevronDown color={colors.muted} size={20} />
-              )}
-            </View>
-            {open ? (
-              <Animated.View
-                entering={enteringAnimation(
-                  reduceMotion,
-                  FadeIn.springify().damping(20).stiffness(220),
-                )}
-              >
-                <Text className="mt-2.5 border-t border-line/60 pt-2.5 font-sans text-sm font-normal leading-6 text-ink-soft">
-                  {item.answer}
-                </Text>
-              </Animated.View>
-            ) : null}
-          </TactilePressable>
-        );
-      }}
+      renderItem={renderItem}
     />
   );
 }

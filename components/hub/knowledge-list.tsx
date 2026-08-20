@@ -14,6 +14,14 @@ type KnowledgeListProps = {
   group: "agent" | "admin";
 };
 
+function keyExtractor(item: KnowledgeArticle) {
+  return item.id;
+}
+
+function KnowledgeItemSeparator() {
+  return <View className="h-3" />;
+}
+
 export function KnowledgeList({ group }: KnowledgeListProps) {
   const [items, setItems] = useState<KnowledgeArticle[]>(listKnowledge);
 
@@ -23,14 +31,31 @@ export function KnowledgeList({ group }: KnowledgeListProps) {
     }, []),
   );
 
+  const openArticle = useCallback(
+    (articleId: string) => {
+      router.push(knowledgeHref(group, articleId));
+    },
+    [group],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: KnowledgeArticle }) => (
+      <KnowledgeRow article={item} onPress={openArticle} />
+    ),
+    [openArticle],
+  );
+
   return (
     <FlatList
       className="flex-1 bg-bg"
       data={items}
-      keyExtractor={(item) => item.id}
+      keyExtractor={keyExtractor}
+      initialNumToRender={10}
+      maxToRenderPerBatch={8}
+      windowSize={5}
       showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
-      ItemSeparatorComponent={() => <View className="h-3" />}
+      ItemSeparatorComponent={KnowledgeItemSeparator}
       ListEmptyComponent={
         <View className="items-center px-4 py-16">
           <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
@@ -44,12 +69,7 @@ export function KnowledgeList({ group }: KnowledgeListProps) {
           </Text>
         </View>
       }
-      renderItem={({ item }) => (
-        <KnowledgeRow
-          article={item}
-          onPress={() => router.push(knowledgeHref(group, item.id))}
-        />
-      )}
+      renderItem={renderItem}
     />
   );
 }

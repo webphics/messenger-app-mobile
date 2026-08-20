@@ -65,7 +65,7 @@ export function KnowledgeAdminHome() {
           <KnowledgeRow
             key={item.id}
             article={item}
-            onPress={() => router.push(knowledgeHref("admin", item.id))}
+            onPress={(articleId) => router.push(knowledgeHref("admin", articleId))}
           />
         ))}
       </View>

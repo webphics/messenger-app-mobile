@@ -1,6 +1,6 @@
 import type { Href } from "expo-router";
 import { MessageSquare, Search, X } from "@/components/icons";
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { FlatList, Modal, View } from "react-native";
 import {
   SafeAreaProvider,
@@ -50,6 +50,84 @@ export function NewChatModal({
   );
 }
 
+function keyExtractor(item: Person) {
+  return item.id;
+}
+
+function ContactItemSeparator() {
+  return <View className="h-2.5" />;
+}
+
+type ContactPickerRowProps = {
+  person: Person;
+  onSelect: (person: Person) => void;
+};
+
+const ContactPickerRow = memo(function ContactPickerRow({
+  person,
+  onSelect,
+}: ContactPickerRowProps) {
+  const handlePress = useCallback(() => {
+    onSelect(person);
+  }, [onSelect, person]);
+
+  return (
+    <TactilePressable
+      accessibilityRole="button"
+      accessibilityLabel={`Chat with ${person.displayName}`}
+      onPress={handlePress}
+      className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-sm shadow-black/5"
+    >
+      <View className="relative">
+        <Avatar alt={person.displayName} className="size-11">
+          <AvatarFallback className="bg-primary-soft">
+            <Text className="font-sans text-sm font-bold text-primary">
+              {initials(person.displayName)}
+            </Text>
+          </AvatarFallback>
+        </Avatar>
+        {person.isOnline ? (
+          <View
+            accessibilityLabel="Online"
+            className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-surface bg-success"
+          />
+        ) : null}
+      </View>
+
+      <View className="min-w-0 flex-1">
+        <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+          {person.displayName}
+        </Text>
+        <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
+          {person.lastActiveLabel ?? (person.isOnline ? "Active now" : "Offline")}
+        </Text>
+      </View>
+
+      <View
+        className={`rounded-full px-2.5 py-0.5 ${
+          person.role === "admin"
+            ? "bg-primary-soft"
+            : person.role === "agent"
+              ? "bg-success/15"
+              : "bg-line/80"
+        }`}
+      >
+        <Text
+          className={`font-sans text-[10px] font-bold uppercase tracking-wider ${
+            person.role === "admin"
+              ? "text-primary"
+              : person.role === "agent"
+                ? "text-success"
+                : "text-muted"
+          }`}
+        >
+          {person.role}
+        </Text>
+      </View>
+    </TactilePressable>
+  );
+});
+
 function NewChatSheet({
   onClose,
   onSelectChat,
@@ -70,18 +148,29 @@ function NewChatSheet({
     });
   }, [myId, query]);
 
-  function handleSelect(person: Person) {
-    // Find if a 1-on-1 conversation exists with this person
-    const existing = CONVERSATIONS.find(
-      (c) =>
-        c.kind === "direct" &&
-        c.participantIds.includes(person.id) &&
-        c.participantIds.includes(myId),
-    );
-    const targetId = existing?.id ?? (person.role === "contact" ? "conv-unassigned" : "conv-assigned");
-    onClose();
-    onSelectChat(chatHref(targetId));
-  }
+  const handleSelect = useCallback(
+    (person: Person) => {
+      // Find if a 1-on-1 conversation exists with this person
+      const existing = CONVERSATIONS.find(
+        (c) =>
+          c.kind === "direct" &&
+          c.participantIds.includes(person.id) &&
+          c.participantIds.includes(myId),
+      );
+      const targetId =
+        existing?.id ?? (person.role === "contact" ? "conv-unassigned" : "conv-assigned");
+      onClose();
+      onSelectChat(chatHref(targetId));
+    },
+    [myId, onClose, onSelectChat],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Person }) => (
+      <ContactPickerRow person={item} onSelect={handleSelect} />
+    ),
+    [handleSelect],
+  );
 
   return (
     <View
@@ -140,69 +229,18 @@ function NewChatSheet({
       <FlatList
         className="flex-1 bg-bg"
         data={filteredPeople}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
+        initialNumToRender={10}
+        maxToRenderPerBatch={8}
+        windowSize={5}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         contentContainerClassName="px-4 py-3"
         contentContainerStyle={{
           paddingBottom: screenBottomPad(insets.bottom, 12),
         }}
-        ItemSeparatorComponent={() => <View className="h-2.5" />}
-        renderItem={({ item }) => (
-          <TactilePressable
-            accessibilityRole="button"
-            accessibilityLabel={`Chat with ${item.displayName}`}
-            onPress={() => handleSelect(item)}
-            className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-sm shadow-black/5"
-          >
-            <View className="relative">
-              <Avatar alt={item.displayName} className="size-11">
-                <AvatarFallback className="bg-primary-soft">
-                  <Text className="font-sans text-sm font-bold text-primary">
-                    {initials(item.displayName)}
-                  </Text>
-                </AvatarFallback>
-              </Avatar>
-              {item.isOnline ? (
-                <View
-                  accessibilityLabel="Online"
-                  className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-surface bg-success"
-                />
-              ) : null}
-            </View>
-
-            <View className="min-w-0 flex-1">
-              <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
-                {item.displayName}
-              </Text>
-              <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
-                {item.lastActiveLabel ?? (item.isOnline ? "Active now" : "Offline")}
-              </Text>
-            </View>
-
-            <View
-              className={`rounded-full px-2.5 py-0.5 ${
-                item.role === "admin"
-                  ? "bg-primary-soft"
-                  : item.role === "agent"
-                    ? "bg-success/15"
-                    : "bg-line/80"
-              }`}
-            >
-              <Text
-                className={`font-sans text-[10px] font-bold uppercase tracking-wider ${
-                  item.role === "admin"
-                    ? "text-primary"
-                    : item.role === "agent"
-                      ? "text-success"
-                      : "text-muted"
-                }`}
-              >
-                {item.role}
-              </Text>
-            </View>
-          </TactilePressable>
-        )}
+        ItemSeparatorComponent={ContactItemSeparator}
+        renderItem={renderItem}
         ListEmptyComponent={
           <View className="items-center px-4 py-12">
             <Text className="font-sans text-base font-semibold text-ink">

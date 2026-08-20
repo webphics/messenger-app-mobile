@@ -1,4 +1,5 @@
 import { BookOpen, ChevronRight } from "@/components/icons";
+import { memo, useCallback } from "react";
 import { View } from "react-native";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
@@ -8,15 +9,22 @@ import type { KnowledgeArticle } from "@/lib/types";
 
 type KnowledgeRowProps = {
   article: KnowledgeArticle;
-  onPress: () => void;
+  onPress: (articleId: string) => void;
 };
 
-export function KnowledgeRow({ article, onPress }: KnowledgeRowProps) {
+export const KnowledgeRow = memo(function KnowledgeRow({
+  article,
+  onPress,
+}: KnowledgeRowProps) {
+  const handlePress = useCallback(() => {
+    onPress(article.id);
+  }, [article.id, onPress]);
+
   return (
     <TactilePressable
       accessibilityRole="button"
       accessibilityLabel={article.title}
-      onPress={onPress}
+      onPress={handlePress}
       className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/5"
     >
       <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
@@ -41,4 +49,4 @@ export function KnowledgeRow({ article, onPress }: KnowledgeRowProps) {
       <ChevronRight color={colors.muted} size={18} />
     </TactilePressable>
   );
-}
+});
