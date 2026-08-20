@@ -1,0 +1,22 @@
+---
+description: Subagents must inherit the parent model; never pin a specific model slug.
+alwaysApply: true
+---
+
+# Subagent model inheritance
+
+When launching any Task / subagent, **always** use `model: "inherit"` (or omit `model` so it inherits).
+
+- NEVER pass a specific model slug (`claude-*`, `gpt-*`, `composer-*`, `cursor-grok-*`, etc.).
+- NEVER “pick a faster/cheaper model” for review, explore, or parallel workers.
+- Only override if the user **explicitly** names a model for that subagent in the current message.
+
+```ts
+// ❌ BAD — pinned model
+Task({ model: "composer-2.5-fast", ... })
+
+// ✅ GOOD — inherit parent session model
+Task({ model: "inherit", ... })
+// or omit `model` entirely
+Task({ ... })
+```
