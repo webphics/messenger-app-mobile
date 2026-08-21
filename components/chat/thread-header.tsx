@@ -51,7 +51,7 @@ export function ThreadHeader({ conversation }: ThreadHeaderProps) {
       <View className="relative">
         <Avatar alt={title} className="size-9">
           <AvatarFallback className="bg-primary-soft">
-            <Text className="font-sans text-xs font-bold text-primary">
+            <Text variant="label" className="font-bold text-primary">
               {initials(title)}
             </Text>
           </AvatarFallback>
@@ -61,18 +61,18 @@ export function ThreadHeader({ conversation }: ThreadHeaderProps) {
         ) : null}
       </View>
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-base font-bold leading-5 text-ink" numberOfLines={1}>
+        <Text variant="body" className="font-semibold text-ink" numberOfLines={1}>
           {title}
         </Text>
         {subtitle ? (
-          <Text className="font-sans text-xs font-normal leading-4 text-muted" numberOfLines={1}>
+          <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
             {subtitle}
           </Text>
         ) : null}
       </View>
       {pill ? (
         <View className={`rounded-full px-2.5 py-0.5 ${pill.style}`}>
-          <Text className={`font-sans text-xs font-bold ${pill.textStyle}`}>
+          <Text variant="label" className={`font-bold ${pill.textStyle}`}>
             {pill.label}
           </Text>
         </View>

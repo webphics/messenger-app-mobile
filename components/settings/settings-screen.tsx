@@ -55,21 +55,21 @@ export function SettingsScreen() {
       >
         <Avatar alt={me.displayName} className="size-14">
           <AvatarFallback className="bg-primary-soft">
-            <Text className="font-sans text-lg font-bold text-primary">
+            <Text variant="headline" className="text-primary">
               {initials(me.displayName)}
             </Text>
           </AvatarFallback>
         </Avatar>
 
         <View className="min-w-0 flex-1">
-          <Text className="font-sans text-lg font-bold text-ink" numberOfLines={1}>
+          <Text variant="headline" className="text-ink" numberOfLines={1}>
             {me.displayName}
           </Text>
-          <Text className="font-sans text-xs font-normal text-muted" numberOfLines={1}>
+          <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
             {session.email || "support@company.internal"}
           </Text>
           <View className="mt-1.5 self-start rounded-full bg-primary-soft px-2.5 py-0.5">
-            <Text className="font-sans text-xs font-bold uppercase tracking-wider text-primary">
+            <Text variant="label" className="font-bold uppercase tracking-wider text-primary">
               {hubEyebrow(session.role)}
             </Text>
           </View>
@@ -88,10 +88,10 @@ export function SettingsScreen() {
         className="my-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
       >
         <View className="mb-4 flex-row items-center justify-between border-b border-line/60 pb-3">
-          <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+          <Text variant="label" className="uppercase tracking-wider text-muted">
             Application
           </Text>
-          <Text className="font-sans text-xs font-medium text-ink-soft">
+          <Text variant="label" className="font-medium text-ink-soft">
             Enki v1.0.0
           </Text>
         </View>

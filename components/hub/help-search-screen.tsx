@@ -75,10 +75,10 @@ export function HelpSearchScreen() {
               <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
                 <Search color={colors.primary} size={26} />
               </View>
-              <Text className="mt-4 font-sans text-base font-semibold text-ink">
+              <Text variant="title" className="mt-4 text-ink">
                 No matching answers
               </Text>
-              <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+              <Text variant="meta" className="mt-1 text-center text-muted">
                 Try different keywords or browse our FAQ section.
               </Text>
             </View>
@@ -87,10 +87,10 @@ export function HelpSearchScreen() {
               <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
                 <HelpCircle color={colors.primary} size={26} />
               </View>
-              <Text className="mt-4 font-sans text-base font-semibold text-ink">
+              <Text variant="title" className="mt-4 text-ink">
                 Search Help & FAQs
               </Text>
-              <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+              <Text variant="meta" className="mt-1 text-center text-muted">
                 Find quick answers to common questions.
               </Text>
             </View>

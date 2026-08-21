@@ -58,7 +58,7 @@ export function HelpHome() {
     >
       <View className="flex-row items-center gap-2.5 rounded-2xl bg-primary-soft/60 p-3.5 border border-primary-soft">
         <Clock color={colors.primary} size={18} />
-        <Text className="flex-1 font-sans text-xs font-medium leading-5 text-ink-soft">
+        <Text variant="meta" className="flex-1 text-ink-soft">
           Agents are active 08:00–20:00 weekdays. Community and Offers chat is open 24/7.
         </Text>
       </View>

@@ -89,7 +89,7 @@ const QuoteChrome = memo(function QuoteChrome({
     <View className={cn("mb-0.5", outgoing ? "items-end" : "items-start")}>
       <View className="mb-0.5 flex-row items-center gap-1 px-1">
         <CornerUpLeft color={colors.muted} size={12} />
-        <Text className="font-sans text-xs font-medium text-muted" numberOfLines={1}>
+        <Text variant="label" className="font-medium text-muted" numberOfLines={1}>
           {replyCaption({
             outgoing,
             senderName,
@@ -100,7 +100,8 @@ const QuoteChrome = memo(function QuoteChrome({
       </View>
       <View className="max-w-[92%] rounded-[18px] border border-line bg-bubble-in px-3 py-1.5 opacity-85 shadow-sm shadow-black/5">
         <Text
-          className="font-sans text-xs font-normal leading-4 text-muted"
+          variant="label"
+          className="font-normal text-muted"
           numberOfLines={2}
         >
           {quoted.body}
@@ -141,15 +142,14 @@ const ReactionBadge = memo(function ReactionBadge({
           }}
           className="px-0.5 active:opacity-60"
         >
-          <Text className="font-sans text-sm leading-4">
-            {reaction.emoji}
-          </Text>
+          <Text variant="meta">{reaction.emoji}</Text>
         </Pressable>
       ))}
       {total > 1 ? (
         <Text
+          variant="label"
           className={cn(
-            "ml-1 font-sans text-xs font-bold",
+            "ml-1 font-bold",
             reactions.some((r) => r.userIds.includes(currentUserId))
               ? "text-primary"
               : "text-muted",
@@ -328,7 +328,7 @@ export const MessageBubble = memo(function MessageBubble({
             )}
           >
             {senderName ? (
-              <Text className="mb-1 px-1 font-sans text-xs text-muted">
+              <Text variant="label" className="mb-1 px-1 font-normal text-muted">
                 {senderName}
               </Text>
             ) : null}
@@ -367,10 +367,10 @@ export const MessageBubble = memo(function MessageBubble({
                 )}
               >
                 <Text
-                  className={cn(
-                    "font-sans text-base font-normal leading-5",
-                    outgoing ? "text-primary-foreground" : "text-ink",
-                  )}
+                  variant="body"
+                  className={
+                    outgoing ? "text-primary-foreground" : "text-ink"
+                  }
                 >
                   {body}
                 </Text>

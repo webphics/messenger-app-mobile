@@ -91,8 +91,8 @@ export function UsersScreen() {
                 )}
               >
                 <Text
+                  variant="label"
                   className={cn(
-                    "font-sans text-xs font-semibold",
                     selected ? "text-primary-foreground" : "text-ink-soft",
                   )}
                 >
@@ -118,8 +118,8 @@ export function UsersScreen() {
               className={`size-2 rounded-full ${onlineOnly ? "bg-white" : "bg-success"}`}
             />
             <Text
+              variant="label"
               className={cn(
-                "font-sans text-xs font-semibold",
                 onlineOnly ? "text-white" : "text-ink-soft",
               )}
             >
@@ -128,7 +128,7 @@ export function UsersScreen() {
           </TactilePressable>
         </View>
 
-        <Text className="mt-2.5 font-sans text-xs font-medium text-muted">
+        <Text variant="meta" className="mt-2.5 text-muted">
           Showing {visible.length} of {PEOPLE.length} members
         </Text>
       </View>
@@ -152,10 +152,10 @@ export function UsersScreen() {
             <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
               <UserX color={colors.primary} size={26} />
             </View>
-            <Text className="mt-4 font-sans text-base font-semibold text-ink">
+            <Text variant="title" className="mt-4 text-ink">
               No matching users found
             </Text>
-            <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+            <Text variant="meta" className="mt-1 text-center text-muted">
               Try adjusting your search query or role filter.
             </Text>
           </View>

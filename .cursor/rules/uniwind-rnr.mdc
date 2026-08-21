@@ -12,7 +12,7 @@ New `--color-*` tokens go in `@theme` (utility) **and** both `@variant light` an
 
 Light chrome only this phase. `Uniwind.setTheme('light')` + `userInterfaceStyle: "light"`. React Navigation `headerStyle` / `tabBarStyle` use hex from `@/lib/tokens`. Everything else is Uniwind. Lucide `color` props may use `colors.*` (icons have no `className`).
 
-Do not invent a palette. Forbidden looks: nsave maroon, Messenger dark chrome, red outgoing bubbles. Incoming bubble = white + `border-line` on light / gray on dark (`bg-bubble-in`); outgoing = `primary`. RN `fontWeight` does not switch Manrope faces — `font-medium` / `font-semibold` / `font-bold` map to `Manrope-Medium` / `Manrope-SemiBold` / `Manrope-Bold` in `global.css`.
+Do not invent a palette. Forbidden looks: nsave maroon, Messenger dark chrome, red outgoing bubbles. Incoming bubble = white + `border-line` on light / gray on dark (`bg-bubble-in`); outgoing = `primary`. RN `fontWeight` does not switch Manrope faces — `font-medium` / `font-semibold` / `font-bold` / `font-extrabold` map to `Manrope-Medium` / `Manrope-SemiBold` / `Manrope-Bold` / `Manrope-ExtraBold` in `global.css`. Prefer `Text` role variants from `components/ui/text.tsx`.
 
 Forbidden: NativeWind, `cssInterop`, `remapProps`, `nativewind/babel`, wrapping RN core views with `withUniwind`. `expo-image` is a later phase — use RN `Image` until then.
 

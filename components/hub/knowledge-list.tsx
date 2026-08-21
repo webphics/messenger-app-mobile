@@ -68,10 +68,10 @@ export function KnowledgeList({ group }: KnowledgeListProps) {
           <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
             <BookOpen color={colors.primary} size={26} />
           </View>
-          <Text className="mt-4 font-sans text-base font-semibold text-ink">
+          <Text variant="title" className="mt-4 text-ink">
             No articles available
           </Text>
-          <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+          <Text variant="meta" className="mt-1 text-center text-muted">
             Knowledge base articles will appear here once published.
           </Text>
         </View>

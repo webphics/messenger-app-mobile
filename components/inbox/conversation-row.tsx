@@ -54,7 +54,7 @@ export const ConversationRow = memo(function ConversationRow({
               </AvatarFallback>
             ) : (
               <AvatarFallback className="bg-primary-soft">
-                <Text className="font-sans text-base font-bold text-primary">
+                <Text variant="title" className="font-bold text-primary">
                   {initials(title)}
                 </Text>
               </AvatarFallback>
@@ -68,25 +68,26 @@ export const ConversationRow = memo(function ConversationRow({
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center justify-between gap-1">
             <Text
-              className={`font-sans text-base leading-5 ${
-                hasUnread ? "font-bold text-ink" : "font-semibold text-ink"
-              }`}
+              variant="title"
+              className={hasUnread ? "font-bold text-ink" : "text-ink"}
               numberOfLines={1}
             >
               {title}
             </Text>
             <Text
-              className={`font-sans text-xs ${
-                hasUnread ? "font-semibold text-ink-soft" : "font-normal text-muted"
-              }`}
+              variant="label"
+              className={
+                hasUnread ? "text-ink-soft" : "font-normal text-muted"
+              }
             >
               {formatRelativeTime(conversation.updatedAt)}
             </Text>
           </View>
           <Text
-            className={`mt-1 font-sans text-sm ${
-              hasUnread ? "font-medium text-ink" : "font-normal text-muted"
-            }`}
+            variant="meta"
+            className={
+              hasUnread ? "mt-1 font-medium text-ink" : "mt-1 text-muted"
+            }
             numberOfLines={1}
           >
             {conversation.lastMessagePreview}
@@ -98,7 +99,7 @@ export const ConversationRow = memo(function ConversationRow({
             entering={popEnter(!!reduceMotion)}
             className="min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5"
           >
-            <Text className="font-sans text-xs font-bold text-primary-foreground">
+            <Text variant="label" className="font-bold text-primary-foreground">
               {conversation.unreadCount}
             </Text>
           </Animated.View>

@@ -27,7 +27,7 @@ export function ChartsSection() {
   return (
     <View className="mt-6">
       <View className="px-4">
-        <Text className="font-sans text-base font-bold text-ink">Analytics & Charts</Text>
+        <Text variant="title" className="text-ink">Analytics & Charts</Text>
       </View>
       <Animated.ScrollView
         horizontal

@@ -77,10 +77,10 @@ export function Composer({
         >
           <View className="w-1 self-stretch rounded-full bg-primary" />
           <View className="min-w-0 flex-1 pl-1">
-            <Text className="font-sans text-xs font-bold text-primary" numberOfLines={1}>
+            <Text variant="label" className="font-bold text-primary" numberOfLines={1}>
               Replying to {replyTo.name}
             </Text>
-            <Text className="font-sans text-xs font-normal text-ink-soft" numberOfLines={1}>
+            <Text variant="label" className="font-normal text-ink-soft" numberOfLines={1}>
               {replyTo.body}
             </Text>
           </View>
@@ -113,7 +113,7 @@ export function Composer({
           placeholder={replyTo ? "Write a reply…" : "Type a message…"}
           accessibilityLabel="Message"
           multiline
-          className="max-h-28 min-h-11 flex-1 rounded-3xl border-line bg-bg px-4 py-2.5 shadow-none font-sans text-sm text-ink"
+          className="max-h-28 min-h-11 flex-1 rounded-3xl border-line bg-bg px-4 py-2.5 shadow-none font-sans text-base text-ink"
         />
 
         <Animated.View style={sendStyle}>

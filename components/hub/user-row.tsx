@@ -75,7 +75,7 @@ export const UserRow = memo(function UserRow({
           <View className="relative">
             <Avatar alt={person.displayName} className="size-13">
               <AvatarFallback className="bg-primary-soft">
-                <Text className="font-sans text-base font-bold text-primary">
+                <Text variant="title" className="text-primary">
                   {initials(person.displayName)}
                 </Text>
               </AvatarFallback>
@@ -87,7 +87,7 @@ export const UserRow = memo(function UserRow({
 
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center gap-2">
-            <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+            <Text variant="title" className="text-ink" numberOfLines={1}>
               {person.displayName}
             </Text>
             <View
@@ -100,19 +100,20 @@ export const UserRow = memo(function UserRow({
               }`}
             >
               <Text
-                className={`font-sans text-xs font-bold ${
+                variant="label"
+                className={
                   person.role === "admin"
                     ? "text-primary"
                     : person.role === "agent"
                       ? "text-amber"
                       : "text-ink-soft"
-                }`}
+                }
               >
                 {ROLE_LABEL[person.role]}
               </Text>
             </View>
           </View>
-          <Text className="mt-0.5 font-sans text-xs font-normal text-muted" numberOfLines={1}>
+          <Text variant="meta" className="mt-0.5 text-muted" numberOfLines={1}>
             {person.isOnline ? "Active now" : `Last seen ${person.lastActiveLabel}`}
           </Text>
         </View>
@@ -131,7 +132,7 @@ export const UserRow = memo(function UserRow({
         >
           <View className="flex-row items-center gap-2">
             <Mail color={colors.muted} size={15} />
-            <Text className="flex-1 font-sans text-sm font-normal text-ink-soft" selectable>
+            <Text variant="meta" className="flex-1 text-ink-soft" selectable>
               {email}
             </Text>
           </View>
@@ -148,7 +149,7 @@ export const UserRow = memo(function UserRow({
               ) : (
                 <Copy color={colors.ink} size={16} />
               )}
-              <Text className="font-sans text-xs font-semibold text-ink">
+              <Text variant="label" className="text-ink">
                 {copied ? "Copied" : "Copy Email"}
               </Text>
             </TactilePressable>
@@ -160,7 +161,7 @@ export const UserRow = memo(function UserRow({
               className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5"
             >
               <MessageCircle color={colors.primaryForeground} size={16} />
-              <Text className="font-sans text-xs font-semibold text-primary-foreground">
+              <Text variant="label" className="text-primary-foreground">
                 Message
               </Text>
             </TactilePressable>

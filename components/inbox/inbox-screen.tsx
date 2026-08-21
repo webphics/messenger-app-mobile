@@ -50,10 +50,10 @@ function InboxEmpty({ showChips }: { showChips: boolean }) {
           <Inbox color={colors.primary} size={26} />
         )}
       </View>
-      <Text className="mt-4 font-sans text-base font-semibold text-ink">
+      <Text variant="title" className="mt-4 text-ink">
         {showChips ? "No conversations found" : "Unassigned pool is empty"}
       </Text>
-      <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+      <Text variant="meta" className="mt-1 text-center text-muted">
         {showChips
           ? "Try searching for a different person or changing the filter."
           : "All incoming requests have been assigned to an agent."}
@@ -163,10 +163,10 @@ export function InboxScreen({
                   )}
                 >
                   <Text
-                    className={cn(
-                      "font-sans text-xs font-semibold",
-                      selected ? "text-primary-foreground" : "text-ink-soft",
-                    )}
+                    variant="label"
+                    className={
+                      selected ? "text-primary-foreground" : "text-ink-soft"
+                    }
                   >
                     {item.label}
                   </Text>

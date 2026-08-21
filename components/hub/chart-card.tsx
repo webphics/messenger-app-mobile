@@ -39,10 +39,10 @@ export function ChartCard({ chart, cardWidth, index, onPress }: ChartCardProps) 
       >
         <View className="flex-row items-start justify-between gap-2">
           <View className="min-w-0 flex-1">
-            <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted" numberOfLines={1}>
+            <Text variant="label" className="uppercase tracking-wider text-muted" numberOfLines={1}>
               {chart.title}
             </Text>
-            <Text className="mt-1 font-sans text-2xl font-bold text-ink" numberOfLines={1}>
+            <Text variant="display" className="mt-1 text-ink" numberOfLines={1}>
               {chart.value}
             </Text>
           </View>
@@ -57,8 +57,8 @@ export function ChartCard({ chart, cardWidth, index, onPress }: ChartCardProps) 
             )}
           >
             <Text
+              variant="label"
               className={cn(
-                "font-sans text-xs font-semibold",
                 isPositive
                   ? "text-success"
                   : isNegative

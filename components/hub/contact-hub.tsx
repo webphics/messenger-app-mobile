@@ -31,10 +31,10 @@ export function ContactHub() {
         <HubHeader settingsHref="/(contact)/settings" />
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
-          <Text className="mt-5 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+          <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
-          <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
+          <Text variant="display" className="mt-0.5 text-ink">
             {hubGreeting(me.role, firstName(me.displayName))}
           </Text>
         </Animated.View>
@@ -59,7 +59,7 @@ export function ContactHub() {
 
         {recent ? (
           <View className="mt-4">
-            <Text className="mb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+            <Text variant="label" className="mb-2 uppercase tracking-wider text-muted">
               Recent Message
             </Text>
             <RecentThreadCard conversation={recent} selfId={me.id} />
@@ -74,7 +74,7 @@ export function ContactHub() {
             className="mt-4 flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
           >
             <IconChip icon={Search} tone="neutral" size={32} />
-            <Text className="font-sans text-sm font-normal text-muted">
+            <Text variant="meta" className="text-muted">
               Search for help & answers…
             </Text>
           </TactilePressable>

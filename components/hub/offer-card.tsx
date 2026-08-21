@@ -55,14 +55,14 @@ export function OfferCard({ offer, cardWidth, index, onPress }: OfferCardProps) 
               paddingVertical: 20,
             }}
           >
-            <Text className="font-sans text-xl font-extrabold text-white">
+            <Text variant="headline" className="text-white">
               {offer.title}
             </Text>
-            <Text className="mt-1.5 font-sans text-sm font-normal leading-5 text-white/90">
+            <Text variant="meta" className="mt-1.5 text-white/90">
               {offer.subtitle}
             </Text>
             <View className="mt-4 self-start rounded-full bg-white px-5 py-2.5 shadow-sm shadow-black/20">
-              <Text className="font-sans text-xs font-bold uppercase tracking-wide text-primary">
+              <Text variant="label" className="uppercase tracking-wider text-primary">
                 {offer.ctaLabel}
               </Text>
             </View>

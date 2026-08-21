@@ -53,9 +53,10 @@ export function ActionRow({
     >
       {icon ? <IconChip icon={icon} tone={tone} /> : null}
       <View className="min-w-0 flex-1">
-        <Text className="font-sans text-base font-semibold text-ink">{title}</Text>
+        <Text variant="title" className="text-ink">{title}</Text>
         <Text
-          className="mt-0.5 font-sans text-xs font-normal text-muted"
+          variant="meta"
+          className="mt-0.5 text-muted"
           numberOfLines={hintLines}
         >
           {hint}

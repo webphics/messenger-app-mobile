@@ -34,10 +34,10 @@ export function ChartDetail({ chart }: ChartDetailProps) {
       <View className="rounded-3xl border border-line bg-surface p-5 shadow-md shadow-black/5">
         <View className="flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1">
-            <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+            <Text variant="label" className="uppercase tracking-wider text-muted">
               {chart.title}
             </Text>
-            <Text className="mt-1 font-sans text-3xl font-extrabold text-ink">
+            <Text variant="display" className="mt-1 text-ink">
               {chart.value}
             </Text>
           </View>
@@ -52,8 +52,8 @@ export function ChartDetail({ chart }: ChartDetailProps) {
             )}
           >
             <Text
+              variant="label"
               className={cn(
-                "font-sans text-xs font-bold",
                 isPositive
                   ? "text-success"
                   : isNegative
@@ -78,7 +78,7 @@ export function ChartDetail({ chart }: ChartDetailProps) {
         {chart.hint ? (
           <View className="flex-row items-start gap-2.5 rounded-2xl bg-primary-soft/60 p-3.5">
             <Info color={colors.primary} size={18} className="mt-0.5" />
-            <Text className="flex-1 font-sans text-sm font-medium leading-5 text-ink-soft">
+            <Text variant="meta" className="flex-1 text-ink-soft">
               {chart.hint}
             </Text>
           </View>

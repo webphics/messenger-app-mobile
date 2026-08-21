@@ -40,7 +40,8 @@ export function MetricChart({
                   style={{ backgroundColor: SLICE_COLORS[i % SLICE_COLORS.length] }}
                 />
                 <Text
-                  className="font-sans text-sm font-normal text-ink-soft"
+                  variant="meta"
+                  className="text-ink-soft"
                   numberOfLines={1}
                 >
                   {slice.label} · {slice.value}

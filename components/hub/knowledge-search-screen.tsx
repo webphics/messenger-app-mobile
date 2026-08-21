@@ -67,10 +67,10 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
               <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
                 <Search color={colors.primary} size={26} />
               </View>
-              <Text className="mt-4 font-sans text-base font-semibold text-ink">
+              <Text variant="title" className="mt-4 text-ink">
                 No matching articles
               </Text>
-              <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+              <Text variant="meta" className="mt-1 text-center text-muted">
                 Try searching for general keywords like "password", "billing", or "account".
               </Text>
             </View>
@@ -79,10 +79,10 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
               <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
                 <BookOpen color={colors.primary} size={26} />
               </View>
-              <Text className="mt-4 font-sans text-base font-semibold text-ink">
+              <Text variant="title" className="mt-4 text-ink">
                 Search the Knowledge Base
               </Text>
-              <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+              <Text variant="meta" className="mt-1 text-center text-muted">
                 Quickly look up guides, troubleshooting steps, and answers.
               </Text>
             </View>
@@ -95,12 +95,13 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
             onPress={() => router.push(knowledgeHref(group, item.id))}
             className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-black/5"
           >
-            <Text className="font-sans text-base font-semibold text-ink">
+            <Text variant="title" className="text-ink">
               {item.title}
             </Text>
             <Animated.View entering={settleEnter(!!reduceMotion)}>
               <Text
-                className="mt-1.5 font-sans text-sm font-normal leading-5 text-ink-soft"
+                variant="meta"
+                className="mt-1.5 text-ink-soft"
                 numberOfLines={2}
               >
                 {item.body}
@@ -113,7 +114,7 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
                     key={tag}
                     className="rounded-md bg-bg px-2 py-0.5 border border-line/60"
                   >
-                    <Text className="font-sans text-xs font-medium text-muted">
+                    <Text variant="label" className="text-muted">
                       #{tag}
                     </Text>
                   </View>
