@@ -31,7 +31,7 @@ export function ContactHub() {
         <HubHeader settingsHref="/(contact)/settings" />
 
         <View className="mt-5">
-          <Text className="font-sans text-sm font-semibold uppercase tracking-wider text-muted">
+          <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
           <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">

@@ -142,16 +142,17 @@ Personality is **friendly and direct**: soft full pills, rounded cards, tactile 
 - White Clear Desk surfaces; Graphite type; Enki Blue as the sparse action/help signal
 - Manrope for UI; JetBrains Mono for code-like fragments only
 - Soft rounded cards (~24px) and chat bubbles (~22px); pills are fully round
-- Hybrid elevation: border-first, shadow for lift and overlays
+- Hybrid elevation: border-first, soft card lift, stronger shadow only on overlays (composer is border-only at rest)
 - Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes
+- Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Beacon Mist for secondary CTAs
 
 ## Colors
 
 A cool light ops palette: white field, Graphite ink, one Enki Blue accent with Beacon Mist wash, plus status greens/ambers/reds.
 
 ### Primary
-- **Enki Blue** (`#3452D9`): Primary actions, selected chips, outgoing bubbles, focus ring, tab active tint, read receipts when read. Keep rare on any given screen so the Clear Desk stays calm.
-- **Beacon Mist** (`#E8EDFB`): Soft selected/active wash, avatar fallbacks, secondary buttons, soft chips. The Support Beacon accent — help is present without flooding the desk.
+- **Enki Blue** (`#3452D9`): Primary actions, selected filter chips, outgoing bubbles, unread count badge (alone), focus ring, tab active tint, read receipts when read. Keep rare on any given screen so the Clear Desk stays calm.
+- **Beacon Mist** (`#E8EDFB`): Soft selected/active wash, avatar fallbacks (including Offers megaphone), secondary buttons, soft chips, admin “Create Offer” row icon. The Support Beacon accent — help is present without flooding the desk.
 
 ### Secondary
 Omit as a second brand accent. Status colors below are functional, not brand.
@@ -186,17 +187,19 @@ Omit as a second brand accent. Status colors below are functional, not brand.
 **Character:** Geometric, friendly sans with clear weight steps. On React Native, weight utilities map to loaded faces (`Manrope-Medium`, `Manrope-SemiBold`, `Manrope-Bold`) — do not rely on `fontWeight` alone to switch Manrope cuts.
 
 ### Hierarchy
-- **Display** (extrabold / Bold face, ~24px): Auth and hub brand moments (“Enki”, large greetings).
-- **Headline** (extrabold / Bold, ~20px): Screen titles, offer card titles.
-- **Title** (semibold, ~16px): Card/row titles, primary button labels, section headers.
-- **Body** (regular, ~15–16px): Message text, supporting copy.
-- **Label** (semibold / medium, ~10–12px, often uppercase + tracking): Role eyebrows (SUPPORT / AGENT / ADMIN), “Sponsored”, chip labels, section kicker.
-- **Mono** (JetBrains Mono medium/bold, ~14px): Rare code-like UI only.
+- **Display** (extrabold / Bold face, `text-2xl` ~24px): Auth and hub brand moments (“Enki”, large greetings).
+- **Headline** (extrabold / Bold, `text-xl` ~20px): Screen titles, offer card titles.
+- **Title** (semibold, `text-base` ~16px): Card/row titles, primary button labels, section headers.
+- **Body** (regular, `text-base` ~16px): Message text, supporting copy, thread titles.
+- **Label** (semibold / medium, `text-xs` ~12px, often uppercase + tracking): Role eyebrows (SUPPORT / AGENT / ADMIN), “Sponsored”, chip labels, section kickers, settings role pill.
+- **Mono** (JetBrains Mono medium/bold, `text-sm` ~14px): Rare code-like UI only.
+
+Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2xl`). Do not invent `text-[Npx]` one-offs.
 
 ### Named Rules
 **The Weight Face Rule.** Use `font-medium` / `font-semibold` / `font-bold` utilities so Manrope faces resolve correctly on native.
 
-**The Role Eyebrow Rule.** Role labels are uppercase labels in the greeting block, never competing with the Enki header wordmark.
+**The Role Eyebrow Rule.** Role labels are uppercase `text-xs` labels in the greeting block (and settings active-role pill via `hubEyebrow`), never competing with the Enki header wordmark.
 
 ## Layout
 
@@ -207,12 +210,12 @@ Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px).
 
 ## Elevation & Depth
 
-**Hybrid.** At rest, depth is a `line` border on white surface. Hub and conversation cards add soft lift (`shadow-md` / `shadow-black/5`). Auth cards and offer media use slightly stronger soft shadow. Overlays (reaction tray, reply chip, attachment sheet) use the strongest lift (`shadow-lg` / `shadow-2xl` family) so they read above the desk. Flat icons and ghost controls stay shadowless.
+**Hybrid.** At rest, depth is a `line` border on white surface. Hub and conversation cards add soft lift (`shadow-md` / `shadow-black/5`). Auth cards and offer media use slightly stronger soft shadow. Overlays (reaction tray, reply chip, attachment sheet) use the strongest lift (`shadow-lg` / `shadow-2xl` family) so they read above the desk. The thread **composer** is resting chrome: `border-t border-line` only — no overlay shadow. Flat icons and ghost controls stay shadowless.
 
 ### Shadow Vocabulary
 - **Card lift** (`shadow-md shadow-black/5`): Conversation rows, hub action rows, FAQ/knowledge cards.
 - **Soft control** (`shadow-sm shadow-black/5`–`/10`): Primary buttons, small chrome.
-- **Overlay** (`shadow-lg` / `shadow-2xl shadow-black/20`): Reaction tray, sheets, offer hero cards.
+- **Overlay** (`shadow-lg` / `shadow-2xl shadow-black/20`): Reaction tray, sheets, offer hero cards — not the always-visible composer.
 
 ### Named Rules
 **The Hybrid Lift Rule.** Borders define resting structure; shadows appear for stacked cards and floating overlays — not as default decoration on every view.
@@ -254,10 +257,23 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Error:** Danger text and border cues; no scary full-bleed red panels.
 
 ### Navigation
-- **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear; optional agent avatar stack. Role eyebrow lives in the greeting, not the header.
+- **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Contact header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
 - **Tabs (Agent/Admin):** Surface bar, `line` top border, Enki Blue active / Muted inactive.
 - **Stacks:** Flat header (no shadow), Graphite title in Manrope-SemiBold, surface background.
 - **Contact:** Stack-only hub — no tab bar.
+
+### Hub ops (Agent / Admin)
+- Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not Enki Blue value tint.
+- Quick **ActionTile** / secondary **ActionRow** icon chips prefer `neutral` (or amber for unassigned); primaryFilled Enki Blue chips are reserved for rare filled signals, not default hub chrome.
+- Admin “Create New Offer” uses Beacon Mist (`tone="primary"`), not filled blue.
+
+### Conversation rows
+- Soft card lift; Offers avatar = Beacon Mist + Enki Blue megaphone (not filled blue).
+- Unread: bold Graphite title; timestamp Ink Soft; **one** Enki Blue count badge as the unread signal.
+
+### Composer
+- Resting: surface + top `line` border; no resting shadow.
+- Reply banner may use Beacon Mist wash + Enki Blue accent bar.
 
 ### Message bubbles (signature)
 - **Outgoing:** Enki Blue fill, white text, ~22px radius, tighter bottom-right.
@@ -268,20 +284,28 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 ### Offers carousel (signature)
 - Local image + dark gradient overlay; white “View offer”; primary pill “Join Offers chat”. `"Sponsored"` is a section label only — not stories UI.
 
+### Settings
+- Active role pill shows `hubEyebrow` labels (SUPPORT / AGENT / ADMIN), not raw `session.role` strings.
+
 ## Do's and Don'ts
 
 ### Do:
 - **Do** keep the Clear Desk: white Bg/Surface, Graphite type, Enki Blue as sparse signal.
 - **Do** use Beacon Mist for soft selected/avatar/secondary moments.
-- **Do** put SUPPORT / AGENT / ADMIN in the greeting block; brand the header as Enki only.
-- **Do** use hybrid elevation — `line` at rest, stronger shadow on overlays.
+- **Do** put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as Enki only.
+- **Do** use hybrid elevation — `line` at rest (including composer), stronger shadow on overlays only.
+- **Do** keep Agent/Admin hub stats and tiles quiet (Graphite / neutral / amber attention).
 - **Do** honor reduced-motion paths for animated transitions.
 - **Do** add new colors to `@theme` **and** both `@variant light` and `@variant dark` when extending tokens.
+- **Do** use the type ramp utilities (`text-xs` … `text-2xl`); no arbitrary `text-[Npx]`.
 
 ### Don't:
 - **Don't** invent palette hex via arbitrary classes when a token exists.
 - **Don't** ship Messenger-dark chrome, nsave maroon, or red outgoing bubbles.
 - **Don't** build stories, case-status steppers, or Casewire branding.
 - **Don't** put role labels in the header wordmark or theme whole hubs per role color.
+- **Don't** show the agent avatar stack on the Contact hub.
+- **Don't** stack Enki Blue on unread time + badge + Offers avatar in the same row.
+- **Don't** put overlay-weight shadow on the resting composer.
 - **Don't** enable system dark mode for app chrome this phase.
 - **Don't** treat Offers as an ad SDK, checkout, or Instagram stories surface.

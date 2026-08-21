@@ -44,7 +44,7 @@ export function Composer({
 
   return (
     <View
-      className="border-t border-line/60 bg-surface shadow-lg shadow-black/5"
+      className="border-t border-line bg-surface"
       style={{ paddingBottom: bottom }}
     >
       {replyTo ? (

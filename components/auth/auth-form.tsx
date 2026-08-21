@@ -184,11 +184,11 @@ export function AuthForm({ mode }: AuthFormProps) {
               {/* Visual Password Strength Indicator */}
               <View className="mt-3">
                 <View className="flex-row items-center justify-between">
-                  <Text className="font-sans text-[11px] font-semibold text-muted">
+                  <Text className="font-sans text-xs font-semibold text-muted">
                     Password strength
                   </Text>
                   <Text
-                    className={`font-sans text-[11px] font-bold ${
+                    className={`font-sans text-xs font-bold ${
                       score === "strong"
                         ? "text-success"
                         : score === "fair"

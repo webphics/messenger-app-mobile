@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { initials } from "@/lib/display";
+import { getSession } from "@/lib/session";
 import { PEOPLE } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 
@@ -14,7 +15,10 @@ type HubHeaderProps = {
 };
 
 export function HubHeader({ settingsHref }: HubHeaderProps) {
-  const agents = PEOPLE.filter((p) => p.role === "agent");
+  const showAgentStack = getSession().role !== "contact";
+  const agents = showAgentStack
+    ? PEOPLE.filter((p) => p.role === "agent")
+    : [];
 
   return (
     <View className="flex-row items-center justify-between">
@@ -31,24 +35,26 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
         </Text>
       </View>
 
-      {/* Right Actions: Agents online stack & Settings */}
+      {/* Right Actions: Agents online stack (ops roles) & Settings */}
       <View className="flex-row items-center gap-3">
-        <View className="flex-row">
-          {agents.map((agent, i) => (
-            <Avatar
-              key={agent.id}
-              alt={agent.displayName}
-              className="size-9 border-2 border-bg shadow-sm shadow-black/10"
-              style={{ marginLeft: i === 0 ? 0 : -10 }}
-            >
-              <AvatarFallback className="bg-primary-soft">
-                <Text className="font-sans text-xs font-bold text-primary">
-                  {initials(agent.displayName)}
-                </Text>
-              </AvatarFallback>
-            </Avatar>
-          ))}
-        </View>
+        {agents.length > 0 ? (
+          <View className="flex-row">
+            {agents.map((agent, i) => (
+              <Avatar
+                key={agent.id}
+                alt={agent.displayName}
+                className="size-9 border-2 border-bg shadow-sm shadow-black/10"
+                style={{ marginLeft: i === 0 ? 0 : -10 }}
+              >
+                <AvatarFallback className="bg-primary-soft">
+                  <Text className="font-sans text-xs font-bold text-primary">
+                    {initials(agent.displayName)}
+                  </Text>
+                </AvatarFallback>
+              </Avatar>
+            ))}
+          </View>
+        ) : null}
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Settings"

@@ -34,7 +34,7 @@ export function AdminHub() {
         <HubHeader settingsHref={"/(admin)/settings" as Href} />
 
         <View className="mt-5">
-          <Text className="font-sans text-sm font-semibold uppercase tracking-wider text-muted">
+          <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
           <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
@@ -52,7 +52,7 @@ export function AdminHub() {
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
             <View className="flex-row items-center gap-2">
-              <ShieldCheck color={colors.primary} size={18} />
+              <ShieldCheck color={colors.muted} size={18} />
               <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-ink-soft">
                 System Oversight
               </Text>
@@ -71,7 +71,6 @@ export function AdminHub() {
             <StatTile
               value={String(CONVERSATIONS.length)}
               label="Conversations"
-              tone="primary"
               accessibilityLabel="Conversations"
               onPress={() => router.navigate("/(admin)/conversations" as Href)}
             />
@@ -90,12 +89,14 @@ export function AdminHub() {
             icon={MessageCircle}
             title="Messages"
             hint="All threads"
+            tone="neutral"
             onPress={() => router.navigate("/(admin)/conversations" as Href)}
           />
           <ActionTile
             icon={BookOpen}
             title="Knowledge"
             hint="Manage articles"
+            tone="neutral"
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("admin"))}
           />
@@ -118,7 +119,7 @@ export function AdminHub() {
       <View className="mt-4 px-4">
         <ActionRow
           icon={Plus}
-          tone="primaryFilled"
+          tone="primary"
           title="Create New Offer"
           hint="Publish a promotional campaign banner"
           accessibilityLabel="Add offer"

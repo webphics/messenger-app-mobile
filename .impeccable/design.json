@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-21T17:17:06.644Z",
+  "generatedAt": "2026-08-21T17:45:28.259Z",
   "title": "Design System: Enki",
   "extensions": {
     "colorMeta": {
@@ -240,7 +240,7 @@
       {
         "name": "overlay",
         "value": "0 10px 25px rgba(0,0,0,0.20)",
-        "purpose": "Reaction tray, sheets, offer hero cards above the desk."
+        "purpose": "Reaction tray, sheets, offer hero cards — not the resting composer."
       }
     ],
     "motion": [
@@ -341,13 +341,14 @@
   ],
   "narrative": {
     "northStar": "The Clear Desk (with Support Beacon accents)",
-    "overview": "Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Blue appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Beacon Mist). Beacon Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.\n\nPersonality is friendly and direct: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is hybrid — hairline line borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). This phase locks light chrome only; dark tokens exist in CSS for later but must not drive UI now.",
+    "overview": "Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Blue appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Beacon Mist). Beacon Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.\n\nPersonality is friendly and direct: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is hybrid — hairline line borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). The thread composer is border-only at rest. This phase locks light chrome only; dark tokens exist in CSS for later but must not drive UI now.",
     "keyCharacteristics": [
       "White Clear Desk surfaces; Graphite type; Enki Blue as the sparse action/help signal",
       "Manrope for UI; JetBrains Mono for code-like fragments only",
       "Soft rounded cards (~24px) and chat bubbles (~22px); pills are fully round",
-      "Hybrid elevation: border-first, shadow for lift and overlays",
-      "Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes"
+      "Hybrid elevation: border-first, soft card lift, stronger shadow only on overlays (composer is border-only at rest)",
+      "Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes",
+      "Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Beacon Mist for secondary CTAs"
     ],
     "rules": [
       {
@@ -372,7 +373,7 @@
       },
       {
         "name": "The Role Eyebrow Rule",
-        "body": "Role labels are uppercase labels in the greeting block, never competing with the Enki header wordmark.",
+        "body": "Role labels are uppercase text-xs labels in the greeting block (and settings active-role pill via hubEyebrow), never competing with the Enki header wordmark.",
         "section": "typography"
       },
       {
@@ -394,16 +395,21 @@
     "dos": [
       "Do keep the Clear Desk: white Bg/Surface, Graphite type, Enki Blue as sparse signal.",
       "Do use Beacon Mist for soft selected/avatar/secondary moments.",
-      "Do put SUPPORT / AGENT / ADMIN in the greeting block; brand the header as Enki only.",
-      "Do use hybrid elevation — line at rest, stronger shadow on overlays.",
+      "Do put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as Enki only.",
+      "Do use hybrid elevation — line at rest (including composer), stronger shadow on overlays only.",
+      "Do keep Agent/Admin hub stats and tiles quiet (Graphite / neutral / amber attention).",
       "Do honor reduced-motion paths for animated transitions.",
-      "Do add new colors to @theme and both @variant light and @variant dark when extending tokens."
+      "Do add new colors to @theme and both @variant light and @variant dark when extending tokens.",
+      "Do use the type ramp utilities (text-xs … text-2xl); no arbitrary text-[Npx]."
     ],
     "donts": [
       "Don't invent palette hex via arbitrary classes when a token exists.",
       "Don't ship Messenger-dark chrome, nsave maroon, or red outgoing bubbles.",
       "Don't build stories, case-status steppers, or Casewire branding.",
       "Don't put role labels in the header wordmark or theme whole hubs per role color.",
+      "Don't show the agent avatar stack on the Contact hub.",
+      "Don't stack Enki Blue on unread time + badge + Offers avatar in the same row.",
+      "Don't put overlay-weight shadow on the resting composer.",
       "Don't enable system dark mode for app chrome this phase.",
       "Don't treat Offers as an ad SDK, checkout, or Instagram stories surface."
     ]

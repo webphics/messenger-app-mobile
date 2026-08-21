@@ -95,7 +95,7 @@ export const UserRow = memo(function UserRow({ person, open, onPress }: UserRowP
               }`}
             >
               <Text
-                className={`font-sans text-[11px] font-bold ${
+                className={`font-sans text-xs font-bold ${
                   person.role === "admin"
                     ? "text-primary"
                     : person.role === "agent"
