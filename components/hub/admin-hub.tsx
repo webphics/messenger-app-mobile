@@ -110,7 +110,7 @@ export function AdminHub() {
       <ChartsSection />
 
       {/* Admin Actions */}
-      <View className="mt-4 px-4">
+      <View className="mt-5 px-4">
         <ActionRow
           icon={Plus}
           tone="primary"

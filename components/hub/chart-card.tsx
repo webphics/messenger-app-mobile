@@ -7,10 +7,10 @@ import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { staggerDelay } from "@/lib/motion";
 import { settleRightEnter } from "@/lib/motion-enter";
-import { CARD_MIN_HEIGHT } from "@/lib/offer-metrics";
 import type { ChartMetric } from "@/lib/types";
 
 const PLOT_HEIGHT = 64;
+const CHART_CARD_MIN_HEIGHT = 152;
 
 type ChartCardProps = {
   chart: ChartMetric;
@@ -35,7 +35,7 @@ export function ChartCard({ chart, cardWidth, index, onPress }: ChartCardProps) 
         accessibilityLabel={`${chart.title}, ${chart.value}`}
         onPress={onPress}
         className="rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
-        style={{ width: cardWidth, minHeight: CARD_MIN_HEIGHT }}
+        style={{ width: cardWidth, minHeight: CHART_CARD_MIN_HEIGHT }}
       >
         <View className="flex-row items-start justify-between gap-2">
           <View className="min-w-0 flex-1">
