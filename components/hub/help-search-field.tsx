@@ -21,7 +21,7 @@ export const HelpSearchField = forwardRef(function HelpSearchField(
   };
 
   return (
-    <View className="h-11 min-w-0 flex-1 flex-row items-center pr-2">
+    <View className="h-11 min-w-0 flex-1 flex-row items-center rounded-2xl border border-line/80 bg-line/35 pl-3 pr-2">
       <Input
         ref={ref}
         autoFocus
@@ -34,7 +34,7 @@ export const HelpSearchField = forwardRef(function HelpSearchField(
         placeholder={placeholder}
         accessibilityLabel={placeholder}
         returnKeyType="search"
-        className="h-11 min-w-0 flex-1 border-0 bg-transparent px-2 shadow-none font-sans text-base text-ink"
+        className="h-11 min-w-0 flex-1 border-0 bg-transparent px-1 font-sans text-base text-ink"
       />
       {value.length > 0 ? <SearchClearButton onPress={handleClear} /> : null}
     </View>

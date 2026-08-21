@@ -71,7 +71,7 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
                 No matching articles
               </Text>
               <Text variant="meta" className="mt-1 text-center text-muted">
-                Try searching for general keywords like "password", "billing", or "account".
+                Try searching for general keywords like “password”, “billing”, or “account”.
               </Text>
             </View>
           ) : (

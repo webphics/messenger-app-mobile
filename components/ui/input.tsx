@@ -15,7 +15,7 @@ const Input = React.forwardRef(function Input(
     <TextInput
       ref={ref}
       className={cn(
-        'dark:bg-input/30 border-input bg-background text-foreground flex h-10 w-full min-w-0 flex-row items-center rounded-md border px-3 py-1 text-base leading-5 shadow-sm shadow-black/5 sm:h-9',
+        'border border-line/80 bg-line/35 text-ink flex h-11 w-full min-w-0 flex-row items-center rounded-2xl px-3.5 py-2 text-base leading-5 dark:border-line/80 dark:bg-line/20 dark:text-ink',
         props.editable === false &&
           cn(
             'opacity-50',
@@ -23,11 +23,11 @@ const Input = React.forwardRef(function Input(
           ),
         Platform.select({
           web: cn(
-            'placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground outline-none transition-[color,box-shadow] md:text-sm',
-            'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-            'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive'
+            'placeholder:text-muted selection:bg-primary selection:text-primary-foreground outline-none transition-[color,box-shadow,border-color]',
+            'focus-visible:border-primary focus-visible:ring-primary/20 focus-visible:ring-[3px]',
+            'aria-invalid:ring-danger/20 aria-invalid:border-danger'
           ),
-          native: 'placeholder:text-muted-foreground/50',
+          native: 'placeholder:text-muted',
         }),
         className
       )}

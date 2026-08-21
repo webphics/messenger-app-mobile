@@ -45,7 +45,7 @@ export function AdminHub() {
         {/* System Health / Overview Stats */}
         <Animated.View
           entering={settleDownEnter(!!reduceMotion, 20)}
-          className="mt-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+          className="mt-4 overflow-hidden rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
             <View className="flex-row items-center gap-2">

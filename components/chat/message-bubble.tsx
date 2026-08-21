@@ -98,10 +98,10 @@ const QuoteChrome = memo(function QuoteChrome({
           })}
         </Text>
       </View>
-      <View className="max-w-[92%] rounded-[18px] border border-line bg-bubble-in px-3 py-1.5 opacity-85 shadow-sm shadow-black/5">
+      <View className="max-w-[92%] rounded-[18px] border border-line/80 bg-line/35 px-3 py-1.5 opacity-90">
         <Text
           variant="label"
-          className="font-normal text-muted"
+          className="font-normal text-ink-soft"
           numberOfLines={2}
         >
           {quoted.body}
@@ -127,7 +127,7 @@ const ReactionBadge = memo(function ReactionBadge({
   return (
     <View
       className={cn(
-        "absolute -bottom-3.5 z-10 flex-row items-center rounded-full border border-line bg-surface px-2 py-0.5 shadow-md shadow-black/10",
+        "absolute -bottom-3.5 z-10 flex-row items-center rounded-full border border-line/80 bg-surface px-2 py-0.5 shadow-md shadow-black/15",
         outgoing ? "right-2" : "left-2",
       )}
     >
@@ -360,10 +360,10 @@ export const MessageBubble = memo(function MessageBubble({
                   };
                 }}
                 className={cn(
-                  "overflow-hidden px-4 py-2.5 shadow-sm shadow-black/10",
+                  "overflow-hidden px-4 py-2.5 shadow-sm",
                   outgoing
-                    ? "rounded-[22px] rounded-br-md bg-primary"
-                    : "rounded-[22px] rounded-bl-md border border-line bg-bubble-in",
+                    ? "rounded-[22px] rounded-br-md bg-primary shadow-primary/25"
+                    : "rounded-[22px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8",
                 )}
               >
                 <Text

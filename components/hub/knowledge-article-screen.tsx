@@ -1,9 +1,8 @@
 import { Redirect, Stack, useLocalSearchParams, usePathname } from "expo-router";
 
 import { KnowledgeArticleView } from "@/components/hub/knowledge-article";
-import { dynamicRouteId } from "@/lib/hub-routes";
+import { dynamicRouteId, ROLE_HREF } from "@/lib/hub-routes";
 import { getKnowledge } from "@/lib/mock-catalog";
-import { ROLE_HREF } from "@/lib/hub-routes";
 import { getSession } from "@/lib/session";
 
 export function KnowledgeArticleScreen() {

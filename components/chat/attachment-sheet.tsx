@@ -124,7 +124,7 @@ function SheetSurface({
   return (
     <Animated.View
       style={[{ transform: [{ translateY }] }, { paddingBottom: bottomPad }]}
-      className="rounded-t-3xl border-t border-line/60 bg-surface px-4 pt-2 shadow-2xl shadow-black/20"
+      className="rounded-t-3xl border-t border-line/80 bg-surface px-4 pt-2 shadow-2xl shadow-black/20"
     >
       {children}
     </Animated.View>
@@ -350,7 +350,7 @@ export function AttachmentSheet({
                   }}
                   disabled={pendingId !== null}
                   onPress={() => void handleOption(item)}
-                  className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-bg p-3.5 shadow-sm shadow-black/5 active:bg-primary-soft/40"
+                  className="flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-3.5 shadow-xs shadow-black/8 active:bg-primary-soft/40"
                 >
                   <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
                     {pendingId === item.id ? (

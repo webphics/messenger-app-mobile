@@ -18,27 +18,27 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: cn(
-          "bg-primary active:bg-primary/90 shadow-sm shadow-black/10",
+          "bg-primary active:bg-primary/95 shadow-sm shadow-primary/25 active:shadow-none",
           Platform.select({ web: "hover:bg-primary/90" }),
         ),
         destructive: cn(
-          "bg-destructive active:bg-destructive/90 shadow-sm shadow-black/10",
+          "bg-destructive active:bg-destructive/95 shadow-sm shadow-danger/25 active:shadow-none",
           Platform.select({
             web: "hover:bg-destructive/90 focus-visible:ring-destructive/20",
           }),
         ),
         outline: cn(
-          "border-line bg-surface active:bg-primary-soft/50 border shadow-sm shadow-black/5",
+          "border-line/80 bg-surface active:bg-line/35 border shadow-xs shadow-black/8 active:shadow-none",
           Platform.select({
             web: "hover:bg-primary-soft/30",
           }),
         ),
         secondary: cn(
-          "bg-primary-soft active:bg-primary-soft/80 shadow-sm shadow-black/5",
+          "bg-primary-soft active:bg-primary-soft/80 shadow-xs shadow-primary/15 active:shadow-none",
           Platform.select({ web: "hover:bg-primary-soft/80" }),
         ),
         ghost: cn(
-          "active:bg-primary-soft/50",
+          "active:bg-line/35",
           Platform.select({ web: "hover:bg-primary-soft/30" }),
         ),
         link: "",
@@ -99,7 +99,7 @@ function Button({
   className,
   variant,
   size,
-  activeScale = 0.97,
+  activeScale = 0.98,
   haptic = "none",
   ...props
 }: ButtonProps) {

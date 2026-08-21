@@ -26,9 +26,9 @@ export function SearchFieldWithClear({
         onChangeText={onChangeText}
         placeholder={placeholder}
         accessibilityLabel={accessibilityLabel}
-        className="h-11 flex-1 rounded-2xl border-line bg-bg pl-10 pr-10 shadow-none font-sans text-base"
+        className="h-11 flex-1 rounded-2xl border-line/80 bg-line/35 pl-10 pr-10 font-sans text-base text-ink"
       />
-      <View className="pointer-events-none absolute left-3">
+      <View className="pointer-events-none absolute left-3.5">
         <Search color={colors.muted} size={18} />
       </View>
       {value.length > 0 ? (

@@ -78,3 +78,20 @@ export const stackChrome = {
   headerRightContainerStyle: { paddingVertical: 0 },
   contentStyle: { backgroundColor: colors.bg },
 } as const;
+
+/** 5-tier elevation and depth token presets */
+export const shadows = {
+  /** Level -1: Sunken/carved well (inputs, search bars, composer text area, metric wells) */
+  divit: "border border-line/80 bg-line/35",
+  /** Level 1: Raised card pop-out (conversation rows, hub action cards, FAQ/knowledge rows) */
+  card: "shadow-md shadow-black/8 border border-line/70 bg-surface",
+  /** Level 2: Primary button resting lift */
+  buttonPrimary: "shadow-sm shadow-primary/25",
+  /** Level 2: Secondary/Outline button resting lift */
+  buttonSecondary: "shadow-xs shadow-black/8",
+  /** Level 3: Floating tab bar capsule */
+  floating: "shadow-xl shadow-black/15 border border-line/80 bg-surface/95",
+  /** Level 3: Overlay sheets, reaction trays, and modal dialogs */
+  overlay: "shadow-2xl shadow-black/20 border border-line bg-surface",
+} as const;
+

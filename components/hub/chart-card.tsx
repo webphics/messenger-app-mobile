@@ -34,7 +34,7 @@ export function ChartCard({ chart, cardWidth, index, onPress }: ChartCardProps) 
         accessibilityRole="button"
         accessibilityLabel={`${chart.title}, ${chart.value}`}
         onPress={onPress}
-        className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+        className="rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
         style={{ width: cardWidth, minHeight: CARD_MIN_HEIGHT }}
       >
         <View className="flex-row items-start justify-between gap-2">

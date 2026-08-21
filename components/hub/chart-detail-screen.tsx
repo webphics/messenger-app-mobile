@@ -1,9 +1,8 @@
 import { Redirect, Stack, useLocalSearchParams, usePathname } from "expo-router";
 
 import { ChartDetail } from "@/components/hub/chart-detail";
-import { dynamicRouteId } from "@/lib/hub-routes";
+import { dynamicRouteId, ROLE_HREF } from "@/lib/hub-routes";
 import { getChart } from "@/lib/mock-catalog";
-import { ROLE_HREF } from "@/lib/hub-routes";
 import { getSession } from "@/lib/session";
 
 export function ChartDetailScreen() {
