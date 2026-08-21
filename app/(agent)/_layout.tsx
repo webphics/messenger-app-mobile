@@ -2,12 +2,14 @@ import { Tabs } from "expo-router";
 import { House, Inbox, MessageCircle } from "@/components/icons";
 import { FloatingTabBar } from "@/components/nav/floating-tab-bar";
 
-import { tabChrome } from "@/lib/tokens";
+import { useTabChrome } from "@/lib/use-tab-chrome";
 
 export default function AgentLayout() {
+  const chrome = useTabChrome();
+
   return (
     <Tabs
-      screenOptions={tabChrome}
+      screenOptions={chrome}
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
       <Tabs.Screen

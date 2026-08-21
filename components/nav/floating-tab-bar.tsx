@@ -1,5 +1,12 @@
 import type { ComponentProps } from "react";
-import { View, Text } from "react-native";
+import { useEffect } from "react";
+import { View, Text, type LayoutChangeEvent } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tabs } from "expo-router";
 
@@ -16,6 +23,15 @@ import { colors } from "@/lib/tokens";
 type FloatingTabBarProps = Parameters<
   NonNullable<ComponentProps<typeof Tabs>["tabBar"]>
 >[0];
+
+/** Matches capsule `px-1.5` — indicator lives in the padded content box. */
+const CAPSULE_PAD = 6;
+
+const INDICATOR_SPRING = {
+  damping: 22,
+  stiffness: 320,
+  mass: 0.55,
+};
 
 function labelFor(
   options: FloatingTabBarProps["descriptors"][string]["options"],
@@ -55,6 +71,33 @@ export function FloatingTabBar({
   navigation,
 }: FloatingTabBarProps) {
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
+  const tabCount = state.routes.length;
+
+  const tabWidth = useSharedValue(0);
+  const activeIndex = useSharedValue(state.index);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      activeIndex.value = state.index;
+      return;
+    }
+    activeIndex.value = withSpring(state.index, INDICATOR_SPRING);
+  }, [state.index, reduceMotion, activeIndex]);
+
+  const onCapsuleLayout = (e: LayoutChangeEvent) => {
+    const inner = e.nativeEvent.layout.width - CAPSULE_PAD * 2;
+    if (inner <= 0 || tabCount === 0) return;
+    // Width is layout-derived; set once — do not animate layout props.
+    tabWidth.value = inner / tabCount;
+  };
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    width: tabWidth.value,
+    transform: [
+      { translateX: CAPSULE_PAD + activeIndex.value * tabWidth.value },
+    ],
+  }));
 
   return (
     <View
@@ -63,9 +106,15 @@ export function FloatingTabBar({
       pointerEvents="box-none"
     >
       <View
-        className="flex-row items-center rounded-full border border-line bg-surface px-1.5 py-1.5 shadow-lg shadow-black/10"
+        onLayout={onCapsuleLayout}
+        className="relative flex-row items-center rounded-full border border-line bg-surface px-1.5 py-1.5 shadow-lg shadow-black/10"
         accessibilityRole="tablist"
       >
+        <Animated.View
+          pointerEvents="none"
+          className="absolute bottom-1.5 top-1.5 left-0 rounded-full bg-primary-soft"
+          style={indicatorStyle}
+        />
         {state.routes.map((route, index) => {
           const focused = state.index === index;
           const { options } = descriptors[route.key];
@@ -103,14 +152,9 @@ export function FloatingTabBar({
               onPress={onPress}
               onLongPress={onLongPress}
               haptic="selection"
-              className="min-h-11 flex-1"
+              className="z-10 min-h-11 flex-1"
             >
-              <View
-                className={cn(
-                  "min-h-11 items-center justify-center rounded-full px-1 py-1.5",
-                  focused && "bg-primary-soft",
-                )}
-              >
+              <View className="min-h-11 items-center justify-center px-1 py-1.5">
                 <View className="relative items-center">
                   {options.tabBarIcon?.({ focused, color, size: 22 })}
                   {badge != null ? (
