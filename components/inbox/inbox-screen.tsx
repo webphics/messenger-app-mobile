@@ -13,8 +13,14 @@ import { cn } from "@/lib/cn";
 import { filterConversations, type InboxChip } from "@/lib/inbox-filter";
 import { getDevUserId } from "@/lib/dev-user";
 import { LABELS, PEOPLE } from "@/lib/mock-data";
+import { settleEnter } from "@/lib/motion-enter";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 const CHIPS: { id: InboxChip; label: string }[] = [
   { id: "all", label: "All Messages" },
@@ -28,6 +34,32 @@ function keyExtractor(item: Conversation) {
 
 function InboxItemSeparator() {
   return <View className="h-3" />;
+}
+
+function InboxEmpty({ showChips }: { showChips: boolean }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <Animated.View
+      entering={settleEnter(!!reduceMotion)}
+      className="items-center px-4 py-16"
+    >
+      <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
+        {showChips ? (
+          <MessageCircle color={colors.primary} size={26} />
+        ) : (
+          <Inbox color={colors.primary} size={26} />
+        )}
+      </View>
+      <Text className="mt-4 font-sans text-base font-semibold text-ink">
+        {showChips ? "No conversations found" : "Unassigned pool is empty"}
+      </Text>
+      <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+        {showChips
+          ? "Try searching for a different person or changing the filter."
+          : "All incoming requests have been assigned to an agent."}
+      </Text>
+    </Animated.View>
+  );
 }
 
 type InboxScreenProps = {
@@ -48,6 +80,10 @@ export function InboxScreen({
   const [query, setQuery] = useState("");
   const [chip, setChip] = useState<InboxChip>("all");
   const [composeOpen, setComposeOpen] = useState(false);
+  const [epoch, setEpoch] = useState(0);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+    setEpoch((n) => n + 1);
+  });
 
   useEffect(() => {
     navigation.setOptions({
@@ -68,18 +104,17 @@ export function InboxScreen({
     });
   }, [navigation, showCompose, title]);
 
-  const visible = useMemo(
-    () =>
-      filterConversations(
-        conversations,
-        query,
-        showChips ? chip : "all",
-        LABELS,
-        PEOPLE,
-        getDevUserId(),
-      ),
-    [conversations, query, chip, showChips],
-  );
+  const visible = useMemo(() => {
+    void epoch;
+    return filterConversations(
+      conversations,
+      query,
+      showChips ? chip : "all",
+      LABELS,
+      PEOPLE,
+      getDevUserId(),
+    );
+  }, [conversations, query, chip, showChips, epoch]);
 
   const openConversation = useCallback(
     (conversationId: string) => {
@@ -89,8 +124,12 @@ export function InboxScreen({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: Conversation }) => (
-      <ConversationRow conversation={item} onPress={openConversation} />
+    ({ item, index }: { item: Conversation; index: number }) => (
+      <ConversationRow
+        conversation={item}
+        onPress={openConversation}
+        index={index}
+      />
     ),
     [openConversation],
   );
@@ -149,25 +188,8 @@ export function InboxScreen({
         contentContainerClassName="px-4 py-3"
         ItemSeparatorComponent={InboxItemSeparator}
         renderItem={renderItem}
-        ListEmptyComponent={
-          <View className="items-center px-4 py-16">
-            <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
-              {showChips ? (
-                <MessageCircle color={colors.primary} size={26} />
-              ) : (
-                <Inbox color={colors.primary} size={26} />
-              )}
-            </View>
-            <Text className="mt-4 font-sans text-base font-semibold text-ink">
-              {showChips ? "No conversations found" : "Unassigned pool is empty"}
-            </Text>
-            <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
-              {showChips
-                ? "Try searching for a different person or changing the filter."
-                : "All incoming requests have been assigned to an agent."}
-            </Text>
-          </View>
-        }
+        ListEmptyComponent={<InboxEmpty showChips={showChips} />}
+        refreshControl={makeRefreshControl(refreshing, onRefresh)}
       />
 
       <NewChatModal

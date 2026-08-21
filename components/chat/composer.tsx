@@ -1,12 +1,20 @@
 import { Plus, Send, X } from "@/components/icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AttachmentSheet } from "@/components/chat/attachment-sheet";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { motion } from "@/lib/motion";
+import { settleDownEnter } from "@/lib/motion-enter";
 import { colors, screenBottomPad } from "@/lib/tokens";
 
 type ComposerProps = {
@@ -28,11 +36,26 @@ export function Composer({
   keyboardInset = 0,
 }: ComposerProps) {
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const [attachOpen, setAttachOpen] = useState(false);
   const canSend = value.trim().length > 0;
+  const ready = useSharedValue(canSend ? 1 : 0.92);
   // The keyboard covers the home indicator / nav bar, so once the thread has
   // lifted the composer by that much, its own safe-area gap is redundant.
   const bottom = Math.max(0, screenBottomPad(insets.bottom) - keyboardInset);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      ready.value = canSend ? 1 : 0.92;
+      return;
+    }
+    ready.value = withSpring(canSend ? 1 : 0.92, motion.springs.press);
+  }, [canSend, ready, reduceMotion]);
+
+  const sendStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: ready.value }],
+    opacity: 0.4 + ready.value * 0.6,
+  }));
 
   function handleAttach(text: string) {
     if (!value.trim()) {
@@ -48,7 +71,10 @@ export function Composer({
       style={{ paddingBottom: bottom }}
     >
       {replyTo ? (
-        <View className="flex-row items-center gap-2 border-b border-line/40 px-4 py-2 bg-primary-soft/40">
+        <Animated.View
+          entering={settleDownEnter(!!reduceMotion)}
+          className="flex-row items-center gap-2 border-b border-line/40 px-4 py-2 bg-primary-soft/40"
+        >
           <View className="w-1 self-stretch rounded-full bg-primary" />
           <View className="min-w-0 flex-1 pl-1">
             <Text className="font-sans text-xs font-bold text-primary" numberOfLines={1}>
@@ -67,7 +93,7 @@ export function Composer({
           >
             <X color={colors.muted} size={16} />
           </TactilePressable>
-        </View>
+        </Animated.View>
       ) : null}
 
       <View className="flex-row items-end gap-2 px-3 py-2.5">
@@ -90,18 +116,18 @@ export function Composer({
           className="max-h-28 min-h-11 flex-1 rounded-3xl border-line bg-bg px-4 py-2.5 shadow-none font-sans text-sm text-ink"
         />
 
-        <TactilePressable
-          haptic="medium"
-          accessibilityRole="button"
-          accessibilityLabel="Send"
-          disabled={!canSend}
-          onPress={onSend}
-          className={`mb-0.5 size-11 items-center justify-center rounded-full bg-primary shadow-sm shadow-black/10 ${
-            canSend ? "opacity-100" : "opacity-40"
-          }`}
-        >
-          <Send color={colors.primaryForeground} size={17} />
-        </TactilePressable>
+        <Animated.View style={sendStyle}>
+          <TactilePressable
+            haptic="medium"
+            accessibilityRole="button"
+            accessibilityLabel="Send"
+            disabled={!canSend}
+            onPress={onSend}
+            className="mb-0.5 size-11 items-center justify-center rounded-full bg-primary shadow-sm shadow-black/10"
+          >
+            <Send color={colors.primaryForeground} size={17} />
+          </TactilePressable>
+        </Animated.View>
       </View>
 
       <AttachmentSheet

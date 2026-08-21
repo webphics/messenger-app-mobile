@@ -4,6 +4,10 @@ import { ScrollView, useWindowDimensions, View } from "react-native";
 import { MetricChart } from "@/components/hub/metric-chart";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { ChartMetric } from "@/lib/types";
 
@@ -18,12 +22,14 @@ export function ChartDetail({ chart }: ChartDetailProps) {
     chart.kind === "pie" || chart.kind === "donut" ? Math.min(plotWidth, 220) : 180;
   const isPositive = chart.deltaLabel.startsWith("+");
   const isNegative = chart.deltaLabel.startsWith("-");
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
 
   return (
     <ScrollView
       className="flex-1 bg-bg"
       showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
+      refreshControl={makeRefreshControl(refreshing, onRefresh)}
     >
       <View className="rounded-3xl border border-line bg-surface p-5 shadow-md shadow-black/5">
         <View className="flex-row items-start justify-between gap-3">

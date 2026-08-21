@@ -16,6 +16,10 @@ import { quotePreview, toggleReaction } from "@/lib/message-react";
 import { getDevUser, getDevUserId } from "@/lib/dev-user";
 import { PEOPLE } from "@/lib/mock-data";
 import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
+import {
   anchorFromPayload,
   type OpenMenuPayload,
   type ReactionAnchor,
@@ -66,6 +70,9 @@ function keyExtractor(item: Row) {
   return item.id;
 }
 
+/** How near inverted offset 0 (newest) before MVCP reveals inserted rows. */
+const NEAR_LATEST_PX = 80;
+
 export function ThreadScreen({
   conversation,
   initialMessages,
@@ -73,10 +80,17 @@ export function ThreadScreen({
   const me = getDevUser();
   const keyboardInset = useKeyboardInset();
   const hostRef = useRef<View>(null);
+  const listRef = useRef<FlatList<Row>>(null);
+  const stickToLatestRef = useRef(false);
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState(initialMessages);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [menu, setMenu] = useState<ReactionAnchor | null>(null);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+    setMessages(initialMessages);
+    setReplyTo(null);
+    setMenu(null);
+  });
   const isGroup = conversation.kind === "group" || conversation.id === "offers";
   const rows = useMemo(() => buildRows(messages, isGroup), [messages, isGroup]);
 
@@ -163,6 +177,10 @@ export function ThreadScreen({
     const id = `local-${Date.now()}`;
     setDraft("");
     setReplyTo(null);
+    // MVCP keeps the prior newest row fixed; after layout, pin offset 0 so the
+    // sent bubble clears the composer (autoscroll threshold alone skips if the
+    // user had scrolled up slightly).
+    stickToLatestRef.current = true;
     setMessages((prev) => [
       ...prev,
       {
@@ -176,6 +194,12 @@ export function ThreadScreen({
       },
     ]);
   }
+
+  const onContentSizeChange = useCallback(() => {
+    if (!stickToLatestRef.current) return;
+    stickToLatestRef.current = false;
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: Row }) => {
@@ -212,6 +236,7 @@ export function ThreadScreen({
   const host = (
     <View ref={hostRef} collapsable={false} className="flex-1">
       <FlatList
+        ref={listRef}
         inverted
         className="flex-1"
         scrollEnabled={!menuOpen}
@@ -225,12 +250,18 @@ export function ThreadScreen({
         keyExtractor={keyExtractor}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        // Anchor whatever is on screen. Without this the list re-anchors to
-        // offset 0 — the newest message — every time the composer changes
-        // height (reply banner appearing, keyboard opening), yanking you away
-        // from the message you were replying to.
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onContentSizeChange={onContentSizeChange}
+        // Anchor mid-thread when rows insert. Without MVCP, composer height
+        // changes yank to offset 0. Without autoscrollToTopThreshold, new
+        // index-0 rows stay under the composer while you were near latest.
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: NEAR_LATEST_PX,
+        }}
         renderItem={renderItem}
+        refreshControl={makeRefreshControl(refreshing, onRefresh, {
+          inverted: true,
+        })}
       />
       <Composer
         value={draft}
@@ -261,9 +292,10 @@ export function ThreadScreen({
         makes `softwareKeyboardLayoutMode: "resize"` a no-op — the window never
         resizes and MainActivity pads only for system bars, so the composer and
         its reply banner sit behind the IME unless something lifts them.
-        `useKeyboardInset` reports the overlap with this padded content view;
-        KeyboardAvoidingView cannot, because it measures against a
-        parent-relative frame. See lib/keyboard-inset.ts.
+        `useKeyboardInset` reports residual overlap only (raw height minus what
+        a host like Expo Go already absorbed via window resize). See
+        lib/keyboard-inset.ts. KeyboardAvoidingView cannot, because it measures
+        against a parent-relative frame.
       */}
       <View className="flex-1" style={{ paddingBottom: keyboardInset }}>
         {host}

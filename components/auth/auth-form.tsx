@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { AlertCircle, Eye, EyeOff, Sparkles } from "@/components/icons";
 import { useState } from "react";
 import { Image, ScrollView, View } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Text } from "@/components/ui/text";
 import { hapticSelection, hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
+import { settleDownEnter, settleEnter } from "@/lib/motion-enter";
 import {
   emailLooksValid,
   passwordIsValid,
@@ -26,6 +28,7 @@ type AuthFormProps = {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
   const { keyboardInset, scrollProps } = useKeyboardAwareScroll();
   const register = mode === "register";
   const [email, setEmail] = useState("");
@@ -85,7 +88,10 @@ export function AuthForm({ mode }: AuthFormProps) {
           paddingBottom: insets.bottom + 24,
         }}
       >
-        <View className="items-center">
+        <Animated.View
+          entering={settleDownEnter(!!reduceMotion)}
+          className="items-center"
+        >
           <Image
             source={require("../../assets/images/splash-icon.png")}
             accessibilityLabel="Enki"
@@ -98,9 +104,12 @@ export function AuthForm({ mode }: AuthFormProps) {
           <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
             Internal Support & Team Collaboration
           </Text>
-        </View>
+        </Animated.View>
 
-        <View className="mt-6 rounded-3xl border border-line bg-surface p-5 shadow-lg shadow-black/5">
+        <Animated.View
+          entering={settleEnter(!!reduceMotion, 60)}
+          className="mt-6 rounded-3xl border border-line bg-surface p-5 shadow-lg shadow-black/5"
+        >
           <Text className="font-sans text-xl font-extrabold text-ink">
             {register ? "Create an account" : "Welcome back"}
           </Text>
@@ -289,21 +298,23 @@ export function AuthForm({ mode }: AuthFormProps) {
           <Button className="mt-6 min-h-12 w-full" onPress={() => void onSubmit()}>
             <Text>{register ? "Create Account" : "Sign In"}</Text>
           </Button>
-        </View>
+        </Animated.View>
 
-        <TactilePressable
-          accessibilityRole="link"
-          onPress={() =>
-            router.replace(register ? "/(auth)/sign-in" : "/(auth)/register")
-          }
-          className="mt-6 min-h-11 items-center justify-center"
-        >
-          <Text className="font-sans text-sm font-semibold text-primary">
-            {register
-              ? "Already have an account? Sign in"
-              : "Don't have an account? Create one"}
-          </Text>
-        </TactilePressable>
+        <Animated.View entering={settleEnter(!!reduceMotion, 120)}>
+          <TactilePressable
+            accessibilityRole="link"
+            onPress={() =>
+              router.replace(register ? "/(auth)/sign-in" : "/(auth)/register")
+            }
+            className="mt-6 min-h-11 items-center justify-center"
+          >
+            <Text className="font-sans text-sm font-semibold text-primary">
+              {register
+                ? "Already have an account? Sign in"
+                : "Don't have an account? Create one"}
+            </Text>
+          </TactilePressable>
+        </Animated.View>
       </ScrollView>
     </View>
   );

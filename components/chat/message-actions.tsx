@@ -10,6 +10,7 @@ import Animated, {
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { motion } from "@/lib/motion";
 import { REACT_EMOJIS } from "@/lib/message-react";
 import {
   replyStyle,
@@ -37,8 +38,8 @@ export function MessageActions({
   const opacity = useSharedValue(0);
 
   useLayoutEffect(() => {
-    scale.value = withSpring(1, { damping: 14, stiffness: 340, mass: 0.4 });
-    opacity.value = withTiming(1, { duration: 80 });
+    scale.value = withSpring(1, motion.springs.tray);
+    opacity.value = withTiming(1, { duration: motion.durations.flash });
   }, [opacity, scale]);
 
   const trayAnim = useAnimatedStyle(() => ({

@@ -1,11 +1,12 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Image, type ImageSourcePropType, View } from "react-native";
-import Animated, { FadeInRight, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { staggerDelay } from "@/lib/motion";
+import { settleRightEnter } from "@/lib/motion-enter";
 import { CARD_MIN_HEIGHT } from "@/lib/offer-metrics";
-import { enteringAnimation } from "@/lib/reduced-motion";
 import type { Offer, OfferVisual } from "@/lib/types";
 
 const OFFER_IMAGES: Record<OfferVisual, ImageSourcePropType> = {
@@ -26,10 +27,7 @@ export function OfferCard({ offer, cardWidth, index, onPress }: OfferCardProps) 
 
   return (
     <Animated.View
-      entering={enteringAnimation(
-        reduceMotion,
-        FadeInRight.springify().damping(18).stiffness(180).delay(index * 80),
-      )}
+      entering={settleRightEnter(!!reduceMotion, staggerDelay(index))}
       style={{ width: cardWidth }}
     >
       <TactilePressable

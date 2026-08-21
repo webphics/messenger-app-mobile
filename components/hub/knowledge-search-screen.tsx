@@ -2,7 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { BookOpen, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, TextInput, View } from "react-native";
-import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { HelpSearchField } from "@/components/hub/help-search-field";
 import { InScreenHeader } from "@/components/in-screen-header";
@@ -11,7 +11,11 @@ import { Text } from "@/components/ui/text";
 import { knowledgeHref } from "@/lib/hub-routes";
 import { filterKnowledge } from "@/lib/knowledge-filter";
 import { listKnowledge } from "@/lib/mock-catalog";
-import { enteringAnimation } from "@/lib/reduced-motion";
+import { settleEnter } from "@/lib/motion-enter";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { KnowledgeArticle } from "@/lib/types";
 
@@ -25,6 +29,9 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<KnowledgeArticle[]>(listKnowledge);
   const results = useMemo(() => filterKnowledge(items, query), [items, query]);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+    setItems(listKnowledge());
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -91,12 +98,7 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
             <Text className="font-sans text-base font-semibold text-ink">
               {item.title}
             </Text>
-            <Animated.View
-              entering={enteringAnimation(
-                reduceMotion,
-                FadeIn.springify().damping(20).stiffness(220),
-              )}
-            >
+            <Animated.View entering={settleEnter(!!reduceMotion)}>
               <Text
                 className="mt-1.5 font-sans text-sm font-normal leading-5 text-ink-soft"
                 numberOfLines={2}
@@ -120,6 +122,7 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
             ) : null}
           </TactilePressable>
         )}
+        refreshControl={makeRefreshControl(refreshing, onRefresh)}
       />
     </View>
   );

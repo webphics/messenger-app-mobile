@@ -1,6 +1,6 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
-import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { BookOpen, MessageCircle, Plus, ShieldCheck } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
@@ -17,7 +17,7 @@ import { latestInboxThread } from "@/lib/inbox-filter";
 import { getDevUser } from "@/lib/dev-user";
 import { knowledgeListHref } from "@/lib/hub-routes";
 import { CONVERSATIONS, PEOPLE } from "@/lib/mock-data";
-import { enteringAnimation } from "@/lib/reduced-motion";
+import { settleDownEnter } from "@/lib/motion-enter";
 import { getSession } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
@@ -33,21 +33,18 @@ export function AdminHub() {
       <View className="px-4">
         <HubHeader settingsHref={"/(admin)/settings" as Href} />
 
-        <View className="mt-5">
-          <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+          <Text className="mt-5 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
           <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
             {hubGreeting(me.role, firstName(me.displayName))}
           </Text>
-        </View>
+        </Animated.View>
 
         {/* System Health / Overview Stats */}
         <Animated.View
-          entering={enteringAnimation(
-            reduceMotion,
-            FadeInDown.springify().damping(18).stiffness(180).delay(20),
-          )}
+          entering={settleDownEnter(!!reduceMotion, 20)}
           className="mt-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
@@ -79,10 +76,7 @@ export function AdminHub() {
 
         {/* Admin Navigation Quick Grid */}
         <Animated.View
-          entering={enteringAnimation(
-            reduceMotion,
-            FadeInDown.springify().damping(18).stiffness(180).delay(60),
-          )}
+          entering={settleDownEnter(!!reduceMotion, 60)}
           className="mt-4 flex-row gap-3"
         >
           <ActionTile

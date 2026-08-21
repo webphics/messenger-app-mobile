@@ -5,10 +5,10 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   cancelAnimation,
   Extrapolation,
-  FadeIn,
   interpolate,
   runOnJS,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -19,6 +19,8 @@ import { cn } from "@/lib/cn";
 import { hapticLight, hapticMedium, hapticSelection } from "@/lib/haptics";
 import { replyCaption } from "@/lib/message-react";
 import { messageStatusLabel } from "@/lib/message-status";
+import { deskMessageEnter } from "@/lib/motion-enter";
+import { motion } from "@/lib/motion";
 import {
   measureWindowOrPage,
   type OpenMenuPayload,
@@ -178,6 +180,7 @@ export const MessageBubble = memo(function MessageBubble({
   const bubbleRef = useRef<View>(null);
   const sizeRef = useRef({ width: 0, height: 0 });
   const isFirstMount = useRef(true);
+  const reduceMotion = useReducedMotion();
   const x = useSharedValue(0);
   const tint = useSharedValue(0);
   const swipedHaptic = useSharedValue(false);
@@ -273,7 +276,7 @@ export const MessageBubble = memo(function MessageBubble({
           })
           .onEnd(() => {
             if (x.value >= SWIPE_REPLY) runOnJS(handleReply)();
-            x.value = withSpring(0, { damping: 18, stiffness: 260, mass: 0.55 });
+            x.value = withSpring(0, motion.springs.overlay);
             swipedHaptic.value = false;
           }),
       ),
@@ -307,7 +310,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   return (
     <Animated.View
-      entering={enter ? FadeIn.springify().damping(20).stiffness(220) : undefined}
+      entering={enter ? deskMessageEnter(!!reduceMotion) : undefined}
       className="pb-3.5"
     >
       <View className="justify-center" pointerEvents="box-none">

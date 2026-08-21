@@ -9,14 +9,17 @@ import {
 
 import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PresenceDot } from "@/components/ui/presence-dot";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { initials } from "@/lib/display";
 import { getDevUserId } from "@/lib/dev-user";
 import { CONVERSATIONS, PEOPLE } from "@/lib/mock-data";
+import { listItemEnter, settleEnter } from "@/lib/motion-enter";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
 import type { Person } from "@/lib/types";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 type NewChatModalProps = {
   visible: boolean;
@@ -58,73 +61,92 @@ function ContactItemSeparator() {
   return <View className="h-2.5" />;
 }
 
+function EmptyContacts() {
+  const reduceMotion = useReducedMotion();
+  return (
+    <Animated.View
+      entering={settleEnter(!!reduceMotion)}
+      className="items-center px-4 py-12"
+    >
+      <Text className="font-sans text-base font-semibold text-ink">
+        No matching contacts
+      </Text>
+      <Text className="mt-1 text-center font-sans text-sm text-muted">
+        Try searching for a different name or role.
+      </Text>
+    </Animated.View>
+  );
+}
+
 type ContactPickerRowProps = {
   person: Person;
   onSelect: (person: Person) => void;
+  index?: number;
 };
 
 const ContactPickerRow = memo(function ContactPickerRow({
   person,
   onSelect,
+  index = 0,
 }: ContactPickerRowProps) {
+  const reduceMotion = useReducedMotion();
   const handlePress = useCallback(() => {
     onSelect(person);
   }, [onSelect, person]);
 
   return (
-    <TactilePressable
-      accessibilityRole="button"
-      accessibilityLabel={`Chat with ${person.displayName}`}
-      onPress={handlePress}
-      className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-sm shadow-black/5"
-    >
-      <View className="relative">
-        <Avatar alt={person.displayName} className="size-11">
-          <AvatarFallback className="bg-primary-soft">
-            <Text className="font-sans text-sm font-bold text-primary">
-              {initials(person.displayName)}
-            </Text>
-          </AvatarFallback>
-        </Avatar>
-        {person.isOnline ? (
-          <View
-            accessibilityLabel="Online"
-            className="absolute bottom-0 right-0 size-3 rounded-full border-2 border-surface bg-success"
-          />
-        ) : null}
-      </View>
-
-      <View className="min-w-0 flex-1">
-        <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
-          {person.displayName}
-        </Text>
-        <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
-          {person.lastActiveLabel ?? (person.isOnline ? "Active now" : "Offline")}
-        </Text>
-      </View>
-
-      <View
-        className={`rounded-full px-2.5 py-0.5 ${
-          person.role === "admin"
-            ? "bg-primary-soft"
-            : person.role === "agent"
-              ? "bg-success/15"
-              : "bg-line/80"
-        }`}
+    <Animated.View entering={listItemEnter(!!reduceMotion, index)}>
+      <TactilePressable
+        accessibilityRole="button"
+        accessibilityLabel={`Chat with ${person.displayName}`}
+        onPress={handlePress}
+        className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-sm shadow-black/5"
       >
-        <Text
-          className={`font-sans text-xs font-bold uppercase tracking-wider ${
+        <View className="relative">
+          <Avatar alt={person.displayName} className="size-11">
+            <AvatarFallback className="bg-primary-soft">
+              <Text className="font-sans text-sm font-bold text-primary">
+                {initials(person.displayName)}
+              </Text>
+            </AvatarFallback>
+          </Avatar>
+          {person.isOnline ? (
+            <PresenceDot className="absolute bottom-0 right-0 size-3 border-2 border-surface" />
+          ) : null}
+        </View>
+
+        <View className="min-w-0 flex-1">
+          <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+            {person.displayName}
+          </Text>
+          <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
+            {person.lastActiveLabel ?? (person.isOnline ? "Active now" : "Offline")}
+          </Text>
+        </View>
+
+        <View
+          className={`rounded-full px-2.5 py-0.5 ${
             person.role === "admin"
-              ? "text-primary"
+              ? "bg-primary-soft"
               : person.role === "agent"
-                ? "text-success"
-                : "text-muted"
+                ? "bg-success/15"
+                : "bg-line/80"
           }`}
         >
-          {person.role}
-        </Text>
-      </View>
-    </TactilePressable>
+          <Text
+            className={`font-sans text-xs font-bold uppercase tracking-wider ${
+              person.role === "admin"
+                ? "text-primary"
+                : person.role === "agent"
+                  ? "text-success"
+                  : "text-muted"
+            }`}
+          >
+            {person.role}
+          </Text>
+        </View>
+      </TactilePressable>
+    </Animated.View>
   );
 });
 
@@ -166,8 +188,8 @@ function NewChatSheet({
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: Person }) => (
-      <ContactPickerRow person={item} onSelect={handleSelect} />
+    ({ item, index }: { item: Person; index: number }) => (
+      <ContactPickerRow person={item} onSelect={handleSelect} index={index} />
     ),
     [handleSelect],
   );
@@ -225,14 +247,7 @@ function NewChatSheet({
         ItemSeparatorComponent={ContactItemSeparator}
         renderItem={renderItem}
         ListEmptyComponent={
-          <View className="items-center px-4 py-12">
-            <Text className="font-sans text-base font-semibold text-ink">
-              No matching contacts
-            </Text>
-            <Text className="mt-1 text-center font-sans text-sm text-muted">
-              Try searching for a different name or role.
-            </Text>
-          </View>
+          <EmptyContacts />
         }
       />
     </View>

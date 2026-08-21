@@ -1,31 +1,63 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  Dimensions,
   Keyboard,
   Platform,
   TextInput,
+  View,
   type KeyboardEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ScrollView,
 } from "react-native";
+import Constants, { AppOwnership } from "expo-constants";
 
 /** Gap left between a focused field and the top of the keyboard. */
 export const FOCUS_REVEAL_MARGIN = 16;
 
 /**
- * How far the keyboard overlaps the app's laid-out content, in dp.
- *
- * `endCoordinates.height` is the correct number on both platforms, and the
- * only one that survives Android edge-to-edge:
- *
- * - Android reports `imeInsets.bottom - systemBarInsets.bottom`, and
- *   MainActivity already pads `android.R.id.content` by the system bars — so
- *   what is left is exactly the overlap with the React root.
- * - iOS reports the keyboard height measured from the bottom of the screen,
- *   and the React root fills the screen — again the exact overlap.
+ * Expo Go still honors `softwareKeyboardLayoutMode: "resize"` (and/or applies
+ * IME window insets). Our edge-to-edge MainActivity does not — so JS must lift
+ * the composer only outside Expo Go. Using StoreClient would also hit
+ * expo-dev-client builds that ship our plugin; `appOwnership === expo` is Go only.
  */
-export function keyboardOverlap(event: KeyboardEvent | null | undefined): number {
-  return Math.max(0, event?.endCoordinates?.height ?? 0);
+export function hostResizesForKeyboard(): boolean {
+  return (
+    Platform.OS === "android" && Constants.appOwnership === AppOwnership.Expo
+  );
+}
+
+/**
+ * Residual overlap after any host resize/IME pad.
+ * `contentBottomInWindow` from `measureInWindow`; `keyboardTop` from
+ * `endCoordinates.screenY`. Cap by reported height so a coordinate mismatch
+ * cannot invent a pad larger than the IME.
+ */
+export function residualKeyboardOverlap(
+  contentBottomInWindow: number,
+  keyboardTop: number,
+  reportedHeight: number,
+): number {
+  const height = Math.max(0, reportedHeight);
+  const geometric = Math.max(0, contentBottomInWindow - keyboardTop);
+  return Math.min(height, geometric);
+}
+
+/**
+ * How far the keyboard overlaps laid-out content, in dp.
+ *
+ * Prefer residual geometry when a content bottom is supplied. Raw height alone
+ * double-pads any host that already resized or IME-padded the window (Expo Go).
+ */
+export function keyboardOverlap(
+  event: KeyboardEvent | null | undefined,
+  contentBottomInWindow?: number,
+): number {
+  const coords = event?.endCoordinates;
+  if (!coords) return 0;
+  const height = Math.max(0, coords.height);
+  if (contentBottomInWindow == null) return height;
+  return residualKeyboardOverlap(contentBottomInWindow, coords.screenY, height);
 }
 
 /** How far to scroll so `inputBottom` clears `viewportBottom`. */
@@ -37,24 +69,65 @@ export function revealScrollDelta(
   return Math.max(0, inputBottom + margin - viewportBottom);
 }
 
+function readOverlapFromEvent(
+  event: KeyboardEvent,
+  contentRef: React.RefObject<View | null> | undefined,
+  apply: (next: number) => void,
+) {
+  if (hostResizesForKeyboard()) {
+    apply(0);
+    return;
+  }
+
+  const node = contentRef?.current;
+  const fallback = () => {
+    const windowH = Dimensions.get("window").height;
+    apply(
+      residualKeyboardOverlap(
+        windowH,
+        event.endCoordinates.screenY,
+        event.endCoordinates.height,
+      ),
+    );
+  };
+
+  if (!node) {
+    fallback();
+    return;
+  }
+
+  node.measureInWindow((_x, y, _w, h) => {
+    apply(keyboardOverlap(event, y + h));
+  });
+}
+
 /**
  * Keyboard overlap as a live value.
  *
+ * Pass `contentRef` to the view that fills the area above the IME *before*
+ * this inset is applied (same node may receive `paddingBottom` — measure runs
+ * while inset is still 0). Expo Go skips the lift entirely.
+ *
  * `KeyboardAvoidingView` cannot do this job here: it subtracts
- * `keyboardFrame.screenY` (window coordinates) from its own `onLayout` frame,
- * which is *parent*-relative. Under edge-to-edge the React root starts below
- * the status bar, so the two coordinate spaces disagree and the view settles a
- * status-bar height too low — the chat composer and the password field ended
- * up clipped by the keyboard for exactly that reason. And with `behavior`
- * unset (what the forms used on Android) it does nothing at all.
+ * `keyboardFrame.screenY` from a parent-relative `onLayout` frame under
+ * edge-to-edge and settles a status-bar height too low.
  */
-export function useKeyboardInset(): number {
-  const [inset, setInset] = useState(() => keyboardOverlap(null));
+export function useKeyboardInset(
+  contentRef?: React.RefObject<View | null>,
+): number {
+  const [inset, setInset] = useState(0);
 
   useEffect(() => {
-    const onShow = (event: KeyboardEvent) => setInset(keyboardOverlap(event));
+    const onShow = (event: KeyboardEvent) => {
+      // Two frames: Expo Go / resize hosts finish window layout first.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          readOverlapFromEvent(event, contentRef, setInset);
+        });
+      });
+    };
     const onHide = () => setInset(0);
-    // iOS fires `will*` ahead of the animation; Android only has `did*`.
+
     const subs =
       Platform.OS === "ios"
         ? [
@@ -66,7 +139,7 @@ export function useKeyboardInset(): number {
             Keyboard.addListener("keyboardDidHide", onHide),
           ];
     return () => subs.forEach((sub) => sub.remove());
-  }, []);
+  }, [contentRef]);
 
   return inset;
 }
@@ -85,6 +158,7 @@ export function useKeyboardInset(): number {
  */
 export function useKeyboardAwareScroll(): {
   keyboardInset: number;
+  contentRef: React.RefObject<View | null>;
   scrollProps: {
     ref: React.RefObject<ScrollView | null>;
     onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
@@ -92,8 +166,10 @@ export function useKeyboardAwareScroll(): {
     scrollEventThrottle: number;
   };
 } {
-  const inset = useKeyboardInset();
-  const keyboardInset = Platform.OS === "android" ? inset : 0;
+  const contentRef = useRef<View | null>(null);
+  const inset = useKeyboardInset(contentRef);
+  const keyboardInset =
+    Platform.OS === "android" && !hostResizesForKeyboard() ? inset : 0;
   const ref = useRef<ScrollView | null>(null);
   const offset = useRef(0);
   const pendingReveal = useRef(false);
@@ -105,14 +181,10 @@ export function useKeyboardAwareScroll(): {
     [],
   );
 
-  // Layout, not passive: the flag has to be set before the shrink's onLayout
-  // can come back from native, or the reveal is skipped.
   useLayoutEffect(() => {
     if (keyboardInset > 0) pendingReveal.current = true;
   }, [keyboardInset]);
 
-  // The shrink arrives as a layout change on the scroll view, so this is the
-  // first moment both it and the focused field measure at their final frames.
   const onLayout = useCallback(() => {
     if (!pendingReveal.current) return;
     pendingReveal.current = false;
@@ -136,6 +208,7 @@ export function useKeyboardAwareScroll(): {
 
   return {
     keyboardInset,
+    contentRef,
     scrollProps: { ref, onScroll, onLayout, scrollEventThrottle: 16 },
   };
 }

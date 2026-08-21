@@ -1,12 +1,12 @@
 import { ChevronDown, ChevronUp } from "@/components/icons";
 import { memo, useCallback } from "react";
 import { View } from "react-native";
-import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
-import { enteringAnimation } from "@/lib/reduced-motion";
+import { settleEnter } from "@/lib/motion-enter";
 import { colors } from "@/lib/tokens";
 import type { FaqItem } from "@/lib/types";
 
@@ -53,12 +53,7 @@ export const FaqRow = memo(function FaqRow({
         )}
       </View>
       {open ? (
-        <Animated.View
-          entering={enteringAnimation(
-            reduceMotion,
-            FadeIn.springify().damping(20).stiffness(220),
-          )}
-        >
+        <Animated.View entering={settleEnter(!!reduceMotion)}>
           <Text
             className={cn(
               "mt-2.5 border-t border-line/60 pt-2.5 font-sans text-sm font-normal text-ink-soft",
