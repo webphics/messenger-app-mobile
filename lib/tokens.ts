@@ -52,9 +52,12 @@ export const tabChrome = {
   ...headerChrome,
   tabBarActiveTintColor: colors.primary,
   tabBarInactiveTintColor: colors.muted,
+  // Floating capsule owns chrome; keep the host bar invisible.
   tabBarStyle: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.line,
+    backgroundColor: "transparent",
+    borderTopWidth: 0,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   sceneStyle: { backgroundColor: colors.bg },
 } as const;

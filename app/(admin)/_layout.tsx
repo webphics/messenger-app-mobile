@@ -1,11 +1,15 @@
 import { Tabs } from "expo-router";
 import { House, Inbox, MessageCircle, Users } from "@/components/icons";
+import { FloatingTabBar } from "@/components/nav/floating-tab-bar";
 
 import { tabChrome } from "@/lib/tokens";
 
 export default function AdminLayout() {
   return (
-    <Tabs screenOptions={tabChrome}>
+    <Tabs
+      screenOptions={tabChrome}
+      tabBar={(props) => <FloatingTabBar {...props} />}
+    >
       <Tabs.Screen
         name="(home)"
         options={{
