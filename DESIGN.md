@@ -287,6 +287,15 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 ### Settings
 - Active role pill shows `hubEyebrow` labels (SUPPORT / AGENT / ADMIN), not raw `session.role` strings.
 
+### Motion
+**Thesis: settle onto the Clear Desk.** Tokens in `lib/motion.ts`; recipes in `lib/motion-enter.ts`.
+- **Focal:** outbound bubble desk spring (scale + opacity; no Y on inverted lists).
+- **Continuity:** hub/settings `settleDownEnter`; lists capped `listItemEnter`.
+- **Feedback:** press spring; tray/pop for reactions, unread, role check; send button readiness scale.
+- **Overlay:** sheets, tab indicator, and swipe snap-back share `motion.springs.overlay`.
+- **Presence:** optional breathe on hub live dots only — never inside long FlatLists.
+- Transform/opacity only; honor reduced motion at every call site.
+
 ## Do's and Don'ts
 
 ### Do:

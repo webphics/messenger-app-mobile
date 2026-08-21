@@ -1,6 +1,6 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
-import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import {
   BookOpen,
@@ -17,6 +17,7 @@ import { HubScroll } from "@/components/hub/hub-scroll";
 import { IconChip } from "@/components/hub/icon-chip";
 import { Pill } from "@/components/hub/pill";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
+import { PresenceDot } from "@/components/ui/presence-dot";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { firstName } from "@/lib/display";
@@ -28,7 +29,7 @@ import {
 import { getDevUser } from "@/lib/dev-user";
 import { knowledgeListHref } from "@/lib/hub-routes";
 import { CONVERSATIONS } from "@/lib/mock-data";
-import { enteringAnimation } from "@/lib/reduced-motion";
+import { settleDownEnter } from "@/lib/motion-enter";
 import { getSession } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
@@ -44,26 +45,23 @@ export function AgentHub() {
       <View className="px-4">
         <HubHeader settingsHref={"/(agent)/settings" as Href} />
 
-        <View className="mt-5">
-          <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+          <Text className="mt-5 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
           <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
             {hubGreeting(me.role, firstName(me.displayName))}
           </Text>
-        </View>
+        </Animated.View>
 
         {/* Live Queue Overview Card */}
         <Animated.View
-          entering={enteringAnimation(
-            reduceMotion,
-            FadeInDown.springify().damping(18).stiffness(180).delay(20),
-          )}
+          entering={settleDownEnter(!!reduceMotion, 20)}
           className="mt-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
             <View className="flex-row items-center gap-2">
-              <View className="size-2 rounded-full bg-success" />
+              <PresenceDot breathe className="size-2" />
               <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-ink-soft">
                 Live Queue Status
               </Text>
@@ -89,10 +87,7 @@ export function AgentHub() {
 
         {/* Quick Actions */}
         <Animated.View
-          entering={enteringAnimation(
-            reduceMotion,
-            FadeInDown.springify().damping(18).stiffness(180).delay(60),
-          )}
+          entering={settleDownEnter(!!reduceMotion, 60)}
           className="mt-4 flex-row gap-3"
         >
           <ActionTile
@@ -122,18 +117,20 @@ export function AgentHub() {
         ) : null}
 
         {/* Search Knowledge Trigger */}
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Search knowledge"
-          onPress={() => router.push("/(agent)/search" as Href)}
-          className="mt-4 flex-row items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
-        >
-          <IconChip icon={Search} tone="neutral" size={32} />
-          <Text className="flex-1 font-sans text-sm font-normal text-muted">
-            Search knowledge articles…
-          </Text>
-          <Sparkles color={colors.muted} size={16} />
-        </TactilePressable>
+        <Animated.View entering={settleDownEnter(!!reduceMotion, 100)}>
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel="Search knowledge"
+            onPress={() => router.push("/(agent)/search" as Href)}
+            className="mt-4 flex-row items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
+          >
+            <IconChip icon={Search} tone="neutral" size={32} />
+            <Text className="flex-1 font-sans text-sm font-normal text-muted">
+              Search knowledge articles…
+            </Text>
+            <Sparkles color={colors.muted} size={16} />
+          </TactilePressable>
+        </Animated.View>
 
         {/* Unassigned Pool Row Card */}
         <ActionRow

@@ -8,6 +8,10 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { PEOPLE } from "@/lib/mock-data";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { filterUsers, type UserRoleChip } from "@/lib/user-filter";
 import type { Person } from "@/lib/types";
@@ -32,11 +36,15 @@ export function UsersScreen() {
   const [chip, setChip] = useState<UserRoleChip>("all");
   const [onlineOnly, setOnlineOnly] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [epoch, setEpoch] = useState(0);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+    setEpoch((n) => n + 1);
+  });
 
-  const visible = useMemo(
-    () => filterUsers(PEOPLE, query, chip, onlineOnly),
-    [query, chip, onlineOnly],
-  );
+  const visible = useMemo(() => {
+    void epoch;
+    return filterUsers(PEOPLE, query, chip, onlineOnly);
+  }, [query, chip, onlineOnly, epoch]);
   const onlineCount = PEOPLE.filter((p) => p.isOnline).length;
 
   const toggleOpen = useCallback((personId: string) => {
@@ -44,8 +52,13 @@ export function UsersScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item }: { item: Person }) => (
-      <UserRow person={item} open={item.id === openId} onPress={toggleOpen} />
+    ({ item, index }: { item: Person; index: number }) => (
+      <UserRow
+        person={item}
+        open={item.id === openId}
+        onPress={toggleOpen}
+        index={index}
+      />
     ),
     [openId, toggleOpen],
   );
@@ -147,6 +160,7 @@ export function UsersScreen() {
             </Text>
           </View>
         }
+        refreshControl={makeRefreshControl(refreshing, onRefresh)}
       />
     </View>
   );

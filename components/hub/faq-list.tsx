@@ -4,6 +4,10 @@ import { FlatList, View } from "react-native";
 
 import { FaqRow } from "@/components/hub/faq-row";
 import { listFaqs } from "@/lib/mock-catalog";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import type { FaqItem } from "@/lib/types";
 
 function keyExtractor(item: FaqItem) {
@@ -17,6 +21,13 @@ function FaqSeparator() {
 export function FaqList() {
   const [items, setItems] = useState<FaqItem[]>(listFaqs);
   const [openId, setOpenId] = useState<string | null>(listFaqs()[0]?.id ?? null);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+    const next = listFaqs();
+    setItems(next);
+    setOpenId((id) =>
+      id && next.some((item) => item.id === id) ? id : (next[0]?.id ?? null),
+    );
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -50,6 +61,7 @@ export function FaqList() {
       keyExtractor={keyExtractor}
       ItemSeparatorComponent={FaqSeparator}
       renderItem={renderItem}
+      refreshControl={makeRefreshControl(refreshing, onRefresh)}
     />
   );
 }

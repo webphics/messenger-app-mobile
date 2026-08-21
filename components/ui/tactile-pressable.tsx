@@ -8,19 +8,15 @@ import {
 } from "react-native";
 import Animated, {
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 
 import { hapticLight, hapticMedium, hapticSelection } from "@/lib/haptics";
+import { motion } from "@/lib/motion";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-const SPRING_CONFIG = {
-  damping: 18,
-  stiffness: 380,
-  mass: 0.45,
-};
 
 export type TactilePressableProps = Omit<PressableProps, "style"> & {
   activeScale?: number;
@@ -45,6 +41,7 @@ export const TactilePressable = React.forwardRef<
   },
   ref,
 ) {
+  const reduceMotion = useReducedMotion();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -53,7 +50,9 @@ export const TactilePressable = React.forwardRef<
 
   const handlePressIn = (e: GestureResponderEvent) => {
     if (!disabled) {
-      scale.value = withSpring(activeScale, SPRING_CONFIG);
+      if (!reduceMotion) {
+        scale.value = withSpring(activeScale, motion.springs.press);
+      }
       if (haptic === "light") hapticLight();
       else if (haptic === "medium") hapticMedium();
       else if (haptic === "selection") hapticSelection();
@@ -62,8 +61,8 @@ export const TactilePressable = React.forwardRef<
   };
 
   const handlePressOut = (e: GestureResponderEvent) => {
-    if (!disabled) {
-      scale.value = withSpring(1, SPRING_CONFIG);
+    if (!disabled && !reduceMotion) {
+      scale.value = withSpring(1, motion.springs.press);
     }
     onPressOut?.(e);
   };

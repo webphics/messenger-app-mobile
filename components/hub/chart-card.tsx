@@ -1,12 +1,13 @@
 import { View } from "react-native";
-import Animated, { FadeInRight, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { MetricChart } from "@/components/hub/metric-chart";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
+import { staggerDelay } from "@/lib/motion";
+import { settleRightEnter } from "@/lib/motion-enter";
 import { CARD_MIN_HEIGHT } from "@/lib/offer-metrics";
-import { enteringAnimation } from "@/lib/reduced-motion";
 import type { ChartMetric } from "@/lib/types";
 
 const PLOT_HEIGHT = 64;
@@ -26,10 +27,7 @@ export function ChartCard({ chart, cardWidth, index, onPress }: ChartCardProps) 
 
   return (
     <Animated.View
-      entering={enteringAnimation(
-        reduceMotion,
-        FadeInRight.springify().damping(18).stiffness(180).delay(index * 80),
-      )}
+      entering={settleRightEnter(!!reduceMotion, staggerDelay(index))}
       style={{ width: cardWidth }}
     >
       <TactilePressable

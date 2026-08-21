@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { LogOut, Trash2 } from "@/components/icons";
 import { Alert, ScrollView, View } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { RoleSwitch } from "@/components/settings/role-switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -9,12 +10,19 @@ import { Text } from "@/components/ui/text";
 import { getDevUser } from "@/lib/dev-user";
 import { initials } from "@/lib/display";
 import { hubEyebrow } from "@/lib/hub-chrome";
+import { settleDownEnter } from "@/lib/motion-enter";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { getSession, signOutSession } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
 export function SettingsScreen() {
   const me = getDevUser();
   const session = getSession();
+  const reduceMotion = useReducedMotion();
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
 
   function handleDeleteAccount() {
     Alert.alert(
@@ -39,9 +47,12 @@ export function SettingsScreen() {
     <ScrollView
       className="flex-1 bg-bg px-4 pt-4"
       showsVerticalScrollIndicator={false}
+      refreshControl={makeRefreshControl(refreshing, onRefresh)}
     >
-      {/* Current User Card */}
-      <View className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5">
+      <Animated.View
+        entering={settleDownEnter(!!reduceMotion)}
+        className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+      >
         <Avatar alt={me.displayName} className="size-14">
           <AvatarFallback className="bg-primary-soft">
             <Text className="font-sans text-lg font-bold text-primary">
@@ -63,15 +74,19 @@ export function SettingsScreen() {
             </Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
 
-      {/* Role Switcher */}
-      <View className="mt-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5">
+      <Animated.View
+        entering={settleDownEnter(!!reduceMotion, 40)}
+        className="mt-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+      >
         <RoleSwitch />
-      </View>
+      </Animated.View>
 
-      {/* App Info & Sign Out */}
-      <View className="my-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5">
+      <Animated.View
+        entering={settleDownEnter(!!reduceMotion, 80)}
+        className="my-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+      >
         <View className="mb-4 flex-row items-center justify-between border-b border-line/60 pb-3">
           <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
             Application
@@ -99,10 +114,10 @@ export function SettingsScreen() {
           className="mt-2.5 min-h-11"
           onPress={handleDeleteAccount}
         >
-          <Trash2 color={colors.muted} size={16} />
-          <Text className="text-muted text-xs font-semibold">Delete Account & Data</Text>
+          <Trash2 color={colors.danger} size={16} />
+          <Text className="text-danger">Delete Account</Text>
         </Button>
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 }

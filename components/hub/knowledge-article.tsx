@@ -6,6 +6,10 @@ import { ScrollView, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { hapticSuccess } from "@/lib/haptics";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { KnowledgeArticle } from "@/lib/types";
 
@@ -15,6 +19,7 @@ type KnowledgeArticleViewProps = {
 
 export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
   const [copied, setCopied] = useState(false);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
 
   async function onCopy() {
     await Clipboard.setStringAsync(article.body);
@@ -28,6 +33,7 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
       className="flex-1 bg-bg"
       showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
+      refreshControl={makeRefreshControl(refreshing, onRefresh)}
     >
       <View className="rounded-3xl border border-line bg-surface p-5 shadow-md shadow-black/5">
         <Text className="font-sans text-2xl font-bold leading-tight text-ink">

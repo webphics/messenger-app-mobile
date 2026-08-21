@@ -9,6 +9,10 @@ import { InScreenHeader } from "@/components/in-screen-header";
 import { Text } from "@/components/ui/text";
 import { filterFaq } from "@/lib/faq-filter";
 import { listFaqs } from "@/lib/mock-catalog";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { FaqItem } from "@/lib/types";
 
@@ -22,6 +26,9 @@ export function HelpSearchScreen() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [faqs, setFaqs] = useState<FaqItem[]>(listFaqs);
   const results = useMemo(() => filterFaq(faqs, query), [faqs, query]);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+    setFaqs(listFaqs());
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -90,6 +97,7 @@ export function HelpSearchScreen() {
           )
         }
         renderItem={renderItem}
+        refreshControl={makeRefreshControl(refreshing, onRefresh)}
       />
     </View>
   );

@@ -1,11 +1,13 @@
 import { router } from "expo-router";
 import { Check, Headphones, ShieldCheck, User } from "@/components/icons";
 import { View } from "react-native";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { ROLE_HREF } from "@/lib/hub-routes";
+import { popEnter } from "@/lib/motion-enter";
 import { getSession, setSessionRole } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 import type { UserRole } from "@/lib/types";
@@ -38,6 +40,7 @@ const ROLES: {
 
 export function RoleSwitch() {
   const selected = getSession().role;
+  const reduceMotion = useReducedMotion();
 
   return (
     <View className="mt-2 gap-2.5">
@@ -95,9 +98,12 @@ export function RoleSwitch() {
             </View>
 
             {active ? (
-              <View className="size-6 items-center justify-center rounded-full bg-primary">
+              <Animated.View
+                entering={popEnter(!!reduceMotion)}
+                className="size-6 items-center justify-center rounded-full bg-primary"
+              >
                 <Check color={colors.primaryForeground} size={14} />
-              </View>
+              </Animated.View>
             ) : null}
           </TactilePressable>
         );

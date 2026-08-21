@@ -10,6 +10,10 @@ import {
 } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
 import { Text } from "@/components/ui/text";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 
 const LINKS: {
@@ -43,11 +47,14 @@ const LINKS: {
 ];
 
 export function HelpHome() {
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
+
   return (
     <ScrollView
       className="flex-1 bg-bg"
       showsVerticalScrollIndicator={false}
       contentContainerClassName="px-4 py-4"
+      refreshControl={makeRefreshControl(refreshing, onRefresh)}
     >
       <View className="flex-row items-center gap-2.5 rounded-2xl bg-primary-soft/60 p-3.5 border border-primary-soft">
         <Clock color={colors.primary} size={18} />

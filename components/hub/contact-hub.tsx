@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { View } from "react-native";
-import Animated, { FadeInDown, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { HelpCircle, MessageCircle, Search } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
@@ -17,7 +17,7 @@ import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { latestInboxThread } from "@/lib/inbox-filter";
 import { getDevUser } from "@/lib/dev-user";
 import { CONVERSATIONS } from "@/lib/mock-data";
-import { enteringAnimation } from "@/lib/reduced-motion";
+import { settleDownEnter } from "@/lib/motion-enter";
 import { getSession } from "@/lib/session";
 
 export function ContactHub() {
@@ -30,20 +30,17 @@ export function ContactHub() {
       <View className="px-4">
         <HubHeader settingsHref="/(contact)/settings" />
 
-        <View className="mt-5">
-          <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+          <Text className="mt-5 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
           <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
             {hubGreeting(me.role, firstName(me.displayName))}
           </Text>
-        </View>
+        </Animated.View>
 
         <Animated.View
-          entering={enteringAnimation(
-            reduceMotion,
-            FadeInDown.springify().damping(18).stiffness(180).delay(40),
-          )}
+          entering={settleDownEnter(!!reduceMotion, 40)}
           className="mt-4 flex-row gap-3"
         >
           <ActionTile
@@ -69,17 +66,19 @@ export function ContactHub() {
           </View>
         ) : null}
 
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Search for help"
-          onPress={() => router.push("/(contact)/search")}
-          className="mt-4 flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
-        >
-          <IconChip icon={Search} tone="neutral" size={32} />
-          <Text className="font-sans text-sm font-normal text-muted">
-            Search for help & answers…
-          </Text>
-        </TactilePressable>
+        <Animated.View entering={settleDownEnter(!!reduceMotion, 80)}>
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel="Search for help"
+            onPress={() => router.push("/(contact)/search")}
+            className="mt-4 flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
+          >
+            <IconChip icon={Search} tone="neutral" size={32} />
+            <Text className="font-sans text-sm font-normal text-muted">
+              Search for help & answers…
+            </Text>
+          </TactilePressable>
+        </Animated.View>
       </View>
 
       <OffersCarousel />

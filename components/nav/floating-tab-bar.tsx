@@ -14,6 +14,7 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { cn } from "@/lib/cn";
 import { getDevUser } from "@/lib/dev-user";
 import { CONVERSATIONS } from "@/lib/mock-data";
+import { motion } from "@/lib/motion";
 import {
   conversationsTabBadge,
   unassignedTabBadge,
@@ -26,12 +27,6 @@ type FloatingTabBarProps = Parameters<
 
 /** Matches capsule `px-1.5` — indicator lives in the padded content box. */
 const CAPSULE_PAD = 6;
-
-const INDICATOR_SPRING = {
-  damping: 22,
-  stiffness: 320,
-  mass: 0.55,
-};
 
 function labelFor(
   options: FloatingTabBarProps["descriptors"][string]["options"],
@@ -82,7 +77,7 @@ export function FloatingTabBar({
       activeIndex.value = state.index;
       return;
     }
-    activeIndex.value = withSpring(state.index, INDICATOR_SPRING);
+    activeIndex.value = withSpring(state.index, motion.springs.overlay);
   }, [state.index, reduceMotion, activeIndex]);
 
   const onCapsuleLayout = (e: LayoutChangeEvent) => {

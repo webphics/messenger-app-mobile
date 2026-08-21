@@ -7,6 +7,10 @@ import { KnowledgeRow } from "@/components/hub/knowledge-row";
 import { Text } from "@/components/ui/text";
 import { knowledgeHref } from "@/lib/hub-routes";
 import { listKnowledge } from "@/lib/mock-catalog";
+import {
+  makeRefreshControl,
+  useSimulatedRefresh,
+} from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { KnowledgeArticle } from "@/lib/types";
 
@@ -24,6 +28,9 @@ function KnowledgeItemSeparator() {
 
 export function KnowledgeList({ group }: KnowledgeListProps) {
   const [items, setItems] = useState<KnowledgeArticle[]>(listKnowledge);
+  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+    setItems(listKnowledge());
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -39,8 +46,8 @@ export function KnowledgeList({ group }: KnowledgeListProps) {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: KnowledgeArticle }) => (
-      <KnowledgeRow article={item} onPress={openArticle} />
+    ({ item, index }: { item: KnowledgeArticle; index: number }) => (
+      <KnowledgeRow article={item} onPress={openArticle} index={index} />
     ),
     [openArticle],
   );
@@ -70,6 +77,7 @@ export function KnowledgeList({ group }: KnowledgeListProps) {
         </View>
       }
       renderItem={renderItem}
+      refreshControl={makeRefreshControl(refreshing, onRefresh)}
     />
   );
 }

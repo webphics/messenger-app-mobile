@@ -31,6 +31,7 @@ import {
   type AttachmentOutcome,
 } from "@/lib/attachments";
 import { hapticLight, hapticSelection } from "@/lib/haptics";
+import { motion } from "@/lib/motion";
 import { colors, screenBottomPad } from "@/lib/tokens";
 
 type AttachmentSheetProps = {
@@ -143,9 +144,9 @@ export function AttachmentSheet({
       translateY.setValue(400);
       Animated.spring(translateY, {
         toValue: 0,
-        damping: 24,
-        stiffness: 280,
-        mass: 0.7,
+        damping: motion.springs.overlay.damping,
+        stiffness: motion.springs.overlay.stiffness,
+        mass: motion.springs.overlay.mass,
         useNativeDriver: true,
       }).start();
     }
@@ -154,7 +155,7 @@ export function AttachmentSheet({
   function dismiss() {
     Animated.timing(translateY, {
       toValue: 400,
-      duration: 160,
+      duration: motion.durations.overlay,
       useNativeDriver: true,
     }).start(() => {
       onClose();
@@ -222,9 +223,9 @@ export function AttachmentSheet({
         } else {
           Animated.spring(translateY, {
             toValue: 0,
-            damping: 22,
-            stiffness: 320,
-            mass: 0.6,
+            damping: motion.springs.overlay.damping,
+            stiffness: motion.springs.overlay.stiffness,
+            mass: motion.springs.overlay.mass,
             useNativeDriver: true,
           }).start();
         }
@@ -232,9 +233,9 @@ export function AttachmentSheet({
       onPanResponderTerminate: () => {
         Animated.spring(translateY, {
           toValue: 0,
-          damping: 22,
-          stiffness: 320,
-          mass: 0.6,
+          damping: motion.springs.overlay.damping,
+          stiffness: motion.springs.overlay.stiffness,
+          mass: motion.springs.overlay.mass,
           useNativeDriver: true,
         }).start();
       },
@@ -266,9 +267,9 @@ export function AttachmentSheet({
         } else {
           Animated.spring(translateY, {
             toValue: 0,
-            damping: 22,
-            stiffness: 320,
-            mass: 0.6,
+            damping: motion.springs.overlay.damping,
+            stiffness: motion.springs.overlay.stiffness,
+            mass: motion.springs.overlay.mass,
             useNativeDriver: true,
           }).start();
         }
@@ -276,9 +277,9 @@ export function AttachmentSheet({
       onPanResponderTerminate: () => {
         Animated.spring(translateY, {
           toValue: 0,
-          damping: 22,
-          stiffness: 320,
-          mass: 0.6,
+          damping: motion.springs.overlay.damping,
+          stiffness: motion.springs.overlay.stiffness,
+          mass: motion.springs.overlay.mass,
           useNativeDriver: true,
         }).start();
       },

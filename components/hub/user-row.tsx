@@ -3,15 +3,16 @@ import { router } from "expo-router";
 import { Check, ChevronDown, ChevronUp, Copy, Mail, MessageCircle } from "@/components/icons";
 import { memo, useCallback, useState } from "react";
 import { View } from "react-native";
-import Animated, { FadeIn, useReducedMotion } from "react-native-reanimated";
+import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PresenceDot } from "@/components/ui/presence-dot";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { initials } from "@/lib/display";
 import { hapticSuccess } from "@/lib/haptics";
 import { CONVERSATIONS } from "@/lib/mock-data";
-import { enteringAnimation } from "@/lib/reduced-motion";
+import { listItemEnter, settleEnter } from "@/lib/motion-enter";
 import { colors } from "@/lib/tokens";
 import { mockEmail } from "@/lib/user-filter";
 import type { Person } from "@/lib/types";
@@ -26,9 +27,15 @@ type UserRowProps = {
   person: Person;
   open: boolean;
   onPress: (personId: string) => void;
+  index?: number;
 };
 
-export const UserRow = memo(function UserRow({ person, open, onPress }: UserRowProps) {
+export const UserRow = memo(function UserRow({
+  person,
+  open,
+  onPress,
+  index = 0,
+}: UserRowProps) {
   const reduceMotion = useReducedMotion();
   const [copied, setCopied] = useState(false);
   const email = mockEmail(person.displayName);
@@ -56,29 +63,27 @@ export const UserRow = memo(function UserRow({ person, open, onPress }: UserRowP
   }
 
   return (
-    <TactilePressable
-      accessibilityRole="button"
-      accessibilityLabel={person.displayName}
-      accessibilityState={{ expanded: open }}
-      onPress={handlePress}
-      className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
-    >
-      <View className="flex-row items-center gap-3.5">
-        <View className="relative">
-          <Avatar alt={person.displayName} className="size-13">
-            <AvatarFallback className="bg-primary-soft">
-              <Text className="font-sans text-base font-bold text-primary">
-                {initials(person.displayName)}
-              </Text>
-            </AvatarFallback>
-          </Avatar>
-          {person.isOnline ? (
-            <View
-              accessibilityLabel="Online"
-              className="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-surface bg-success"
-            />
-          ) : null}
-        </View>
+    <Animated.View entering={listItemEnter(!!reduceMotion, index)}>
+      <TactilePressable
+        accessibilityRole="button"
+        accessibilityLabel={person.displayName}
+        accessibilityState={{ expanded: open }}
+        onPress={handlePress}
+        className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+      >
+        <View className="flex-row items-center gap-3.5">
+          <View className="relative">
+            <Avatar alt={person.displayName} className="size-13">
+              <AvatarFallback className="bg-primary-soft">
+                <Text className="font-sans text-base font-bold text-primary">
+                  {initials(person.displayName)}
+                </Text>
+              </AvatarFallback>
+            </Avatar>
+            {person.isOnline ? (
+              <PresenceDot className="absolute bottom-0 right-0 size-3.5 border-2 border-surface" />
+            ) : null}
+          </View>
 
         <View className="min-w-0 flex-1">
           <View className="flex-row items-center gap-2">
@@ -121,10 +126,7 @@ export const UserRow = memo(function UserRow({ person, open, onPress }: UserRowP
 
       {open ? (
         <Animated.View
-          entering={enteringAnimation(
-            reduceMotion,
-            FadeIn.springify().damping(20).stiffness(220),
-          )}
+          entering={settleEnter(!!reduceMotion)}
           className="mt-3.5 border-t border-line/60 pt-3.5"
         >
           <View className="flex-row items-center gap-2">
@@ -166,5 +168,6 @@ export const UserRow = memo(function UserRow({ person, open, onPress }: UserRowP
         </Animated.View>
       ) : null}
     </TactilePressable>
+    </Animated.View>
   );
 });
