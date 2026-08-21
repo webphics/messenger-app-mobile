@@ -113,7 +113,7 @@ const ContactPickerRow = memo(function ContactPickerRow({
         }`}
       >
         <Text
-          className={`font-sans text-[10px] font-bold uppercase tracking-wider ${
+          className={`font-sans text-xs font-bold uppercase tracking-wider ${
             person.role === "admin"
               ? "text-primary"
               : person.role === "agent"

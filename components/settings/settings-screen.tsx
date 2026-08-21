@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { LogOut, Shield, Trash2 } from "@/components/icons";
+import { LogOut, Trash2 } from "@/components/icons";
 import { Alert, ScrollView, View } from "react-native";
 
 import { RoleSwitch } from "@/components/settings/role-switch";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { getDevUser } from "@/lib/dev-user";
 import { initials } from "@/lib/display";
+import { hubEyebrow } from "@/lib/hub-chrome";
 import { getSession, signOutSession } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
@@ -57,8 +58,8 @@ export function SettingsScreen() {
             {session.email || "support@company.internal"}
           </Text>
           <View className="mt-1.5 self-start rounded-full bg-primary-soft px-2.5 py-0.5">
-            <Text className="font-sans text-[10px] font-bold uppercase tracking-wider text-primary">
-              Active: {session.role}
+            <Text className="font-sans text-xs font-bold uppercase tracking-wider text-primary">
+              {hubEyebrow(session.role)}
             </Text>
           </View>
         </View>

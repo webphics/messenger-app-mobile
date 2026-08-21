@@ -45,7 +45,7 @@ export function AgentHub() {
         <HubHeader settingsHref={"/(agent)/settings" as Href} />
 
         <View className="mt-5">
-          <Text className="font-sans text-sm font-semibold uppercase tracking-wider text-muted">
+          <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
           <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
@@ -80,7 +80,6 @@ export function AgentHub() {
             <StatTile
               value={String(unassignedCount)}
               label="Unassigned pool"
-              tone="primary"
               alert={unassignedCount > 0}
               accessibilityLabel="Unassigned tickets"
               onPress={() => router.navigate("/(agent)/unassigned" as Href)}
@@ -100,12 +99,14 @@ export function AgentHub() {
             icon={MessageCircle}
             title="Messages"
             hint="Active chats"
+            tone="neutral"
             onPress={() => router.navigate("/(agent)/conversations" as Href)}
           />
           <ActionTile
             icon={BookOpen}
             title="Knowledge"
             hint="Guides & answers"
+            tone="neutral"
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("agent"))}
           />
@@ -131,7 +132,7 @@ export function AgentHub() {
           <Text className="flex-1 font-sans text-sm font-normal text-muted">
             Search knowledge articles…
           </Text>
-          <Sparkles color={colors.primary} size={16} />
+          <Sparkles color={colors.muted} size={16} />
         </TactilePressable>
 
         {/* Unassigned Pool Row Card */}
@@ -155,6 +156,7 @@ export function AgentHub() {
       <View className="mt-4 px-4">
         <ActionRow
           icon={Headphones}
+          tone="neutral"
           title="Frequently Asked Questions"
           hint="Quick references for common customer issues"
           hintLines={1}

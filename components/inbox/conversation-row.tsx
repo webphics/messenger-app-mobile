@@ -41,8 +41,8 @@ export const ConversationRow = memo(function ConversationRow({
       <View className="relative">
         <Avatar alt={title} className="size-13">
           {isOffers ? (
-            <AvatarFallback className="bg-primary">
-              <Megaphone color={colors.primaryForeground} size={22} />
+            <AvatarFallback className="bg-primary-soft">
+              <Megaphone color={colors.primary} size={22} />
             </AvatarFallback>
           ) : (
             <AvatarFallback className="bg-primary-soft">
@@ -72,7 +72,7 @@ export const ConversationRow = memo(function ConversationRow({
           </Text>
           <Text
             className={`font-sans text-xs ${
-              hasUnread ? "font-semibold text-primary" : "font-normal text-muted"
+              hasUnread ? "font-semibold text-ink-soft" : "font-normal text-muted"
             }`}
           >
             {formatRelativeTime(conversation.updatedAt)}
@@ -89,8 +89,8 @@ export const ConversationRow = memo(function ConversationRow({
       </View>
 
       {hasUnread ? (
-        <View className="min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 shadow-sm shadow-black/10">
-          <Text className="font-sans text-[11px] font-bold text-primary-foreground">
+        <View className="min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5">
+          <Text className="font-sans text-xs font-bold text-primary-foreground">
             {conversation.unreadCount}
           </Text>
         </View>

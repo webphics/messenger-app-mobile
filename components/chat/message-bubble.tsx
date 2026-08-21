@@ -87,7 +87,7 @@ const QuoteChrome = memo(function QuoteChrome({
     <View className={cn("mb-0.5", outgoing ? "items-end" : "items-start")}>
       <View className="mb-0.5 flex-row items-center gap-1 px-1">
         <CornerUpLeft color={colors.muted} size={12} />
-        <Text className="font-sans text-[11px] font-medium text-muted" numberOfLines={1}>
+        <Text className="font-sans text-xs font-medium text-muted" numberOfLines={1}>
           {replyCaption({
             outgoing,
             senderName,
@@ -139,7 +139,7 @@ const ReactionBadge = memo(function ReactionBadge({
           }}
           className="px-0.5 active:opacity-60"
         >
-          <Text className="font-sans text-[13px] leading-4">
+          <Text className="font-sans text-sm leading-4">
             {reaction.emoji}
           </Text>
         </Pressable>
@@ -147,7 +147,7 @@ const ReactionBadge = memo(function ReactionBadge({
       {total > 1 ? (
         <Text
           className={cn(
-            "ml-1 font-sans text-[11px] font-bold",
+            "ml-1 font-sans text-xs font-bold",
             reactions.some((r) => r.userIds.includes(currentUserId))
               ? "text-primary"
               : "text-muted",
@@ -365,7 +365,7 @@ export const MessageBubble = memo(function MessageBubble({
               >
                 <Text
                   className={cn(
-                    "font-sans text-[15px] font-normal leading-5",
+                    "font-sans text-base font-normal leading-5",
                     outgoing ? "text-primary-foreground" : "text-ink",
                   )}
                 >

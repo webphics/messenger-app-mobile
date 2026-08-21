@@ -38,7 +38,7 @@ export const KnowledgeRow = memo(function KnowledgeRow({
           <View className="mt-1 flex-row flex-wrap gap-1.5">
             {article.tags.map((tag) => (
               <View key={tag} className="rounded-md bg-bg px-2 py-0.5 border border-line/60">
-                <Text className="font-sans text-[11px] font-medium text-muted">
+                <Text className="font-sans text-xs font-medium text-muted">
                   #{tag}
                 </Text>
               </View>

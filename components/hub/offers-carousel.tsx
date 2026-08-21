@@ -47,7 +47,7 @@ export function OffersCarousel() {
             Featured Offers
           </Text>
           <View className="rounded-md bg-line/80 px-2 py-0.5">
-            <Text className="font-sans text-[10px] font-bold uppercase tracking-wider text-muted">
+            <Text className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
               Sponsored
             </Text>
           </View>
