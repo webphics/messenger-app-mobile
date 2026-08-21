@@ -38,8 +38,10 @@ export function ChartsSection() {
         onScroll={onScroll}
         showsHorizontalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
+        className="overflow-visible"
         contentContainerStyle={{
-          marginTop: 12,
+          paddingTop: 8,
+          paddingBottom: 14,
           paddingStart: edgePad,
           paddingEnd: edgePad,
           gap,
