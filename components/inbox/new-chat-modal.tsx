@@ -68,10 +68,10 @@ function EmptyContacts() {
       entering={settleEnter(!!reduceMotion)}
       className="items-center px-4 py-12"
     >
-      <Text className="font-sans text-base font-semibold text-ink">
+      <Text variant="title" className="text-ink">
         No matching contacts
       </Text>
-      <Text className="mt-1 text-center font-sans text-sm text-muted">
+      <Text variant="meta" className="mt-1 text-center text-muted">
         Try searching for a different name or role.
       </Text>
     </Animated.View>
@@ -105,7 +105,7 @@ const ContactPickerRow = memo(function ContactPickerRow({
         <View className="relative">
           <Avatar alt={person.displayName} className="size-11">
             <AvatarFallback className="bg-primary-soft">
-              <Text className="font-sans text-sm font-bold text-primary">
+              <Text variant="meta" className="font-bold text-primary">
                 {initials(person.displayName)}
               </Text>
             </AvatarFallback>
@@ -116,10 +116,10 @@ const ContactPickerRow = memo(function ContactPickerRow({
         </View>
 
         <View className="min-w-0 flex-1">
-          <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+          <Text variant="title" className="text-ink" numberOfLines={1}>
             {person.displayName}
           </Text>
-          <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
+          <Text variant="label" className="mt-0.5 font-normal text-muted">
             {person.lastActiveLabel ?? (person.isOnline ? "Active now" : "Offline")}
           </Text>
         </View>
@@ -134,7 +134,8 @@ const ContactPickerRow = memo(function ContactPickerRow({
           }`}
         >
           <Text
-            className={`font-sans text-xs font-bold uppercase tracking-wider ${
+            variant="label"
+            className={`font-bold uppercase tracking-wider ${
               person.role === "admin"
                 ? "text-primary"
                 : person.role === "agent"
@@ -205,7 +206,7 @@ function NewChatSheet({
           <View className="size-8 items-center justify-center rounded-full bg-primary-soft">
             <MessageSquare color={colors.primary} size={18} />
           </View>
-          <Text className="font-sans text-lg font-bold text-ink">
+          <Text variant="headline" className="text-ink">
             New Message
           </Text>
         </View>

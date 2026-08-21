@@ -30,7 +30,7 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
           className="size-9 rounded-xl shadow-sm shadow-black/10"
           resizeMode="cover"
         />
-        <Text className="font-sans text-xl font-extrabold tracking-tight text-ink">
+        <Text variant="headline" className="text-ink">
           Enki
         </Text>
       </View>
@@ -47,7 +47,7 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
                 style={{ marginLeft: i === 0 ? 0 : -10 }}
               >
                 <AvatarFallback className="bg-primary-soft">
-                  <Text className="font-sans text-xs font-bold text-primary">
+                  <Text variant="label" className="text-primary">
                     {initials(agent.displayName)}
                   </Text>
                 </AvatarFallback>

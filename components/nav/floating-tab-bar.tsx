@@ -1,6 +1,6 @@
 import type { ComponentProps } from "react";
 import { useEffect } from "react";
-import { View, Text, type LayoutChangeEvent } from "react-native";
+import { View, type LayoutChangeEvent } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Tabs } from "expo-router";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
+import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { getDevUser } from "@/lib/dev-user";
 import { CONVERSATIONS } from "@/lib/mock-data";
@@ -154,16 +155,17 @@ export function FloatingTabBar({
                   {options.tabBarIcon?.({ focused, color, size: 22 })}
                   {badge != null ? (
                     <View className="absolute -right-3 -top-1.5 min-w-4 items-center rounded-full bg-primary px-1 py-px">
-                      <Text className="font-sans text-[10px] font-semibold leading-3 text-primary-foreground tabular-nums">
+                      <Text variant="label" className="text-primary-foreground tabular-nums">
                         {badge > 99 ? "99+" : String(badge)}
                       </Text>
                     </View>
                   ) : null}
                 </View>
                 <Text
+                  variant="label"
                   numberOfLines={1}
                   className={cn(
-                    "mt-0.5 max-w-full px-0.5 text-center font-sans text-[10px] font-semibold",
+                    "mt-0.5 max-w-full px-0.5 text-center",
                     focused ? "text-primary" : "text-muted",
                   )}
                 >

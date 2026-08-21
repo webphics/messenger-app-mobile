@@ -67,15 +67,15 @@ export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddForm
           {fields.map((field, i) => (
             <View key={field.key} className={i === 0 ? "" : "mt-4"}>
               <View className="mb-1.5 flex-row items-center justify-between">
-                <Text className="font-sans text-sm font-semibold text-ink">
+                <Text variant="label" className="text-ink">
                   {field.label}
                 </Text>
                 {field.required === false ? (
-                  <Text className="font-sans text-xs text-muted">Optional</Text>
+                  <Text variant="label" className="text-muted">Optional</Text>
                 ) : null}
               </View>
               <Input
-                className={`rounded-2xl border-line bg-bg font-sans text-sm ${
+                className={`rounded-2xl border-line bg-bg font-sans text-base ${
                   field.multiline ? "h-28 py-3.5" : "h-12"
                 }`}
                 placeholder={field.placeholder}
@@ -94,7 +94,7 @@ export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddForm
           {error ? (
             <View className="mt-4 flex-row items-center gap-2 rounded-xl bg-danger/10 p-3">
               <AlertCircle color={colors.danger} size={18} />
-              <Text className="flex-1 font-sans text-sm font-medium text-danger">
+              <Text variant="meta" className="flex-1 text-danger">
                 {error}
               </Text>
             </View>

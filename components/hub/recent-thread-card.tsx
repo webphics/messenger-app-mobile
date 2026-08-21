@@ -37,7 +37,7 @@ export function RecentThreadCard({ conversation, selfId }: RecentThreadCardProps
         <View className="relative">
           <Avatar alt={title} className="size-12">
             <AvatarFallback className="bg-primary-soft">
-              <Text className="font-sans text-sm font-bold text-primary">
+              <Text variant="label" className="text-primary">
                 {initials(title)}
               </Text>
             </AvatarFallback>
@@ -48,10 +48,10 @@ export function RecentThreadCard({ conversation, selfId }: RecentThreadCardProps
         </View>
 
         <View className="min-w-0 flex-1">
-          <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+          <Text variant="title" className="text-ink" numberOfLines={1}>
             {title}
           </Text>
-          <Text className="mt-0.5 font-sans text-xs font-normal text-muted" numberOfLines={1}>
+          <Text variant="meta" className="mt-0.5 text-muted" numberOfLines={1}>
             {conversation.lastMessagePreview} · {formatRelativeTime(conversation.updatedAt)}
           </Text>
         </View>

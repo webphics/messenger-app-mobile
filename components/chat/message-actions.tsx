@@ -85,7 +85,7 @@ export function MessageActions({
             }}
             className="size-10 items-center justify-center rounded-full"
           >
-            <Text className="font-sans text-2xl leading-7">{emoji}</Text>
+            <Text variant="display">{emoji}</Text>
           </TactilePressable>
         ))}
       </Animated.View>
@@ -112,7 +112,7 @@ export function MessageActions({
           className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line bg-surface px-5 py-2 shadow-lg shadow-black/20"
         >
           <Reply color={colors.primary} size={18} />
-          <Text className="font-sans text-sm font-semibold text-primary">
+          <Text variant="meta" className="font-semibold text-primary">
             Reply
           </Text>
         </TactilePressable>

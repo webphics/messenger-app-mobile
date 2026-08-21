@@ -37,14 +37,14 @@ export const KnowledgeRow = memo(function KnowledgeRow({
           <BookOpen color={colors.primary} size={20} />
         </View>
         <View className="min-w-0 flex-1">
-          <Text className="font-sans text-base font-semibold text-ink" numberOfLines={1}>
+          <Text variant="title" className="text-ink" numberOfLines={1}>
             {article.title}
           </Text>
           {article.tags.length > 0 ? (
             <View className="mt-1 flex-row flex-wrap gap-1.5">
               {article.tags.map((tag) => (
                 <View key={tag} className="rounded-md bg-bg px-2 py-0.5 border border-line/60">
-                  <Text className="font-sans text-xs font-medium text-muted">
+                  <Text variant="label" className="text-muted">
                     #{tag}
                   </Text>
                 </View>

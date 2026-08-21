@@ -322,7 +322,7 @@ export function AttachmentSheet({
 
               {/* Drawer Header */}
               <View className="flex-row items-center justify-between px-1">
-                <Text className="font-sans text-base font-bold text-ink">
+                <Text variant="title" className="font-bold text-ink">
                   Share & Attach
                 </Text>
                 <TactilePressable
@@ -360,10 +360,10 @@ export function AttachmentSheet({
                     )}
                   </View>
                   <View className="min-w-0 flex-1">
-                    <Text className="font-sans text-sm font-semibold text-ink">
+                    <Text variant="meta" className="font-semibold text-ink">
                       {item.title}
                     </Text>
-                    <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
+                    <Text variant="label" className="mt-0.5 font-normal text-muted">
                       {item.subtitle}
                     </Text>
                   </View>

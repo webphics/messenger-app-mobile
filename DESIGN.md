@@ -17,38 +17,51 @@ colors:
   amber: "#E2831C"
 typography:
   display:
-    fontFamily: "Manrope, system-ui, sans-serif"
+    fontFamily: "Manrope-ExtraBold, Manrope, system-ui, sans-serif"
     fontSize: "24px"
     fontWeight: 800
     lineHeight: 1.2
     letterSpacing: "-0.02em"
   headline:
-    fontFamily: "Manrope, system-ui, sans-serif"
+    fontFamily: "Manrope-ExtraBold, Manrope, system-ui, sans-serif"
     fontSize: "20px"
     fontWeight: 800
     lineHeight: 1.25
     letterSpacing: "-0.01em"
   title:
-    fontFamily: "Manrope-SemiBold, Manrope, system-ui, sans-serif"
+    fontFamily: "Manrope-SemiBold, Manrope-Medium, Manrope-Bold, Manrope, system-ui, sans-serif"
     fontSize: "16px"
     fontWeight: 600
     lineHeight: 1.35
   body:
-    fontFamily: "Manrope, system-ui, sans-serif"
+    fontFamily: "Manrope, Manrope-Medium, Manrope-Bold, system-ui, sans-serif"
     fontSize: "16px"
     fontWeight: 400
     lineHeight: 1.45
+  meta:
+    fontFamily: "Manrope, Manrope-Medium, system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.4
   label:
-    fontFamily: "Manrope-SemiBold, Manrope, system-ui, sans-serif"
+    fontFamily: "Manrope-SemiBold, Manrope-Medium, Manrope-Bold, Manrope, system-ui, sans-serif"
     fontSize: "12px"
     fontWeight: 600
     lineHeight: 1.3
     letterSpacing: "0.04em"
   mono:
-    fontFamily: "JetBrains Mono, ui-monospace, monospace"
+    fontFamily: "JetBrains Mono, JetBrains Mono-Bold, ui-monospace, monospace"
     fontSize: "14px"
     fontWeight: 500
     lineHeight: 1.4
+faces:
+  manrope-regular: "Manrope"
+  manrope-medium: "Manrope-Medium"
+  manrope-semibold: "Manrope-SemiBold"
+  manrope-bold: "Manrope-Bold"
+  manrope-extrabold: "Manrope-ExtraBold"
+  jetbrains-mono: "JetBrains Mono"
+  jetbrains-mono-bold: "JetBrains Mono-Bold"
 rounded:
   sm: "8px"
   md: "12px"
@@ -184,22 +197,25 @@ Omit as a second brand accent. Status colors below are functional, not brand.
 **Body Font:** Manrope  
 **Label/Mono Font:** JetBrains Mono (code / monospace moments only)
 
-**Character:** Geometric, friendly sans with clear weight steps. On React Native, weight utilities map to loaded faces (`Manrope-Medium`, `Manrope-SemiBold`, `Manrope-Bold`) — do not rely on `fontWeight` alone to switch Manrope cuts.
+**Character:** Geometric, friendly sans with clear weight steps. On React Native, weight utilities map to loaded faces (`Manrope-Medium`, `Manrope-SemiBold`, `Manrope-Bold`, `Manrope-ExtraBold`) — do not rely on `fontWeight` alone to switch Manrope cuts. JetBrains Mono Bold uses `font-mono-bold` so `font-bold` never clobbers mono with Manrope.
+
+**API:** `Text` variants in `components/ui/text.tsx` — `display` | `headline` | `title` | `body` | `meta` | `label` | `mono`. Color stays on `className`.
 
 ### Hierarchy
-- **Display** (extrabold / Bold face, `text-2xl` ~24px): Auth and hub brand moments (“Enki”, large greetings).
-- **Headline** (extrabold / Bold, `text-xl` ~20px): Screen titles, offer card titles.
-- **Title** (semibold, `text-base` ~16px): Card/row titles, primary button labels, section headers.
-- **Body** (regular, `text-base` ~16px): Message text, supporting copy, thread titles.
-- **Label** (semibold / medium, `text-xs` ~12px, often uppercase + tracking): Role eyebrows (SUPPORT / AGENT / ADMIN), “Sponsored”, chip labels, section kickers, settings role pill.
-- **Mono** (JetBrains Mono medium/bold, `text-sm` ~14px): Rare code-like UI only.
+- **Display** (`variant="display"`, ExtraBold face, `text-2xl` ~24px): Auth and hub brand moments (“Enki”, large greetings), primary metrics.
+- **Headline** (`variant="headline"`, ExtraBold, `text-xl` ~20px): Screen titles, offer card titles, settings display name.
+- **Title** (`variant="title"`, semibold, `text-base` ~16px): Card/row titles, primary button labels, section headers.
+- **Body** (`variant="body"`, regular, `text-base` ~16px): Message text, supporting prose, thread titles. Text inputs also use `text-base` (≥16px iOS floor).
+- **Meta** (`variant="meta"`, regular, `text-sm` ~14px): Previews, FAQ answers, empty-state hints, secondary copy.
+- **Label** (`variant="label"`, semibold, `text-xs` ~12px; add `uppercase tracking-wider` for eyebrows/chips): Role eyebrows (SUPPORT / AGENT / ADMIN), “Sponsored”, chip labels, section kickers, settings role pill, form labels, tab labels.
+- **Mono** (`variant="mono"`, JetBrains Mono medium, `text-sm` ~14px): Rare code-like UI only (`font-mono-bold` when bold mono is required).
 
-Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2xl`). Do not invent `text-[Npx]` one-offs.
+Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2xl`). Do not invent `text-[Npx]` one-offs. Do not use orphan `text-lg` / `text-3xl` — map to headline / display.
 
 ### Named Rules
-**The Weight Face Rule.** Use `font-medium` / `font-semibold` / `font-bold` utilities so Manrope faces resolve correctly on native.
+**The Weight Face Rule.** Use `font-medium` / `font-semibold` / `font-bold` / `font-extrabold` utilities so Manrope faces resolve correctly on native. Prefer `Text` role variants over hand-rolled size+weight stacks.
 
-**The Role Eyebrow Rule.** Role labels are uppercase `text-xs` labels in the greeting block (and settings active-role pill via `hubEyebrow`), never competing with the Enki header wordmark.
+**The Role Eyebrow Rule.** Role labels are uppercase `label` variants in the greeting block (and settings active-role pill via `hubEyebrow`), never competing with the Enki header wordmark.
 
 ## Layout
 

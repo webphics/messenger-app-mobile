@@ -98,10 +98,10 @@ export function AuthForm({ mode }: AuthFormProps) {
             className="mb-3 h-20 w-20"
             resizeMode="contain"
           />
-          <Text className="text-center font-sans text-2xl font-extrabold text-ink">
+          <Text variant="display" className="text-center text-ink">
             Enki
           </Text>
-          <Text className="mt-1 text-center font-sans text-sm font-normal text-muted">
+          <Text variant="meta" className="mt-1 text-center text-muted">
             Internal Support & Team Collaboration
           </Text>
         </Animated.View>
@@ -110,21 +110,21 @@ export function AuthForm({ mode }: AuthFormProps) {
           entering={settleEnter(!!reduceMotion, 60)}
           className="mt-6 rounded-3xl border border-line bg-surface p-5 shadow-lg shadow-black/5"
         >
-          <Text className="font-sans text-xl font-extrabold text-ink">
+          <Text variant="headline" className="text-ink">
             {register ? "Create an account" : "Welcome back"}
           </Text>
-          <Text className="mt-0.5 font-sans text-xs font-normal text-muted">
+          <Text variant="label" className="mt-0.5 font-normal text-muted">
             {register
               ? "Sign up with your organization email"
               : "Sign in to access your queue and chats"}
           </Text>
 
           <View className="mt-5">
-            <Text className="mb-1.5 font-sans text-xs font-semibold text-ink">
+            <Text variant="label" className="mb-1.5 text-ink">
               Work Email
             </Text>
             <Input
-              className="h-12 rounded-2xl border-line bg-bg font-sans text-sm"
+              className="h-12 rounded-2xl border-line bg-bg font-sans text-base"
               placeholder="name@company.com"
               accessibilityLabel="Email"
               autoCapitalize="none"
@@ -139,7 +139,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             {emailError ? (
               <View className="mt-1.5 flex-row items-center gap-1.5">
                 <AlertCircle color={colors.danger} size={14} />
-                <Text className="font-sans text-xs font-medium text-danger">
+                <Text variant="label" className="font-medium text-danger">
                   {emailError}
                 </Text>
               </View>
@@ -147,12 +147,12 @@ export function AuthForm({ mode }: AuthFormProps) {
           </View>
 
           <View className="mt-4">
-            <Text className="mb-1.5 font-sans text-xs font-semibold text-ink">
+            <Text variant="label" className="mb-1.5 text-ink">
               Password
             </Text>
             <View className="relative justify-center">
               <Input
-                className="h-12 rounded-2xl border-line bg-bg pr-11 font-sans text-sm"
+                className="h-12 rounded-2xl border-line bg-bg pr-11 font-sans text-base"
                 placeholder="••••••••"
                 accessibilityLabel="Password"
                 secureTextEntry={!showPassword}
@@ -181,7 +181,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             {passwordError ? (
               <View className="mt-1.5 flex-row items-center gap-1.5">
                 <AlertCircle color={colors.danger} size={14} />
-                <Text className="font-sans text-xs font-medium text-danger">
+                <Text variant="label" className="font-medium text-danger">
                   {passwordError}
                 </Text>
               </View>
@@ -193,11 +193,12 @@ export function AuthForm({ mode }: AuthFormProps) {
               {/* Visual Password Strength Indicator */}
               <View className="mt-3">
                 <View className="flex-row items-center justify-between">
-                  <Text className="font-sans text-xs font-semibold text-muted">
+                  <Text variant="label" className="text-muted">
                     Password strength
                   </Text>
                   <Text
-                    className={`font-sans text-xs font-bold ${
+                    variant="label"
+                    className={`font-bold ${
                       score === "strong"
                         ? "text-success"
                         : score === "fair"
@@ -240,12 +241,12 @@ export function AuthForm({ mode }: AuthFormProps) {
               </View>
 
               <View className="mt-4">
-                <Text className="mb-1.5 font-sans text-xs font-semibold text-ink">
+                <Text variant="label" className="mb-1.5 text-ink">
                   Confirm Password
                 </Text>
                 <View className="relative justify-center">
                   <Input
-                    className="h-12 rounded-2xl border-line bg-bg pr-11 font-sans text-sm"
+                    className="h-12 rounded-2xl border-line bg-bg pr-11 font-sans text-base"
                     placeholder="••••••••"
                     accessibilityLabel="Confirm password"
                     secureTextEntry={!showConfirm}
@@ -274,7 +275,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 {confirmError ? (
                   <View className="mt-1.5 flex-row items-center gap-1.5">
                     <AlertCircle color={colors.danger} size={14} />
-                    <Text className="font-sans text-xs font-medium text-danger">
+                    <Text variant="label" className="font-medium text-danger">
                       {confirmError}
                     </Text>
                   </View>
@@ -288,7 +289,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 className="mt-3.5 flex-row items-center gap-1.5 self-start rounded-xl bg-primary-soft/70 px-3 py-1.5"
               >
                 <Sparkles color={colors.primary} size={14} />
-                <Text className="font-sans text-xs font-bold text-primary">
+                <Text variant="label" className="font-bold text-primary">
                   Suggest strong password
                 </Text>
               </TactilePressable>
@@ -308,7 +309,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             }
             className="mt-6 min-h-11 items-center justify-center"
           >
-            <Text className="font-sans text-sm font-semibold text-primary">
+            <Text variant="meta" className="font-semibold text-primary">
               {register
                 ? "Already have an account? Sign in"
                 : "Don't have an account? Create one"}

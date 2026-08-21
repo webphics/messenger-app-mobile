@@ -206,7 +206,7 @@ export function ThreadScreen({
       if (item.type === "day") {
         return (
           <View className="my-2 items-center">
-            <Text className="font-sans text-xs font-medium text-muted">
+            <Text variant="label" className="font-medium text-muted">
               {item.label}
             </Text>
           </View>

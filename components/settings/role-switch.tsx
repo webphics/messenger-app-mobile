@@ -44,7 +44,7 @@ export function RoleSwitch() {
 
   return (
     <View className="mt-2 gap-2.5">
-      <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+      <Text variant="label" className="uppercase tracking-wider text-muted">
         Select Active Role (Mock Switcher)
       </Text>
       {ROLES.map((item) => {
@@ -82,15 +82,17 @@ export function RoleSwitch() {
 
             <View className="min-w-0 flex-1">
               <Text
+                variant="title"
                 className={cn(
-                  "font-sans text-base font-bold",
+                  "font-bold",
                   active ? "text-primary" : "text-ink",
                 )}
               >
                 {item.label}
               </Text>
               <Text
-                className="mt-0.5 font-sans text-xs font-normal text-muted"
+                variant="label"
+                className="mt-0.5 font-normal text-muted"
                 numberOfLines={2}
               >
                 {item.desc}

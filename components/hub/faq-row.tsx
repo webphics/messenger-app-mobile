@@ -43,7 +43,7 @@ export const FaqRow = memo(function FaqRow({
       )}
     >
       <View className="flex-row items-start justify-between gap-3">
-        <Text className="flex-1 font-sans text-base font-semibold text-ink">
+        <Text variant="title" className="flex-1 text-ink">
           {item.question}
         </Text>
         {open ? (
@@ -55,10 +55,8 @@ export const FaqRow = memo(function FaqRow({
       {open ? (
         <Animated.View entering={settleEnter(!!reduceMotion)}>
           <Text
-            className={cn(
-              "mt-2.5 border-t border-line/60 pt-2.5 font-sans text-sm font-normal text-ink-soft",
-              chrome === "card" ? "leading-6" : "leading-5",
-            )}
+            variant="meta"
+            className="mt-2.5 border-t border-line/60 pt-2.5 text-ink-soft"
           >
             {item.answer}
           </Text>

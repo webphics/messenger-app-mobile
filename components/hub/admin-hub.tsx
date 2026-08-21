@@ -34,10 +34,10 @@ export function AdminHub() {
         <HubHeader settingsHref={"/(admin)/settings" as Href} />
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
-          <Text className="mt-5 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+          <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
-          <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
+          <Text variant="display" className="mt-0.5 text-ink">
             {hubGreeting(me.role, firstName(me.displayName))}
           </Text>
         </Animated.View>
@@ -50,7 +50,7 @@ export function AdminHub() {
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
             <View className="flex-row items-center gap-2">
               <ShieldCheck color={colors.muted} size={18} />
-              <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-ink-soft">
+              <Text variant="label" className="uppercase tracking-wider text-ink-soft">
                 System Oversight
               </Text>
             </View>
@@ -98,7 +98,7 @@ export function AdminHub() {
 
         {recent ? (
           <View className="mt-4">
-            <Text className="mb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+            <Text variant="label" className="mb-2 uppercase tracking-wider text-muted">
               Recent Message
             </Text>
             <RecentThreadCard conversation={recent} selfId={me.id} />

@@ -123,6 +123,16 @@
   font-weight: 700;
 }
 @utility font-extrabold {
-  font-family: Manrope-Bold;
+  font-family: Manrope-ExtraBold;
   font-weight: 800;
+}
+/* JetBrains Mono: RN needs the loaded face key; Bold is a separate utility so
+   font-bold (Manrope) never clobber mono. */
+@utility font-mono {
+  font-family: "JetBrains Mono";
+  font-weight: 500;
+}
+@utility font-mono-bold {
+  font-family: "JetBrains Mono-Bold";
+  font-weight: 700;
 }

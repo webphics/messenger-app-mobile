@@ -36,7 +36,7 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
       refreshControl={makeRefreshControl(refreshing, onRefresh)}
     >
       <View className="rounded-3xl border border-line bg-surface p-5 shadow-md shadow-black/5">
-        <Text className="font-sans text-2xl font-bold leading-tight text-ink">
+        <Text variant="display" className="text-ink">
           {article.title}
         </Text>
         {article.tags.length > 0 ? (
@@ -46,7 +46,7 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
                 key={tag}
                 className="rounded-lg bg-primary-soft/80 px-2.5 py-1"
               >
-                <Text className="font-sans text-xs font-semibold text-primary">
+                <Text variant="label" className="text-primary">
                   #{tag}
                 </Text>
               </View>
@@ -58,7 +58,8 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
 
         <Text
           selectable
-          className="font-sans text-base font-normal leading-7 text-ink-soft"
+          variant="body"
+          className="text-ink-soft"
         >
           {article.body}
         </Text>
@@ -75,7 +76,7 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
           ) : (
             <Copy color={colors.primaryForeground} size={18} />
           )}
-          <Text className={copied ? "text-primary font-semibold" : "text-primary-foreground font-semibold"}>
+          <Text className={copied ? "text-primary" : "text-primary-foreground"}>
             {copied ? "Copied to clipboard" : "Copy article text"}
           </Text>
         </Button>

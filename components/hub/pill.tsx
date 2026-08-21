@@ -31,7 +31,7 @@ export function Pill({ label, tone = "primary", dot = false, className }: PillPr
       )}
     >
       {dot ? <View className={cn("size-2 rounded-full", style.dot)} /> : null}
-      <Text className={cn("font-sans text-xs font-semibold", style.text)}>{label}</Text>
+      <Text variant="label" className={style.text}>{label}</Text>
     </View>
   );
 }

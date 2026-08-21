@@ -41,8 +41,8 @@ export function ActionTile({
       )}
     >
       <IconChip icon={icon} tone={tone} />
-      <Text className="mt-3 font-sans text-base font-semibold text-ink">{title}</Text>
-      <Text className="mt-0.5 font-sans text-xs font-normal text-muted">{hint}</Text>
+      <Text variant="title" className="mt-3 text-ink">{title}</Text>
+      <Text variant="meta" className="mt-0.5 text-muted">{hint}</Text>
     </TactilePressable>
   );
 }
@@ -80,15 +80,15 @@ export function StatTile({
       className="flex-1 rounded-2xl bg-bg/80 p-3"
     >
       <View className="flex-row items-center gap-1.5">
-        <Text className={cn("font-sans text-2xl font-extrabold", VALUE_TONE[tone])}>
+        <Text variant="display" className={VALUE_TONE[tone]}>
           {value}
           {suffix ? (
-            <Text className="font-sans text-sm font-medium text-muted">{suffix}</Text>
+            <Text variant="meta" className="text-muted">{suffix}</Text>
           ) : null}
         </Text>
         {alert ? <View className="size-2 rounded-full bg-amber" /> : null}
       </View>
-      <Text className="mt-0.5 font-sans text-xs font-medium text-muted">{label}</Text>
+      <Text variant="label" className="mt-0.5 text-muted">{label}</Text>
     </TactilePressable>
   );
 }

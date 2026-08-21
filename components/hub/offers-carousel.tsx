@@ -43,11 +43,11 @@ export function OffersCarousel() {
     <View className="mt-6">
       <View className="flex-row items-center justify-between px-4">
         <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          <Text className="font-sans text-base font-bold text-ink">
+          <Text variant="title" className="text-ink">
             Featured Offers
           </Text>
           <View className="rounded-md bg-line/80 px-2 py-0.5">
-            <Text className="font-sans text-xs font-bold uppercase tracking-wider text-muted">
+            <Text variant="label" className="uppercase tracking-wider text-muted">
               Sponsored
             </Text>
           </View>
@@ -58,7 +58,7 @@ export function OffersCarousel() {
           onPress={openOffers}
           className="min-h-9 flex-row items-center gap-0.5 justify-center pl-2"
         >
-          <Text className="font-sans text-sm font-semibold text-primary">
+          <Text variant="meta" className="font-semibold text-primary">
             See all
           </Text>
           <ChevronRight color={colors.primary} size={16} />
@@ -106,7 +106,7 @@ export function OffersCarousel() {
           className="mt-4 min-h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary px-4 shadow-md shadow-black/10"
         >
           <MessageCircle color={colors.primaryForeground} size={18} />
-          <Text className="font-sans font-semibold text-primary-foreground">
+          <Text variant="title" className="text-primary-foreground">
             Join Offers Group Chat
           </Text>
         </TactilePressable>

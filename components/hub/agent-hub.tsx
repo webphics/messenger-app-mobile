@@ -46,10 +46,10 @@ export function AgentHub() {
         <HubHeader settingsHref={"/(agent)/settings" as Href} />
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
-          <Text className="mt-5 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+          <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
             {hubEyebrow(me.role)}
           </Text>
-          <Text className="mt-0.5 font-sans text-2xl font-bold text-ink">
+          <Text variant="display" className="mt-0.5 text-ink">
             {hubGreeting(me.role, firstName(me.displayName))}
           </Text>
         </Animated.View>
@@ -62,7 +62,7 @@ export function AgentHub() {
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
             <View className="flex-row items-center gap-2">
               <PresenceDot breathe className="size-2" />
-              <Text className="font-sans text-xs font-semibold uppercase tracking-wider text-ink-soft">
+              <Text variant="label" className="uppercase tracking-wider text-ink-soft">
                 Live Queue Status
               </Text>
             </View>
@@ -109,7 +109,7 @@ export function AgentHub() {
 
         {recent ? (
           <View className="mt-4">
-            <Text className="mb-2 font-sans text-xs font-semibold uppercase tracking-wider text-muted">
+            <Text variant="label" className="mb-2 uppercase tracking-wider text-muted">
               Recent Conversation
             </Text>
             <RecentThreadCard conversation={recent} selfId={me.id} />
@@ -125,7 +125,7 @@ export function AgentHub() {
             className="mt-4 flex-row items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
           >
             <IconChip icon={Search} tone="neutral" size={32} />
-            <Text className="flex-1 font-sans text-sm font-normal text-muted">
+            <Text variant="meta" className="flex-1 text-muted">
               Search knowledge articles…
             </Text>
             <Sparkles color={colors.muted} size={16} />

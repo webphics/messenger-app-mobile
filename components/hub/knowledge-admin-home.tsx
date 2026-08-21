@@ -64,7 +64,7 @@ export function KnowledgeAdminHome() {
       />
 
       <View className="mt-6 flex-row items-center justify-between">
-        <Text className="font-sans text-base font-bold text-ink">Knowledge Articles</Text>
+        <Text variant="title" className="text-ink">Knowledge Articles</Text>
         <Pill label={`${items.length} articles`} />
       </View>
 
