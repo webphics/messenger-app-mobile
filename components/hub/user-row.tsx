@@ -69,7 +69,7 @@ export const UserRow = memo(function UserRow({
         accessibilityLabel={person.displayName}
         accessibilityState={{ expanded: open }}
         onPress={handlePress}
-        className="rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+        className="rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
       >
         <View className="flex-row items-center gap-3.5">
           <View className="relative">
@@ -93,20 +93,20 @@ export const UserRow = memo(function UserRow({
             <View
               className={`rounded-md px-2 py-0.5 ${
                 person.role === "admin"
-                  ? "bg-primary-soft text-primary"
+                  ? "bg-primary-soft"
                   : person.role === "agent"
-                    ? "bg-amber/15 text-amber"
-                    : "bg-line/70 text-muted"
+                    ? "bg-amber/15"
+                    : "bg-line/70"
               }`}
             >
               <Text
                 variant="label"
                 className={
                   person.role === "admin"
-                    ? "text-primary"
+                    ? "font-bold text-primary"
                     : person.role === "agent"
-                      ? "text-amber"
-                      : "text-ink-soft"
+                      ? "font-bold text-amber"
+                      : "text-muted"
                 }
               >
                 {ROLE_LABEL[person.role]}
@@ -142,7 +142,7 @@ export const UserRow = memo(function UserRow({
               accessibilityRole="button"
               accessibilityLabel="Copy email"
               onPress={handleCopyEmail}
-              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-line bg-bg py-2.5"
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-line/80 bg-line/35 py-2.5 shadow-xs shadow-black/5 active:scale-[0.98]"
             >
               {copied ? (
                 <Check color={colors.success} size={16} />
@@ -158,7 +158,7 @@ export const UserRow = memo(function UserRow({
               accessibilityRole="button"
               accessibilityLabel="Direct message"
               onPress={handleMessage}
-              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5"
+              className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-primary py-2.5 shadow-sm shadow-primary/25 active:scale-[0.98]"
             >
               <MessageCircle color={colors.primaryForeground} size={16} />
               <Text variant="label" className="text-primary-foreground">

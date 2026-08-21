@@ -32,7 +32,7 @@ export function RecentThreadCard({ conversation, selfId }: RecentThreadCardProps
         accessibilityRole="button"
         accessibilityLabel="Open recent message"
         onPress={() => router.push(chatHref(conversation.id))}
-        className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+        className="flex-row items-center gap-3.5 rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
       >
         <View className="relative">
           <Avatar alt={title} className="size-12">

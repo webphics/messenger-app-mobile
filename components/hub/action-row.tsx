@@ -47,7 +47,7 @@ export function ActionRow({
       accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
       className={cn(
-        "flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/5",
+        "flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8",
         className,
       )}
     >

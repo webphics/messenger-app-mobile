@@ -226,15 +226,27 @@ Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px).
 
 ## Elevation & Depth
 
-**Hybrid.** At rest, depth is a `line` border on white surface. Hub and conversation cards add soft lift (`shadow-md` / `shadow-black/5`). Auth cards and offer media use slightly stronger soft shadow. Overlays (reaction tray, reply chip, attachment sheet) use the strongest lift (`shadow-lg` / `shadow-2xl` family) so they read above the desk. The thread **composer** is resting chrome: `border-t border-line` only — no overlay shadow. Flat icons and ghost controls stay shadowless.
+**5-Tier Structured Elevation.** Depth across Enki is defined by a clean, physical lighting hierarchy that balances sunken negative space (divits) with crisp positive lift (cards, buttons, floating bars) without adding new palette colors:
 
-### Shadow Vocabulary
-- **Card lift** (`shadow-md shadow-black/5`): Conversation rows, hub action rows, FAQ/knowledge cards.
-- **Soft control** (`shadow-sm shadow-black/5`–`/10`): Primary buttons, small chrome.
-- **Overlay** (`shadow-lg` / `shadow-2xl shadow-black/20`): Reaction tray, sheets, offer hero cards — not the always-visible composer.
+```
+Level 3: Overlays & Floating Capsule  [▲ +16px lift, shadow-xl / shadow-2xl + rim border]
+Level 2: Interactive Controls & Pills   [▲ +4px lift, shadow-sm / shadow-primary/25]
+Level 1: Cards & Popped-Out Surfaces    [▲ +2px lift, shadow-md shadow-black/8 + border-line/70]
+-----------------------------------------------------------------------------------------
+Level 0: Base Desk Canvas               [— 0px flat, bg-bg / #FFFFFF]
+-----------------------------------------------------------------------------------------
+Level -1: Divits & Recessed Wells       [▼ -2px sunken, bg-line/35 / #F4F6FA + border-line/80]
+```
+
+### Shadow & Depth Vocabulary
+- **Level -1 Divit Well** (`border border-line/80 bg-line/35`): Inputs, search bars, chat composer text area, and metric sparkline wells. Feels carved into the desk canvas.
+- **Level 1 Card Lift** (`shadow-md shadow-black/8 border border-line/70 bg-surface`): Conversation rows, hub action tiles, FAQ/knowledge cards, metric containers, and incoming chat bubbles.
+- **Level 2 Tactile Button** (`shadow-sm shadow-primary/25` / `shadow-xs shadow-black/8`): Primary and secondary buttons; depresses flush into the desk (`scale-[0.98]` + flattened shadow) on tap.
+- **Level 3 Floating Capsule & Overlays** (`shadow-xl shadow-black/15 border border-line/80 bg-surface/95` / `shadow-2xl shadow-black/20`): Floating tab bar capsule, reaction tray, attachment sheet, and modals.
 
 ### Named Rules
-**The Hybrid Lift Rule.** Borders define resting structure; shadows appear for stacked cards and floating overlays — not as default decoration on every view.
+**The Pop-Out & Divit Rule.** Inputs and tracks are recessed divits (Level -1); cards and interactive containers pop out above the desk (Level 1–3). The desk plane (Level 0) serves as the calm negative foundation.
+
 
 ## Shapes
 

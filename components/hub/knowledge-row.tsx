@@ -31,7 +31,7 @@ export const KnowledgeRow = memo(function KnowledgeRow({
         accessibilityRole="button"
         accessibilityLabel={article.title}
         onPress={handlePress}
-        className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+        className="flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
       >
         <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
           <BookOpen color={colors.primary} size={20} />
@@ -43,7 +43,7 @@ export const KnowledgeRow = memo(function KnowledgeRow({
           {article.tags.length > 0 ? (
             <View className="mt-1 flex-row flex-wrap gap-1.5">
               {article.tags.map((tag) => (
-                <View key={tag} className="rounded-md bg-bg px-2 py-0.5 border border-line/60">
+                <View key={tag} className="rounded-md bg-line/35 px-2 py-0.5 border border-line/80">
                   <Text variant="label" className="text-muted">
                     #{tag}
                   </Text>

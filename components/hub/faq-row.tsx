@@ -36,10 +36,10 @@ export const FaqRow = memo(function FaqRow({
       accessibilityState={{ expanded: open }}
       onPress={handlePress}
       className={cn(
-        "border border-line bg-surface p-4",
+        "border border-line/70 bg-surface p-4",
         chrome === "card"
-          ? "rounded-3xl shadow-md shadow-black/5"
-          : "rounded-2xl shadow-sm shadow-black/5",
+          ? "rounded-3xl shadow-md shadow-black/8"
+          : "rounded-2xl shadow-sm shadow-black/8",
       )}
     >
       <View className="flex-row items-start justify-between gap-3">

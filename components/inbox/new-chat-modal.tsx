@@ -100,7 +100,7 @@ const ContactPickerRow = memo(function ContactPickerRow({
         accessibilityRole="button"
         accessibilityLabel={`Chat with ${person.displayName}`}
         onPress={handlePress}
-        className="flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 shadow-sm shadow-black/5"
+        className="flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-3.5 shadow-md shadow-black/8"
       >
         <View className="relative">
           <Avatar alt={person.displayName} className="size-11">

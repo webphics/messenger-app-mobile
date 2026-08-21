@@ -72,7 +72,7 @@ export function MessageActions({
           },
           trayAnim,
         ]}
-        className="flex-row rounded-full border border-line bg-surface px-2 py-1 shadow-lg shadow-black/20"
+        className="flex-row rounded-full border border-line/80 bg-surface px-2 py-1 shadow-2xl shadow-black/20"
       >
         {REACT_EMOJIS.map((emoji) => (
           <TactilePressable
@@ -109,7 +109,7 @@ export function MessageActions({
           onPress={() => {
             onReply();
           }}
-          className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line bg-surface px-5 py-2 shadow-lg shadow-black/20"
+          className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line/80 bg-surface px-5 py-2 shadow-2xl shadow-black/20"
         >
           <Reply color={colors.primary} size={18} />
           <Text variant="meta" className="font-semibold text-primary">

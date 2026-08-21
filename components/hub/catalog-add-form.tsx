@@ -63,7 +63,7 @@ export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddForm
           paddingBottom: screenBottomPad(insets.bottom) + 24,
         }}
       >
-        <View className="rounded-3xl border border-line bg-surface p-5 shadow-md shadow-black/5">
+        <View className="rounded-3xl border border-line/70 bg-surface p-5 shadow-md shadow-black/8">
           {fields.map((field, i) => (
             <View key={field.key} className={i === 0 ? "" : "mt-4"}>
               <View className="mb-1.5 flex-row items-center justify-between">
@@ -75,7 +75,7 @@ export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddForm
                 ) : null}
               </View>
               <Input
-                className={`rounded-2xl border-line bg-bg font-sans text-base ${
+                className={`rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink ${
                   field.multiline ? "h-28 py-3.5" : "h-12"
                 }`}
                 placeholder={field.placeholder}

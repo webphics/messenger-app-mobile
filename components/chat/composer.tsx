@@ -102,7 +102,7 @@ export function Composer({
           accessibilityLabel="Attach"
           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           onPress={() => setAttachOpen(true)}
-          className="mb-0.5 size-11 items-center justify-center rounded-full bg-bg border border-line/60"
+          className="mb-0.5 size-11 items-center justify-center rounded-full bg-line/35 border border-line/80 active:scale-95"
         >
           <Plus color={colors.inkSoft} size={20} />
         </TactilePressable>
@@ -113,7 +113,7 @@ export function Composer({
           placeholder={replyTo ? "Write a reply…" : "Type a message…"}
           accessibilityLabel="Message"
           multiline
-          className="max-h-28 min-h-11 flex-1 rounded-3xl border-line bg-bg px-4 py-2.5 shadow-none font-sans text-base text-ink"
+          className="max-h-28 min-h-11 flex-1 rounded-2xl border-line/80 bg-line/35 px-4 py-2.5 font-sans text-base text-ink"
         />
 
         <Animated.View style={sendStyle}>
@@ -123,7 +123,7 @@ export function Composer({
             accessibilityLabel="Send"
             disabled={!canSend}
             onPress={onSend}
-            className="mb-0.5 size-11 items-center justify-center rounded-full bg-primary shadow-sm shadow-black/10"
+            className="mb-0.5 size-11 items-center justify-center rounded-full bg-primary shadow-sm shadow-primary/30 active:scale-95"
           >
             <Send color={colors.primaryForeground} size={17} />
           </TactilePressable>

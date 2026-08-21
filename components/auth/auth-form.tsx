@@ -108,7 +108,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         <Animated.View
           entering={settleEnter(!!reduceMotion, 60)}
-          className="mt-6 rounded-3xl border border-line bg-surface p-5 shadow-lg shadow-black/5"
+          className="mt-6 rounded-3xl border border-line/70 bg-surface p-5 shadow-md shadow-black/8"
         >
           <Text variant="headline" className="text-ink">
             {register ? "Create an account" : "Welcome back"}
@@ -124,7 +124,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               Work Email
             </Text>
             <Input
-              className="h-12 rounded-2xl border-line bg-bg font-sans text-base"
+              className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
               placeholder="name@company.com"
               accessibilityLabel="Email"
               autoCapitalize="none"
@@ -152,7 +152,7 @@ export function AuthForm({ mode }: AuthFormProps) {
             </Text>
             <View className="relative justify-center">
               <Input
-                className="h-12 rounded-2xl border-line bg-bg pr-11 font-sans text-base"
+                className="h-12 rounded-2xl border-line/80 bg-line/35 pr-11 font-sans text-base text-ink"
                 placeholder="••••••••"
                 accessibilityLabel="Password"
                 secureTextEntry={!showPassword}
@@ -246,7 +246,7 @@ export function AuthForm({ mode }: AuthFormProps) {
                 </Text>
                 <View className="relative justify-center">
                   <Input
-                    className="h-12 rounded-2xl border-line bg-bg pr-11 font-sans text-base"
+                    className="h-12 rounded-2xl border-line/80 bg-line/35 pr-11 font-sans text-base text-ink"
                     placeholder="••••••••"
                     accessibilityLabel="Confirm password"
                     secureTextEntry={!showConfirm}

@@ -86,8 +86,8 @@ export function UsersScreen() {
                 className={cn(
                   "min-h-9 justify-center rounded-full border px-3.5",
                   selected
-                    ? "border-transparent bg-primary text-primary-foreground shadow-sm shadow-black/10"
-                    : "border-line bg-bg",
+                    ? "border-transparent bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                    : "border-line/80 bg-line/35",
                 )}
               >
                 <Text
@@ -110,8 +110,8 @@ export function UsersScreen() {
             className={cn(
               "min-h-9 flex-row items-center gap-1.5 justify-center rounded-full border px-3.5",
               onlineOnly
-                ? "border-transparent bg-success text-white shadow-sm shadow-black/10"
-                : "border-line bg-bg",
+                ? "border-transparent bg-success text-white shadow-sm shadow-success/25"
+                : "border-line/80 bg-line/35",
             )}
           >
             <View

@@ -1,10 +1,9 @@
 import type { KeyboardEvent } from "react-native";
 
 import {
-  imeAbsorbedByWindowResize,
   keyboardOverlap,
+  residualKeyboardOverlap,
   revealScrollDelta,
-  screenWindowGap,
 } from "@/lib/keyboard-inset";
 
 function showEvent(height: number, screenY = 0): KeyboardEvent {
@@ -13,33 +12,33 @@ function showEvent(height: number, screenY = 0): KeyboardEvent {
   } as KeyboardEvent;
 }
 
-describe("screenWindowGap", () => {
-  test("is the positive screen-minus-window difference", () => {
-    expect(screenWindowGap(800, 750)).toBe(50);
-    expect(screenWindowGap(800, 800)).toBe(0);
-    expect(screenWindowGap(800, 900)).toBe(0);
-  });
-});
-
-describe("imeAbsorbedByWindowResize", () => {
-  test("is zero when the window did not shrink further for the IME", () => {
-    // Edge-to-edge APK: rest gap (nav) stays put when keyboard opens.
-    expect(imeAbsorbedByWindowResize(48, 48)).toBe(0);
+describe("residualKeyboardOverlap", () => {
+  test("calculates positive overlap between content bottom and keyboard top", () => {
+    expect(residualKeyboardOverlap(800, 500, 300)).toBe(300);
+    expect(residualKeyboardOverlap(700, 500, 300)).toBe(200);
   });
 
-  test("is the extra shrink once Expo Go / resize mode absorbs the IME", () => {
-    expect(imeAbsorbedByWindowResize(48 + 312, 48)).toBe(312);
+  test("is zero when content clears the keyboard top", () => {
+    expect(residualKeyboardOverlap(450, 500, 300)).toBe(0);
+  });
+
+  test("is capped by the reported height", () => {
+    expect(residualKeyboardOverlap(900, 400, 300)).toBe(300);
+  });
+
+  test("never goes negative", () => {
+    expect(residualKeyboardOverlap(300, 600, -50)).toBe(0);
   });
 });
 
 describe("keyboardOverlap", () => {
-  test("reads the reported keyboard height when nothing was absorbed", () => {
+  test("reads the reported keyboard height when content bottom is omitted", () => {
     expect(keyboardOverlap(showEvent(312))).toBe(312);
   });
 
-  test("subtracts what the window resize already absorbed", () => {
-    expect(keyboardOverlap(showEvent(312), 312)).toBe(0);
-    expect(keyboardOverlap(showEvent(312), 100)).toBe(212);
+  test("calculates residual overlap when content bottom is supplied", () => {
+    expect(keyboardOverlap(showEvent(312, 500), 800)).toBe(300);
+    expect(keyboardOverlap(showEvent(312, 500), 500)).toBe(0);
   });
 
   test("is zero when there is no event", () => {
@@ -47,17 +46,8 @@ describe("keyboardOverlap", () => {
     expect(keyboardOverlap(undefined)).toBe(0);
   });
 
-  test("never goes negative", () => {
+  test("never goes negative on invalid coordinates", () => {
     expect(keyboardOverlap(showEvent(-40))).toBe(0);
-    expect(keyboardOverlap(showEvent(200), 400)).toBe(0);
-  });
-
-  test("ignores screenY, which is window-relative and edge-to-edge unsafe", () => {
-    // The status-bar offset that broke KeyboardAvoidingView lives in screenY;
-    // height alone is already net of the system bars on Android.
-    expect(keyboardOverlap(showEvent(312, 600))).toBe(
-      keyboardOverlap(showEvent(312, 0)),
-    );
   });
 });
 

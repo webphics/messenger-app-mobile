@@ -103,12 +103,12 @@ export function FloatingTabBar({
     >
       <View
         onLayout={onCapsuleLayout}
-        className="relative flex-row items-center rounded-full border border-line bg-surface px-1.5 py-1.5 shadow-lg shadow-black/10"
+        className="relative flex-row items-center rounded-full border border-line/80 bg-surface/95 px-1.5 py-1.5 shadow-xl shadow-black/15"
         accessibilityRole="tablist"
       >
         <Animated.View
           pointerEvents="none"
-          className="absolute bottom-1.5 top-1.5 left-0 rounded-full bg-primary-soft"
+          className="absolute bottom-1.5 top-1.5 left-0 rounded-full bg-primary-soft border border-primary/20 shadow-xs shadow-primary/10"
           style={indicatorStyle}
         />
         {state.routes.map((route, index) => {

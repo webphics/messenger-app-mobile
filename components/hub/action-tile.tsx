@@ -36,7 +36,7 @@ export function ActionTile({
       accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
       className={cn(
-        "flex-1 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5",
+        "flex-1 rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8",
         className,
       )}
     >
@@ -77,7 +77,7 @@ export function StatTile({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       onPress={onPress}
-      className="flex-1 rounded-2xl bg-bg/80 p-3"
+      className="flex-1 rounded-2xl border border-line/80 bg-line/35 p-3"
     >
       <View className="flex-row items-center gap-1.5">
         <Text variant="display" className={VALUE_TONE[tone]}>
