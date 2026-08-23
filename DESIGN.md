@@ -207,7 +207,7 @@ Omit as a second brand accent. Status colors below are functional, not brand.
 - **Title** (`variant="title"`, semibold, `text-base` ~16px): Card/row titles, primary button labels, section headers.
 - **Body** (`variant="body"`, regular, `text-base` ~16px): Message text, supporting prose, thread titles. Text inputs also use `text-base` (≥16px iOS floor).
 - **Meta** (`variant="meta"`, regular, `text-sm` ~14px): Previews, FAQ answers, empty-state hints, secondary copy.
-- **Label** (`variant="label"`, semibold, `text-xs` ~12px; add `uppercase tracking-wider` for eyebrows/chips): Role eyebrows (SUPPORT / AGENT / ADMIN), “Sponsored”, chip labels, section kickers, settings role pill, form labels, tab labels.
+- **Label** (`variant="label"`, semibold, `text-xs` ~12px; add `uppercase tracking-wider` for eyebrows/chips): Role eyebrows (SUPPORT / AGENT / ADMIN), “Sponsored”, chip labels, section kickers, settings role pill, form labels.
 - **Mono** (`variant="mono"`, JetBrains Mono medium, `text-sm` ~14px): Rare code-like UI only (`font-mono-bold` when bold mono is required).
 
 Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2xl`). Do not invent `text-[Npx]` one-offs. Do not use orphan `text-lg` / `text-3xl` — map to headline / display.
@@ -286,7 +286,7 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 
 ### Navigation
 - **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Contact header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
-- **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Active item = Ember Mist inner pill + Enki Ember icon/label (Manrope semibold). Idle = Muted. Unassigned / Conversations may show Enki Ember count badges. Stack header title may stay **Messages** while the tab label stays **Conversations** (intentional split: inbox screen title vs ops destination). Host tab bar chrome is transparent — the capsule is the only visible nav.
+- **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Icon-only — no visible text label. Active item = Ember Mist inner pill behind the Enki Ember icon; idle = Muted icon, no pill. Unassigned / Conversations may show Enki Ember count badges. Destination names live in the accessible name (`aria-label`/`accessibilityLabel`) only, not as rendered text — the stack header title (e.g. **Messages**) is independent of that accessible name. Host tab bar chrome is transparent — the capsule is the only visible nav.
 - **Stacks:** Flat header (no shadow), Graphite title in Manrope-SemiBold, surface background.
 - **Contact:** Same floating capsule as Agent/Admin — tabs Home | Messages | Help.
 
