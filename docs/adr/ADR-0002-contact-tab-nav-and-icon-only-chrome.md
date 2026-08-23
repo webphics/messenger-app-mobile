@@ -34,11 +34,12 @@ other roles did not need.
 
 ## Consequences
 
-- `CONTEXT.md`'s Contact and Hub entries and `PRODUCT.md`'s Users and
-  Positioning sections were rewritten to match; the "no tab bar" premise no
-  longer appears in either document. The `.cursor/rules/*.mdc` files listed
-  above still carry it as of this ADR and are tracked as follow-up cleanup,
-  not part of this decision.
+- `CONTEXT.md`'s Contact and Hub entries, `PRODUCT.md`'s Users and
+  Positioning sections, all three `.cursor/rules/*.mdc` files listed above,
+  and `DESIGN.md` were all rewritten to match; the "no tab bar" premise no
+  longer appears anywhere in the repo. `expo-router.mdc` also lost its "Do
+  not nest `home/` under contact" directive, which would otherwise have
+  instructed a future contributor to revert this decision.
 - Contact reaches Messages and Help in one tap from any screen instead of two.
 - Wayfinding for Admin's four tabs now rests entirely on icon recognition. The
   four glyphs (House, Users, Inbox, MessageCircle) were reviewed as silhouettes
