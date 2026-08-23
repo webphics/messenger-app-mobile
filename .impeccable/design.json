@@ -40,16 +40,16 @@
       "ink-soft": {
         "role": "neutral",
         "displayName": "Ink Soft",
-        "canonical": "#3A3D4A",
+        "canonical": "#453F39",
         "tonalRamp": [
-          "#14161F",
-          "#2A2D38",
-          "#3A3D4A",
-          "#555866",
-          "#6B7280",
-          "#9CA1B0",
-          "#C5C8D4",
-          "#E4E6EC"
+          "#1E1A15",
+          "#38312A",
+          "#453F39",
+          "#675E54",
+          "#80766B",
+          "#ACA6A0",
+          "#CFCDCA",
+          "#E9E8E7"
         ]
       },
       "muted": {
@@ -132,10 +132,10 @@
         "displayName": "On Primary",
         "canonical": "#FFFFFF",
         "tonalRamp": [
-          "#E8EDFB",
-          "#F0F3FC",
-          "#F5F7FD",
-          "#FAFBFE",
+          "#FEEBDC",
+          "#FEF2E8",
+          "#FEF6EF",
+          "#FFFAF7",
           "#FFFFFF",
           "#FFFFFF",
           "#FFFFFF",
@@ -250,17 +250,17 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Main CTA — Enki Blue fill, white semibold label, 48px tall.",
+      "description": "Main CTA — Enki Ember fill, white semibold label, 48px tall.",
       "html": "<button class=\"ds-btn-primary\">Sign in</button>",
-      "css": ".ds-btn-primary { background: #3452D9; color: #FFFFFF; padding: 10px 20px; height: 48px; border: none; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.10); transition: background 0.15s, transform 0.15s; } .ds-btn-primary:hover { background: rgba(52,82,217,0.9); } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52,82,217,0.5); }"
+      "css": ".ds-btn-primary { background: #B83E0B; color: #FFFFFF; padding: 10px 20px; height: 48px; border: none; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.10); transition: background 0.15s, transform 0.15s; } .ds-btn-primary:hover { background: rgba(184,62,11,0.9); } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.5); }"
     },
     {
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Beacon Mist wash with Enki Blue text for secondary actions.",
+      "description": "Ember Mist wash with Enki Ember text for secondary actions.",
       "html": "<button class=\"ds-btn-secondary\">Secondary</button>",
-      "css": ".ds-btn-secondary { background: #E8EDFB; color: #3452D9; padding: 10px 20px; height: 48px; border: none; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.15s, transform 0.15s; } .ds-btn-secondary:hover { background: rgba(232,237,251,0.8); } .ds-btn-secondary:active { transform: scale(0.97); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52,82,217,0.4); }"
+      "css": ".ds-btn-secondary { background: #FEEBDC; color: #B83E0B; padding: 10px 20px; height: 48px; border: none; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.15s, transform 0.15s; } .ds-btn-secondary:hover { background: rgba(254,235,220,0.8); } .ds-btn-secondary:active { transform: scale(0.97); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.4); }"
     },
     {
       "name": "Outline Button",
@@ -268,7 +268,7 @@
       "refersTo": "button-outline",
       "description": "Surface field with line border for quieter actions.",
       "html": "<button class=\"ds-btn-outline\">Cancel</button>",
-      "css": ".ds-btn-outline { background: #FFFFFF; color: #14161F; padding: 10px 20px; height: 48px; border: 1px solid #E4E6EC; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.15s, transform 0.15s; } .ds-btn-outline:hover { background: rgba(232,237,251,0.3); color: #3452D9; } .ds-btn-outline:active { transform: scale(0.97); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52,82,217,0.4); }"
+      "css": ".ds-btn-outline { background: #FFFFFF; color: #1A1714; padding: 10px 20px; height: 48px; border: 1px solid #EAE6E2; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.15s, transform 0.15s; } .ds-btn-outline:hover { background: rgba(254,235,220,0.3); color: #B83E0B; } .ds-btn-outline:active { transform: scale(0.97); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.4); }"
     },
     {
       "name": "Auth Input",
@@ -276,15 +276,15 @@
       "refersTo": "input-field",
       "description": "Friendly field — bg fill, line border, 16px radius, 48px height.",
       "html": "<input class=\"ds-input\" type=\"email\" placeholder=\"name@company.com\" />",
-      "css": ".ds-input { background: #FFFFFF; color: #14161F; border: 1px solid #E4E6EC; border-radius: 16px; height: 48px; padding: 0 12px; width: 100%; font-family: Manrope, system-ui, sans-serif; font-size: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: border-color 0.15s, box-shadow 0.15s; } .ds-input::placeholder { color: rgba(107,114,128,0.5); } .ds-input:hover { border-color: #C5C8D4; } .ds-input:focus { outline: none; border-color: #3452D9; box-shadow: 0 0 0 3px rgba(52,82,217,0.35); } .ds-input:focus-visible { outline: none; border-color: #3452D9; box-shadow: 0 0 0 3px rgba(52,82,217,0.35); }"
+      "css": ".ds-input { background: #FFFFFF; color: #1A1714; border: 1px solid #EAE6E2; border-radius: 16px; height: 48px; padding: 0 12px; width: 100%; font-family: Manrope, system-ui, sans-serif; font-size: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: border-color 0.15s, box-shadow 0.15s; } .ds-input::placeholder { color: rgba(110,104,98,0.5); } .ds-input:hover { border-color: #C5C8D4; } .ds-input:focus { outline: none; border-color: #B83E0B; box-shadow: 0 0 0 3px rgba(184,62,11,0.35); } .ds-input:focus-visible { outline: none; border-color: #B83E0B; box-shadow: 0 0 0 3px rgba(184,62,11,0.35); }"
     },
     {
       "name": "Filter Chip Selected",
       "kind": "chip",
       "refersTo": "chip-selected",
-      "description": "Selected inbox/users filter — Enki Blue fill, white label.",
+      "description": "Selected inbox/users filter — Enki Ember fill, white label.",
       "html": "<button class=\"ds-chip-selected\">All</button>",
-      "css": ".ds-chip-selected { background: #3452D9; color: #FFFFFF; border: 1px solid transparent; border-radius: 9999px; padding: 8px 14px; min-height: 36px; font-family: Manrope, system-ui, sans-serif; font-size: 12px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.10); transition: transform 0.15s, background 0.15s; } .ds-chip-selected:hover { background: rgba(52,82,217,0.9); } .ds-chip-selected:active { transform: scale(0.97); } .ds-chip-selected:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52,82,217,0.45); }"
+      "css": ".ds-chip-selected { background: #B83E0B; color: #FFFFFF; border: 1px solid transparent; border-radius: 9999px; padding: 8px 14px; min-height: 36px; font-family: Manrope, system-ui, sans-serif; font-size: 12px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.10); transition: transform 0.15s, background 0.15s; } .ds-chip-selected:hover { background: rgba(184,62,11,0.9); } .ds-chip-selected:active { transform: scale(0.97); } .ds-chip-selected:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.45); }"
     },
     {
       "name": "Filter Chip Idle",
@@ -292,7 +292,7 @@
       "refersTo": "chip-idle",
       "description": "Idle filter chip — surface + line border, ink-soft text.",
       "html": "<button class=\"ds-chip-idle\">Unread</button>",
-      "css": ".ds-chip-idle { background: #FFFFFF; color: #3A3D4A; border: 1px solid #E4E6EC; border-radius: 9999px; padding: 8px 14px; min-height: 36px; font-family: Manrope, system-ui, sans-serif; font-size: 12px; font-weight: 600; transition: background 0.15s, transform 0.15s; } .ds-chip-idle:hover { background: rgba(232,237,251,0.5); } .ds-chip-idle:active { transform: scale(0.97); } .ds-chip-idle:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52,82,217,0.35); }"
+      "css": ".ds-chip-idle { background: #FFFFFF; color: #453F39; border: 1px solid #EAE6E2; border-radius: 9999px; padding: 8px 14px; min-height: 36px; font-family: Manrope, system-ui, sans-serif; font-size: 12px; font-weight: 600; transition: background 0.15s, transform 0.15s; } .ds-chip-idle:hover { background: rgba(254,235,220,0.5); } .ds-chip-idle:active { transform: scale(0.97); } .ds-chip-idle:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.35); }"
     },
     {
       "name": "Surface Card",
@@ -300,15 +300,15 @@
       "refersTo": "card-surface",
       "description": "Hub/inbox card — white surface, line border, soft lift, ~24px radius.",
       "html": "<div class=\"ds-card\"><strong class=\"ds-card-title\">Billing question</strong><p class=\"ds-card-meta\">2m ago</p></div>",
-      "css": ".ds-card { background: #FFFFFF; color: #14161F; border: 1px solid #E4E6EC; border-radius: 24px; padding: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .ds-card-title { display: block; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; } .ds-card-meta { margin: 4px 0 0; font-family: Manrope, system-ui, sans-serif; font-size: 12px; font-weight: 400; color: #6B7280; }"
+      "css": ".ds-card { background: #FFFFFF; color: #1A1714; border: 1px solid #EAE6E2; border-radius: 24px; padding: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); } .ds-card-title { display: block; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; } .ds-card-meta { margin: 4px 0 0; font-family: Manrope, system-ui, sans-serif; font-size: 12px; font-weight: 400; color: #6E6862; }"
     },
     {
       "name": "Outgoing Bubble",
       "kind": "custom",
       "refersTo": "bubble-outgoing",
-      "description": "Support Beacon accent in chat — Enki Blue fill, ~22px radius.",
+      "description": "Support Ember accent in chat — Enki Ember fill, ~22px radius.",
       "html": "<div class=\"ds-bubble-out\">Thanks — I’ll check that now.</div>",
-      "css": ".ds-bubble-out { background: #3452D9; color: #FFFFFF; border-radius: 22px 22px 6px 22px; padding: 10px 12px; max-width: 80%; font-family: Manrope, system-ui, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.4; }"
+      "css": ".ds-bubble-out { background: #B83E0B; color: #FFFFFF; border-radius: 22px 22px 6px 22px; padding: 10px 12px; max-width: 80%; font-family: Manrope, system-ui, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.4; }"
     },
     {
       "name": "Incoming Bubble",
@@ -316,7 +316,7 @@
       "refersTo": "bubble-incoming",
       "description": "Clear Desk incoming — white field, line border, Graphite text.",
       "html": "<div class=\"ds-bubble-in\">Can you help with my invoice?</div>",
-      "css": ".ds-bubble-in { background: #FFFFFF; color: #14161F; border: 1px solid #E4E6EC; border-radius: 22px 22px 22px 6px; padding: 10px 12px; max-width: 80%; font-family: Manrope, system-ui, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }"
+      "css": ".ds-bubble-in { background: #FFFFFF; color: #1A1714; border: 1px solid #EAE6E2; border-radius: 22px 22px 22px 6px; padding: 10px 12px; max-width: 80%; font-family: Manrope, system-ui, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.4; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }"
     },
     {
       "name": "Hub Brand Header",
@@ -324,24 +324,24 @@
       "refersTo": "card-surface",
       "description": "Enki logo + extrabold wordmark; role eyebrow stays out of this row.",
       "html": "<header class=\"ds-hub-header\"><span class=\"ds-hub-mark\" aria-hidden=\"true\"></span><span class=\"ds-hub-wordmark\">Enki</span></header>",
-      "css": ".ds-hub-header { display: flex; align-items: center; gap: 10px; background: #FFFFFF; } .ds-hub-mark { width: 36px; height: 36px; border-radius: 12px; background: #3452D9; box-shadow: 0 1px 2px rgba(0,0,0,0.10); } .ds-hub-wordmark { font-family: Manrope, system-ui, sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #14161F; }"
+      "css": ".ds-hub-header { display: flex; align-items: center; gap: 10px; background: #FFFFFF; } .ds-hub-mark { width: 36px; height: 36px; border-radius: 12px; background: #B83E0B; box-shadow: 0 1px 2px rgba(0,0,0,0.10); } .ds-hub-wordmark { font-family: Manrope, system-ui, sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #1A1714; }"
     }
   ],
   "narrative": {
-    "northStar": "The Clear Desk (with Support Beacon accents)",
-    "overview": "Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Blue appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Beacon Mist). Beacon Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.\n\nPersonality is friendly and direct: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is hybrid — hairline line borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). The thread composer is border-only at rest. This phase locks light chrome only; dark tokens exist in CSS for later but must not drive UI now.",
+    "northStar": "The Clear Desk (with Support Ember accents)",
+    "overview": "Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Ember appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Ember Mist). Ember Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.\n\nPersonality is friendly and direct: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is hybrid — hairline line borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). The thread composer is border-only at rest. This phase locks light chrome only; dark tokens exist in CSS for later but must not drive UI now.",
     "keyCharacteristics": [
-      "White Clear Desk surfaces; Graphite type; Enki Blue as the sparse action/help signal",
+      "White Clear Desk surfaces; Graphite type; Enki Ember as the sparse action/help signal",
       "Manrope for UI; JetBrains Mono for code-like fragments only",
       "Soft rounded cards (~24px) and chat bubbles (~22px); pills are fully round",
       "Hybrid elevation: border-first, soft card lift, stronger shadow only on overlays (composer is border-only at rest)",
       "Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes",
-      "Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Beacon Mist for secondary CTAs"
+      "Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Ember Mist for secondary CTAs"
     ],
     "rules": [
       {
         "name": "The One Signal Rule",
-        "body": "Enki Blue occupies a small share of any screen. If blue is everywhere, the Clear Desk failed.",
+        "body": "Enki Ember occupies a small share of any screen. If ember is everywhere, the Clear Desk failed.",
         "section": "colors"
       },
       {
@@ -381,8 +381,8 @@
       }
     ],
     "dos": [
-      "Do keep the Clear Desk: white Bg/Surface, Graphite type, Enki Blue as sparse signal.",
-      "Do use Beacon Mist for soft selected/avatar/secondary moments.",
+      "Do keep the Clear Desk: white Bg/Surface, Graphite type, Enki Ember as sparse signal.",
+      "Do use Ember Mist for soft selected/avatar/secondary moments.",
       "Do put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as Enki only.",
       "Do use hybrid elevation — line at rest (including composer), stronger shadow on overlays only.",
       "Do keep Agent/Admin hub stats and tiles quiet (Graphite / neutral / amber attention).",
@@ -396,7 +396,7 @@
       "Don't build stories, case-status steppers, or Casewire branding.",
       "Don't put role labels in the header wordmark or theme whole hubs per role color.",
       "Don't show the agent avatar stack on the Contact hub.",
-      "Don't stack Enki Blue on unread time + badge + Offers avatar in the same row.",
+      "Don't stack Enki Ember on unread time + badge + Offers avatar in the same row.",
       "Don't put overlay-weight shadow on the resting composer.",
       "Don't enable system dark mode for app chrome this phase.",
       "Don't treat Offers as an ad SDK, checkout, or Instagram stories surface."
