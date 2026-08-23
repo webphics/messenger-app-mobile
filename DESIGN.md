@@ -219,7 +219,7 @@ Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2
 
 ## Layout
 
-Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px). Hub/inbox lists stack soft cards with ~12–14px gaps, not hairline separator rows. Headerless screens (hub, search, chat) share `screenTopPad(insets.top)` = safe-area top + 12px. Bottom chrome respects safe-area + the floating Agent/Admin tab capsule. Contact hub has **no tab bar**. Hide scrollbars. Offers carousel: edge pad 16 both ends, ~78% card width with next-slide peek.
+Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px). Hub/inbox lists stack soft cards with ~12–14px gaps, not hairline separator rows. Headerless screens (hub, search, chat) share `screenTopPad(insets.top)` = safe-area top + 12px. Bottom chrome respects safe-area + the floating tab capsule, shared by Agent, Admin, and Contact. Hide scrollbars. Offers carousel: edge pad 16 both ends, ~78% card width with next-slide peek.
 
 ### Named Rules
 **The Safe Desk Rule.** Content stays inside safe areas; Android edge-to-edge + inset padding is mandatory — do not invent a second status-bar stack.
@@ -288,7 +288,7 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Contact header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
 - **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Active item = Ember Mist inner pill + Enki Ember icon/label (Manrope semibold). Idle = Muted. Unassigned / Conversations may show Enki Ember count badges. Stack header title may stay **Messages** while the tab label stays **Conversations** (intentional split: inbox screen title vs ops destination). Host tab bar chrome is transparent — the capsule is the only visible nav.
 - **Stacks:** Flat header (no shadow), Graphite title in Manrope-SemiBold, surface background.
-- **Contact:** Stack-only hub — no tab bar.
+- **Contact:** Same floating capsule as Agent/Admin — tabs Home | Messages | Help.
 
 ### Hub ops (Agent / Admin)
 - Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not Enki Ember value tint.
