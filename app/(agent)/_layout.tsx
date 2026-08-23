@@ -31,7 +31,6 @@ export default function AgentLayout() {
         name="conversations"
         options={{
           title: "Messages",
-          tabBarLabel: "Conversations",
           tabBarIcon: ({ color, size }) => (
             <MessageCircle color={color} size={size} />
           ),
