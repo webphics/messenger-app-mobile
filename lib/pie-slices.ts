@@ -1,11 +1,21 @@
 import { colors } from '@/lib/tokens'
 import type { ChartSlice } from '@/lib/types'
 
+/**
+ * Categorical ramp for pie/donut charts. Deliberately decoupled from the
+ * semantic palette (`colors.amber` / `colors.danger`) — after the ember
+ * recolour, primary/amber/danger are all warm oranges with pairwise contrast
+ * as low as ~1.14:1, which collapses under deuteranopia and on charts that
+ * render without a text legend. `#F2A93B` (gold) and `#3D3129` (graphite) are
+ * chart-only literals chosen for luminance spread against primary/success;
+ * they are NOT app theme tokens. Do not add them to global.css or
+ * lib/tokens.ts, and do not re-point this ramp at colors.amber/colors.danger.
+ */
 export const SLICE_COLORS = [
-  colors.primary,
-  colors.success,
-  colors.amber,
-  colors.danger,
+  colors.primary, // #B83E0B ember
+  colors.success, // #1F9D6C green
+  '#F2A93B', // gold
+  '#3D3129', // graphite
 ] as const
 
 export type DrawnSlice = ChartSlice & {
