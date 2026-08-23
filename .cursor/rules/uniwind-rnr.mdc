@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Uniwind + RNR
 
-Use `className` + `cn()` from `@/lib/cn`. Locked tokens: `bg` `#FFFFFF`, `surface` `#FFFFFF`, `ink` / `ink-soft` / `muted`, `line`, `primary` `#3452D9`, `primary-soft` `#E8EDFB`, `bubble-in` light `#FFFFFF` / dark `#2A2E3B`, `success`, `danger`, `amber`.
+Use `className` + `cn()` from `@/lib/cn`. Locked tokens: `bg` `#FFFFFF`, `surface` `#FFFFFF`, `ink` / `ink-soft` / `muted`, `line`, `primary` `#B83E0B`, `primary-soft` `#FEEBDC`, `bubble-in` light `#FFFFFF` / dark `#3A3129`, `success`, `danger`, `amber`.
 
 New `--color-*` tokens go in `@theme` (utility) **and** both `@variant light` and `@variant dark` with the same variable name. Uniwind only diffs `@variant` blocks — missing one side crashes Metro. Do not use arbitrary hex (`bg-[#…]`) for palette colors.
 
