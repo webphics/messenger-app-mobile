@@ -18,7 +18,13 @@
  * before it.
  */
 
-const MARKER = "applySystemBarInsets";
+// Unique to the CURRENT implementation (the old plugin painted statusBarColor /
+// navigationBarColor directly and never called decorView.setBackgroundColor), so
+// this correctly distinguishes "already patched with this version" from "patched
+// by a stale, pre-decorView-paint version of this plugin".
+const MARKER = "decorView.setBackgroundColor";
+// Present in both the old and the new patch — used only to detect the stale case.
+const STALE_MARKER = "private fun applyLightSystemBars";
 
 const IMPORTS = [
   "import android.graphics.Color",
@@ -93,6 +99,14 @@ function addCalls(src) {
       "with-system-bar-insets: could not find `super.onCreate(null)` in MainActivity.kt",
     );
   }
+  // Idempotent: the call text is identical between the old and new patch, so if
+  // both calls are already present anywhere in the file, don't add a second copy.
+  if (
+    src.includes("applyLightSystemBars()") &&
+    src.includes("applySystemBarInsets(findViewById(android.R.id.content))")
+  ) {
+    return src;
+  }
   return src.replace(
     anchor,
     `${anchor}\n    applyLightSystemBars()\n    applySystemBarInsets(findViewById(android.R.id.content))`,
@@ -100,6 +114,17 @@ function addCalls(src) {
 }
 
 function addMethods(src) {
+  // Reliably splicing out the OLD applyLightSystemBars body (nested `if` /
+  // `.apply {}` blocks) and replacing it in place is fragile with a regex — a
+  // wrong match risks emitting silently-broken Kotlin. The caller already
+  // throws on the stale-patch case before this runs, so by the time we get
+  // here `src` is guaranteed to be a fresh, unpatched template. Guard anyway.
+  if (src.includes(STALE_MARKER)) {
+    throw new Error(
+      "with-system-bar-insets: MainActivity.kt already has an outdated applyLightSystemBars " +
+        "patch. Run `expo prebuild --clean -p android` to regenerate from a clean template.",
+    );
+  }
   // Insert above getMainComponentName's KDoc, not between the doc and the
   // function — splitting those would orphan the comment onto our methods.
   const anchor = /(\n[ \t]*\/\*\*(?:(?!\*\/)[\s\S])*?\*\/\n)?([ \t]*override fun getMainComponentName\()/;
@@ -147,6 +172,17 @@ module.exports = function withSystemBarInsets(config) {
     }
     // Idempotent: prebuild can run repeatedly against an existing android/.
     if (mod.modResults.contents.includes(MARKER)) return mod;
+    // A project patched by a STALE (pre-decorView-paint) version of this plugin
+    // won't match MARKER above but does still have the old method — running the
+    // adders against it would double-insert imports/calls/methods and produce
+    // uncompilable Kotlin. Fail loudly instead of guessing.
+    if (mod.modResults.contents.includes(STALE_MARKER)) {
+      throw new Error(
+        "with-system-bar-insets: MainActivity.kt was patched by an outdated version of this " +
+          "plugin (it still sets window.statusBarColor instead of painting decorView). " +
+          "Run `expo prebuild --clean -p android` to regenerate the native project, then retry.",
+      );
+    }
 
     let src = mod.modResults.contents;
     src = addImports(src);
