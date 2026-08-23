@@ -28,7 +28,7 @@ export function ContactHub() {
   return (
     <HubScroll>
       <View className="px-4">
-        <HubHeader settingsHref="/(contact)/settings" />
+        <HubHeader settingsHref="/(contact)/(home)/settings" />
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
@@ -70,7 +70,7 @@ export function ContactHub() {
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Search for help"
-            onPress={() => router.push("/(contact)/search")}
+            onPress={() => router.push("/(contact)/(home)/search")}
             className="mt-4 flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
           >
             <IconChip icon={Search} tone="neutral" size={32} />
@@ -88,7 +88,7 @@ export function ContactHub() {
           title="Frequently Asked Questions"
           hint="Common questions — passwords, billing, access…"
           accessibilityLabel="Frequently asked questions"
-          onPress={() => router.push("/(contact)/faq")}
+          onPress={() => router.push("/(contact)/(home)/faq")}
         />
       </View>
     </HubScroll>

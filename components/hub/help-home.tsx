@@ -31,14 +31,14 @@ const LINKS: {
     Icon: MessageCircle,
   },
   {
-    href: "/(contact)/search",
+    href: "/(contact)/(home)/search",
     label: "Search for Help",
     hint: "Instant answers and troubleshooting guides",
     a11y: "Search for help",
     Icon: Search,
   },
   {
-    href: "/(contact)/faq",
+    href: "/(contact)/(home)/faq",
     label: "Frequently Asked Questions",
     hint: "Common queries on passwords, billing, and access",
     a11y: "Frequently asked questions",
