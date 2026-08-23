@@ -9,7 +9,7 @@ The product brand shown on launcher, auth, and hub wordmarks.
 _Avoid_: Messenger (as product name), Casewire, ISM
 
 **Contact**:
-End-user role that only sees their own conversations. Reaches Home, Messages, and Help from the tab capsule; FAQ, Search, and Settings stay inside the home stack.
+End-user role that only sees their own conversations. Reaches Home, Messages, and Help from the tab capsule; FAQ, Search, and Settings are reached from Home rather than from the tab capsule.
 _Avoid_: Customer, client, user (when meaning this role)
 
 **Agent**:

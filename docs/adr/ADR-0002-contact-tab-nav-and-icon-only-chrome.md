@@ -2,15 +2,17 @@
 
 - Status: Accepted
 - Date: 2026-08-24
-- Supersedes: ADR-0001 §1–3 (partially — hub branding and greeting copy stand)
 
 ## Context
 
-ADR-0001 fixed hub chrome on the premise that Contact is a stack hub with no
-tab bar, and `CONTEXT.md` and `PRODUCT.md` both recorded that as domain law.
-In practice Contact's two most-used destinations — Messages and Help — were
-reachable only by returning to the hub and tapping an action tile, one level
-deeper than the equivalent journey for Agent or Admin.
+The domain record carried a premise that Contact has no tab bar: the
+`CONTEXT.md` glossary's Contact entry, `PRODUCT.md`'s Contact role
+description and its Positioning bullet, and the `.cursor/rules/*.mdc` rule
+files all stated it, one of them (`expo-router.mdc`) with the further
+directive "Do not nest `home/` under contact." In practice Contact's two
+most-used destinations — Messages and Help — were reachable only by
+returning to the hub and tapping an action tile, one level deeper than the
+equivalent journey for Agent or Admin.
 
 Separately, the shared tab capsule carried a text label under every icon.
 Admin's four labels ("Home", "Users", "Unassigned", "Conversations") set the
@@ -33,8 +35,10 @@ other roles did not need.
 ## Consequences
 
 - `CONTEXT.md`'s Contact and Hub entries and `PRODUCT.md`'s Users and
-  Positioning sections were rewritten; "Contact is a stack hub" is no longer
-  true anywhere in the repo.
+  Positioning sections were rewritten to match; the "no tab bar" premise no
+  longer appears in either document. The `.cursor/rules/*.mdc` files listed
+  above still carry it as of this ADR and are tracked as follow-up cleanup,
+  not part of this decision.
 - Contact reaches Messages and Help in one tap from any screen instead of two.
 - Wayfinding for Admin's four tabs now rests entirely on icon recognition. The
   four glyphs (House, Users, Inbox, MessageCircle) were reviewed as silhouettes
