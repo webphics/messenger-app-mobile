@@ -31,7 +31,7 @@ const CAPSULE_PAD = 6;
 function badgeForRoute(name: string): number | undefined {
   const user = getDevUser();
   if (name === "unassigned") return unassignedTabBadge(CONVERSATIONS);
-  if (name === "conversations") {
+  if (name === "conversations" || name === "messages") {
     return conversationsTabBadge(user.role, user.id, CONVERSATIONS);
   }
   return undefined;
