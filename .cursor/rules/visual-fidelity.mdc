@@ -20,6 +20,6 @@ Thread reactions + reply: Meta/Messenger light chrome — swipe right to reply; 
 
 Inbox chips: selected = `bg-primary-soft` + primary text; idle = line/grey. Conversation rows = individual surface cards (`rounded-2xl` + `border-line` + `shadow-md` on `bg`), not separator lines. Hub/help/FAQ cards same chrome. Offers chat (`id: 'offers'`) is pinned first whenever it is in the list. Compose icon visible, **dead**. Unassigned tab: hide chips.
 
-Offers promo: locked hub mock. `"Sponsored"` is the section label only. Carousel `edgePad` 16 on start **and** end; next slide peeks off the right (~78% width). Title + Join Offers stay `px-4`. Background = local `assets/offers/*.png` + dark gradient overlay + white **View offer**. **Join Offers chat** = primary pill + message icon. RN `Image` only (no expo-image). Contact hub has **no tab bar**. Search ≠ Help ≠ FAQ. No scrollbars (`showsVerticalScrollIndicator={false}` + CSS).
+Offers promo: locked hub mock. `"Sponsored"` is the section label only. Carousel `edgePad` 16 on start **and** end; next slide peeks off the right (~78% width). Title + Join Offers stay `px-4`. Background = local `assets/offers/*.png` + dark gradient overlay + white **View offer**. **Join Offers chat** = primary pill + message icon. RN `Image` only (no expo-image). Contact hub has the floating tab capsule (Home | Messages | Help). Search ≠ Help ≠ FAQ. No scrollbars (`showsVerticalScrollIndicator={false}` + CSS).
 
 Use RN `Image` until the expo-image phase. Do not rewrite `components/ui/*` class strings to chase a mock.

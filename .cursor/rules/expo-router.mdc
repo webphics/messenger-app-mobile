@@ -12,7 +12,7 @@ Shared thread: `app/chat/[id].tsx` → `/chat/:id`. Offers group id is literally
 
 Android: `disableTopInsetApplication` (MainActivity already pads status inset). Chat + search: `headerShown: false` + `InScreenHeader` (`screenTopPad` = inset + 12). Do not `setOptions` the chat header. Do not default the chat screen to `title: 'Chat'`. Do not add a nested `chat/_layout`. Root `animation: 'ios_from_right'` (not linear `slide_from_right`). Sign out `signOutSession()` then `router.replace('/(auth)/sign-in')`. Login/register `loginSession(email)` then `router.replace(ROLE_HREF[role])`. Root `/` hydrates session then Redirect to login or `ROLE_HREF[role]` — do not hardcode `DEV_ROLE`.
 
-Contact: **Stack, no tab bar.** Hub gear → settings. `messages` / `help` / `faq` / `settings` use native `stackChrome` back. `search` is in-screen header (autofocus). Search ≠ Help ≠ FAQ. Do not nest `home/` under contact. Do not put messages/help on the root stack. Do not bring back Home \| Settings tabs.
+Contact: **Tabs, mirrors `(agent)`.** `app/(contact)/` is a `Tabs` layout wrapping a nested `(home)` Stack. Tabs: **Home | Messages | Help**. `faq` / `search` / `settings` are stack pushes inside `(home)`. Hub gear → settings. `search` is in-screen header (autofocus). Search ≠ Help ≠ FAQ. Do not put messages/help on the root stack.
 
 Agent tabs: **Home | Unassigned | Conversations**. Home = one `(home)` Stack (hub `headerShown: false`). Settings / `knowledge` / `article/[id]` / search / FAQ are **sibling** stack screens (`stackChrome` native back). Do not nest `knowledge/_layout` or fake `headerLeft` back. Conversations = inbox (header **Messages**). Unassigned = `assigneeId === null` only; hide Open/Resolved chips. Hub gear → settings. Search stays `InScreenHeader`.
 
