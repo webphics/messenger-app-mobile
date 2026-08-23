@@ -4,48 +4,36 @@
   "title": "Design System: Enki",
   "extensions": {
     "colorMeta": {
-      "enki-blue": {
+      "enki-ember": {
         "role": "primary",
-        "displayName": "Enki Blue",
-        "canonical": "#3452D9",
+        "displayName": "Enki Ember",
+        "canonical": "#B83E0B",
         "tonalRamp": [
-          "#1A2A7A",
-          "#2436A3",
-          "#2C44C4",
-          "#3452D9",
-          "#5A72E3",
-          "#8496EC",
-          "#B3BEF5",
-          "#E8EDFB"
+          "#3A1303", "#571C05", "#7A2807", "#99330B",
+          "#B83E0B", "#DC5A22", "#F09163", "#FEEBDC"
         ]
       },
-      "beacon-mist": {
+      "ember-mist": {
         "role": "primary",
-        "displayName": "Beacon Mist",
-        "canonical": "#E8EDFB",
+        "displayName": "Ember Mist",
+        "canonical": "#FEEBDC",
         "tonalRamp": [
-          "#243056",
-          "#3A4A7A",
-          "#5A6BA8",
-          "#8496C8",
-          "#B3BEF0",
-          "#D0D8F5",
-          "#E8EDFB",
-          "#F5F7FD"
+          "#4A2413", "#6B3A22", "#9A5C3C", "#C4886A",
+          "#F0B894", "#FBD8BC", "#FEEBDC", "#FFF7F1"
         ]
       },
       "graphite": {
         "role": "neutral",
         "displayName": "Graphite",
-        "canonical": "#14161F",
+        "canonical": "#1A1714",
         "tonalRamp": [
-          "#0A0B10",
-          "#14161F",
-          "#3A3D4A",
-          "#6B7280",
-          "#8B90A0",
-          "#C5C8D4",
-          "#E4E6EC",
+          "#0D0B0A",
+          "#1A1714",
+          "#4A423A",
+          "#766B60",
+          "#968C82",
+          "#BCB8B3",
+          "#DDDBDA",
           "#FFFFFF"
         ]
       },
@@ -67,30 +55,30 @@
       "muted": {
         "role": "neutral",
         "displayName": "Muted",
-        "canonical": "#6B7280",
+        "canonical": "#6E6862",
         "tonalRamp": [
-          "#3A3D4A",
-          "#4B5160",
-          "#6B7280",
-          "#8B90A0",
-          "#A8ADB8",
-          "#C5C8D4",
-          "#E4E6EC",
-          "#F4F5F8"
+          "#4C4239",
+          "#60554B",
+          "#6E6862",
+          "#978C81",
+          "#AFA8A1",
+          "#CBC7C3",
+          "#E2E0DF",
+          "#F3F2F2"
         ]
       },
       "line": {
         "role": "neutral",
         "displayName": "Line",
-        "canonical": "#E4E6EC",
+        "canonical": "#EAE6E2",
         "tonalRamp": [
-          "#2A2E3B",
-          "#4B5160",
-          "#8B90A0",
-          "#C5C8D4",
-          "#D5D8E0",
-          "#E4E6EC",
-          "#F0F1F5",
+          "#3C332A",
+          "#635548",
+          "#9C8C7C",
+          "#C7BFB8",
+          "#DDD9D5",
+          "#EAE6E2",
+          "#F3F2F1",
           "#FFFFFF"
         ]
       },
@@ -172,31 +160,31 @@
       "danger": {
         "role": "tertiary",
         "displayName": "Danger",
-        "canonical": "#D64545",
+        "canonical": "#B3261E",
         "tonalRamp": [
-          "#6B1C1C",
-          "#A32E2E",
-          "#D64545",
-          "#E06B6B",
-          "#EA9898",
-          "#F3C4C4",
-          "#F9E0E0",
-          "#FCF0F0"
+          "#571D19",
+          "#81312D",
+          "#B3261E",
+          "#B9736F",
+          "#C89F9D",
+          "#D7C2C1",
+          "#E7DFDF",
+          "#F3F1F1"
         ]
       },
       "amber": {
         "role": "tertiary",
         "displayName": "Amber",
-        "canonical": "#E2831C",
+        "canonical": "#A16207",
         "tonalRamp": [
-          "#6B3D0C",
-          "#A85C12",
-          "#E2831C",
-          "#F0A04A",
-          "#F5BC7A",
-          "#F9D5AB",
-          "#FCEBD5",
-          "#FEF6EC"
+          "#432E0E",
+          "#60441A",
+          "#A16207",
+          "#A57E46",
+          "#B79A71",
+          "#C5B6A0",
+          "#D9D2CA",
+          "#EFEDEC"
         ]
       }
     },
