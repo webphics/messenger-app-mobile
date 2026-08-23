@@ -8,7 +8,7 @@ adaptive
 
 ## Users
 
-**Contact** — internal person seeking help or participating in support conversations; sees only their own threads. Hub has no tab bar.
+**Contact** — internal person seeking help or participating in support conversations; sees only their own threads. Reaches Home, Messages, and Help from the tab capsule.
 
 **Agent** — support staff who reply in assigned threads and work the unassigned pool. Cannot delete.
 
@@ -24,7 +24,7 @@ Success: each role reaches the right conversations and hub actions quickly, with
 
 ## Positioning
 
-- Role-shaped hubs and RBAC: Contact is a stack hub (no tabs); Agent/Admin use tab hubs; capabilities follow role (view rules, unassigned pool, notes, delete, assign, broadcast — capability ≠ ship UI this phase).
+- Role-shaped hubs and RBAC: every role uses a tab hub, with a role-specific destination set (Contact: Home/Messages/Help; Agent: Home/Unassigned/Conversations; Admin: Home/Users/Unassigned/Conversations); capabilities follow role (view rules, unassigned pool, notes, delete, assign, broadcast — capability ≠ ship UI this phase).
 - Internal-only product: not consumer chat, not Casewire, no Instagram-style stories, no case-status stepper.
 - Offers = in-app promo carousel + shared group chat `id: 'offers'` (`"Sponsored"` is a label only). Agent/Admin hubs may include mock knowledge and overview charts; not an ad SDK or checkout.
 
@@ -37,7 +37,7 @@ Success: each role reaches the right conversations and hub actions quickly, with
 
 ## Capabilities and Constraints
 
-- Confirmed roles and navigation model as in scope (Contact hub vs Agent/Admin tabs; Settings via hub gear).
+- Confirmed roles and navigation model as in scope (all roles use tab hubs; Settings via hub gear).
 - Phase discipline: do not install later-phase packages (real auth, sockets, TanStack Query, FlashList, etc.) ahead of the phase bump.
 - Dead controls stay dead where phase says so (e.g. inbox compose, thread attach until that phase).
 - RBAC helpers live in `lib/rbac.ts`; screens import them.
