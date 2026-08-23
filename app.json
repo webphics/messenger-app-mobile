@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#3631E7",
+        "backgroundColor": "#FFA034",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -37,9 +37,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 120
+          "backgroundColor": "#FFFFFF"
         }
       ],
       "expo-font",
@@ -74,7 +72,9 @@
           "savePhotosPermission": "Allow $(PRODUCT_NAME) to save attachments you receive to your photo library.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-video",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
