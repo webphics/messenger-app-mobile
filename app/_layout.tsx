@@ -25,6 +25,7 @@ import { colors } from "@/lib/tokens";
 
 Uniwind.setTheme("light");
 Appearance.setColorScheme("light");
+void SplashScreen.preventAutoHideAsync();
 
 function applyAndroidNavChrome() {
   NavigationBar.setHidden(false);
@@ -43,7 +44,6 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    void SplashScreen.hideAsync();
     if (Platform.OS !== "android") return;
     applyAndroidNavChrome();
     const sub = AppState.addEventListener("change", (state) => {

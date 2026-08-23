@@ -23,12 +23,12 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
   return (
     <View className="flex-row items-center justify-between">
       {/* Brand Logo & Name */}
-      <View className="flex-row items-center gap-2.5">
+      <View className="flex-row items-center gap-2">
         <Image
-          source={require("../../assets/images/icon.png")}
+          source={require("../../assets/images/logo.png")}
           accessibilityLabel="Enki Logo"
-          className="size-9 rounded-xl shadow-sm shadow-black/10"
-          resizeMode="cover"
+          className="h-8 w-12"
+          resizeMode="contain"
         />
         <Text variant="headline" className="text-ink">
           Enki

@@ -93,9 +93,9 @@ export function AuthForm({ mode }: AuthFormProps) {
           className="items-center"
         >
           <Image
-            source={require("../../assets/images/splash-icon.png")}
+            source={require("../../assets/images/logo.png")}
             accessibilityLabel="Enki"
-            className="mb-3 h-20 w-20"
+            className="mb-3 h-20 w-28"
             resizeMode="contain"
           />
           <Text variant="display" className="text-center text-ink">

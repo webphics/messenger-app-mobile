@@ -80,6 +80,16 @@ function prebuild(reason) {
 if (process.argv.includes("--prebuild")) prebuild("--prebuild requested");
 else if (!existsSync(android)) prebuild("android/ is missing");
 
+const resDir = join(android, "app", "src", "main", "res", "drawable");
+if (!existsSync(resDir)) mkdirSync(resDir, { recursive: true });
+const logoXml = join(resDir, "splashscreen_logo.xml");
+if (!existsSync(logoXml)) {
+  writeFileSync(
+    logoXml,
+    `<?xml version="1.0" encoding="utf-8"?>\n<shape xmlns:android="http://schemas.android.com/apk/res/android"\n    android:shape="rectangle">\n    <solid android:color="@android:color/transparent"/>\n    <size android:width="1dp" android:height="1dp"/>\n</shape>\n`,
+  );
+}
+
 writeFileSync(join(android, "local.properties"), `sdk.dir=${sdk.replace(/\\/g, "/")}\n`);
 
 const env = {
@@ -96,7 +106,7 @@ const env = {
 const gradle = join(android, win ? "gradlew.bat" : "gradlew");
 const result = spawnSync(
   win ? `"${gradle}"` : gradle,
-  ["assembleRelease", "-PreactNativeArchitectures=arm64-v8a"],
+  ["assembleRelease", "-PreactNativeArchitectures=arm64-v8a,x86_64"],
   { cwd: android, env, stdio: "inherit", shell: win },
 );
 if (result.status !== 0) process.exit(result.status ?? 1);

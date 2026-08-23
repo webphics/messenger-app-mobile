@@ -1,5 +1,3 @@
-const { withMainActivity } = require("expo/config-plugins");
-
 /**
  * Applies the Android system-bar handling that this app depends on, as a
  * prebuild mod rather than a hand edit — `expo prebuild` regenerates
@@ -105,7 +103,34 @@ function addMethods(src) {
   return src.replace(anchor, (_match, doc, decl) => `\n${METHODS}${doc ?? "\n"}${decl}`);
 }
 
+const { withMainActivity, withDangerousMod } = require("expo/config-plugins");
+const fs = require("fs");
+const path = require("path");
+
+function withTransparentSplashScreenLogo(config) {
+  return withDangerousMod(config, [
+    "android",
+    async (mod) => {
+      const resDir = path.join(mod.modRequest.platformProjectRoot, "app", "src", "main", "res", "drawable");
+      if (!fs.existsSync(resDir)) {
+        fs.mkdirSync(resDir, { recursive: true });
+      }
+      const logoXml = path.join(resDir, "splashscreen_logo.xml");
+      const content = `<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent"/>
+    <size android:width="1dp" android:height="1dp"/>
+</shape>
+`;
+      fs.writeFileSync(logoXml, content, "utf-8");
+      return mod;
+    },
+  ]);
+}
+
 module.exports = function withSystemBarInsets(config) {
+  config = withTransparentSplashScreenLogo(config);
   return withMainActivity(config, (mod) => {
     if (mod.modResults.language !== "kt") {
       throw new Error(
