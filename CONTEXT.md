@@ -35,3 +35,7 @@ _Avoid_: Queue (unless referring to ordering), inbox (inbox is the conversation 
 **Offers**:
 In-app promo carousel plus the shared group chat `id: 'offers'`. `"Sponsored"` is a section label only.
 _Avoid_: Stories, ads, sponsored content (as a product feature)
+
+**Launch animation**:
+The looping transparent character animation on the cold-start screen, shown while the session hydrates. Rendered from an animated WebP; the surface behind it is the app background, not part of the asset.
+_Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface this screen dismisses), loading video, chroma-keyed video
