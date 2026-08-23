@@ -16,6 +16,7 @@ import { NavigationBar } from "expo-navigation-bar";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
+import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
 import { Appearance, AppState, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -25,6 +26,11 @@ import { colors } from "@/lib/tokens";
 
 Uniwind.setTheme("light");
 Appearance.setColorScheme("light");
+// The decor view is what shows through the strips MainActivity pads for the
+// system bars; AppTheme's DayNight parent paints it black on dark-mode phones.
+// The prebuild plugin does this natively for frame zero — this covers the dev
+// client, where that plugin has not run.
+void SystemUI.setBackgroundColorAsync(colors.bg);
 void SplashScreen.preventAutoHideAsync();
 
 function applyAndroidNavChrome() {
