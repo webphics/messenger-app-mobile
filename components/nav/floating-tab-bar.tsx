@@ -12,7 +12,6 @@ import { Tabs } from "expo-router";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { cn } from "@/lib/cn";
 import { getDevUser } from "@/lib/dev-user";
 import { CONVERSATIONS } from "@/lib/mock-data";
 import { motion } from "@/lib/motion";
@@ -29,25 +28,6 @@ type FloatingTabBarProps = Parameters<
 /** Matches capsule `px-1.5` — indicator lives in the padded content box. */
 const CAPSULE_PAD = 6;
 
-function labelFor(
-  options: FloatingTabBarProps["descriptors"][string]["options"],
-  focused: boolean,
-  color: string,
-): string {
-  const raw = options.tabBarLabel;
-  if (typeof raw === "string") return raw;
-  if (typeof raw === "function") {
-    const node = raw({
-      focused,
-      color,
-      position: "below-icon",
-      children: options.title ?? "",
-    });
-    return typeof node === "string" ? node : (options.title ?? "");
-  }
-  return options.title ?? "";
-}
-
 function badgeForRoute(name: string): number | undefined {
   const user = getDevUser();
   if (name === "unassigned") return unassignedTabBadge(CONVERSATIONS);
@@ -58,8 +38,9 @@ function badgeForRoute(name: string): number | undefined {
 }
 
 /**
- * Floating Clear Desk tab capsule for Agent/Admin.
- * Structure inspired by floating docks; materials stay Enki (surface, Beacon Mist, Enki Blue).
+ * Floating Clear Desk tab capsule for Contact/Agent/Admin.
+ * Icon-only: `options.title` is not rendered, but still feeds the
+ * `accessibilityLabel` below so screen readers keep every destination name.
  */
 export function FloatingTabBar({
   state,
@@ -115,7 +96,7 @@ export function FloatingTabBar({
           const focused = state.index === index;
           const { options } = descriptors[route.key];
           const color = focused ? colors.primary : colors.muted;
-          const label = labelFor(options, focused, color);
+          const label = options.title ?? route.name;
           const badge = badgeForRoute(route.name);
 
           const onPress = () => {
@@ -148,29 +129,19 @@ export function FloatingTabBar({
               onPress={onPress}
               onLongPress={onLongPress}
               haptic="selection"
-              className="z-10 min-h-11 flex-1"
+              className="z-10 min-h-12 flex-1"
             >
-              <View className="min-h-11 items-center justify-center px-1 py-1.5">
+              <View className="min-h-12 items-center justify-center px-1 py-2.5">
                 <View className="relative items-center">
-                  {options.tabBarIcon?.({ focused, color, size: 22 })}
+                  {options.tabBarIcon?.({ focused, color, size: 24 })}
                   {badge != null ? (
-                    <View className="absolute -right-3 -top-1.5 min-w-4 items-center rounded-full bg-primary px-1 py-px">
+                    <View className="absolute -right-2.5 -top-1 min-w-4 items-center rounded-full bg-primary px-1 py-px">
                       <Text variant="label" className="text-primary-foreground tabular-nums">
                         {badge > 99 ? "99+" : String(badge)}
                       </Text>
                     </View>
                   ) : null}
                 </View>
-                <Text
-                  variant="label"
-                  numberOfLines={1}
-                  className={cn(
-                    "mt-0.5 max-w-full px-0.5 text-center",
-                    focused ? "text-primary" : "text-muted",
-                  )}
-                >
-                  {label}
-                </Text>
               </View>
             </TactilePressable>
           );
