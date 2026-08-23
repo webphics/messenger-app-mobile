@@ -47,13 +47,13 @@ export function ContactHub() {
             icon={MessageCircle}
             title="Messages"
             hint="Get in touch"
-            onPress={() => router.push("/(contact)/messages")}
+            onPress={() => router.navigate("/(contact)/messages")}
           />
           <ActionTile
             icon={HelpCircle}
             title="Help"
             hint="Browse guides"
-            onPress={() => router.push("/(contact)/help")}
+            onPress={() => router.navigate("/(contact)/help")}
           />
         </Animated.View>
 
