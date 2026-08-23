@@ -1,16 +1,43 @@
-import { Stack } from "expo-router";
+import { Tabs } from "expo-router";
+import { HelpCircle, House, MessageCircle } from "@/components/icons";
+import { FloatingTabBar } from "@/components/nav/floating-tab-bar";
 
-import { stackChrome } from "@/lib/tokens";
+import { useTabChrome } from "@/lib/use-tab-chrome";
 
 export default function ContactLayout() {
+  const chrome = useTabChrome();
+
   return (
-    <Stack screenOptions={stackChrome}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="messages" options={{ title: "Messages" }} />
-      <Stack.Screen name="help" options={{ title: "Help" }} />
-      <Stack.Screen name="faq" options={{ title: "FAQ" }} />
-      <Stack.Screen name="search" options={{ headerShown: false }} />
-      <Stack.Screen name="settings" options={{ title: "Settings" }} />
-    </Stack>
+    <Tabs
+      screenOptions={chrome}
+      tabBar={(props) => <FloatingTabBar {...props} />}
+    >
+      <Tabs.Screen
+        name="(home)"
+        options={{
+          title: "Home",
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <House color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: "Messages",
+          tabBarIcon: ({ color, size }) => (
+            <MessageCircle color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="help"
+        options={{
+          title: "Help",
+          tabBarIcon: ({ color, size }) => (
+            <HelpCircle color={color} size={size} />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
