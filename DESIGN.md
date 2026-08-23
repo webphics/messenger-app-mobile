@@ -1,20 +1,20 @@
 ---
 name: Enki
-description: Light internal support messenger — Clear Desk chrome with Beacon accents
+description: Light internal support messenger — Clear Desk chrome with Ember accents
 colors:
-  enki-blue: "#3452D9"
-  beacon-mist: "#E8EDFB"
-  graphite: "#14161F"
-  ink-soft: "#3A3D4A"
-  muted: "#6B7280"
-  line: "#E4E6EC"
+  enki-ember: "#B83E0B"
+  ember-mist: "#FEEBDC"
+  graphite: "#1A1714"
+  ink-soft: "#453F39"
+  muted: "#6E6862"
+  line: "#EAE6E2"
   bg: "#FFFFFF"
   surface: "#FFFFFF"
   bubble-in: "#FFFFFF"
   on-primary: "#FFFFFF"
   success: "#1F9D6C"
-  danger: "#D64545"
-  amber: "#E2831C"
+  danger: "#B3261E"
+  amber: "#A16207"
 typography:
   display:
     fontFamily: "Manrope-ExtraBold, Manrope, system-ui, sans-serif"
@@ -77,15 +77,15 @@ spacing:
   screen-top-extra: "12px"
 components:
   button-primary:
-    backgroundColor: "{colors.enki-blue}"
+    backgroundColor: "{colors.enki-ember}"
     textColor: "{colors.on-primary}"
     typography: "{typography.title}"
     rounded: "{rounded.md}"
     padding: "10px 20px"
     height: "48px"
   button-secondary:
-    backgroundColor: "{colors.beacon-mist}"
-    textColor: "{colors.enki-blue}"
+    backgroundColor: "{colors.ember-mist}"
+    textColor: "{colors.enki-ember}"
     typography: "{typography.title}"
     rounded: "{rounded.md}"
     padding: "10px 20px"
@@ -111,7 +111,7 @@ components:
     padding: "12px"
     height: "48px"
   chip-selected:
-    backgroundColor: "{colors.enki-blue}"
+    backgroundColor: "{colors.enki-ember}"
     textColor: "{colors.on-primary}"
     typography: "{typography.label}"
     rounded: "{rounded.full}"
@@ -128,7 +128,7 @@ components:
     rounded: "{rounded.xl}"
     padding: "16px"
   bubble-outgoing:
-    backgroundColor: "{colors.enki-blue}"
+    backgroundColor: "{colors.enki-ember}"
     textColor: "{colors.on-primary}"
     typography: "{typography.body}"
     rounded: "{rounded.bubble}"
