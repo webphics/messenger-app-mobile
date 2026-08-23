@@ -16,15 +16,15 @@ export function screenBottomPad(insetBottom: number, extra = 0) {
 export const colors = {
   bg: "#FFFFFF",
   surface: "#FFFFFF",
-  ink: "#14161F",
-  inkSoft: "#3A3D4A",
-  muted: "#6B7280",
-  line: "#E4E6EC",
-  primary: "#3452D9",
+  ink: "#1A1714",
+  inkSoft: "#453F39",
+  muted: "#6E6862",
+  line: "#EAE6E2",
+  primary: "#B83E0B",
   primaryForeground: "#FFFFFF",
   success: "#1F9D6C",
-  danger: "#D64545",
-  amber: "#E2831C",
+  danger: "#B3261E",
+  amber: "#A16207",
 } as const;
 
 const headerChrome = {

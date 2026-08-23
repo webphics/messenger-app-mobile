@@ -62,4 +62,8 @@ describe("colour contrast floors", () => {
   test("body ink clears AAA on the app background", () => {
     expect(contrastRatio(colors.ink, colors.bg)).toBeGreaterThanOrEqual(7);
   });
+
+  test("danger reads as text on the app background at AA", () => {
+    expect(contrastRatio(colors.danger, colors.bg)).toBeGreaterThanOrEqual(4.5);
+  });
 });
