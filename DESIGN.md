@@ -145,47 +145,47 @@ components:
 
 ## Overview
 
-**Creative North Star: "The Clear Desk" (with Support Beacon accents)**
+**Creative North Star: "The Clear Desk" (with Support Ember accents)**
 
-Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Blue appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Beacon Mist). Beacon Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.
+Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Ember appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Ember Mist). Ember Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.
 
 Personality is **friendly and direct**: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is **hybrid** — hairline `line` borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). This phase locks **light chrome only** (`Uniwind.setTheme('light')`); dark tokens exist in CSS for later but must not drive UI now.
 
 **Key Characteristics:**
-- White Clear Desk surfaces; Graphite type; Enki Blue as the sparse action/help signal
+- White Clear Desk surfaces; Graphite type; Enki Ember as the sparse action/help signal
 - Manrope for UI; JetBrains Mono for code-like fragments only
 - Soft rounded cards (~24px) and chat bubbles (~22px); pills are fully round
 - Hybrid elevation: border-first, soft card lift, stronger shadow only on overlays (composer is border-only at rest)
 - Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes
-- Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Beacon Mist for secondary CTAs
+- Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Ember Mist for secondary CTAs
 
 ## Colors
 
-A cool light ops palette: white field, Graphite ink, one Enki Blue accent with Beacon Mist wash, plus status greens/ambers/reds.
+A warm light ops palette: white field, Graphite ink, one Enki Ember accent with Ember Mist wash, plus status greens/ambers/reds.
 
 ### Primary
-- **Enki Blue** (`#3452D9`): Primary actions, selected filter chips, outgoing bubbles, unread count badge (alone), focus ring, tab active tint, read receipts when read. Keep rare on any given screen so the Clear Desk stays calm.
-- **Beacon Mist** (`#E8EDFB`): Soft selected/active wash, avatar fallbacks (including Offers megaphone), secondary buttons, soft chips, admin “Create Offer” row icon. The Support Beacon accent — help is present without flooding the desk.
+- **Enki Ember** (`#B83E0B`): Primary actions, selected filter chips, outgoing bubbles, unread count badge (alone), focus ring, tab active tint, read receipts when read. Keep rare on any given screen so the Clear Desk stays calm.
+- **Ember Mist** (`#FEEBDC`): Soft selected/active wash, avatar fallbacks (including Offers megaphone), secondary buttons, soft chips, admin “Create Offer” row icon. The Support Ember accent — help is present without flooding the desk.
 
 ### Secondary
 Omit as a second brand accent. Status colors below are functional, not brand.
 
 ### Neutral
-- **Graphite** (`#14161F`): Primary text, wordmarks, headers.
-- **Ink Soft** (`#3A3D4A`): Secondary body / idle chip text.
-- **Muted** (`#6B7280`): Timestamps, hints, inactive tab tint.
-- **Line** (`#E4E6EC`): Borders, dividers, outline control strokes.
+- **Graphite** (`#1A1714`): Primary text, wordmarks, headers.
+- **Ink Soft** (`#453F39`): Secondary body / idle chip text.
+- **Muted** (`#6E6862`): Timestamps, hints, inactive tab tint.
+- **Line** (`#EAE6E2`): Borders, dividers, outline control strokes.
 - **Bg / Surface** (`#FFFFFF`): Screen and card fields (same hex this phase).
 - **Bubble In** (`#FFFFFF`): Incoming bubbles on light (paired with `border-line`).
-- **On Primary** (`#FFFFFF`): Text/icons on Enki Blue fills.
+- **On Primary** (`#FFFFFF`): Text/icons on Enki Ember fills.
 
 ### Functional
 - **Success** (`#1F9D6C`): Online dots, positive pills.
-- **Danger** (`#D64545`): Errors, destructive actions.
-- **Amber** (`#E2831C`): Warning / attention pills.
+- **Danger** (`#B3261E`): Errors, destructive actions.
+- **Amber** (`#A16207`): Warning / attention pills.
 
 ### Named Rules
-**The One Signal Rule.** Enki Blue occupies a small share of any screen. If blue is everywhere, the Clear Desk failed.
+**The One Signal Rule.** Enki Ember occupies a small share of any screen. If ember is everywhere, the Clear Desk failed.
 
 **The Light Chrome Rule.** Ship light appearance only this phase. Do not follow system dark mode for app chrome.
 
@@ -261,16 +261,16 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 
 ### Buttons
 - **Shape:** 12px radius default (`rounded-xl`); large ~16px; icon buttons fully round (44px).
-- **Primary:** Enki Blue fill, white label, height 48px, semibold — main CTAs (auth submit, Join Offers).
-- **Secondary:** Beacon Mist fill, Enki Blue text.
+- **Primary:** Enki Ember fill, white label, height 48px, semibold — main CTAs (auth submit, Join Offers).
+- **Secondary:** Ember Mist fill, Enki Ember text.
 - **Outline:** Surface + `line` border, Graphite text.
-- **Ghost / Link:** No fill; ghost tints Beacon Mist on press; link uses Enki Blue.
-- **Hover / Focus / Active:** Slightly darker primary on press; web focus ring uses Enki Blue; disabled at 50% opacity.
+- **Ghost / Link:** No fill; ghost tints Ember Mist on press; link uses Enki Ember.
+- **Hover / Focus / Active:** Slightly darker primary on press; web focus ring uses Enki Ember; disabled at 50% opacity.
 
 ### Chips
-- **Selected:** Enki Blue fill, white semibold label (or Beacon Mist + primary text on some hub filters — prefer one pattern per screen).
+- **Selected:** Enki Ember fill, white semibold label (or Ember Mist + primary text on some hub filters — prefer one pattern per screen).
 - **Idle:** Surface or light border, Ink Soft text.
-- **Pills:** Beacon Mist / success / amber soft washes with matching text; optional status dot.
+- **Pills:** Ember Mist / success / amber soft washes with matching text; optional status dot.
 
 ### Cards / Containers
 - **Corner Style:** ~24px for conversation/auth cards; ~16–24px for hub tiles.
@@ -281,32 +281,32 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 
 ### Inputs / Fields
 - **Style:** Bg field, `line` border, ~16px radius on auth/search (`rounded-2xl`), 48px height common; base Input primitive is shorter/md radius — screens often override to match friendly auth chrome.
-- **Focus:** Ring / border shift to Enki Blue (web); native relies on system caret + border tokens.
+- **Focus:** Ring / border shift to Enki Ember (web); native relies on system caret + border tokens.
 - **Error:** Danger text and border cues; no scary full-bleed red panels.
 
 ### Navigation
 - **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Contact header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
-- **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Active item = Beacon Mist inner pill + Enki Blue icon/label (Manrope semibold). Idle = Muted. Unassigned / Conversations may show Enki Blue count badges. Stack header title may stay **Messages** while the tab label stays **Conversations** (intentional split: inbox screen title vs ops destination). Host tab bar chrome is transparent — the capsule is the only visible nav.
+- **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Active item = Ember Mist inner pill + Enki Ember icon/label (Manrope semibold). Idle = Muted. Unassigned / Conversations may show Enki Ember count badges. Stack header title may stay **Messages** while the tab label stays **Conversations** (intentional split: inbox screen title vs ops destination). Host tab bar chrome is transparent — the capsule is the only visible nav.
 - **Stacks:** Flat header (no shadow), Graphite title in Manrope-SemiBold, surface background.
 - **Contact:** Stack-only hub — no tab bar.
 
 ### Hub ops (Agent / Admin)
-- Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not Enki Blue value tint.
-- Quick **ActionTile** / secondary **ActionRow** icon chips prefer `neutral` (or amber for unassigned); primaryFilled Enki Blue chips are reserved for rare filled signals, not default hub chrome.
-- Admin “Create New Offer” uses Beacon Mist (`tone="primary"`), not filled blue.
+- Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not Enki Ember value tint.
+- Quick **ActionTile** / secondary **ActionRow** icon chips prefer `neutral` (or amber for unassigned); primaryFilled Enki Ember chips are reserved for rare filled signals, not default hub chrome.
+- Admin “Create New Offer” uses Ember Mist (`tone="primary"`), not filled ember.
 
 ### Conversation rows
-- Soft card lift; Offers avatar = Beacon Mist + Enki Blue megaphone (not filled blue).
-- Unread: bold Graphite title; timestamp Ink Soft; **one** Enki Blue count badge as the unread signal.
+- Soft card lift; Offers avatar = Ember Mist + Enki Ember megaphone (not filled ember).
+- Unread: bold Graphite title; timestamp Ink Soft; **one** Enki Ember count badge as the unread signal.
 
 ### Composer
 - Resting: surface + top `line` border; no resting shadow.
-- Reply banner may use Beacon Mist wash + Enki Blue accent bar.
+- Reply banner may use Ember Mist wash + Enki Ember accent bar.
 
 ### Message bubbles (signature)
-- **Outgoing:** Enki Blue fill, white text, ~22px radius, tighter bottom-right.
+- **Outgoing:** Enki Ember fill, white text, ~22px radius, tighter bottom-right.
 - **Incoming:** White / bubble-in + `line` border, Graphite text, tighter bottom-left.
-- **Receipts:** Tick icons only; read tint Enki Blue.
+- **Receipts:** Tick icons only; read tint Enki Ember.
 - **Reactions / reply:** Same-window overlay tray (not Modal-as-cell); honor reduced motion.
 
 ### Offers carousel (signature)
@@ -327,8 +327,8 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep the Clear Desk: white Bg/Surface, Graphite type, Enki Blue as sparse signal.
-- **Do** use Beacon Mist for soft selected/avatar/secondary moments.
+- **Do** keep the Clear Desk: white Bg/Surface, Graphite type, Enki Ember as sparse signal.
+- **Do** use Ember Mist for soft selected/avatar/secondary moments.
 - **Do** put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as Enki only.
 - **Do** use hybrid elevation — `line` at rest (including composer), stronger shadow on overlays only.
 - **Do** keep Agent/Admin hub stats and tiles quiet (Graphite / neutral / amber attention).
@@ -342,7 +342,7 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Don't** build stories, case-status steppers, or Casewire branding.
 - **Don't** put role labels in the header wordmark or theme whole hubs per role color.
 - **Don't** show the agent avatar stack on the Contact hub.
-- **Don't** stack Enki Blue on unread time + badge + Offers avatar in the same row.
+- **Don't** stack Enki Ember on unread time + badge + Offers avatar in the same row.
 - **Don't** put overlay-weight shadow on the resting composer.
 - **Don't** enable system dark mode for app chrome this phase.
 - **Don't** treat Offers as an ad SDK, checkout, or Instagram stories surface.
