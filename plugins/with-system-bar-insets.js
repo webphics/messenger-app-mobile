@@ -6,8 +6,9 @@
  *
  * Two behaviours, both documented in AGENTS.md:
  *
- * 1. `applyLightSystemBars` — RN's enableEdgeToEdge() forces transparent bars;
- *    paint them white so 3-button navigation matches the hub background.
+ * 1. `applyLightSystemBars` — paint `window.decorView` white so the strips left
+ *    by the inset padding below match the hub background. AppTheme's DayNight
+ *    parent would otherwise resolve them to black on dark-mode phones.
  * 2. `applySystemBarInsets` — Android 15+ draws behind the system bars, and
  *    safe-area-context's getGlobalVisibleRect math reports 0 on a standalone
  *    APK. Pad `android.R.id.content` instead, and consume only the system-bar
@@ -29,11 +30,18 @@ const IMPORTS = [
 ];
 
 const METHODS = `
-  /** RN enableEdgeToEdge() forces transparent bars; paint bg so 3-button nav matches hub. */
+  /**
+   * \`window.statusBarColor\` / \`navigationBarColor\` are NO-OPS on API 35+, and
+   * AppTheme's DayNight parent resolves \`windowBackground\` to BLACK when the
+   * phone's system theme is dark. \`applySystemBarInsets\` pads the content view,
+   * so those strips expose the window background — hence black bars on
+   * dark-mode devices only. Paint the decor view instead; it is the surface the
+   * strips actually show. Mirrored in app/_layout.tsx for the dev client.
+   * DO NOT reinstate those setters; they silently do nothing.
+   */
   private fun applyLightSystemBars() {
     val bg = Color.parseColor("#FFFFFF")
-    window.statusBarColor = bg
-    window.navigationBarColor = bg
+    window.decorView.setBackgroundColor(bg)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       window.isStatusBarContrastEnforced = false
       window.isNavigationBarContrastEnforced = false
