@@ -38,7 +38,6 @@ export default function AdminLayout() {
         name="conversations"
         options={{
           title: "Messages",
-          tabBarLabel: "Conversations",
           tabBarIcon: ({ color, size }) => (
             <MessageCircle color={color} size={size} />
           ),
