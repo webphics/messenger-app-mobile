@@ -9,7 +9,7 @@ The product brand shown on launcher, auth, and hub wordmarks.
 _Avoid_: Messenger (as product name), Casewire, ISM
 
 **Contact**:
-End-user role that only sees their own conversations. Hub has no tab bar.
+End-user role that only sees their own conversations. Reaches Home, Messages, and Help from the tab capsule; FAQ, Search, and Settings stay inside the home stack.
 _Avoid_: Customer, client, user (when meaning this role)
 
 **Agent**:
@@ -21,7 +21,7 @@ Oversight role with slim mobile surface (users, unassigned, conversations, hub).
 _Avoid_: Superuser, owner
 
 **Hub**:
-Role home screen (Contact / Agent / Admin variants). Not a tab destination for Contact.
+Role home screen (Contact / Agent / Admin variants). The first tab destination in every role.
 _Avoid_: Dashboard, home feed
 
 **Hub role label**:
@@ -39,3 +39,7 @@ _Avoid_: Stories, ads, sponsored content (as a product feature)
 **Launch animation**:
 The looping transparent character animation on the cold-start screen, shown while the session hydrates. Rendered from an animated WebP; the surface behind it is the app background, not part of the asset.
 _Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface this screen dismisses), loading video, chroma-keyed video
+
+**Tab capsule**:
+The floating rounded nav bar at the bottom of every role. Icon-only — destination names live in the accessible name, not on screen.
+_Avoid_: Tab bar (that is the host navigator's own bar, kept invisible beneath), dock, bottom nav
