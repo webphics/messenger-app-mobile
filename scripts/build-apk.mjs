@@ -66,12 +66,19 @@ if (!sdk) {
 // `android/` is gitignored and generated, so it is absent in a fresh clone or a
 // git worktree. Generate it rather than failing on a missing local.properties.
 // Config-plugin output (see plugins/with-system-bar-insets.js) lands here too,
-// so pass --prebuild after changing app.json or a plugin.
+// so pass --prebuild after changing app.json or a plugin — and it MUST be a
+// `--clean` prebuild: the plugin's idempotency marker can only detect "this
+// project already has the CURRENT patch applied", not "this project has a
+// STALE patch from a previous version of the plugin". A non-clean prebuild
+// against a stale android/ either leaves the old patch in place unnoticed, or
+// (once the plugin detects the mismatch) throws rather than silently
+// miscompiling. `--clean` regenerates the native project from template so the
+// current plugin version always applies cleanly.
 function prebuild(reason) {
-  console.log(`expo prebuild --platform android (${reason})`);
+  console.log(`expo prebuild --platform android --clean (${reason})`);
   const run = spawnSync(
     win ? "npx.cmd" : "npx",
-    ["expo", "prebuild", "--platform", "android", "--no-install"],
+    ["expo", "prebuild", "--platform", "android", "--clean", "--no-install"],
     { cwd: root, stdio: "inherit", shell: win },
   );
   if (run.status !== 0) process.exit(run.status ?? 1);
