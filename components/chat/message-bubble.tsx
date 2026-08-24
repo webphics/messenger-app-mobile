@@ -169,7 +169,16 @@ const QuoteChrome = memo(function QuoteChrome({
             />
           )
         ) : null}
-        <View className={cn('min-w-0 flex-1 py-1.5', quoted.thumbUri ? 'pr-3' : 'px-3')}>
+        <View
+          className={cn(
+            'min-w-0 py-1.5',
+            // `flex-1` only when the thumb shares the row. As the sole child it
+            // makes the row grow to its max-width cap instead of hugging the
+            // text — Yoga sizes an auto-width row to the available space once a
+            // child wants to grow, so a two-word quote rendered full width.
+            quoted.thumbUri ? 'flex-1 pr-3' : 'shrink px-3',
+          )}
+        >
           <Text
             variant="label"
             className="font-normal text-ink-soft"
