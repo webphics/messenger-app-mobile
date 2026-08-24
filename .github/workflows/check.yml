@@ -32,16 +32,33 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Each step runs even if an earlier one failed, so a single push reports
-      # every category of problem at once instead of one per re-run.
+      # tsconfig.json includes expo-env.d.ts and uniwind-types.d.ts, both of
+      # which are generated and gitignored, so they never exist in a fresh
+      # checkout. Without them TypeScript loses the `className` prop that
+      # uniwind adds to RN components and the CSS side-effect module type,
+      # which alone produces ~450 phantom errors. Locally these are written as
+      # a side effect of `expo start`, which CI never runs.
+      #
+      # `expo customize` with an explicit filename is non-interactive and
+      # leaves an already-correct tsconfig.json untouched.
+      - name: Generate type declarations
+        id: codegen
+        run: |
+          pnpm exec expo customize tsconfig.json
+          pnpm exec uniwind generate-artifacts --css ./global.css --dts ./uniwind-types.d.ts
+
+      # Each check runs even if an earlier one failed, so a single push reports
+      # every category of problem at once instead of one per re-run. They are
+      # still skipped if codegen failed, since every one of them would then be
+      # reporting missing types rather than anything real.
       - name: Typecheck
-        if: '!cancelled()'
+        if: ${{ !cancelled() && steps.codegen.conclusion == 'success' }}
         run: pnpm exec tsc --noEmit
 
       - name: Lint
-        if: '!cancelled()'
+        if: ${{ !cancelled() && steps.codegen.conclusion == 'success' }}
         run: pnpm run lint
 
       - name: Test
-        if: '!cancelled()'
+        if: ${{ !cancelled() && steps.codegen.conclusion == 'success' }}
         run: pnpm test
