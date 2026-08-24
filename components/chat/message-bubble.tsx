@@ -182,8 +182,8 @@ const FusedImageReply = memo(function FusedImageReply({
       <View
         className={cn(
           'relative overflow-visible',
-          // Room for the overhanging reply bubble under the thumb.
-          'pb-3',
+          // Meta: reply hangs under the thumb, not flush on the photo.
+          'pb-7',
         )}
       >
         <Image

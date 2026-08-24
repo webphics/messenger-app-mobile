@@ -20,8 +20,8 @@ import { colors } from "@/lib/tokens";
  */
 const LAUNCH_ANIMATION = require("@/assets/images/launch-animation.webp");
 
-/** Hide the native splash even if the animation never reports back. */
-const SPLASH_FALLBACK_MS = 1000;
+/** Hide native splash if WebP onLoad never fires (slow tunnel / decode stall). */
+const SPLASH_FALLBACK_MS = 2500;
 
 export type AppLoadingScreenProps = {
   /** If true, triggers the smooth fade-out exit transition */
@@ -43,9 +43,9 @@ export function AppLoadingScreen({
   const opacity = useSharedValue(1);
 
   /**
-   * Handing off from the native splash only once the animation has decoded
-   * avoids a flash of empty background — the asset is ~4 MB and does not
-   * appear instantly.
+   * Keep the native splash until the launch WebP has decoded so the handoff is
+   * icon → character animation (not a blank white frame). Root layout has a
+   * longer failsafe if this screen never mounts.
    */
   const hideSplash = useCallback(() => {
     void SplashScreen.hideAsync().catch(() => {});

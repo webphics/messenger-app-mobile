@@ -21,9 +21,7 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
-      "blockedPermissions": [
-        "android.permission.READ_MEDIA_AUDIO"
-      ],
+      "blockedPermissions": ["android.permission.READ_MEDIA_AUDIO"],
       "softwareKeyboardLayoutMode": "resize",
       "package": "com.anonymous.enki"
     },
@@ -77,7 +75,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations."
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations.",
+          "recordAudioAndroid": true
         }
       ]
     ],

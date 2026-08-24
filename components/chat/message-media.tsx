@@ -1,4 +1,4 @@
-import { FileText, Pause, Play } from '@/components/icons'
+import { FileText } from '@/components/icons'
 import { useCallback } from 'react'
 import {
   Alert,
@@ -8,18 +8,14 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native'
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import * as Sharing from 'expo-sharing'
 
-import { Waveform } from '@/components/chat/waveform'
+import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
 import { Text } from '@/components/ui/text'
 import { formatBytes } from '@/lib/attachments'
 import { cn } from '@/lib/cn'
-import {
-  attachmentKindLabel,
-  formatDurationMs,
-} from '@/lib/message-attachment'
+import { attachmentKindLabel } from '@/lib/message-attachment'
 import { colors } from '@/lib/tokens'
 import type { MessageAttachment } from '@/lib/types'
 
@@ -51,7 +47,7 @@ export function MessageMedia({
   if (attachment.kind === 'audio') {
     return (
       <MediaShell outgoing={outgoing} caption={caption}>
-        <VoiceAttachment attachment={attachment} outgoing={outgoing} />
+        <VoiceNotePlayer attachment={attachment} outgoing={outgoing} />
       </MediaShell>
     )
   }
@@ -147,80 +143,6 @@ function VideoAttachment({ uri, name }: { uri: string; name: string }) {
         nativeControls
         accessibilityLabel={name || 'Video'}
       />
-    </View>
-  )
-}
-
-function VoiceAttachment({
-  attachment,
-  outgoing,
-}: {
-  attachment: MessageAttachment
-  outgoing: boolean
-}) {
-  const player = useAudioPlayer(attachment.uri)
-  const status = useAudioPlayerStatus(player)
-  const peaks = attachment.peaks ?? [0.2, 0.45, 0.3, 0.6, 0.25]
-  const duration =
-    attachment.durationMs ??
-    (status.duration > 0 ? status.duration * 1000 : 0)
-  const progress =
-    status.duration > 0 ? status.currentTime / status.duration : 0
-  const playing = status.playing
-
-  const toggle = useCallback(() => {
-    if (playing) {
-      player.pause()
-    } else {
-      if (status.currentTime >= status.duration && status.duration > 0) {
-        player.seekTo(0)
-      }
-      player.play()
-    }
-  }, [player, playing, status.currentTime, status.duration])
-
-  return (
-    <View className="min-w-[200px] flex-row items-center gap-2">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={playing ? 'Pause voice note' : 'Play voice note'}
-        onPress={toggle}
-        className={cn(
-          'size-10 shrink-0 items-center justify-center rounded-full',
-          outgoing ? 'bg-primary-foreground/20' : 'bg-primary-soft',
-        )}
-      >
-        {playing ? (
-          <Pause
-            color={outgoing ? colors.primaryForeground : colors.primary}
-            size={18}
-          />
-        ) : (
-          <Play
-            color={outgoing ? colors.primaryForeground : colors.primary}
-            size={18}
-          />
-        )}
-      </Pressable>
-      <Waveform
-        peaks={peaks}
-        progress={progress}
-        outgoing={outgoing}
-        className="min-w-0 flex-1"
-      />
-      <Text
-        variant="label"
-        className={cn(
-          'w-10 shrink-0 text-right font-medium tabular-nums',
-          outgoing ? 'text-primary-foreground/80' : 'text-muted',
-        )}
-      >
-        {formatDurationMs(
-          playing || status.currentTime > 0
-            ? status.currentTime * 1000
-            : duration,
-        )}
-      </Text>
     </View>
   )
 }

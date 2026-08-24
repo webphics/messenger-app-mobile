@@ -24,6 +24,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AttachmentSheet } from '@/components/chat/attachment-sheet'
+import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
 import { Waveform } from '@/components/chat/waveform'
 import { Input } from '@/components/ui/input'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
@@ -34,7 +35,6 @@ import {
   formatBytes,
 } from '@/lib/attachments'
 import {
-  attachmentKindLabel,
   downsamplePeaks,
   formatDurationMs,
   meteringToLevel,
@@ -72,7 +72,7 @@ const RECORD_OPTIONS = {
   isMeteringEnabled: true,
 }
 
-/** In-chrome staging thumb (Meta-style nested preview). */
+/** In-chrome staging preview (Meta-style). Voice = player; document = file chip. */
 function StagedAttachmentChip({
   attachment,
   onClear,
@@ -80,38 +80,55 @@ function StagedAttachmentChip({
   attachment: MessageAttachment
   onClear: () => void
 }) {
-  const isVisual =
-    attachment.kind === 'image' || attachment.kind === 'video'
+  if (attachment.kind === 'audio') {
+    return (
+      <View className="mb-1.5 self-stretch">
+        <VoiceNotePlayer
+          attachment={attachment}
+          compact
+          onClear={onClear}
+        />
+      </View>
+    )
+  }
 
-  return (
-    <View className="relative mb-1.5 self-start">
-      {isVisual ? (
+  if (attachment.kind === 'image' || attachment.kind === 'video') {
+    return (
+      <View className="relative mb-1.5 self-start">
         <Image
           source={{ uri: attachment.uri }}
           className="size-16 rounded-xl bg-line/40"
           resizeMode="cover"
           accessibilityLabel={attachment.name}
         />
-      ) : (
-        <View className="h-14 min-w-[7.5rem] max-w-[11rem] flex-row items-center gap-2 rounded-xl border border-line/70 bg-surface px-2.5">
-          <View className="size-9 items-center justify-center rounded-lg bg-primary-soft">
-            <FileText color={colors.primary} size={18} />
-          </View>
-          <View className="min-w-0 flex-1 pr-4">
-            <Text variant="label" className="font-bold text-ink" numberOfLines={1}>
-              {attachment.kind === 'audio'
-                ? attachmentKindLabel('audio')
-                : attachment.name}
-            </Text>
-            <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
-              {attachment.kind === 'audio'
-                ? formatDurationMs(attachment.durationMs)
-                : formatBytes(attachment.size) ??
-                  attachmentKindLabel(attachment.kind)}
-            </Text>
-          </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Remove attachment"
+          hitSlop={8}
+          onPress={onClear}
+          className="absolute -right-1.5 -top-1.5 size-6 items-center justify-center rounded-full border border-line bg-surface shadow-sm"
+        >
+          <X color={colors.inkSoft} size={14} />
+        </Pressable>
+      </View>
+    )
+  }
+
+  return (
+    <View className="relative mb-1.5 self-start">
+      <View className="h-14 min-w-[7.5rem] max-w-[11rem] flex-row items-center gap-2 rounded-xl border border-line/70 bg-surface px-2.5">
+        <View className="size-9 items-center justify-center rounded-lg bg-primary-soft">
+          <FileText color={colors.primary} size={18} />
         </View>
-      )}
+        <View className="min-w-0 flex-1 pr-4">
+          <Text variant="label" className="font-bold text-ink" numberOfLines={1}>
+            {attachment.name}
+          </Text>
+          <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
+            {formatBytes(attachment.size) ?? 'Document'}
+          </Text>
+        </View>
+      </View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Remove attachment"

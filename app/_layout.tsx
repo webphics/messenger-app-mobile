@@ -31,11 +31,15 @@ Appearance.setColorScheme("light");
 // The prebuild plugin does this natively for frame zero — this covers the dev
 // client, where that plugin has not run.
 void SystemUI.setBackgroundColorAsync(colors.bg);
-void SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function applyAndroidNavChrome() {
   NavigationBar.setHidden(false);
   NavigationBar.setStyle("dark");
+}
+
+function hideNativeSplash() {
+  void SplashScreen.hideAsync().catch(() => {});
 }
 
 export default function RootLayout() {
@@ -48,6 +52,14 @@ export default function RootLayout() {
     "JetBrains Mono": JetBrainsMono_500Medium,
     "JetBrains Mono-Bold": JetBrainsMono_700Bold,
   });
+
+  // Failsafe: never leave the native splash up if the index loading screen
+  // fails to mount or its WebP onLoad never fires (Expo Go + tunnel).
+  useEffect(() => {
+    hideNativeSplash();
+    const timer = setTimeout(hideNativeSplash, 800);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "android") return;
