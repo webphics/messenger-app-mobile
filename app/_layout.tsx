@@ -1,3 +1,9 @@
+// Gesture Handler requires this side-effect import to run before any other
+// import in the entry file, so it has to stay pinned at line 1. Kept separate
+// from the `GestureHandlerRootView` import below for that reason — merging them
+// to satisfy import/no-duplicates would drag a named import up here and hide
+// why this line has to lead.
+// eslint-disable-next-line import/no-duplicates
 import "react-native-gesture-handler";
 import "../global.css";
 
@@ -19,6 +25,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
 import { Appearance, AppState, Platform } from "react-native";
+// eslint-disable-next-line import/no-duplicates -- see the leading side-effect import
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
