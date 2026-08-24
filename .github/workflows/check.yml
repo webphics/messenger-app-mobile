@@ -1,0 +1,64 @@
+name: Check
+
+# Types, lint and unit tests. Runs on every push and PR because it is cheap:
+# ubuntu bills 1x and the whole job is well under a minute, versus the macOS
+# iOS build in build.yml which bills 10x. Keep anything slow or native out of
+# here so this stays the fast feedback loop.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Types, lint, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      # Version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # tsconfig.json includes expo-env.d.ts and uniwind-types.d.ts, both of
+      # which are generated and gitignored, so they never exist in a fresh
+      # checkout. Without them TypeScript loses the `className` prop that
+      # uniwind adds to RN components and the CSS side-effect module type,
+      # which alone produces ~450 phantom errors. Locally these are written as
+      # a side effect of `expo start`, which CI never runs.
+      #
+      # `expo customize` with an explicit filename is non-interactive and
+      # leaves an already-correct tsconfig.json untouched.
+      - name: Generate type declarations
+        id: codegen
+        run: |
+          pnpm exec expo customize tsconfig.json
+          pnpm exec uniwind generate-artifacts --css ./global.css --dts ./uniwind-types.d.ts
+
+      # Each check runs even if an earlier one failed, so a single push reports
+      # every category of problem at once instead of one per re-run. They are
+      # still skipped if codegen failed, since every one of them would then be
+      # reporting missing types rather than anything real.
+      - name: Typecheck
+        if: ${{ !cancelled() && steps.codegen.conclusion == 'success' }}
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint
+        if: ${{ !cancelled() && steps.codegen.conclusion == 'success' }}
+        run: pnpm run lint
+
+      - name: Test
+        if: ${{ !cancelled() && steps.codegen.conclusion == 'success' }}
+        run: pnpm test

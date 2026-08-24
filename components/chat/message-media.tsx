@@ -226,6 +226,10 @@ function VideoAttachment({
   useEffect(() => {
     const track = player.videoTrack
     if (track?.size?.width && track.size.height) {
+      // Catching up on a size the player already resolved before this listener
+      // attached, not a render-driven update: the effect is keyed on `player`
+      // and the write is guarded, so it corrects once and cannot cascade.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNatural({ width: track.size.width, height: track.size.height })
     }
     const sub = player.addListener('sourceLoad', ({ availableVideoTracks }) => {

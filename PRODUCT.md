@@ -33,7 +33,7 @@ Success: each role reaches the right conversations and hub actions quickly, with
 - This repo is the Expo iOS/Android client only. Next.js web, NestJS, and Postgres live elsewhere.
 - Current phase: mock auth + role hubs, plus Phase 5a local media UI (`Message.attachment`, no server upload). Session blob `{ email, role }` in AsyncStorage (`ism.session`); mock data; no real backend in-app.
 - Terminology source of truth: `CONTEXT.md` (Enki, Contact, Agent, Admin, Hub, Unassigned pool, Offers, Message, Attachment, Voice note).
-- Scope source of truth: `docs/scope.md`.
+- Scope source of truth: `docs/scope.md` + current phase in `AGENTS.md`.
 
 ## Capabilities and Constraints
 

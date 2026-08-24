@@ -1,1 +1,6 @@
+# unrs-resolver ships prebuilt per-platform binaries and its install script
+# selects the right one; eslint-config-expo's import resolver needs it, and
+# pnpm 11 blocks install scripts until each is explicitly approved.
+allowBuilds:
+  unrs-resolver: true
 nodeLinker: hoisted

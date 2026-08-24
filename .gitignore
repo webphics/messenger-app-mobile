@@ -47,3 +47,5 @@ example
 
 # local agent scratch
 .claude/
+
+.env*

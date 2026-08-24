@@ -201,6 +201,9 @@ export function ThreadScreen({
     if (!body && !payload.attachment) return
     const id = `local-${Date.now()}`
     setReplyTo(null)
+    // MVCP keeps the prior newest row fixed; after layout, pin offset 0 so the
+    // sent bubble clears the composer (autoscroll threshold alone skips if the
+    // user had scrolled up slightly).
     stickToLatestRef.current = true
     setMessages((prev) => [
       ...prev,
@@ -274,6 +277,9 @@ export function ThreadScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onContentSizeChange={onContentSizeChange}
+        // Anchor mid-thread when rows insert. Without MVCP, composer height
+        // changes yank to offset 0. Without autoscrollToTopThreshold, new
+        // index-0 rows stay under the composer while you were near latest.
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
           autoscrollToTopThreshold: NEAR_LATEST_PX,
@@ -307,6 +313,16 @@ export function ThreadScreen({
       <InScreenHeader>
         <ThreadHeader conversation={conversation} />
       </InScreenHeader>
+      {/*
+        Android too: edge-to-edge sets `setDecorFitsSystemWindows(false)`, which
+        makes `softwareKeyboardLayoutMode: "resize"` a no-op — the window never
+        resizes and MainActivity pads only for system bars, so the composer and
+        its reply banner sit behind the IME unless something lifts them.
+        `useKeyboardInset` reports residual overlap only (raw height minus what
+        a host like Expo Go already absorbed via window resize). See
+        lib/keyboard-inset.ts. KeyboardAvoidingView cannot, because it measures
+        against a parent-relative frame.
+      */}
       <View className="flex-1" style={{ paddingBottom: keyboardInset }}>
         {host}
       </View>

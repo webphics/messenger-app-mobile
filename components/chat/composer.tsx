@@ -189,6 +189,8 @@ export function Composer({
   const canSend = value.trim().length > 0 || staged != null
   const showMic = !recording && !staged && value.trim().length === 0
   const ready = useSharedValue(canSend || recording ? 1 : 0.92)
+  // The keyboard covers the home indicator / nav bar, so once the thread has
+  // lifted the composer by that much, its own safe-area gap is redundant.
   const bottom = Math.max(0, screenBottomPad(insets.bottom) - keyboardInset)
 
   useEffect(() => {

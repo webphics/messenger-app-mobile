@@ -50,8 +50,13 @@ export function AppLoadingScreen({
   const opacity = useSharedValue(1);
   const readyRef = useRef(false);
   // Read through a ref so an inline `onReady` cannot restart the failsafe timer.
+  // Assigned in an effect rather than during render: `markReady` only ever runs
+  // from the failsafe timer or the image's onLoad/onError, all of which fire
+  // after commit, so the ref is always current by the time it is read.
   const onReadyRef = useRef(onReady);
-  onReadyRef.current = onReady;
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  });
 
   /**
    * Hold the native splash until the launch WebP has decoded so the handoff is

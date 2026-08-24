@@ -20,6 +20,10 @@ export default function Index() {
   const navigatedRef = useRef(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinTimeElapsed(true);
+    }, MINIMUM_DISPLAY_MS);
+
     void hydrateSession()
       .then((blob) => {
         setTargetHref(isLoggedIn(blob) ? ROLE_HREF[blob.role] : "/(auth)/sign-in");
@@ -27,6 +31,8 @@ export default function Index() {
       .catch(() => {
         setTargetHref("/(auth)/sign-in");
       });
+
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -60,3 +66,4 @@ export default function Index() {
     </View>
   );
 }
+
