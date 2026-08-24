@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import * as SplashScreen from "expo-splash-screen";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
 import Animated, {
   runOnJS,
@@ -28,6 +28,12 @@ export type AppLoadingScreenProps = {
   isFinishing?: boolean;
   /** Called when the exit fade animation finishes */
   onFinish?: () => void;
+  /**
+   * Called once the launch WebP has decoded and is on screen (or the decode
+   * failsafe fired). The parent starts its minimum-display window from here so
+   * the animation gets its full run instead of being cut short by decode time.
+   */
+  onReady?: () => void;
   /** Colour shown behind the transparent animation. */
   backgroundColor?: string;
 };
@@ -35,26 +41,34 @@ export type AppLoadingScreenProps = {
 export function AppLoadingScreen({
   isFinishing = false,
   onFinish,
+  onReady,
   backgroundColor = colors.bg,
 }: AppLoadingScreenProps) {
   const reduceMotion = useReducedMotion();
   const { width: screenWidth } = useWindowDimensions();
   const animation = launchAnimationSize(screenWidth);
   const opacity = useSharedValue(1);
+  const readyRef = useRef(false);
+  // Read through a ref so an inline `onReady` cannot restart the failsafe timer.
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
 
   /**
-   * Keep the native splash until the launch WebP has decoded so the handoff is
-   * icon → character animation (not a blank white frame). Root layout has a
-   * longer failsafe if this screen never mounts.
+   * Hold the native splash until the launch WebP has decoded so the handoff is
+   * icon → character animation, never a blank frame. Root layout has a longer
+   * backstop if this screen never mounts.
    */
-  const hideSplash = useCallback(() => {
+  const markReady = useCallback(() => {
+    if (readyRef.current) return;
+    readyRef.current = true;
     void SplashScreen.hideAsync().catch(() => {});
+    onReadyRef.current?.();
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(hideSplash, SPLASH_FALLBACK_MS);
+    const timer = setTimeout(markReady, SPLASH_FALLBACK_MS);
     return () => clearTimeout(timer);
-  }, [hideSplash]);
+  }, [markReady]);
 
   useEffect(() => {
     if (isFinishing) {
@@ -88,8 +102,12 @@ export function AppLoadingScreen({
         // Reduced motion holds the first frame instead of looping.
         autoplay={!reduceMotion}
         transition={0}
-        onLoad={hideSplash}
-        onError={hideSplash}
+        // Decode straight from the bundled asset; a disk round-trip on a 4 MB
+        // WebP is the difference between a played animation and a flash of one.
+        cachePolicy="memory-disk"
+        priority="high"
+        onLoad={markReady}
+        onError={markReady}
         aria-hidden
       />
     </Animated.View>

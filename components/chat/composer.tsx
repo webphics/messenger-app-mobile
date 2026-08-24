@@ -24,6 +24,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AttachmentSheet } from '@/components/chat/attachment-sheet'
+import { VideoThumb } from '@/components/chat/video-thumb'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
 import { Waveform } from '@/components/chat/waveform'
 import { Input } from '@/components/ui/input'
@@ -44,7 +45,7 @@ import {
 import { motion } from '@/lib/motion'
 import { settleDownEnter } from '@/lib/motion-enter'
 import { colors, screenBottomPad } from '@/lib/tokens'
-import type { MessageAttachment } from '@/lib/types'
+import type { AttachmentKind, MessageAttachment } from '@/lib/types'
 
 export type ComposerSendPayload = {
   body: string
@@ -55,6 +56,7 @@ export type ComposerReplyPreview = {
   name: string
   body: string
   thumbUri?: string
+  kind?: AttachmentKind
 }
 
 type ComposerProps = {
@@ -71,6 +73,9 @@ const RECORD_OPTIONS = {
   ...RecordingPresets.HIGH_QUALITY,
   isMeteringEnabled: true,
 }
+
+/** Recorder metering poll, and the cadence the live waveform samples it at. */
+const METERING_POLL_MS = 120
 
 /** In-chrome staging preview (Meta-style). Voice = player; document = file chip. */
 function StagedAttachmentChip({
@@ -95,12 +100,21 @@ function StagedAttachmentChip({
   if (attachment.kind === 'image' || attachment.kind === 'video') {
     return (
       <View className="relative mb-1.5 self-start">
-        <Image
-          source={{ uri: attachment.uri }}
-          className="size-16 rounded-xl bg-line/40"
-          resizeMode="cover"
-          accessibilityLabel={attachment.name}
-        />
+        {attachment.kind === 'video' ? (
+          <VideoThumb
+            uri={attachment.uri}
+            size={64}
+            className="rounded-xl"
+            accessibilityLabel={attachment.name || 'Video'}
+          />
+        ) : (
+          <Image
+            source={{ uri: attachment.uri }}
+            className="size-16 rounded-xl bg-line/40"
+            resizeMode="cover"
+            accessibilityLabel={attachment.name || 'Photo'}
+          />
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Remove attachment"
@@ -164,7 +178,13 @@ export function Composer({
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const recorder = useAudioRecorder(RECORD_OPTIONS)
-  const recorderState = useAudioRecorderState(recorder, 120)
+  const recorderState = useAudioRecorderState(recorder, METERING_POLL_MS)
+  // Read through refs at teardown: the cleanup closure runs after the last
+  // render, and both the mic and the audio session outlive this component.
+  const recorderRef = useRef(recorder)
+  recorderRef.current = recorder
+  const heldAudioSessionRef = useRef(false)
+  const meteringRef = useRef<number | null>(null)
 
   const canSend = value.trim().length > 0 || staged != null
   const showMic = !recording && !staged && value.trim().length === 0
@@ -179,23 +199,56 @@ export function Composer({
     ready.value = withSpring(canSend || recording ? 1 : 0.92, motion.springs.press)
   }, [canSend, ready, recording, reduceMotion])
 
+  // Unmounting mid-recording (hardware back, tapping through to another thread)
+  // does not stop the recorder or hand the audio session back on its own: the
+  // mic stays hot, and `allowsRecording: true` keeps routing playback to the
+  // earpiece on iOS for the rest of the app session.
   useEffect(() => {
     return () => {
       if (tickRef.current) clearInterval(tickRef.current)
+      if (!heldAudioSessionRef.current) return
+      heldAudioSessionRef.current = false
+      const active = recorderRef.current
+      void (async () => {
+        try {
+          if (active?.isRecording) await active.stop()
+        } catch {
+          // Native recorder may already be released — the mode restore below
+          // is the part that has to happen either way.
+        }
+        try {
+          await setAudioModeAsync({
+            playsInSilentMode: true,
+            allowsRecording: false,
+          })
+        } catch {
+          // Nothing left to fall back to at teardown.
+        }
+      })()
     }
   }, [])
 
-  // Live metering → rolling peaks while recording.
+  useEffect(() => {
+    meteringRef.current = recorderState.metering ?? null
+  }, [recorderState.metering])
+
+  // Live metering → rolling peaks, sampled on our own tick rather than on
+  // metering *change*: silence pins the dB reading to a floor value, so keying
+  // off the value stops appending samples exactly where the strip should still
+  // be scrolling — and the saved waveform ends up mostly filler bars.
   useEffect(() => {
     if (!recording) return
-    const level = meteringToLevel(recorderState.metering)
-    levelsRef.current.push(level)
-    setLivePeaks((prev) => {
-      const next = prev.slice(1)
-      next.push(level)
-      return next
-    })
-  }, [recording, recorderState.metering])
+    const id = setInterval(() => {
+      const level = meteringToLevel(meteringRef.current)
+      levelsRef.current.push(level)
+      setLivePeaks((prev) => {
+        const next = prev.slice(1)
+        next.push(level)
+        return next
+      })
+    }, METERING_POLL_MS)
+    return () => clearInterval(id)
+  }, [recording])
 
   // Auto-stop at 20 minutes.
   useEffect(() => {
@@ -208,6 +261,24 @@ export function Composer({
     transform: [{ scale: ready.value }],
     opacity: 0.4 + ready.value * 0.6,
   }))
+
+  /**
+   * Hand the audio session back to playback. Guarded so a composer that never
+   * recorded does not stamp a global audio mode it never took.
+   */
+  async function restorePlaybackAudioMode() {
+    if (!heldAudioSessionRef.current) return
+    try {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: false,
+      })
+      heldAudioSessionRef.current = false
+    } catch {
+      // Leave the flag set so teardown gets one more attempt; surfacing an
+      // audio-session error mid-send helps nobody.
+    }
+  }
 
   function clearTicker() {
     if (tickRef.current) {
@@ -233,6 +304,7 @@ export function Composer({
         playsInSilentMode: true,
         allowsRecording: true,
       })
+      heldAudioSessionRef.current = true
       levelsRef.current = []
       setLivePeaks(Array.from({ length: VOICE_NOTE_PEAK_BARS }, () => 0.12))
       setElapsedMs(0)
@@ -248,6 +320,7 @@ export function Composer({
       Alert.alert('Could not record', 'Something went wrong starting the voice note.')
       setRecording(false)
       clearTicker()
+      await restorePlaybackAudioMode()
     }
   }
 
@@ -275,12 +348,12 @@ export function Composer({
         durationMs,
         peaks,
       })
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        allowsRecording: false,
-      })
     } catch {
       Alert.alert('Could not save voice note', 'Something went wrong finishing the recording.')
+    } finally {
+      // Every exit runs this — including the no-URI early return and the throw,
+      // which both used to leave the session stuck in recording mode.
+      await restorePlaybackAudioMode()
     }
   }
 
@@ -293,12 +366,10 @@ export function Composer({
       if (recorder.isRecording) {
         await recorder.stop()
       }
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        allowsRecording: false,
-      })
     } catch {
       // Discard path — nothing useful to surface.
+    } finally {
+      await restorePlaybackAudioMode()
     }
   }
 
@@ -326,6 +397,23 @@ export function Composer({
           className="flex-row items-center gap-2 border-b border-line/40 px-4 py-2 bg-primary-soft/40"
         >
           <View className="w-1 self-stretch rounded-full bg-primary" />
+          {replyTo.thumbUri ? (
+            replyTo.kind === 'video' ? (
+              <VideoThumb
+                uri={replyTo.thumbUri}
+                size={36}
+                className="rounded-lg"
+                accessibilityLabel="Replying to a video"
+              />
+            ) : (
+              <Image
+                source={{ uri: replyTo.thumbUri }}
+                className="size-9 rounded-lg bg-line/40"
+                resizeMode="cover"
+                accessibilityLabel="Replying to a photo"
+              />
+            )
+          ) : null}
           <View className="min-w-0 flex-1 pl-1">
             <Text variant="label" className="font-bold text-primary" numberOfLines={1}>
               Replying to {replyTo.name}

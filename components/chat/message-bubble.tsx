@@ -16,6 +16,7 @@ import Animated, {
 
 import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { MessageMedia } from '@/components/chat/message-media'
+import { VideoThumb } from '@/components/chat/video-thumb'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics'
@@ -151,12 +152,22 @@ const QuoteChrome = memo(function QuoteChrome({
       <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
       <View className="max-w-[92%] flex-row items-center gap-2 overflow-hidden rounded-[18px] border border-line/80 bg-line/35 opacity-90">
         {quoted.thumbUri ? (
-          <Image
-            source={{ uri: quoted.thumbUri }}
-            className="size-11 bg-line/50"
-            resizeMode="cover"
-            accessibilityLabel="Quoted media"
-          />
+          // `<Image>` cannot decode mp4/mov, so a video quote needs a player
+          // surface for its frame — otherwise the strip is a blank grey square.
+          quoted.attachmentKind === 'video' ? (
+            <VideoThumb
+              uri={quoted.thumbUri}
+              size={44}
+              accessibilityLabel="Quoted video"
+            />
+          ) : (
+            <Image
+              source={{ uri: quoted.thumbUri }}
+              className="size-11 bg-line/50"
+              resizeMode="cover"
+              accessibilityLabel="Quoted photo"
+            />
+          )
         ) : null}
         <View className={cn('min-w-0 flex-1 py-1.5', quoted.thumbUri ? 'pr-3' : 'px-3')}>
           <Text

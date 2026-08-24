@@ -47,6 +47,8 @@ export function MessageMedia({
       <VideoAttachment
         uri={attachment.uri}
         name={attachment.name}
+        naturalWidth={attachment.width}
+        naturalHeight={attachment.height}
         outgoing={outgoing}
         caption={caption}
       />
@@ -194,24 +196,49 @@ function ImageAttachment({
 function VideoAttachment({
   uri,
   name,
+  naturalWidth,
+  naturalHeight,
   outgoing,
   caption,
 }: {
   uri: string
   name: string
+  naturalWidth?: number
+  naturalHeight?: number
   outgoing: boolean
   caption?: string
 }) {
   const { width: screenW, height: screenH } = useWindowDimensions()
   const maxW = Math.min(300, Math.round(screenW * 0.74))
   const maxH = Math.min(Math.round(screenH * 0.48), Math.round(maxW * 1.45))
-  const box = fitImageSize(16, 9, maxW, maxH)
   const trimmed = caption?.trim() ?? ''
   const hasCaption = trimmed.length > 0
-  const columnW = mediaCaptionColumnWidth(box.width, maxW, hasCaption)
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false
   })
+  // Videos have no `Image.getSize`. The picker's report is the size we have at
+  // first paint; the loaded track is authoritative once it arrives. Assuming
+  // 16:9 letterboxes every portrait phone video into a thin strip.
+  const [natural, setNatural] = useState<{ width: number; height: number }>(
+    () => ({ width: naturalWidth ?? 0, height: naturalHeight ?? 0 }),
+  )
+
+  useEffect(() => {
+    const track = player.videoTrack
+    if (track?.size?.width && track.size.height) {
+      setNatural({ width: track.size.width, height: track.size.height })
+    }
+    const sub = player.addListener('sourceLoad', ({ availableVideoTracks }) => {
+      const size = availableVideoTracks[0]?.size
+      if (size?.width && size.height) {
+        setNatural({ width: size.width, height: size.height })
+      }
+    })
+    return () => sub.remove()
+  }, [player])
+
+  const box = fitImageSize(natural.width, natural.height, maxW, maxH)
+  const columnW = mediaCaptionColumnWidth(box.width, maxW, hasCaption)
 
   return (
     <View style={{ width: columnW, minWidth: columnW }}>

@@ -61,6 +61,10 @@ function assetKind(type: string | null | undefined): 'image' | 'video' {
   return type === 'video' || type === 'pairedVideo' ? 'video' : 'image'
 }
 
+function positiveOrUndefined(n: number | null | undefined): number | undefined {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined
+}
+
 function toAttachment(asset: ImagePicker.ImagePickerAsset): PickedAttachment {
   const kind = assetKind(asset.type)
   return {
@@ -72,6 +76,10 @@ function toAttachment(asset: ImagePicker.ImagePickerAsset): PickedAttachment {
       kind === 'video' && asset.duration != null
         ? Math.round(asset.duration * 1000)
         : undefined,
+    // Videos have no `Image.getSize` equivalent, so the picker's own report is
+    // the only aspect ratio available before the player has loaded a track.
+    width: positiveOrUndefined(asset.width),
+    height: positiveOrUndefined(asset.height),
   }
 }
 

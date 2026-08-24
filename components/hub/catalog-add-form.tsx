@@ -26,7 +26,7 @@ type CatalogAddFormProps = {
 
 export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddFormProps) {
   const insets = useSafeAreaInsets();
-  const { keyboardInset, scrollProps } = useKeyboardAwareScroll();
+  const { keyboardInset, contentRef, scrollProps } = useKeyboardAwareScroll();
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(fields.map((f) => [f.key, ""])),
   );
@@ -49,7 +49,15 @@ export function CatalogAddForm({ fields, submitLabel, onSubmit }: CatalogAddForm
   return (
     // Shrinking the scroll viewport is what keeps a focused field above the
     // Android IME; iOS does the same natively via automaticallyAdjustKeyboardInsets.
-    <View className="flex-1 bg-bg" style={{ paddingBottom: keyboardInset }}>
+    // `contentRef` must sit on this node: `keyboardInset` is padding *inside* its
+    // frame, so measuring it stays stable across repeat keyboardDidShow events
+    // and reports a bottom the host has already resized when the host resizes.
+    <View
+      ref={contentRef}
+      collapsable={false}
+      className="flex-1 bg-bg"
+      style={{ paddingBottom: keyboardInset }}
+    >
       <ScrollView
         {...scrollProps}
         className="flex-1 bg-bg"

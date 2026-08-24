@@ -41,6 +41,9 @@ export type MessageAttachment = {
   size: number | null
   /** Voice notes and videos when known. */
   durationMs?: number
+  /** Natural pixel size for images and videos when the picker reported it. */
+  width?: number
+  height?: number
   /** Downsampled 0..1 levels for voice-note waveforms (~32–64 bars). */
   peaks?: number[]
 }

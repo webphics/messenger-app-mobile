@@ -135,7 +135,12 @@ export function ThreadScreen({
   const replyQuote = useMemo(() => {
     if (!replyTo) return null
     const q = toQuoted(replyTo)
-    return { name: q.name, body: q.body, thumbUri: q.thumbUri }
+    return {
+      name: q.name,
+      body: q.body,
+      thumbUri: q.thumbUri,
+      kind: q.attachmentKind,
+    }
   }, [replyTo])
 
   const menuOpen = menu !== null
