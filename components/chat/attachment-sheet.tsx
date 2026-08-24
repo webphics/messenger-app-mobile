@@ -6,7 +6,7 @@ import {
   X,
 } from "@/components/icons";
 import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -136,7 +136,10 @@ export function AttachmentSheet({
   onClose,
   onSelectAction,
 }: AttachmentSheetProps) {
-  const translateY = useRef(new Animated.Value(400)).current;
+  // Lazy initialiser, not `useRef(new Animated.Value(400))`: useRef evaluates
+  // its argument on every render and discards all but the first, so the plain
+  // form allocates a throwaway Animated.Value per render.
+  const [translateY] = useState(() => new Animated.Value(400));
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -198,8 +201,10 @@ export function AttachmentSheet({
     }
   }
 
-  // Dedicated PanResponder for the top grab handle + header area (circled section)
-  const headerPanResponder = useRef(
+  // Dedicated PanResponder for the top grab handle + header area (circled section).
+  // Lazy initialiser for the same reason as translateY above — PanResponder.create
+  // builds an object and six closures, and useRef would rebuild them every render.
+  const [headerPanResponder] = useState(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onStartShouldSetPanResponderCapture: () => false,
@@ -240,10 +245,10 @@ export function AttachmentSheet({
         }).start();
       },
     }),
-  ).current;
+  );
 
   // PanResponder for downward drag on the option list area
-  const bodyPanResponder = useRef(
+  const [bodyPanResponder] = useState(() =>
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
@@ -284,7 +289,7 @@ export function AttachmentSheet({
         }).start();
       },
     }),
-  ).current;
+  );
 
   const backdropOpacity = translateY.interpolate({
     inputRange: [0, 260],
