@@ -24,7 +24,7 @@ The iOS IPA will not install via TestFlight or the App Store. Sideload it with A
 
 ### Costs
 
-Android costs ~1 GitHub minute per run plus one of the **15 free EAS Android builds/month** — no overage charges, the quota just resets on the 1st. iOS is the expensive one: `macos-latest` bills at **10×** on a private repo, so a ~30-minute build consumes ~300 of the 2,000 free monthly minutes.
+Android costs ~1 GitHub minute per run plus one of the **15 free EAS Android builds/month** — no overage charges, the quota just resets on the 1st. iOS is the expensive one: `macos-latest` bills at **10×** on a private repo. A run measures ~13 minutes, so ~130 billable minutes — roughly 15 iOS builds against the 2,000 free monthly minutes.
 
 ### One-time setup
 
