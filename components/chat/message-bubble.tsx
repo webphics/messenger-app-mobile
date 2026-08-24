@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, CheckCheck, CornerUpLeft, Reply } from '@/components/icons'
 import { Dimensions, Image, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -14,10 +14,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
+import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { MessageMedia } from '@/components/chat/message-media'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics'
+import { fitImageSize } from '@/lib/image-layout'
 import {
   isImageOrVideo,
   type QuoteLayoutMode,
@@ -100,9 +102,19 @@ const QuoteCaption = memo(function QuoteCaption({
   senderName?: string
 }) {
   return (
-    <View className="mb-0.5 flex-row items-center gap-1 px-1">
-      <CornerUpLeft color={colors.muted} size={12} />
-      <Text variant="label" className="font-medium text-muted" numberOfLines={1}>
+    <View
+      className={cn(
+        'mb-1 flex-row items-center gap-1',
+        // Messenger: label sits on the same edge as the cluster, not centered in the column.
+        outgoing ? 'justify-end self-end' : 'justify-start self-start',
+      )}
+    >
+      <CornerUpLeft color={colors.muted} size={11} />
+      <Text
+        variant="label"
+        className="font-medium text-muted"
+        numberOfLines={1}
+      >
         {replyCaption({
           outgoing,
           senderName,
@@ -171,34 +183,91 @@ const FusedImageReply = memo(function FusedImageReply({
   outgoing: boolean
   senderName?: string
 }) {
-  const { width } = Dimensions.get('window')
-  // Meta: compact square thumb; reply bubble hangs off the bottom corner.
-  const thumbSize = Math.min(148, width * 0.42)
+  const { width: screenW, height: screenH } = Dimensions.get('window')
+  // Full bubble column — reply text can overhang the photo (Messenger).
+  const columnW = Math.min(300, Math.round(screenW * 0.74))
+  // Quoted photo is intentionally smaller / recessed behind the reply bubble.
+  const thumbMaxW = Math.min(152, Math.round(columnW * 0.52))
+  const thumbMaxH = Math.min(Math.round(screenH * 0.28), Math.round(thumbMaxW * 1.2))
+  const [box, setBox] = useState(() => fitImageSize(1, 1, thumbMaxW, thumbMaxH))
+  const [previewOpen, setPreviewOpen] = useState(false)
   const thumb = quoted.thumbUri
+
+  useEffect(() => {
+    if (!thumb) return
+    let cancelled = false
+    Image.getSize(
+      thumb,
+      (w, h) => {
+        if (!cancelled) setBox(fitImageSize(w, h, thumbMaxW, thumbMaxH))
+      },
+      () => {
+        if (!cancelled) setBox(fitImageSize(1, 1, thumbMaxW, thumbMaxH))
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [thumb, thumbMaxW, thumbMaxH])
+
   if (!thumb) return null
+
+  // Overlap: bubble covers the bottom ~28px of the photo for layered depth.
+  const overlap = 28
+
   return (
-    <View className={cn(outgoing ? 'items-end' : 'items-start')}>
+    <View
+      style={{ width: columnW, minWidth: columnW }}
+      className={cn(outgoing ? 'items-end' : 'items-start')}
+    >
       <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
       <View
+        style={{
+          width: columnW,
+          minWidth: columnW,
+          // Room under the photo so the overhanging bubble isn’t clipped.
+          paddingBottom: Math.max(0, 44 - overlap),
+        }}
         className={cn(
           'relative overflow-visible',
-          // Meta: reply hangs under the thumb, not flush on the photo.
-          'pb-7',
+          outgoing ? 'items-end' : 'items-start',
         )}
       >
-        <Image
-          source={{ uri: thumb }}
-          className="rounded-2xl bg-line/40"
-          style={{ width: thumbSize, height: thumbSize }}
-          resizeMode="cover"
-          accessibilityLabel="Quoted photo"
-        />
+        {/* Recessed quoted photo — behind the reply bubble */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="View quoted photo"
+          onPress={() => setPreviewOpen(true)}
+          style={{ zIndex: 0 }}
+        >
+          <View
+            className="overflow-hidden rounded-2xl border border-line/50 bg-line/40"
+            style={{ opacity: 0.88 }}
+          >
+            <Image
+              source={{ uri: thumb }}
+              style={{ width: box.width, height: box.height }}
+              resizeMode="cover"
+              accessibilityLabel="Quoted photo"
+            />
+          </View>
+        </Pressable>
+        {/*
+          Messenger depth: reply sits in front, same corner as the photo,
+          maxWidth = full column so it extends past the image.
+        */}
         <View
+          style={{
+            zIndex: 2,
+            maxWidth: columnW,
+            // Pull up so it covers the bottom of the photo.
+            marginTop: -overlap,
+          }}
           className={cn(
-            'absolute max-w-[92%] px-3.5 py-2 shadow-md',
+            'px-3.5 py-2 shadow-md shadow-black/20',
             outgoing
-              ? 'bottom-0 right-0 rounded-[20px] bg-primary shadow-primary/30'
-              : 'bottom-0 left-0 rounded-[20px] border border-line/70 bg-bubble-in shadow-black/10',
+              ? 'self-end rounded-[20px] rounded-br-md bg-primary'
+              : 'self-start rounded-[20px] rounded-bl-md border border-line/70 bg-bubble-in',
           )}
         >
           <Text
@@ -209,6 +278,11 @@ const FusedImageReply = memo(function FusedImageReply({
           </Text>
         </View>
       </View>
+      <ImagePreviewModal
+        uri={thumb}
+        visible={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+      />
     </View>
   )
 })
@@ -297,6 +371,12 @@ export const MessageBubble = memo(function MessageBubble({
     !!quoted.thumbUri
   const showQuoteChrome = !!quoted && !fused
   const showMainBubble = !fused && (showChromeBubble || borderless || hasText)
+  const screenW = Dimensions.get('window').width
+  /** Force wide column when image/video has a caption — Yoga stretch was locking to thumb width. */
+  const mediaCaptionWidth =
+    borderless && hasText
+      ? Math.min(300, Math.round(screenW * 0.74))
+      : undefined
 
   useEffect(() => {
     if (isFirstMount.current) {
@@ -510,6 +590,11 @@ export const MessageBubble = memo(function MessageBubble({
                 outgoing ? 'self-end' : 'self-start',
                 reactions.length > 0 && 'mb-2',
               )}
+              style={
+                mediaCaptionWidth != null
+                  ? { width: mediaCaptionWidth, minWidth: mediaCaptionWidth }
+                  : undefined
+              }
             >
               <View
                 ref={bubbleRef}
@@ -531,6 +616,11 @@ export const MessageBubble = memo(function MessageBubble({
                       : 'rounded-[22px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8'),
                   borderless && 'bg-transparent shadow-none',
                 )}
+                style={
+                  mediaCaptionWidth != null
+                    ? { width: mediaCaptionWidth, minWidth: mediaCaptionWidth }
+                    : undefined
+                }
               >
                 {attachment ? (
                   <MessageMedia

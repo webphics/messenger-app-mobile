@@ -1,5 +1,5 @@
 import { FileText } from '@/components/icons'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   Image,
@@ -11,9 +11,11 @@ import {
 import { useVideoPlayer, VideoView } from 'expo-video'
 import * as Sharing from 'expo-sharing'
 
+import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
 import { Text } from '@/components/ui/text'
 import { formatBytes } from '@/lib/attachments'
+import { fitImageSize, mediaCaptionColumnWidth } from '@/lib/image-layout'
 import { cn } from '@/lib/cn'
 import { attachmentKindLabel } from '@/lib/message-attachment'
 import { colors } from '@/lib/tokens'
@@ -32,16 +34,22 @@ export function MessageMedia({
 }: MessageMediaProps) {
   if (attachment.kind === 'image') {
     return (
-      <MediaShell outgoing={outgoing} caption={caption} borderless>
-        <ImageAttachment uri={attachment.uri} name={attachment.name} />
-      </MediaShell>
+      <ImageAttachment
+        uri={attachment.uri}
+        name={attachment.name}
+        outgoing={outgoing}
+        caption={caption}
+      />
     )
   }
   if (attachment.kind === 'video') {
     return (
-      <MediaShell outgoing={outgoing} caption={caption} borderless>
-        <VideoAttachment uri={attachment.uri} name={attachment.name} />
-      </MediaShell>
+      <VideoAttachment
+        uri={attachment.uri}
+        name={attachment.name}
+        outgoing={outgoing}
+        caption={caption}
+      />
     )
   }
   if (attachment.kind === 'audio') {
@@ -62,39 +70,12 @@ function MediaShell({
   children,
   outgoing,
   caption,
-  borderless,
 }: {
   children: React.ReactNode
   outgoing: boolean
   caption?: string
-  borderless?: boolean
 }) {
   const trimmed = caption?.trim()
-  if (borderless) {
-    return (
-      <View className={cn('overflow-hidden', outgoing ? 'items-end' : 'items-start')}>
-        {children}
-        {trimmed ? (
-          <View
-            className={cn(
-              'mt-1.5 max-w-full rounded-[18px] px-3 py-2',
-              outgoing
-                ? 'self-end rounded-br-md bg-primary'
-                : 'self-start rounded-bl-md border border-line/70 bg-bubble-in',
-            )}
-          >
-            <Text
-              variant="body"
-              className={outgoing ? 'text-primary-foreground' : 'text-ink'}
-            >
-              {trimmed}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-    )
-  }
-
   return (
     <View>
       {children}
@@ -113,36 +94,141 @@ function MediaShell({
   )
 }
 
-function ImageAttachment({ uri, name }: { uri: string; name: string }) {
-  const { width } = useWindowDimensions()
-  const maxW = Math.min(280, width * 0.72)
+function CaptionBubble({
+  text,
+  outgoing,
+  width,
+}: {
+  text: string
+  outgoing: boolean
+  width: number
+}) {
   return (
-    <Image
-      source={{ uri }}
-      accessibilityLabel={name || 'Photo'}
-      className="rounded-[18px] bg-line/40"
-      style={{ width: maxW, height: maxW * 0.75 }}
-      resizeMode="cover"
-    />
+    <View
+      style={{ width }}
+      className={cn(
+        'mt-1.5 rounded-[18px] px-3 py-2',
+        outgoing
+          ? 'rounded-br-md bg-primary'
+          : 'rounded-bl-md border border-line/70 bg-bubble-in',
+      )}
+    >
+      <Text
+        variant="body"
+        className={outgoing ? 'text-primary-foreground' : 'text-ink'}
+      >
+        {text}
+      </Text>
+    </View>
   )
 }
 
-function VideoAttachment({ uri, name }: { uri: string; name: string }) {
-  const { width } = useWindowDimensions()
-  const maxW = Math.min(280, width * 0.72)
+function ImageAttachment({
+  uri,
+  name,
+  outgoing,
+  caption,
+}: {
+  uri: string
+  name: string
+  outgoing: boolean
+  caption?: string
+}) {
+  const { width: screenW, height: screenH } = useWindowDimensions()
+  const maxW = Math.min(300, Math.round(screenW * 0.74))
+  const maxH = Math.min(Math.round(screenH * 0.48), Math.round(maxW * 1.45))
+  const [box, setBox] = useState(() => fitImageSize(0, 0, maxW, maxH))
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const trimmed = caption?.trim() ?? ''
+  const hasCaption = trimmed.length > 0
+  const columnW = mediaCaptionColumnWidth(box.width, maxW, hasCaption)
+
+  useEffect(() => {
+    let cancelled = false
+    Image.getSize(
+      uri,
+      (w, h) => {
+        if (cancelled) return
+        setBox(fitImageSize(w, h, maxW, maxH))
+      },
+      () => {
+        if (cancelled) return
+        setBox(fitImageSize(0, 0, maxW, maxH))
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [uri, maxW, maxH])
+
+  return (
+    <View style={{ width: columnW, minWidth: columnW }}>
+      <View className={cn(outgoing ? 'items-end' : 'items-start')}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={name ? `View ${name}` : 'View photo'}
+          onPress={() => setPreviewOpen(true)}
+        >
+          <Image
+            source={{ uri }}
+            accessibilityLabel={name || 'Photo'}
+            className="rounded-[18px] bg-line/40"
+            style={{ width: box.width, height: box.height }}
+            resizeMode="cover"
+          />
+        </Pressable>
+      </View>
+      {hasCaption ? (
+        <CaptionBubble text={trimmed} outgoing={outgoing} width={columnW} />
+      ) : null}
+      <ImagePreviewModal
+        uri={uri}
+        name={name}
+        visible={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+      />
+    </View>
+  )
+}
+
+function VideoAttachment({
+  uri,
+  name,
+  outgoing,
+  caption,
+}: {
+  uri: string
+  name: string
+  outgoing: boolean
+  caption?: string
+}) {
+  const { width: screenW, height: screenH } = useWindowDimensions()
+  const maxW = Math.min(300, Math.round(screenW * 0.74))
+  const maxH = Math.min(Math.round(screenH * 0.48), Math.round(maxW * 1.45))
+  const box = fitImageSize(16, 9, maxW, maxH)
+  const trimmed = caption?.trim() ?? ''
+  const hasCaption = trimmed.length > 0
+  const columnW = mediaCaptionColumnWidth(box.width, maxW, hasCaption)
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false
   })
 
   return (
-    <View className="overflow-hidden rounded-[18px] bg-ink">
-      <VideoView
-        player={player}
-        style={{ width: maxW, height: maxW * 0.75 }}
-        contentFit="cover"
-        nativeControls
-        accessibilityLabel={name || 'Video'}
-      />
+    <View style={{ width: columnW, minWidth: columnW }}>
+      <View className={cn(outgoing ? 'items-end' : 'items-start')}>
+        <View className="overflow-hidden rounded-[18px] bg-ink">
+          <VideoView
+            player={player}
+            style={{ width: box.width, height: box.height }}
+            contentFit="contain"
+            nativeControls
+            accessibilityLabel={name || 'Video'}
+          />
+        </View>
+      </View>
+      {hasCaption ? (
+        <CaptionBubble text={trimmed} outgoing={outgoing} width={columnW} />
+      ) : null}
     </View>
   )
 }
