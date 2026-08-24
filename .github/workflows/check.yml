@@ -1,0 +1,47 @@
+name: Check
+
+# Types, lint and unit tests. Runs on every push and PR because it is cheap:
+# ubuntu bills 1x and the whole job is well under a minute, versus the macOS
+# iOS build in build.yml which bills 10x. Keep anything slow or native out of
+# here so this stays the fast feedback loop.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Types, lint, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      # Version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Each step runs even if an earlier one failed, so a single push reports
+      # every category of problem at once instead of one per re-run.
+      - name: Typecheck
+        if: '!cancelled()'
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint
+        if: '!cancelled()'
+        run: pnpm run lint
+
+      - name: Test
+        if: '!cancelled()'
+        run: pnpm test
