@@ -76,6 +76,11 @@
       "expo-video",
       "expo-image"
     ],
+    "extra": {
+      "eas": {
+        "projectId": "113365ad-8eea-4a56-b6ae-8f0013618e69"
+      }
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

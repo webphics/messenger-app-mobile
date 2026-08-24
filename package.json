@@ -2,6 +2,7 @@
   "name": "enki",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "packageManager": "pnpm@11.3.0",
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
     "@expo-google-fonts/manrope": "^0.4.2",
@@ -63,6 +64,7 @@
     "start:tunnel": "pnpm exec expo start -c --tunnel",
     "lint": "expo lint",
     "test": "jest --watchAll=false",
+    "build:android": "eas build --platform android --profile preview",
     "build:apk": "node scripts/build-apk.mjs"
   },
   "jest": {

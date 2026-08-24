@@ -1,0 +1,156 @@
+name: Build
+
+# Manual only. Android is submitted to EAS (Expo's servers do the work, so this
+# job costs ~1 GitHub minute); iOS builds on a macOS runner, which bills at 10x
+# on a private repo — roughly 300 minutes of quota per run. Keep it deliberate.
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which platform to build
+        type: choice
+        default: both
+        options:
+          - both
+          - android
+          - ios
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    name: Android APK (EAS)
+    if: ${{ inputs.platform == 'android' || inputs.platform == 'both' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # A missing secret otherwise surfaces as an opaque auth failure from the
+      # EAS CLI several steps later.
+      - name: Require EXPO_TOKEN
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN repository secret is not set. Run: gh secret set EXPO_TOKEN"
+            exit 1
+          fi
+
+      - name: Set up EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # --no-wait, not --wait: the free EAS queue can exceed 90 minutes and
+      # --wait would bill every one of them to this runner while it sits idle.
+      # The APK is collected from the EAS install page instead.
+      - name: Submit Android build to EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -o pipefail
+          eas build --platform android --profile preview --non-interactive --no-wait 2>&1 | tee eas.log
+
+      - name: Link the build
+        if: success()
+        run: |
+          URL=$(grep -oE 'https://expo\.dev/[^[:space:]]*builds/[0-9a-fA-F-]+' eas.log | head -1)
+          {
+            echo "### Android build submitted"
+            echo
+            if [ -n "$URL" ]; then
+              echo "[Open the build on expo.dev]($URL)"
+              echo
+              echo "Install the APK from the EAS page once it finishes — internal distribution serves an install link and QR code."
+            else
+              echo "Submitted, but the build URL could not be parsed from the log. See the previous step's output."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios:
+    name: iOS unsigned IPA
+    if: ${{ inputs.platform == 'ios' || inputs.platform == 'both' }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # ios/ is gitignored and generated (CNG), so it never exists in a fresh
+      # checkout. --no-install splits prebuild from pod install so a failure in
+      # either is individually diagnosable.
+      - name: Prebuild iOS project
+        run: pnpm exec expo prebuild --platform ios --clean --no-install
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      # No Apple Developer account, so the build is unsigned. Derive the scheme
+      # from the generated workspace rather than hardcoding "Enki", so renaming
+      # expo.name cannot silently break CI.
+      - name: Build unsigned .app
+        run: |
+          set -euo pipefail
+          WORKSPACE=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "Workspace: $WORKSPACE / Scheme: $SCHEME"
+          echo "SCHEME=$SCHEME" >> "$GITHUB_ENV"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            -quiet
+
+      # An .ipa is a zip with the .app under Payload/.
+      - name: Package .ipa
+        run: |
+          set -euo pipefail
+          APP="ios/build/Build/Products/Release-iphoneos/${SCHEME}.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::xcodebuild succeeded but $APP is missing."
+            exit 1
+          fi
+          mkdir -p dist/Payload
+          cp -R "$APP" dist/Payload/
+          (cd dist && zip -qry enki-unsigned.ipa Payload && rm -rf Payload)
+          ls -lh dist/enki-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: enki-ios-unsigned-${{ github.sha }}
+          path: dist/enki-unsigned.ipa
+          retention-days: 30
+
+      - name: Note how to install
+        if: success()
+        run: |
+          {
+            echo "### iOS unsigned IPA"
+            echo
+            echo "Download the \`enki-ios-unsigned-${{ github.sha }}\` artifact from this run."
+            echo
+            echo "It is **unsigned** — it will not install via TestFlight or the App Store. Sideload it with AltStore or Sideloadly. On a free Apple ID the signature expires after 7 days."
+          } >> "$GITHUB_STEP_SUMMARY"
