@@ -39,6 +39,12 @@ describe('replyCaption', () => {
     ).toBe('You replied to Evan')
   })
 
+  test('outgoing to yourself', () => {
+    expect(
+      replyCaption({ outgoing: true, quotedName: 'Me', quotedIsMe: true }),
+    ).toBe('You replied to yourself')
+  })
+
   test('incoming reply to you', () => {
     expect(
       replyCaption({

@@ -4,9 +4,9 @@ import {
   Image as ImageIcon,
   Sparkles,
   X,
-} from "@/components/icons";
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+} from '@/components/icons'
+import type { ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -15,111 +15,105 @@ import {
   PanResponder,
   Pressable,
   View,
-} from "react-native";
+} from 'react-native'
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
-} from "react-native-safe-area-context";
+} from 'react-native-safe-area-context'
 
-import { TactilePressable } from "@/components/ui/tactile-pressable";
-import { Text } from "@/components/ui/text";
+import { TactilePressable } from '@/components/ui/tactile-pressable'
+import { Text } from '@/components/ui/text'
 import {
   capturePhoto,
-  describeAttachment,
   pickDocument,
   pickFromLibrary,
   type AttachmentOutcome,
-} from "@/lib/attachments";
-import { hapticLight, hapticSelection } from "@/lib/haptics";
-import { motion } from "@/lib/motion";
-import { colors, screenBottomPad } from "@/lib/tokens";
+} from '@/lib/attachments'
+import { hapticLight, hapticSelection } from '@/lib/haptics'
+import { motion } from '@/lib/motion'
+import { colors, screenBottomPad } from '@/lib/tokens'
+import type { MessageAttachment } from '@/lib/types'
 
 type AttachmentSheetProps = {
-  visible: boolean;
-  onClose: () => void;
-  onSelectAction: (textToInsert: string) => void;
-};
+  visible: boolean
+  onClose: () => void
+  onPicked: (attachment: MessageAttachment) => void
+  onInsertText: (text: string) => void
+}
 
 /**
- * `pick` options open a native picker and resolve to real file metadata;
- * `insert` options are pure text. Keeping both in one list lets the sheet render
- * a single row type.
+ * `pick` options open a native picker and resolve to a real Attachment;
+ * `insert` options are pure text (quick replies).
  */
 type AttachmentOption =
   | {
-      id: string;
-      title: string;
-      subtitle: string;
-      icon: typeof ImageIcon;
-      pick: () => Promise<AttachmentOutcome>;
-      insertText?: never;
+      id: string
+      title: string
+      subtitle: string
+      icon: typeof ImageIcon
+      pick: () => Promise<AttachmentOutcome>
+      insertText?: never
     }
   | {
-      id: string;
-      title: string;
-      subtitle: string;
-      icon: typeof ImageIcon;
-      pick?: never;
-      insertText: string;
-    };
+      id: string
+      title: string
+      subtitle: string
+      icon: typeof ImageIcon
+      pick?: never
+      insertText: string
+    }
 
 const ATTACHMENT_OPTIONS: AttachmentOption[] = [
   {
-    id: "photo",
-    title: "Photo & Video Library",
-    subtitle: "Share images or screenshots",
+    id: 'photo',
+    title: 'Photo & Video Library',
+    subtitle: 'Share images or screenshots',
     icon: ImageIcon,
     pick: pickFromLibrary,
   },
   {
-    id: "camera",
-    title: "Take Photo",
-    subtitle: "Capture photo with camera",
+    id: 'camera',
+    title: 'Take Photo',
+    subtitle: 'Capture photo with camera',
     icon: Camera,
     pick: capturePhoto,
   },
   {
-    id: "document",
-    title: "Document",
-    subtitle: "Attach invoice or PDF",
+    id: 'document',
+    title: 'Document',
+    subtitle: 'Attach invoice or PDF',
     icon: FileText,
     pick: pickDocument,
   },
   {
-    id: "quick-reply",
-    title: "Quick Response",
-    subtitle: "Insert standard support greeting",
+    id: 'quick-reply',
+    title: 'Quick Response',
+    subtitle: 'Insert standard support greeting',
     icon: Sparkles,
-    insertText: "Hi there! Thanks for reaching out. How can I assist you today?",
+    insertText: 'Hi there! Thanks for reaching out. How can I assist you today?',
   },
-];
+]
 
 const DENIED_COPY = {
   camera: {
-    title: "Camera access needed",
-    body: "Enable camera access in Settings to take a photo from here.",
+    title: 'Camera access needed',
+    body: 'Enable camera access in Settings to take a photo from here.',
   },
   library: {
-    title: "Photo access needed",
-    body: "Enable photo access in Settings to attach images or video.",
+    title: 'Photo access needed',
+    body: 'Enable photo access in Settings to attach images or video.',
   },
-} as const;
+} as const
 
-/**
- * The sheet surface. Must render inside the modal's own `SafeAreaProvider` —
- * MainActivity pads `android.R.id.content` and then consumes the system-bar
- * insets, so the root provider reports 0 and the modal's separate window never
- * receives that native padding.
- */
 function SheetSurface({
   translateY,
   children,
 }: {
-  translateY: Animated.Value;
-  children: ReactNode;
+  translateY: Animated.Value
+  children: ReactNode
 }) {
-  const insets = useSafeAreaInsets();
-  const bottomPad = screenBottomPad(insets.bottom, 16);
+  const insets = useSafeAreaInsets()
+  const bottomPad = screenBottomPad(insets.bottom, 16)
 
   return (
     <Animated.View
@@ -128,32 +122,33 @@ function SheetSurface({
     >
       {children}
     </Animated.View>
-  );
+  )
 }
 
 export function AttachmentSheet({
   visible,
   onClose,
-  onSelectAction,
+  onPicked,
+  onInsertText,
 }: AttachmentSheetProps) {
   // Lazy initialiser, not `useRef(new Animated.Value(400))`: useRef evaluates
   // its argument on every render and discards all but the first, so the plain
   // form allocates a throwaway Animated.Value per render.
-  const [translateY] = useState(() => new Animated.Value(400));
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [translateY] = useState(() => new Animated.Value(400))
+  const [pendingId, setPendingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (visible) {
-      translateY.setValue(400);
+      translateY.setValue(400)
       Animated.spring(translateY, {
         toValue: 0,
         damping: motion.springs.overlay.damping,
         stiffness: motion.springs.overlay.stiffness,
         mass: motion.springs.overlay.mass,
         useNativeDriver: true,
-      }).start();
+      }).start()
     }
-  }, [visible, translateY]);
+  }, [visible, translateY])
 
   function dismiss() {
     Animated.timing(translateY, {
@@ -161,43 +156,42 @@ export function AttachmentSheet({
       duration: motion.durations.overlay,
       useNativeDriver: true,
     }).start(() => {
-      onClose();
-    });
+      onClose()
+    })
   }
 
-  function handleSelect(insertText: string) {
-    hapticSelection();
-    onSelectAction(insertText);
-    dismiss();
+  function handleSelectText(insertText: string) {
+    hapticSelection()
+    onInsertText(insertText)
+    dismiss()
   }
 
   async function handleOption(option: AttachmentOption) {
-    if (pendingId) return;
+    if (pendingId) return
 
     if (option.insertText !== undefined) {
-      handleSelect(option.insertText);
-      return;
+      handleSelectText(option.insertText)
+      return
     }
 
-    hapticSelection();
-    setPendingId(option.id);
+    hapticSelection()
+    setPendingId(option.id)
     try {
-      const outcome = await option.pick();
-      if (outcome.status === "picked") {
-        onSelectAction(describeAttachment(outcome.attachment));
-        dismiss();
-        return;
+      const outcome = await option.pick()
+      if (outcome.status === 'picked') {
+        onPicked(outcome.attachment)
+        dismiss()
+        return
       }
-      if (outcome.status === "denied") {
-        const copy = DENIED_COPY[outcome.scope];
-        Alert.alert(copy.title, copy.body);
+      if (outcome.status === 'denied') {
+        if (outcome.reason !== 'denied-settings') return
+        const copy = DENIED_COPY[outcome.scope]
+        Alert.alert(copy.title, copy.body)
       }
-      // `cancelled` leaves the sheet open so another option can be chosen.
     } catch {
-      // Never surface the picker's raw error — it can carry file paths.
-      Alert.alert("Could not attach", "Something went wrong opening that picker.");
+      Alert.alert('Could not attach', 'Something went wrong opening that picker.')
     } finally {
-      setPendingId(null);
+      setPendingId(null)
     }
   }
 
@@ -209,22 +203,22 @@ export function AttachmentSheet({
       onStartShouldSetPanResponder: () => true,
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 2 || Math.abs(gesture.dy) > Math.abs(gesture.dx);
+        return gesture.dy > 2 || Math.abs(gesture.dy) > Math.abs(gesture.dx)
       },
       onMoveShouldSetPanResponderCapture: (_, gesture) => {
-        return gesture.dy > 2;
+        return gesture.dy > 2
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
-          translateY.setValue(gesture.dy);
+          translateY.setValue(gesture.dy)
         } else {
-          translateY.setValue(gesture.dy * 0.15);
+          translateY.setValue(gesture.dy * 0.15)
         }
       },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dy > 45 || gesture.vy > 0.25) {
-          hapticLight();
-          dismiss();
+          hapticLight()
+          dismiss()
         } else {
           Animated.spring(translateY, {
             toValue: 0,
@@ -232,7 +226,7 @@ export function AttachmentSheet({
             stiffness: motion.springs.overlay.stiffness,
             mass: motion.springs.overlay.mass,
             useNativeDriver: true,
-          }).start();
+          }).start()
         }
       },
       onPanResponderTerminate: () => {
@@ -242,10 +236,10 @@ export function AttachmentSheet({
           stiffness: motion.springs.overlay.stiffness,
           mass: motion.springs.overlay.mass,
           useNativeDriver: true,
-        }).start();
+        }).start()
       },
     }),
-  );
+  )
 
   // PanResponder for downward drag on the option list area
   const [bodyPanResponder] = useState(() =>
@@ -253,22 +247,22 @@ export function AttachmentSheet({
       onStartShouldSetPanResponder: () => false,
       onStartShouldSetPanResponderCapture: () => false,
       onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+        return gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
       },
       onMoveShouldSetPanResponderCapture: (_, gesture) => {
-        return gesture.dy > 12 && Math.abs(gesture.dy) > Math.abs(gesture.dx);
+        return gesture.dy > 12 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
       },
       onPanResponderMove: (_, gesture) => {
         if (gesture.dy > 0) {
-          translateY.setValue(gesture.dy);
+          translateY.setValue(gesture.dy)
         } else {
-          translateY.setValue(gesture.dy * 0.15);
+          translateY.setValue(gesture.dy * 0.15)
         }
       },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dy > 55 || gesture.vy > 0.3) {
-          hapticLight();
-          dismiss();
+          hapticLight()
+          dismiss()
         } else {
           Animated.spring(translateY, {
             toValue: 0,
@@ -276,7 +270,7 @@ export function AttachmentSheet({
             stiffness: motion.springs.overlay.stiffness,
             mass: motion.springs.overlay.mass,
             useNativeDriver: true,
-          }).start();
+          }).start()
         }
       },
       onPanResponderTerminate: () => {
@@ -286,16 +280,16 @@ export function AttachmentSheet({
           stiffness: motion.springs.overlay.stiffness,
           mass: motion.springs.overlay.mass,
           useNativeDriver: true,
-        }).start();
+        }).start()
       },
     }),
-  );
+  )
 
   const backdropOpacity = translateY.interpolate({
     inputRange: [0, 260],
     outputRange: [1, 0],
-    extrapolate: "clamp",
-  });
+    extrapolate: 'clamp',
+  })
 
   return (
     <Modal
@@ -304,11 +298,8 @@ export function AttachmentSheet({
       animationType="none"
       onRequestClose={dismiss}
     >
-      {/* The modal is its own Android window: nest a provider so insets are read
-          from that window instead of the root (consumed) ones. */}
       <SafeAreaProvider>
         <View className="flex-1 justify-end">
-          {/* Dimmed backdrop */}
           <Animated.View
             style={{ opacity: backdropOpacity }}
             className="absolute inset-0 bg-black/40"
@@ -316,16 +307,12 @@ export function AttachmentSheet({
             <Pressable className="flex-1" onPress={dismiss} />
           </Animated.View>
 
-          {/* Drawer Sheet */}
           <SheetSurface translateY={translateY}>
-            {/* Top Grab Handle + Header Zone (Immediately responds to swipe down) */}
             <View {...headerPanResponder.panHandlers} className="pb-3 pt-1">
-              {/* Grab handle with generous touch zone */}
               <View className="items-center py-2.5">
                 <View className="h-1.5 w-12 rounded-full bg-line" />
               </View>
 
-              {/* Drawer Header */}
               <View className="flex-row items-center justify-between px-1">
                 <Text variant="title" className="font-bold text-ink">
                   Share & Attach
@@ -342,7 +329,6 @@ export function AttachmentSheet({
               </View>
             </View>
 
-            {/* Option rows container */}
             <View {...bodyPanResponder.panHandlers} className="gap-2 pb-1">
               {ATTACHMENT_OPTIONS.map((item) => (
                 <TactilePressable
@@ -379,5 +365,5 @@ export function AttachmentSheet({
         </View>
       </SafeAreaProvider>
     </Modal>
-  );
+  )
 }

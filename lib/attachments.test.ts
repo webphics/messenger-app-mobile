@@ -1,9 +1,31 @@
 import {
-  describeAttachment,
+  classifyPermissionOutcome,
   fileNameFromUri,
   formatBytes,
-  type PickedAttachment,
 } from '@/lib/attachments'
+
+describe('classifyPermissionOutcome', () => {
+  test('granted proceeds', () => {
+    expect(classifyPermissionOutcome({ granted: true, canAskAgain: true })).toBe(
+      'proceed',
+    )
+    expect(
+      classifyPermissionOutcome({ granted: true, canAskAgain: false }),
+    ).toBe('proceed')
+  })
+
+  test('denied but askable stays askable', () => {
+    expect(
+      classifyPermissionOutcome({ granted: false, canAskAgain: true }),
+    ).toBe('denied-askable')
+  })
+
+  test('denied and cannot ask again needs Settings', () => {
+    expect(
+      classifyPermissionOutcome({ granted: false, canAskAgain: false }),
+    ).toBe('denied-settings')
+  })
+})
 
 describe('formatBytes', () => {
   test('bytes below a kilobyte stay raw', () => {
@@ -26,37 +48,18 @@ describe('formatBytes', () => {
 
 describe('fileNameFromUri', () => {
   test('takes the last path segment', () => {
-    expect(fileNameFromUri('file:///tmp/abc/receipt.pdf', 'document')).toBe('receipt.pdf')
+    expect(fileNameFromUri('file:///tmp/abc/receipt.pdf', 'document')).toBe(
+      'receipt.pdf',
+    )
   })
 
   test('drops the query string', () => {
-    expect(fileNameFromUri('file:///tmp/shot.jpg?width=90', 'image.jpg')).toBe('shot.jpg')
+    expect(fileNameFromUri('file:///tmp/shot.jpg?width=90', 'image.jpg')).toBe(
+      'shot.jpg',
+    )
   })
 
   test('falls back when the uri ends in a slash', () => {
     expect(fileNameFromUri('file:///tmp/', 'document')).toBe('document')
-  })
-})
-
-describe('describeAttachment', () => {
-  const base: PickedAttachment = {
-    uri: 'file:///tmp/shot.jpg',
-    name: 'shot.jpg',
-    size: 1_500_000,
-    kind: 'image',
-  }
-
-  test('names the kind, file and size', () => {
-    expect(describeAttachment(base)).toBe('[Attached image: shot.jpg · 1.4 MB]')
-  })
-
-  test('omits the size when unknown', () => {
-    expect(describeAttachment({ ...base, size: null })).toBe('[Attached image: shot.jpg]')
-  })
-
-  test('documents read as documents', () => {
-    expect(
-      describeAttachment({ ...base, name: 'invoice.pdf', kind: 'document', size: 4096 })
-    ).toBe('[Attached document: invoice.pdf · 4 KB]')
   })
 })

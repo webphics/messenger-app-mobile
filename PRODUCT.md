@@ -31,15 +31,15 @@ Success: each role reaches the right conversations and hub actions quickly, with
 ## Operating Context
 
 - This repo is the Expo iOS/Android client only. Next.js web, NestJS, and Postgres live elsewhere.
-- Current phase: mock auth + role hubs — session blob `{ email, role }` in AsyncStorage (`ism.session`); mock data; no real backend in-app.
-- Terminology source of truth: `CONTEXT.md` (Enki, Contact, Agent, Admin, Hub, Unassigned pool, Offers).
+- Current phase: mock auth + role hubs, plus Phase 5a local media UI (`Message.attachment`, no server upload). Session blob `{ email, role }` in AsyncStorage (`ism.session`); mock data; no real backend in-app.
+- Terminology source of truth: `CONTEXT.md` (Enki, Contact, Agent, Admin, Hub, Unassigned pool, Offers, Message, Attachment, Voice note).
 - Scope source of truth: `docs/scope.md` + current phase in `AGENTS.md`.
 
 ## Capabilities and Constraints
 
 - Confirmed roles and navigation model as in scope (all roles use tab hubs; Settings via hub gear).
 - Phase discipline: do not install later-phase packages (real auth, sockets, TanStack Query, FlashList, etc.) ahead of the phase bump.
-- Dead controls stay dead where phase says so (e.g. inbox compose, thread attach until that phase).
+- Dead controls stay dead where phase says so (e.g. inbox compose). Thread attach + voice notes are live for Phase 5a (local URI only).
 - RBAC helpers live in `lib/rbac.ts`; screens import them.
 - Undecided for product record: exact org that will deploy Enki; production API contracts (owned outside this repo).
 

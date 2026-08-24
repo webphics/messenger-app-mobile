@@ -7,17 +7,17 @@ alwaysApply: true
 
 Current phase is `AGENTS.md` + `docs/scope.md`. Do not install or wire the next phase’s stack.
 
-## Now (Phase 2 — mock auth + role hubs)
+## Now (Phase 2 — mock auth + role hubs; Phase 5a local media UI)
 
 Mock data still in `lib/mock-data.ts`. In-memory extras in `lib/mock-catalog.ts` (FAQ / knowledge / offers adds). Session = AsyncStorage blob `{ email, role }` via `lib/session.ts` (`ism.session`). Current user = `getDevUser()` (`lib/dev-user.ts`) from `getSession().role`. Login/register validate locally then persist. No `fetch`. No fake JWT. No SecureStore. No better-auth.
 
 Contact hub stays Phase 1. Agent Home + Admin Home are hub variants. Charts are mock series, not analytics product.
 
-Optimistic send / react / reply = local component state. Dead controls stay dead: inbox compose, thread attach.
+Optimistic send / react / reply = local component state. Dead controls stay dead: inbox compose. Thread attach + voice notes are live for Phase 5a (local URI only; stage on composer → send). Messages may include optional `attachment` (`lib/types.ts`).
 
 RBAC capability ≠ UI: do not render internal notes / accept-from-pool / assign / delete / broadcast.
 
-Do not install: TanStack Query, socket.io-client, expo-sqlite, Drizzle, better-auth, expo-secure-store, expo-image, react-native-keyboard-controller, i18next, FlashList, LegendList. `expo-clipboard` is allowed for knowledge Copy only.
+Do not install: TanStack Query, socket.io-client, expo-sqlite, Drizzle, better-auth, expo-secure-store, react-native-keyboard-controller, i18next, FlashList, LegendList. `expo-clipboard` is allowed for knowledge Copy only. `expo-audio` / `expo-video` / `expo-image-picker` / `expo-document-picker` / `expo-sharing` are allowed for Phase 5a local media. Prefer RN `Image` for chat thumbnails until a dedicated expo-image bubble pass.
 
 Never edit `.env`. Do not log message bodies, email, password, or PII.
 

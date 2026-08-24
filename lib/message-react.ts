@@ -32,7 +32,11 @@ export function replyCaption(args: {
   quotedName: string
   quotedIsMe: boolean
 }): string {
+  if (args.outgoing) {
+    return args.quotedIsMe
+      ? 'You replied to yourself'
+      : `You replied to ${args.quotedName}`
+  }
   const target = args.quotedIsMe ? 'you' : args.quotedName
-  if (args.outgoing) return `You replied to ${target}`
   return `${args.senderName ?? 'They'} replied to ${target}`
 }

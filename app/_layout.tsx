@@ -38,12 +38,25 @@ Appearance.setColorScheme("light");
 // The prebuild plugin does this natively for frame zero — this covers the dev
 // client, where that plugin has not run.
 void SystemUI.setBackgroundColorAsync(colors.bg);
-void SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 function applyAndroidNavChrome() {
   NavigationBar.setHidden(false);
   NavigationBar.setStyle("dark");
 }
+
+function hideNativeSplash() {
+  void SplashScreen.hideAsync().catch(() => {});
+}
+
+/**
+ * Backstop only. `AppLoadingScreen` hides the native splash the moment the
+ * launch WebP has decoded, which is what makes the handoff icon -> character
+ * animation instead of a blank frame. This timer exists solely so a failure to
+ * mount that screen at all cannot strand the splash forever, so it must sit
+ * well past the WebP's own decode failsafe.
+ */
+const SPLASH_BACKSTOP_MS = 6000;
 
 export default function RootLayout() {
   useFonts({
@@ -55,6 +68,13 @@ export default function RootLayout() {
     "JetBrains Mono": JetBrainsMono_500Medium,
     "JetBrains Mono-Bold": JetBrainsMono_700Bold,
   });
+
+  // Never leave the native splash up if the index loading screen fails to
+  // mount. Do NOT hide it eagerly here: the launch animation owns the handoff.
+  useEffect(() => {
+    const timer = setTimeout(hideNativeSplash, SPLASH_BACKSTOP_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "android") return;

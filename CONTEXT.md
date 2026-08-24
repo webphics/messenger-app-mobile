@@ -43,3 +43,15 @@ _Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface
 **Tab capsule**:
 The floating rounded nav bar at the bottom of every role. Icon-only — destination names live in the accessible name, not on screen.
 _Avoid_: Tab bar (that is the host navigator's own bar, kept invisible beneath), dock, bottom nav
+
+**Message**:
+A unit of chat content in a Conversation: a text body and/or one Attachment. The body may be empty when the Message is only an Attachment; when both are present the body is a caption.
+_Avoid_: Post, chat item, media message (as a separate entity from Message)
+
+**Attachment**:
+A single file or recording on a Message — image, video, document, or voice note — identified by a local device URI in this client until a server exists. At most one Attachment per Message.
+_Avoid_: Upload, media blob, file message (as a type parallel to Message)
+
+**Voice note**:
+An audio Attachment recorded in the app for a Message, not a file picked from the library.
+_Avoid_: Voice message, audio clip, mic message

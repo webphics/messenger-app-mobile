@@ -30,6 +30,8 @@ Broadcasts are in-inbox announcements (later), not stories.
 3. Real auth — better-auth + expo-secure-store.
 4. Realtime (socket.io) + REST (TanStack Query).
 5. Media, push, i18n, list virtualization.
+   - **5a. Client media UI (local attachments)** — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (this slice)
+   - 5b. Push, i18n, list virtualization.
 
 ## Session
 
