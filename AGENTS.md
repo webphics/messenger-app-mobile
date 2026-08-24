@@ -1,5 +1,7 @@
 Concise rules for building accessible, fast, delightful UIs. Use MUST/SHOULD/NEVER to guide decisions.
 
+**Project phase:** Phase 2 (mock auth + role hubs) is current for auth/session. Phase **5a** (client media UI — local attachments) is in progress per `docs/scope.md`. Domain glossary: `CONTEXT.md`.
+
 ## Interactions
 
 ### Keyboard

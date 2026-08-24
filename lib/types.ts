@@ -31,6 +31,20 @@ export type Conversation = {
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read'
 
+export type AttachmentKind = 'image' | 'video' | 'audio' | 'document'
+
+/** Local-URI attachment on a Message (no server upload this phase). */
+export type MessageAttachment = {
+  kind: AttachmentKind
+  uri: string
+  name: string
+  size: number | null
+  /** Voice notes and videos when known. */
+  durationMs?: number
+  /** Downsampled 0..1 levels for voice-note waveforms (~32–64 bars). */
+  peaks?: number[]
+}
+
 export type MessageReaction = {
   emoji: string
   userIds: string[]
@@ -40,11 +54,13 @@ export type Message = {
   id: string
   conversationId: string
   senderId: string
+  /** Caption or plain text; may be empty when only an Attachment is present. */
   body: string
   createdAt: string
   status: MessageStatus
   replyToId?: string
   reactions?: MessageReaction[]
+  attachment?: MessageAttachment
 }
 
 export type InternalNote = {

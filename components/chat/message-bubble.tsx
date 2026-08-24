@@ -1,7 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
-import { Check, CheckCheck, CornerUpLeft, Reply } from "@/components/icons";
-import { Dimensions, Pressable, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import { Check, CheckCheck, CornerUpLeft, Reply } from '@/components/icons'
+import { Dimensions, Image, Pressable, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
   Extrapolation,
@@ -12,104 +12,199 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
-} from "react-native-reanimated";
+} from 'react-native-reanimated'
 
-import { Text } from "@/components/ui/text";
-import { cn } from "@/lib/cn";
-import { hapticLight, hapticMedium, hapticSelection } from "@/lib/haptics";
-import { replyCaption } from "@/lib/message-react";
-import { messageStatusLabel } from "@/lib/message-status";
-import { deskMessageEnter } from "@/lib/motion-enter";
-import { motion } from "@/lib/motion";
+import { MessageMedia } from '@/components/chat/message-media'
+import { Text } from '@/components/ui/text'
+import { cn } from '@/lib/cn'
+import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics'
+import {
+  isImageOrVideo,
+  type QuoteLayoutMode,
+} from '@/lib/message-attachment'
+import { replyCaption } from '@/lib/message-react'
+import { messageStatusLabel } from '@/lib/message-status'
+import { deskMessageEnter } from '@/lib/motion-enter'
+import { motion } from '@/lib/motion'
 import {
   measureWindowOrPage,
   type OpenMenuPayload,
-} from "@/lib/overlay-frame";
-import { colors } from "@/lib/tokens";
-import type { MessageReaction, MessageStatus } from "@/lib/types";
+} from '@/lib/overlay-frame'
+import { colors } from '@/lib/tokens'
+import type {
+  AttachmentKind,
+  MessageAttachment,
+  MessageReaction,
+  MessageStatus,
+} from '@/lib/types'
 
-export type { OpenMenuPayload };
+export type { OpenMenuPayload }
 
 export type QuotedMessage = {
-  name: string;
-  body: string;
-  isMe: boolean;
-};
+  name: string
+  body: string
+  isMe: boolean
+  attachmentKind?: AttachmentKind
+  thumbUri?: string
+  layoutMode: QuoteLayoutMode
+}
 
 type MessageBubbleProps = {
-  messageId: string;
-  body: string;
-  outgoing: boolean;
-  status: MessageStatus;
-  senderName?: string;
-  quoted?: QuotedMessage;
-  reactions?: MessageReaction[];
-  currentUserId: string;
-  selected?: boolean;
-  enter?: boolean;
-  onOpenMenu: (payload: OpenMenuPayload) => void;
-  onReply: (messageId: string) => void;
-  onToggleReaction: (messageId: string, emoji: string) => void;
-};
+  messageId: string
+  body: string
+  outgoing: boolean
+  status: MessageStatus
+  senderName?: string
+  quoted?: QuotedMessage
+  reactions?: MessageReaction[]
+  currentUserId: string
+  selected?: boolean
+  enter?: boolean
+  attachment?: MessageAttachment
+  onOpenMenu: (payload: OpenMenuPayload) => void
+  onReply: (messageId: string) => void
+  onToggleReaction: (messageId: string, emoji: string) => void
+}
 
-const SWIPE_REPLY = 56;
-const LONG_PRESS_MS = 150;
+const SWIPE_REPLY = 56
+const LONG_PRESS_MS = 150
 
 function Receipt({
   status,
   outgoing,
 }: {
-  status: MessageStatus;
-  outgoing: boolean;
+  status: MessageStatus
+  outgoing: boolean
 }) {
-  if (!outgoing) return null;
-  const read = status === "read";
-  const Icon = status === "sent" || status === "sending" ? Check : CheckCheck;
+  if (!outgoing) return null
+  const read = status === 'read'
+  const Icon = status === 'sent' || status === 'sending' ? Check : CheckCheck
   return (
     <View
       accessibilityLabel={messageStatusLabel(status)}
       className="mt-1 items-end pr-1"
-      style={{ opacity: status === "sending" ? 0.4 : 1 }}
+      style={{ opacity: status === 'sending' ? 0.4 : 1 }}
     >
       <Icon color={read ? colors.primary : colors.muted} size={13} />
     </View>
-  );
+  )
 }
+
+const QuoteCaption = memo(function QuoteCaption({
+  quoted,
+  outgoing,
+  senderName,
+}: {
+  quoted: QuotedMessage
+  outgoing: boolean
+  senderName?: string
+}) {
+  return (
+    <View className="mb-0.5 flex-row items-center gap-1 px-1">
+      <CornerUpLeft color={colors.muted} size={12} />
+      <Text variant="label" className="font-medium text-muted" numberOfLines={1}>
+        {replyCaption({
+          outgoing,
+          senderName,
+          quotedName: quoted.name,
+          quotedIsMe: quoted.isMe,
+        })}
+      </Text>
+    </View>
+  )
+})
 
 const QuoteChrome = memo(function QuoteChrome({
   quoted,
   outgoing,
   senderName,
 }: {
-  quoted: QuotedMessage;
-  outgoing: boolean;
-  senderName?: string;
+  quoted: QuotedMessage
+  outgoing: boolean
+  senderName?: string
 }) {
-  return (
-    <View className={cn("mb-0.5", outgoing ? "items-end" : "items-start")}>
-      <View className="mb-0.5 flex-row items-center gap-1 px-1">
-        <CornerUpLeft color={colors.muted} size={12} />
-        <Text variant="label" className="font-medium text-muted" numberOfLines={1}>
-          {replyCaption({
-            outgoing,
-            senderName,
-            quotedName: quoted.name,
-            quotedIsMe: quoted.isMe,
-          })}
-        </Text>
+  if (
+    quoted.layoutMode === 'header-only' ||
+    quoted.layoutMode === 'fused-on-image'
+  ) {
+    return (
+      <View className={cn('mb-0.5', outgoing ? 'items-end' : 'items-start')}>
+        <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
       </View>
-      <View className="max-w-[92%] rounded-[18px] border border-line/80 bg-line/35 px-3 py-1.5 opacity-90">
-        <Text
-          variant="label"
-          className="font-normal text-ink-soft"
-          numberOfLines={2}
-        >
-          {quoted.body}
-        </Text>
+    )
+  }
+
+  return (
+    <View className={cn('mb-0.5', outgoing ? 'items-end' : 'items-start')}>
+      <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
+      <View className="max-w-[92%] flex-row items-center gap-2 overflow-hidden rounded-[18px] border border-line/80 bg-line/35 opacity-90">
+        {quoted.thumbUri ? (
+          <Image
+            source={{ uri: quoted.thumbUri }}
+            className="size-11 bg-line/50"
+            resizeMode="cover"
+            accessibilityLabel="Quoted media"
+          />
+        ) : null}
+        <View className={cn('min-w-0 flex-1 py-1.5', quoted.thumbUri ? 'pr-3' : 'px-3')}>
+          <Text
+            variant="label"
+            className="font-normal text-ink-soft"
+            numberOfLines={2}
+          >
+            {quoted.body}
+          </Text>
+        </View>
       </View>
     </View>
-  );
-});
+  )
+})
+
+const FusedImageReply = memo(function FusedImageReply({
+  quoted,
+  body,
+  outgoing,
+  senderName,
+}: {
+  quoted: QuotedMessage
+  body: string
+  outgoing: boolean
+  senderName?: string
+}) {
+  const { width } = Dimensions.get('window')
+  const maxW = Math.min(220, width * 0.62)
+  const thumb = quoted.thumbUri
+  if (!thumb) return null
+  return (
+    <View className={cn(outgoing ? 'items-end' : 'items-start')}>
+      <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
+      <View className="relative overflow-visible">
+        <Image
+          source={{ uri: thumb }}
+          className="rounded-[18px] bg-line/40"
+          style={{ width: maxW, height: maxW * 0.75 }}
+          resizeMode="cover"
+          accessibilityLabel="Quoted photo"
+        />
+        <View
+          className={cn(
+            'absolute bottom-2 max-w-[85%] px-3 py-2 shadow-sm',
+            outgoing
+              ? 'right-2 rounded-[18px] rounded-br-md bg-primary shadow-primary/25'
+              : 'left-2 rounded-[18px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8',
+          )}
+        >
+          <Text
+            variant="body"
+            className={outgoing ? 'text-primary-foreground' : 'text-ink'}
+          >
+            {body}
+          </Text>
+        </View>
+      </View>
+    </View>
+  )
+})
 
 const ReactionBadge = memo(function ReactionBadge({
   reactions,
@@ -117,18 +212,18 @@ const ReactionBadge = memo(function ReactionBadge({
   currentUserId,
   onToggleReaction,
 }: {
-  reactions: MessageReaction[];
-  outgoing: boolean;
-  currentUserId: string;
-  onToggleReaction: (emoji: string) => void;
+  reactions: MessageReaction[]
+  outgoing: boolean
+  currentUserId: string
+  onToggleReaction: (emoji: string) => void
 }) {
-  if (reactions.length === 0) return null;
-  const total = reactions.reduce((n, r) => n + r.userIds.length, 0);
+  if (reactions.length === 0) return null
+  const total = reactions.reduce((n, r) => n + r.userIds.length, 0)
   return (
     <View
       className={cn(
-        "absolute -bottom-3.5 z-10 flex-row items-center rounded-full border border-line/80 bg-surface px-2 py-0.5 shadow-md shadow-black/15",
-        outgoing ? "right-2" : "left-2",
+        'absolute -bottom-3.5 z-10 flex-row items-center rounded-full border border-line/80 bg-surface px-2 py-0.5 shadow-md shadow-black/15',
+        outgoing ? 'right-2' : 'left-2',
       )}
     >
       {reactions.map((reaction) => (
@@ -137,8 +232,8 @@ const ReactionBadge = memo(function ReactionBadge({
           accessibilityRole="button"
           accessibilityLabel={`React ${reaction.emoji}`}
           onPress={() => {
-            hapticSelection();
-            onToggleReaction(reaction.emoji);
+            hapticSelection()
+            onToggleReaction(reaction.emoji)
           }}
           className="px-0.5 active:opacity-60"
         >
@@ -149,18 +244,18 @@ const ReactionBadge = memo(function ReactionBadge({
         <Text
           variant="label"
           className={cn(
-            "ml-1 font-bold",
+            'ml-1 font-bold',
             reactions.some((r) => r.userIds.includes(currentUserId))
-              ? "text-primary"
-              : "text-muted",
+              ? 'text-primary'
+              : 'text-muted',
           )}
         >
           {total}
         </Text>
       ) : null}
     </View>
-  );
-});
+  )
+})
 
 export const MessageBubble = memo(function MessageBubble({
   messageId,
@@ -173,38 +268,49 @@ export const MessageBubble = memo(function MessageBubble({
   currentUserId,
   selected,
   enter,
+  attachment,
   onOpenMenu,
   onReply,
   onToggleReaction,
 }: MessageBubbleProps) {
-  const bubbleRef = useRef<View>(null);
-  const sizeRef = useRef({ width: 0, height: 0 });
-  const isFirstMount = useRef(true);
-  const reduceMotion = useReducedMotion();
-  const x = useSharedValue(0);
-  const tint = useSharedValue(0);
-  const swipedHaptic = useSharedValue(false);
+  const bubbleRef = useRef<View>(null)
+  const sizeRef = useRef({ width: 0, height: 0 })
+  const isFirstMount = useRef(true)
+  const reduceMotion = useReducedMotion()
+  const x = useSharedValue(0)
+  const tint = useSharedValue(0)
+  const swipedHaptic = useSharedValue(false)
+  const borderless = isImageOrVideo(attachment)
+  const hasText = body.trim().length > 0
+  const showChromeBubble = !borderless && (hasText || !!attachment)
+  const fused =
+    quoted?.layoutMode === 'fused-on-image' &&
+    hasText &&
+    !attachment &&
+    !!quoted.thumbUri
+  const showQuoteChrome = !!quoted && !fused
+  const showMainBubble = !fused && (showChromeBubble || borderless || hasText)
 
   useEffect(() => {
     if (isFirstMount.current) {
-      isFirstMount.current = false;
-      return;
+      isFirstMount.current = false
+      return
     }
     if (!selected && tint.value !== 0) {
-      tint.value = withTiming(0, { duration: 60 });
+      tint.value = withTiming(0, { duration: 60 })
     }
-  }, [selected, tint]);
+  }, [selected, tint])
 
   useEffect(() => {
     return () => {
-      cancelAnimation(tint);
-      cancelAnimation(x);
-    };
-  }, [tint, x]);
+      cancelAnimation(tint)
+      cancelAnimation(x)
+    }
+  }, [tint, x])
 
   const reportOpen = useCallback(
     (absX: number, absY: number) => {
-      const size = sizeRef.current;
+      const size = sizeRef.current
       const fallback = () => {
         onOpenMenu({
           messageId,
@@ -213,14 +319,14 @@ export const MessageBubble = memo(function MessageBubble({
           pageY: absY - size.height / 2,
           width: size.width,
           height: size.height,
-        });
-      };
-      const node = bubbleRef.current;
-      if (!node) {
-        fallback();
-        return;
+        })
       }
-      void measureWindowOrPage(node, Dimensions.get("window")).then((rect) => {
+      const node = bubbleRef.current
+      if (!node) {
+        fallback()
+        return
+      }
+      void measureWindowOrPage(node, Dimensions.get('window')).then((rect) => {
         onOpenMenu({
           messageId,
           outgoing,
@@ -228,22 +334,22 @@ export const MessageBubble = memo(function MessageBubble({
           pageY: rect.y,
           width: rect.width,
           height: rect.height,
-        });
-      });
+        })
+      })
     },
     [messageId, onOpenMenu, outgoing],
-  );
+  )
 
   const handleReply = useCallback(() => {
-    onReply(messageId);
-  }, [messageId, onReply]);
+    onReply(messageId)
+  }, [messageId, onReply])
 
   const handleToggleReaction = useCallback(
     (emoji: string) => {
-      onToggleReaction(messageId, emoji);
+      onToggleReaction(messageId, emoji)
     },
     [messageId, onToggleReaction],
-  );
+  )
 
   const gesture = useMemo(
     () =>
@@ -252,43 +358,43 @@ export const MessageBubble = memo(function MessageBubble({
           .minDuration(LONG_PRESS_MS)
           .maxDistance(12)
           .onBegin(() => {
-            tint.value = withTiming(0.55, { duration: 80 });
+            tint.value = withTiming(0.55, { duration: 80 })
           })
           .onStart((e) => {
-            tint.value = 1;
-            runOnJS(hapticMedium)();
-            runOnJS(reportOpen)(e.absoluteX, e.absoluteY);
+            tint.value = 1
+            runOnJS(hapticMedium)()
+            runOnJS(reportOpen)(e.absoluteX, e.absoluteY)
           })
           .onFinalize((_, ok) => {
-            if (!ok) tint.value = withTiming(0, { duration: 60 });
+            if (!ok) tint.value = withTiming(0, { duration: 60 })
           }),
         Gesture.Pan()
           .activeOffsetX(18)
           .failOffsetY([-18, 18])
           .onUpdate((e) => {
-            x.value = Math.max(0, Math.min(e.translationX, 80));
+            x.value = Math.max(0, Math.min(e.translationX, 80))
             if (x.value >= SWIPE_REPLY && !swipedHaptic.value) {
-              swipedHaptic.value = true;
-              runOnJS(hapticLight)();
+              swipedHaptic.value = true
+              runOnJS(hapticLight)()
             } else if (x.value < SWIPE_REPLY) {
-              swipedHaptic.value = false;
+              swipedHaptic.value = false
             }
           })
           .onEnd(() => {
-            if (x.value >= SWIPE_REPLY) runOnJS(handleReply)();
-            x.value = withSpring(0, motion.springs.overlay);
-            swipedHaptic.value = false;
+            if (x.value >= SWIPE_REPLY) runOnJS(handleReply)()
+            x.value = withSpring(0, motion.springs.overlay)
+            swipedHaptic.value = false
           }),
       ),
     [handleReply, reportOpen, swipedHaptic, tint, x],
-  );
+  )
 
   const swipeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.value }],
-  }));
+  }))
   const tintStyle = useAnimatedStyle(() => ({
     opacity: tint.value,
-  }));
+  }))
   const iconStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
       x.value,
@@ -306,7 +412,15 @@ export const MessageBubble = memo(function MessageBubble({
         ),
       },
     ],
-  }));
+  }))
+
+  const a11yLabel = attachment
+    ? outgoing
+      ? `Outgoing ${attachment.kind}`
+      : `Incoming ${attachment.kind}`
+    : outgoing
+      ? 'Outgoing message'
+      : 'Incoming message'
 
   return (
     <Animated.View
@@ -323,8 +437,8 @@ export const MessageBubble = memo(function MessageBubble({
           <Animated.View
             style={swipeStyle}
             className={cn(
-              "max-w-[78%]",
-              outgoing ? "self-end items-end" : "self-start items-start",
+              'max-w-[78%]',
+              outgoing ? 'self-end items-end' : 'self-start items-start',
             )}
           >
             {senderName ? (
@@ -332,53 +446,116 @@ export const MessageBubble = memo(function MessageBubble({
                 {senderName}
               </Text>
             ) : null}
-            {quoted ? (
+            {showQuoteChrome && quoted ? (
               <QuoteChrome
                 quoted={quoted}
                 outgoing={outgoing}
                 senderName={senderName}
               />
             ) : null}
+            {fused && quoted ? (
+              <View
+                className={cn(
+                  'relative overflow-visible',
+                  outgoing ? 'self-end' : 'self-start',
+                  reactions.length > 0 && 'mb-2',
+                )}
+              >
+                <View
+                  ref={bubbleRef}
+                  collapsable={false}
+                  accessibilityRole="button"
+                  accessibilityLabel={a11yLabel}
+                  onLayout={(e) => {
+                    sizeRef.current = {
+                      width: e.nativeEvent.layout.width,
+                      height: e.nativeEvent.layout.height,
+                    }
+                  }}
+                >
+                  <FusedImageReply
+                    quoted={quoted}
+                    body={body}
+                    outgoing={outgoing}
+                    senderName={senderName}
+                  />
+                  <Animated.View
+                    pointerEvents="none"
+                    className={cn(
+                      'absolute inset-0 rounded-[18px]',
+                      outgoing ? 'bg-ink/25' : 'bg-ink/12',
+                    )}
+                    style={tintStyle}
+                  />
+                </View>
+                <ReactionBadge
+                  reactions={reactions}
+                  outgoing={outgoing}
+                  currentUserId={currentUserId}
+                  onToggleReaction={handleToggleReaction}
+                />
+              </View>
+            ) : null}
+            {showMainBubble ? (
             <View
               className={cn(
-                "relative overflow-visible",
-                outgoing ? "self-end" : "self-start",
-                reactions.length > 0 && "mb-2",
+                'relative overflow-visible',
+                outgoing ? 'self-end' : 'self-start',
+                reactions.length > 0 && 'mb-2',
               )}
             >
               <View
                 ref={bubbleRef}
                 collapsable={false}
                 accessibilityRole="button"
-                accessibilityLabel={
-                  outgoing ? "Outgoing message" : "Incoming message"
-                }
+                accessibilityLabel={a11yLabel}
                 onLayout={(e) => {
                   sizeRef.current = {
                     width: e.nativeEvent.layout.width,
                     height: e.nativeEvent.layout.height,
-                  };
+                  }
                 }}
                 className={cn(
-                  "overflow-hidden px-4 py-2.5 shadow-sm",
-                  outgoing
-                    ? "rounded-[22px] rounded-br-md bg-primary shadow-primary/25"
-                    : "rounded-[22px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8",
+                  'relative overflow-hidden shadow-sm',
+                  showChromeBubble && 'px-4 py-2.5',
+                  showChromeBubble &&
+                    (outgoing
+                      ? 'rounded-[22px] rounded-br-md bg-primary shadow-primary/25'
+                      : 'rounded-[22px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8'),
+                  borderless && 'bg-transparent shadow-none',
                 )}
               >
-                <Text
-                  variant="body"
-                  className={
-                    outgoing ? "text-primary-foreground" : "text-ink"
-                  }
-                >
-                  {body}
-                </Text>
+                {attachment ? (
+                  <MessageMedia
+                    attachment={attachment}
+                    outgoing={outgoing}
+                    caption={borderless ? body : undefined}
+                  />
+                ) : null}
+                {!borderless && hasText ? (
+                  <Text
+                    variant="body"
+                    className={cn(
+                      attachment ? 'mt-1.5' : undefined,
+                      outgoing ? 'text-primary-foreground' : 'text-ink',
+                    )}
+                  >
+                    {body}
+                  </Text>
+                ) : null}
+                {!attachment && !hasText ? (
+                  <Text
+                    variant="body"
+                    className={outgoing ? 'text-primary-foreground' : 'text-ink'}
+                  >
+                    {' '}
+                  </Text>
+                ) : null}
                 <Animated.View
                   pointerEvents="none"
                   className={cn(
-                    "absolute inset-0",
-                    outgoing ? "bg-ink/25" : "bg-ink/12",
+                    'absolute inset-0',
+                    outgoing ? 'bg-ink/25' : 'bg-ink/12',
                   )}
                   style={tintStyle}
                 />
@@ -390,10 +567,11 @@ export const MessageBubble = memo(function MessageBubble({
                 onToggleReaction={handleToggleReaction}
               />
             </View>
+            ) : null}
             <Receipt status={status} outgoing={outgoing} />
           </Animated.View>
         </GestureDetector>
       </View>
     </Animated.View>
-  );
-});
+  )
+})

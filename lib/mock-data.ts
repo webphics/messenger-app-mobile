@@ -1,3 +1,5 @@
+import { Image } from 'react-native'
+
 import type {
   ChartMetric,
   Conversation,
@@ -9,6 +11,22 @@ import type {
   Offer,
   Person,
 } from '@/lib/types'
+
+const DEMO_PHOTO_URI = Image.resolveAssetSource(
+  require('../assets/offers/payouts.png'),
+).uri
+const DEMO_PHOTO_2_URI = Image.resolveAssetSource(
+  require('../assets/offers/zero-fee.png'),
+).uri
+const DEMO_VOICE_URI = Image.resolveAssetSource(
+  require('../assets/chat/voice-note-demo.wav'),
+).uri
+
+const DEMO_VOICE_PEAKS = Array.from({ length: 48 }, (_, i) => {
+  const wave = 0.25 + 0.55 * Math.abs(Math.sin(i / 3.2))
+  return Math.round(wave * 100) / 100
+})
+
 
 export const PEOPLE: Person[] = [
   {
@@ -91,8 +109,8 @@ export const CONVERSATIONS: Conversation[] = [
     participantIds: ['contact-1', 'agent-1'],
     assigneeId: 'agent-1',
     labelIds: ['label-urgent'],
-    lastMessagePreview: 'Got it, thanks! 🙏',
-    updatedAt: '2026-08-13T08:12:00.000Z',
+    lastMessagePreview: 'Voice note',
+    updatedAt: '2026-08-13T08:22:00.000Z',
     unreadCount: 2,
   },
   {
@@ -184,6 +202,69 @@ export const MESSAGES: Message[] = [
     createdAt: '2026-08-13T08:18:00.000Z',
     status: 'sent',
     replyToId: 'msg-9',
+  },
+  {
+    id: 'msg-11',
+    conversationId: 'conv-assigned',
+    senderId: 'agent-1',
+    body: '',
+    createdAt: '2026-08-13T08:19:00.000Z',
+    status: 'read',
+    attachment: {
+      kind: 'image',
+      uri: DEMO_PHOTO_URI,
+      name: 'reset-hint.png',
+      size: 48_000,
+    },
+  },
+  {
+    id: 'msg-11b',
+    conversationId: 'conv-assigned',
+    senderId: 'contact-1',
+    body: 'Looks good — thanks!',
+    createdAt: '2026-08-13T08:19:30.000Z',
+    status: 'delivered',
+    replyToId: 'msg-11',
+  },
+  {
+    id: 'msg-12',
+    conversationId: 'conv-assigned',
+    senderId: 'contact-1',
+    body: 'That matches what I see',
+    createdAt: '2026-08-13T08:20:00.000Z',
+    status: 'delivered',
+    replyToId: 'msg-11',
+    attachment: {
+      kind: 'image',
+      uri: DEMO_PHOTO_2_URI,
+      name: 'my-screen.png',
+      size: 52_000,
+    },
+  },
+  {
+    id: 'msg-12b',
+    conversationId: 'conv-assigned',
+    senderId: 'agent-1',
+    body: 'Perfect, that confirms it',
+    createdAt: '2026-08-13T08:21:00.000Z',
+    status: 'delivered',
+    replyToId: 'msg-12',
+  },
+  {
+    id: 'msg-13',
+    conversationId: 'conv-assigned',
+    senderId: 'agent-1',
+    body: '',
+    createdAt: '2026-08-13T08:22:00.000Z',
+    status: 'delivered',
+    attachment: {
+      kind: 'audio',
+      uri: DEMO_VOICE_URI,
+      name: 'voice-note-demo.wav',
+      size: 16_000,
+      durationMs: 1000,
+      peaks: DEMO_VOICE_PEAKS,
+    },
   },
   {
     id: 'msg-4',
