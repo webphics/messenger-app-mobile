@@ -172,26 +172,33 @@ const FusedImageReply = memo(function FusedImageReply({
   senderName?: string
 }) {
   const { width } = Dimensions.get('window')
-  const maxW = Math.min(220, width * 0.62)
+  // Meta: compact square thumb; reply bubble hangs off the bottom corner.
+  const thumbSize = Math.min(148, width * 0.42)
   const thumb = quoted.thumbUri
   if (!thumb) return null
   return (
     <View className={cn(outgoing ? 'items-end' : 'items-start')}>
       <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
-      <View className="relative overflow-visible">
+      <View
+        className={cn(
+          'relative overflow-visible',
+          // Room for the overhanging reply bubble under the thumb.
+          'pb-3',
+        )}
+      >
         <Image
           source={{ uri: thumb }}
-          className="rounded-[18px] bg-line/40"
-          style={{ width: maxW, height: maxW * 0.75 }}
+          className="rounded-2xl bg-line/40"
+          style={{ width: thumbSize, height: thumbSize }}
           resizeMode="cover"
           accessibilityLabel="Quoted photo"
         />
         <View
           className={cn(
-            'absolute bottom-2 max-w-[85%] px-3 py-2 shadow-sm',
+            'absolute max-w-[92%] px-3.5 py-2 shadow-md',
             outgoing
-              ? 'right-2 rounded-[18px] rounded-br-md bg-primary shadow-primary/25'
-              : 'left-2 rounded-[18px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8',
+              ? 'bottom-0 right-0 rounded-[20px] bg-primary shadow-primary/30'
+              : 'bottom-0 left-0 rounded-[20px] border border-line/70 bg-bubble-in shadow-black/10',
           )}
         >
           <Text
