@@ -1,6 +1,6 @@
 Concise rules for building accessible, fast, delightful UIs. Use MUST/SHOULD/NEVER to guide decisions.
 
-**Project phase:** Phase 2 (mock auth + role hubs) is current for auth/session. Phase **5a** (client media UI — local attachments) is in progress per `docs/scope.md`. Domain glossary: `CONTEXT.md`.
+**Project phase:** Phase **3a** (real auth — Bearer sessions, password + magic link) is current per `docs/scope.md`. Phase 5a (client media UI — local attachments) is done. Domain glossary: `CONTEXT.md`. Session transport: `docs/adr/ADR-0004-bearer-sessions-on-mobile.md`.
 
 ## Interactions
 

@@ -78,7 +78,8 @@
           "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

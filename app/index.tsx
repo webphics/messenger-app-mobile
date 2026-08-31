@@ -2,9 +2,10 @@ import { router, type Href } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
+import { UnreachableScreen } from "@/components/auth/unreachable-screen";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
+import { useAuth } from "@/lib/auth-context";
 import { ROLE_HREF } from "@/lib/hub-routes";
-import { hydrateSession, isLoggedIn } from "@/lib/session";
 
 /**
  * How long the launch animation stays up *after it is actually on screen*.
@@ -14,24 +15,26 @@ import { hydrateSession, isLoggedIn } from "@/lib/session";
 const MINIMUM_DISPLAY_MS = 2000;
 
 export default function Index() {
-  const [targetHref, setTargetHref] = useState<Href | null>(null);
+  const { state } = useAuth();
   const [animationReady, setAnimationReady] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const navigatedRef = useRef(false);
+
+  /**
+   * Where Hydration says this person belongs. Null while it is still running, and
+   * while it ended Unreachable — that outcome is a screen here, not a route.
+   */
+  const targetHref: Href | null =
+    state.status === "signed-in"
+      ? ROLE_HREF[state.user.role]
+      : state.status === "hydrating" || state.status === "unreachable"
+        ? null
+        : "/(auth)/sign-in";
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinTimeElapsed(true);
     }, MINIMUM_DISPLAY_MS);
-
-    void hydrateSession()
-      .then((blob) => {
-        setTargetHref(isLoggedIn(blob) ? ROLE_HREF[blob.role] : "/(auth)/sign-in");
-      })
-      .catch(() => {
-        setTargetHref("/(auth)/sign-in");
-      });
-
     return () => clearTimeout(timer);
   }, []);
 
@@ -56,6 +59,13 @@ export default function Index() {
     }
   }, [targetHref]);
 
+  // Gated on `animationReady` rather than shown the instant Hydration fails:
+  // `AppLoadingScreen` owns hiding the native splash, so unmounting it before it
+  // has reported ready would leave the splash up until the root layout's backstop.
+  if (state.status === "unreachable" && animationReady) {
+    return <UnreachableScreen />;
+  }
+
   return (
     <View className="flex-1 bg-bg">
       <AppLoadingScreen
@@ -66,4 +76,3 @@ export default function Index() {
     </View>
   );
 }
-
