@@ -2,7 +2,7 @@ import { Stack } from "expo-router";
 
 import { stackChrome } from "@/lib/tokens";
 
-export default function ContactHomeLayout() {
+export default function CustomerHomeLayout() {
   return (
     <Stack screenOptions={stackChrome}>
       <Stack.Screen name="index" options={{ headerShown: false }} />

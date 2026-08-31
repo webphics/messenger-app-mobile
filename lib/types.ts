@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'agent' | 'contact'
+export type UserRole = 'admin' | 'agent' | 'customer'
 
 export type Person = {
   id: string

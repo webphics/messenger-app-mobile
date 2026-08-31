@@ -38,7 +38,7 @@ function badgeForRoute(name: string): number | undefined {
 }
 
 /**
- * Floating Clear Desk tab capsule for Contact/Agent/Admin.
+ * Floating Clear Desk tab capsule for Customer/Agent/Admin.
  * Icon-only: `options.title` is not rendered, but still feeds the
  * `accessibilityLabel` below so screen readers keep every destination name.
  */

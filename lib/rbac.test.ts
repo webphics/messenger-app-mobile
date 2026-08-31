@@ -16,11 +16,11 @@ const unassigned = CONVERSATIONS.find((c) => c.id === 'conv-unassigned') as Conv
 const group = CONVERSATIONS.find((c) => c.id === 'conv-group') as Conversation
 
 describe('canViewConversation', () => {
-  test('contact sees only threads they participate in', () => {
-    expect(canViewConversation('contact', 'contact-1', assigned)).toBe(true)
-    expect(canViewConversation('contact', 'contact-1', unassigned)).toBe(false)
-    expect(canViewConversation('contact', 'contact-2', unassigned)).toBe(true)
-    expect(canViewConversation('contact', 'contact-2', assigned)).toBe(false)
+  test('customer sees only threads they participate in', () => {
+    expect(canViewConversation('customer', 'customer-1', assigned)).toBe(true)
+    expect(canViewConversation('customer', 'customer-1', unassigned)).toBe(false)
+    expect(canViewConversation('customer', 'customer-2', unassigned)).toBe(true)
+    expect(canViewConversation('customer', 'customer-2', assigned)).toBe(false)
   })
 
   test('agent sees assignee, participant, or unassigned', () => {
@@ -39,34 +39,34 @@ describe('canViewConversation', () => {
 
 describe('role matrix', () => {
   test('unassigned pool', () => {
-    expect(canAccessUnassignedPool('contact')).toBe(false)
+    expect(canAccessUnassignedPool('customer')).toBe(false)
     expect(canAccessUnassignedPool('agent')).toBe(true)
     expect(canAccessUnassignedPool('admin')).toBe(true)
   })
 
   test('internal notes', () => {
-    expect(canSeeInternalNotes('contact')).toBe(false)
+    expect(canSeeInternalNotes('customer')).toBe(false)
     expect(canSeeInternalNotes('agent')).toBe(true)
     expect(canSeeInternalNotes('admin')).toBe(true)
   })
 
   test('delete message and conversation — admin only', () => {
-    expect(canDeleteMessage('contact')).toBe(false)
+    expect(canDeleteMessage('customer')).toBe(false)
     expect(canDeleteMessage('agent')).toBe(false)
     expect(canDeleteMessage('admin')).toBe(true)
-    expect(canDeleteConversation('contact')).toBe(false)
+    expect(canDeleteConversation('customer')).toBe(false)
     expect(canDeleteConversation('agent')).toBe(false)
     expect(canDeleteConversation('admin')).toBe(true)
   })
 
   test('assign, broadcast, manage users — admin only', () => {
-    expect(canAssignConversation('contact')).toBe(false)
+    expect(canAssignConversation('customer')).toBe(false)
     expect(canAssignConversation('agent')).toBe(false)
     expect(canAssignConversation('admin')).toBe(true)
-    expect(canBroadcast('contact')).toBe(false)
+    expect(canBroadcast('customer')).toBe(false)
     expect(canBroadcast('agent')).toBe(false)
     expect(canBroadcast('admin')).toBe(true)
-    expect(canManageUsers('contact')).toBe(false)
+    expect(canManageUsers('customer')).toBe(false)
     expect(canManageUsers('agent')).toBe(false)
     expect(canManageUsers('admin')).toBe(true)
   })

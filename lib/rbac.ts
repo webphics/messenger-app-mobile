@@ -1,6 +1,6 @@
 import type { Conversation, UserRole } from '@/lib/types'
 
-const ROLES: readonly UserRole[] = ['admin', 'agent', 'contact']
+const ROLES: readonly UserRole[] = ['admin', 'agent', 'customer']
 
 function assertRole(role: UserRole): void {
   if (!ROLES.includes(role)) {
@@ -15,7 +15,7 @@ export function canViewConversation(
 ): boolean {
   assertRole(role)
   if (role === 'admin') return true
-  if (role === 'contact') return conversation.participantIds.includes(userId)
+  if (role === 'customer') return conversation.participantIds.includes(userId)
   return (
     conversation.assigneeId === userId ||
     conversation.participantIds.includes(userId) ||

@@ -12,7 +12,7 @@ describe('chatIdFromRoute', () => {
   })
 
   test('undefined when not on a chat route', () => {
-    expect(chatIdFromRoute(undefined, '/(contact)')).toBeUndefined()
+    expect(chatIdFromRoute(undefined, '/(customer)')).toBeUndefined()
     expect(chatIdFromRoute(undefined, '/chat')).toBeUndefined()
     expect(chatIdFromRoute(undefined, '/chat/[id]')).toBeUndefined()
   })
@@ -21,12 +21,12 @@ describe('chatIdFromRoute', () => {
 describe('chatIdFromSegments', () => {
   test('reads the segment after chat', () => {
     expect(chatIdFromSegments(['chat', 'conv-assigned'])).toBe('conv-assigned')
-    expect(chatIdFromSegments(['(contact)', 'chat', 'offers'])).toBe('offers')
+    expect(chatIdFromSegments(['(customer)', 'chat', 'offers'])).toBe('offers')
   })
 
   test('ignores placeholder segment', () => {
     expect(chatIdFromSegments(['chat', '[id]'])).toBeUndefined()
-    expect(chatIdFromSegments(['(contact)'])).toBeUndefined()
+    expect(chatIdFromSegments(['(customer)'])).toBeUndefined()
   })
 })
 

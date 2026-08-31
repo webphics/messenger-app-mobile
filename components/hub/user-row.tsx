@@ -20,7 +20,7 @@ import type { Person } from "@/lib/types";
 const ROLE_LABEL = {
   admin: "Admin",
   agent: "Agent",
-  contact: "Contact",
+  customer: "Customer",
 } as const;
 
 type UserRowProps = {

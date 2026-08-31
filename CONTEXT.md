@@ -8,9 +8,15 @@ Internal support messenger mobile client. This repo is Expo-only; web and API li
 The product brand shown on launcher, auth, and hub wordmarks.
 _Avoid_: Messenger (as product name), Casewire, ISM
 
-**Contact**:
-End-user role that only sees their own conversations. Reaches Home, Messages, and Help from the tab capsule; FAQ, Search, and Settings are reached from Home rather than from the tab capsule.
-_Avoid_: Customer, client, user (when meaning this role)
+**Customer**:
+End-user role that only sees their own conversations. Reaches Home, Messages, and Help from the tab capsule; FAQ, Search, and Settings are reached from Home rather than from the tab capsule. The name matches the API's `role` enum and the web client's glossary; the on-screen eyebrow still reads SUPPORT.
+_Avoid_: Contact, client, user (when meaning this role)
+
+**Contact list**:
+The address book a staff member picks from when starting a conversation, backed by
+`GET /conversations/contacts`. A *contact* here is an addressable person of any role — unrelated to
+the end-user role, which is Customer. The two must not be collapsed.
+_Avoid_: Contacts (bare, when the Customer role is meant), directory, people picker
 
 **Agent**:
 Support staff role. Sees assigned threads plus the unassigned pool. Cannot delete.
@@ -21,7 +27,7 @@ Oversight role with slim mobile surface (users, unassigned, conversations, hub).
 _Avoid_: Superuser, owner
 
 **Hub**:
-Role home screen (Contact / Agent / Admin variants). The first tab destination in every role.
+Role home screen (Customer / Agent / Admin variants). The first tab destination in every role.
 _Avoid_: Dashboard, home feed
 
 **Hub role label**:

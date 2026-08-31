@@ -16,7 +16,7 @@ export function listInboxConversations(
   conversations: Conversation[],
 ): Conversation[] {
   if (role === 'admin') return conversations
-  if (role === 'contact') {
+  if (role === 'customer') {
     return conversations.filter((c) => canViewConversation(role, userId, c))
   }
   return conversations.filter(

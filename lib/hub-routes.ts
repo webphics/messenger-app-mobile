@@ -3,7 +3,7 @@ import type { Href } from "expo-router";
 import type { UserRole } from "@/lib/types";
 
 export const ROLE_HREF: Record<UserRole, Href> = {
-  contact: "/(contact)" as Href,
+  customer: "/(customer)" as Href,
   agent: "/(agent)" as Href,
   admin: "/(admin)" as Href,
 };

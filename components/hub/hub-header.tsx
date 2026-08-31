@@ -15,7 +15,7 @@ type HubHeaderProps = {
 };
 
 export function HubHeader({ settingsHref }: HubHeaderProps) {
-  const showAgentStack = getSession().role !== "contact";
+  const showAgentStack = getSession().role !== "customer";
   const agents = showAgentStack
     ? PEOPLE.filter((p) => p.role === "agent")
     : [];

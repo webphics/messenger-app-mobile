@@ -181,7 +181,7 @@ function NewChatSheet({
           c.participantIds.includes(myId),
       );
       const targetId =
-        existing?.id ?? (person.role === "contact" ? "conv-unassigned" : "conv-assigned");
+        existing?.id ?? (person.role === "customer" ? "conv-unassigned" : "conv-assigned");
       onClose();
       onSelectChat(chatHref(targetId));
     },

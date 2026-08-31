@@ -1,6 +1,6 @@
 # Internal Support Messenger (Expo)
 
-iOS/Android client. Roles: Admin / Agent / Contact. This repo is Expo-only.
+iOS/Android client. Roles: Admin / Agent / Customer. This repo is Expo-only.
 
 ```bash
 pnpm install

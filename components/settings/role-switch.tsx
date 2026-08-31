@@ -19,8 +19,8 @@ const ROLES: {
   icon: typeof User;
 }[] = [
   {
-    id: "contact",
-    label: "Contact",
+    id: "customer",
+    label: "Customer",
     desc: "Customer view — access personal messages & help center",
     icon: User,
   },

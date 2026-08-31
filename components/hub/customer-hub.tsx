@@ -20,7 +20,7 @@ import { CONVERSATIONS } from "@/lib/mock-data";
 import { settleDownEnter } from "@/lib/motion-enter";
 import { getSession } from "@/lib/session";
 
-export function ContactHub() {
+export function CustomerHub() {
   const me = getDevUser();
   const reduceMotion = useReducedMotion();
   const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
@@ -28,7 +28,7 @@ export function ContactHub() {
   return (
     <HubScroll>
       <View className="px-4">
-        <HubHeader settingsHref="/(contact)/(home)/settings" />
+        <HubHeader settingsHref="/(customer)/(home)/settings" />
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
@@ -47,13 +47,13 @@ export function ContactHub() {
             icon={MessageCircle}
             title="Messages"
             hint="Get in touch"
-            onPress={() => router.navigate("/(contact)/messages")}
+            onPress={() => router.navigate("/(customer)/messages")}
           />
           <ActionTile
             icon={HelpCircle}
             title="Help"
             hint="Browse guides"
-            onPress={() => router.navigate("/(contact)/help")}
+            onPress={() => router.navigate("/(customer)/help")}
           />
         </Animated.View>
 
@@ -70,7 +70,7 @@ export function ContactHub() {
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Search for help"
-            onPress={() => router.push("/(contact)/(home)/search")}
+            onPress={() => router.push("/(customer)/(home)/search")}
             className="mt-4 flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
           >
             <IconChip icon={Search} tone="neutral" size={32} />
@@ -88,7 +88,7 @@ export function ContactHub() {
           title="Frequently Asked Questions"
           hint="Common questions — passwords, billing, access…"
           accessibilityLabel="Frequently asked questions"
-          onPress={() => router.push("/(contact)/(home)/faq")}
+          onPress={() => router.push("/(customer)/(home)/faq")}
         />
       </View>
     </HubScroll>

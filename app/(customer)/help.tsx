@@ -1,5 +1,5 @@
 import { HelpHome } from "@/components/hub/help-home";
 
-export default function ContactHelpScreen() {
+export default function CustomerHelpScreen() {
   return <HelpHome />;
 }
