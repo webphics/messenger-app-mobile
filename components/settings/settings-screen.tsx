@@ -1,6 +1,6 @@
 import { router } from "expo-router";
-import { LogOut, Trash2 } from "@/components/icons";
-import { Alert, ScrollView, View } from "react-native";
+import { LogOut } from "@/components/icons";
+import { ScrollView, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -29,24 +29,6 @@ export function SettingsScreen() {
   const displayName = account?.name ?? me.displayName;
   const reduceMotion = useReducedMotion();
   const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
-
-  function handleDeleteAccount() {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your account? All messages, active queue assignments, and stored profile data will be permanently removed.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete Account",
-          style: "destructive",
-          onPress: () => {
-            void signOut();
-            router.replace("/(auth)/sign-in");
-          },
-        },
-      ],
-    );
-  }
 
   return (
     <ScrollView
@@ -104,15 +86,6 @@ export function SettingsScreen() {
         >
           <LogOut color={colors.danger} size={18} />
           <Text className="text-danger">Sign out</Text>
-        </Button>
-
-        <Button
-          variant="ghost"
-          className="mt-2.5 min-h-11"
-          onPress={handleDeleteAccount}
-        >
-          <Trash2 color={colors.danger} size={16} />
-          <Text className="text-danger">Delete Account</Text>
         </Button>
       </Animated.View>
     </ScrollView>
