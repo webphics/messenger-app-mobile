@@ -21,7 +21,7 @@ const PEOPLE: Person[] = [
   {
     id: 'c',
     displayName: 'Luis Ferreira',
-    role: 'contact',
+    role: 'customer',
     avatarUrl: null,
     isOnline: true,
     lastActiveLabel: 'Active now',
@@ -50,7 +50,7 @@ describe('filterUsers', () => {
 
   test('matches name, role, or email', () => {
     expect(filterUsers(PEOPLE, 'amina', 'all', false).map((p) => p.id)).toEqual(['a'])
-    expect(filterUsers(PEOPLE, 'contact', 'all', false).map((p) => p.id)).toEqual(['c'])
+    expect(filterUsers(PEOPLE, 'customer', 'all', false).map((p) => p.id)).toEqual(['c'])
     expect(filterUsers(PEOPLE, 'jonah.reed', 'all', false).map((p) => p.id)).toEqual(['b'])
   })
 })

@@ -29,7 +29,7 @@ describe("conversationsTabBadge", () => {
     );
   });
 
-  it("omits when all unread are zero for contact-visible set", () => {
+  it("omits when all unread are zero for customer-visible set", () => {
     const zero: Conversation[] = CONVERSATIONS.map((c) => ({
       ...c,
       unreadCount: 0,

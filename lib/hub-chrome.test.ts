@@ -1,8 +1,8 @@
 import { hubEyebrow, hubGreeting } from '@/lib/hub-chrome'
 
 describe('hubEyebrow', () => {
-  test('returns SUPPORT for contact', () => {
-    expect(hubEyebrow('contact')).toBe('SUPPORT')
+  test('returns SUPPORT for customer', () => {
+    expect(hubEyebrow('customer')).toBe('SUPPORT')
   })
 
   test('returns AGENT for agent', () => {
@@ -15,8 +15,8 @@ describe('hubEyebrow', () => {
 })
 
 describe('hubGreeting', () => {
-  test('formats contact greeting copy', () => {
-    expect(hubGreeting('contact', 'Alex')).toBe('How can we help, Alex? 👋')
+  test('formats customer greeting copy', () => {
+    expect(hubGreeting('customer', 'Alex')).toBe('How can we help, Alex? 👋')
   })
 
   test('formats agent greeting copy', () => {

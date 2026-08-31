@@ -1,13 +1,13 @@
 import type { UserRole } from '@/lib/types'
 
 const HUB_EYEBROW_BY_ROLE: Record<UserRole, string> = {
-  contact: 'SUPPORT',
+  customer: 'SUPPORT',
   agent: 'AGENT',
   admin: 'ADMIN',
 }
 
 const HUB_GREETING_BY_ROLE: Record<UserRole, string> = {
-  contact: 'How can we help, {name}? 👋',
+  customer: 'How can we help, {name}? 👋',
   agent: 'Ready when you are, {name} 👋',
   admin: 'Welcome back, {name} 👋',
 }

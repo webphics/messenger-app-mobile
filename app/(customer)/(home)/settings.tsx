@@ -1,5 +1,5 @@
 import { SettingsScreen } from "@/components/settings/settings-screen";
 
-export default function ContactSettingsScreen() {
+export default function CustomerSettingsScreen() {
   return <SettingsScreen />;
 }

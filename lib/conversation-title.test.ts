@@ -11,9 +11,9 @@ const people: Person[] = [
     lastActiveLabel: 'Active now',
   },
   {
-    id: 'contact-1',
+    id: 'customer-1',
     displayName: 'Luis Ferreira',
-    role: 'contact',
+    role: 'customer',
     avatarUrl: null,
     isOnline: false,
     lastActiveLabel: 'Active 3h ago',
@@ -21,7 +21,7 @@ const people: Person[] = [
 ]
 
 const base = {
-  participantIds: ['contact-1', 'agent-1'],
+  participantIds: ['customer-1', 'agent-1'],
   assigneeId: 'agent-1',
   labelIds: [] as string[],
   lastMessagePreview: 'Hi',
@@ -37,7 +37,7 @@ describe('otherParticipant', () => {
       kind: 'direct',
       subject: 'Cannot reset password',
     }
-    expect(otherParticipant(c, people, 'contact-1')?.displayName).toBe('Jonah Reed')
+    expect(otherParticipant(c, people, 'customer-1')?.displayName).toBe('Jonah Reed')
     expect(otherParticipant(c, people, 'agent-1')?.displayName).toBe('Luis Ferreira')
   })
 })
@@ -45,7 +45,7 @@ describe('otherParticipant', () => {
 describe('conversationTitle', () => {
   test('offers id is Offers', () => {
     const c: Conversation = { ...base, id: 'offers', kind: 'group', subject: 'Offers' }
-    expect(conversationTitle(c, people, 'contact-1')).toBe('Offers')
+    expect(conversationTitle(c, people, 'customer-1')).toBe('Offers')
   })
 
   test('direct uses the other participant name', () => {
@@ -55,7 +55,7 @@ describe('conversationTitle', () => {
       kind: 'direct',
       subject: 'Cannot reset password',
     }
-    expect(conversationTitle(c, people, 'contact-1')).toBe('Jonah Reed')
+    expect(conversationTitle(c, people, 'customer-1')).toBe('Jonah Reed')
     expect(conversationTitle(c, people, 'agent-1')).toBe('Luis Ferreira')
   })
 
@@ -67,7 +67,7 @@ describe('conversationTitle', () => {
       subject: 'Warehouse onboarding',
     }
     const unnamed: Conversation = { ...named, id: 'g2', subject: null }
-    expect(conversationTitle(named, people, 'contact-1')).toBe('Warehouse onboarding')
-    expect(conversationTitle(unnamed, people, 'contact-1')).toBe('Group')
+    expect(conversationTitle(named, people, 'customer-1')).toBe('Warehouse onboarding')
+    expect(conversationTitle(unnamed, people, 'customer-1')).toBe('Group')
   })
 })

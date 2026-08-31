@@ -8,7 +8,7 @@ adaptive
 
 ## Users
 
-**Contact** — internal person seeking help or participating in support conversations; sees only their own threads. Reaches Home, Messages, and Help from the tab capsule.
+**Customer** — internal person seeking help or participating in support conversations; sees only their own threads. Reaches Home, Messages, and Help from the tab capsule.
 
 **Agent** — support staff who reply in assigned threads and work the unassigned pool. Cannot delete.
 
@@ -18,13 +18,13 @@ Primary jobs on this client: support conversations, internal role-shaped communi
 
 ## Product Purpose
 
-Enki is an internal support messenger. People log in, work in Contact / Agent / Admin roles, and handle help threads (plus related hub tools) without leaving the org’s messenger.
+Enki is an internal support messenger. People log in, work in Customer / Agent / Admin roles, and handle help threads (plus related hub tools) without leaving the org’s messenger.
 
-Success: each role reaches the right conversations and hub actions quickly, with RBAC respected; Contacts get help; Agents triage and reply; Admins oversee on mobile without needing the full web admin stack.
+Success: each role reaches the right conversations and hub actions quickly, with RBAC respected; Customers get help; Agents triage and reply; Admins oversee on mobile without needing the full web admin stack.
 
 ## Positioning
 
-- Role-shaped hubs and RBAC: every role uses a tab hub, with a role-specific destination set (Contact: Home/Messages/Help; Agent: Home/Unassigned/Conversations; Admin: Home/Users/Unassigned/Conversations); capabilities follow role (view rules, unassigned pool, notes, delete, assign, broadcast — capability ≠ ship UI this phase).
+- Role-shaped hubs and RBAC: every role uses a tab hub, with a role-specific destination set (Customer: Home/Messages/Help; Agent: Home/Unassigned/Conversations; Admin: Home/Users/Unassigned/Conversations); capabilities follow role (view rules, unassigned pool, notes, delete, assign, broadcast — capability ≠ ship UI this phase).
 - Internal-only product: not consumer chat, not Casewire, no Instagram-style stories, no case-status stepper.
 - Offers = in-app promo carousel + shared group chat `id: 'offers'` (`"Sponsored"` is a label only). Agent/Admin hubs may include mock knowledge and overview charts; not an ad SDK or checkout.
 
@@ -32,7 +32,7 @@ Success: each role reaches the right conversations and hub actions quickly, with
 
 - This repo is the Expo iOS/Android client only. Next.js web, NestJS, and Postgres live elsewhere.
 - Current phase: mock auth + role hubs, plus Phase 5a local media UI (`Message.attachment`, no server upload). Session blob `{ email, role }` in AsyncStorage (`ism.session`); mock data; no real backend in-app.
-- Terminology source of truth: `CONTEXT.md` (Enki, Contact, Agent, Admin, Hub, Unassigned pool, Offers, Message, Attachment, Voice note).
+- Terminology source of truth: `CONTEXT.md` (Enki, Customer, Contact list, Agent, Admin, Hub, Unassigned pool, Offers, Message, Attachment, Voice note).
 - Scope source of truth: `docs/scope.md` + current phase in `AGENTS.md`.
 
 ## Capabilities and Constraints
@@ -47,8 +47,8 @@ Success: each role reaches the right conversations and hub actions quickly, with
 
 - Product name: **Enki** (launcher, auth, hub wordmarks).
 - Avoid as product naming: Messenger, Casewire, ISM.
-- Hub role eyebrow labels: SUPPORT (Contact), AGENT, ADMIN — not in the header wordmark.
-- Greeting copy (ADR-0001): Contact `How can we help, {name}?`; Agent `Ready when you are, {name}`; Admin `Welcome back, {name}`.
+- Hub role eyebrow labels: SUPPORT (Customer), AGENT, ADMIN — not in the header wordmark.
+- Greeting copy (ADR-0001): Customer `How can we help, {name}?`; Agent `Ready when you are, {name}`; Admin `Welcome back, {name}`.
 
 ## Evidence on Hand
 

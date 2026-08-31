@@ -20,8 +20,8 @@ describe('isResolved', () => {
 })
 
 describe('listInboxConversations', () => {
-  test('contact sees only participating threads including offers', () => {
-    const list = listInboxConversations('contact', 'contact-1', CONVERSATIONS)
+  test('customer sees only participating threads including offers', () => {
+    const list = listInboxConversations('customer', 'customer-1', CONVERSATIONS)
     expect(list.map((c) => c.id).sort()).toEqual(['conv-assigned', 'conv-group', 'offers'])
   })
 
@@ -40,7 +40,7 @@ describe('listInboxConversations', () => {
 
 describe('latestInboxThread', () => {
   test('skips offers and returns newest visible', () => {
-    const latest = latestInboxThread('contact', 'contact-1', CONVERSATIONS)
+    const latest = latestInboxThread('customer', 'customer-1', CONVERSATIONS)
     expect(latest?.id).toBe('conv-assigned')
     expect(latestInboxThread('admin', 'admin-1', CONVERSATIONS)?.id).toBe(
       'conv-unassigned',

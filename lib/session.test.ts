@@ -22,13 +22,19 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 const storage = AsyncStorage as jest.Mocked<typeof AsyncStorage>
 
 describe('parseSessionBlob', () => {
-  test('null or garbage → logged out contact', () => {
-    expect(parseSessionBlob(null)).toEqual({ email: null, role: 'contact' })
-    expect(parseSessionBlob('{')).toEqual({ email: null, role: 'contact' })
+  test('null or garbage → logged out customer', () => {
+    expect(parseSessionBlob(null)).toEqual({ email: null, role: 'customer' })
+    expect(parseSessionBlob('{')).toEqual({ email: null, role: 'customer' })
     expect(parseSessionBlob('{"email":1,"role":"wizard"}')).toEqual({
       email: null,
-      role: 'contact',
+      role: 'customer',
     })
+  })
+
+  test('a stored legacy contact role falls back to customer', () => {
+    expect(
+      parseSessionBlob(JSON.stringify({ email: 'a@b.co', role: 'contact' })),
+    ).toEqual({ email: 'a@b.co', role: 'customer' })
   })
 
   test('valid blob', () => {
@@ -51,10 +57,10 @@ describe('transitions', () => {
     ).toEqual({ email: 'luis@example.com', role: 'agent' })
   })
 
-  test('login with default contact', () => {
+  test('login with default customer', () => {
     expect(
-      blobAfterLogin({ email: null, role: 'contact' }, 'luis@example.com'),
-    ).toEqual({ email: 'luis@example.com', role: 'contact' })
+      blobAfterLogin({ email: null, role: 'customer' }, 'luis@example.com'),
+    ).toEqual({ email: 'luis@example.com', role: 'customer' })
   })
 
   test('sign out clears email keeps role', () => {
@@ -65,13 +71,13 @@ describe('transitions', () => {
 
   test('role change keeps email', () => {
     expect(
-      blobAfterRoleChange({ email: 'a@b.co', role: 'contact' }, 'agent'),
+      blobAfterRoleChange({ email: 'a@b.co', role: 'customer' }, 'agent'),
     ).toEqual({ email: 'a@b.co', role: 'agent' })
   })
 
   test('isLoggedIn', () => {
-    expect(isLoggedIn({ email: null, role: 'contact' })).toBe(false)
-    expect(isLoggedIn({ email: 'a@b.co', role: 'contact' })).toBe(true)
+    expect(isLoggedIn({ email: null, role: 'customer' })).toBe(false)
+    expect(isLoggedIn({ email: 'a@b.co', role: 'customer' })).toBe(true)
   })
 })
 
@@ -79,7 +85,7 @@ describe('memory', () => {
   test('set/get', () => {
     setSessionMemory({ email: 'a@b.co', role: 'admin' })
     expect(getSession()).toEqual({ email: 'a@b.co', role: 'admin' })
-    setSessionMemory({ email: null, role: 'contact' })
+    setSessionMemory({ email: null, role: 'customer' })
   })
 })
 
@@ -94,12 +100,12 @@ describe('persist', () => {
     storage.setItem.mockImplementation(async (key, value) => {
       store[key] = String(value)
     })
-    setSessionMemory({ email: null, role: 'contact' })
+    setSessionMemory({ email: null, role: 'customer' })
   })
 
   test('hydrate missing key', async () => {
     const blob = await hydrateSession()
-    expect(blob).toEqual({ email: null, role: 'contact' })
+    expect(blob).toEqual({ email: null, role: 'customer' })
     expect(getSession()).toEqual(blob)
   })
 
@@ -108,7 +114,7 @@ describe('persist', () => {
       new Error('Native module is null, cannot access legacy storage'),
     )
     const blob = await hydrateSession()
-    expect(blob).toEqual({ email: null, role: 'contact' })
+    expect(blob).toEqual({ email: null, role: 'customer' })
   })
 
   test('login then sign out keeps role', async () => {
@@ -126,21 +132,21 @@ describe('persist', () => {
 
   test('loginSession hydrates stored role first', async () => {
     store[SESSION_KEY] = JSON.stringify({ email: null, role: 'admin' })
-    setSessionMemory({ email: null, role: 'contact' })
+    setSessionMemory({ email: null, role: 'customer' })
     const logged = await loginSession('luis@example.com')
     expect(logged).toEqual({ email: 'luis@example.com', role: 'admin' })
   })
 
   test('signOutSession hydrates stored role first', async () => {
     store[SESSION_KEY] = JSON.stringify({ email: 'a@b.co', role: 'agent' })
-    setSessionMemory({ email: null, role: 'contact' })
+    setSessionMemory({ email: null, role: 'customer' })
     const out = await signOutSession()
     expect(out).toEqual({ email: null, role: 'agent' })
   })
 
   test('setSessionRole hydrates stored email first', async () => {
-    store[SESSION_KEY] = JSON.stringify({ email: 'a@b.co', role: 'contact' })
-    setSessionMemory({ email: null, role: 'contact' })
+    store[SESSION_KEY] = JSON.stringify({ email: 'a@b.co', role: 'customer' })
+    setSessionMemory({ email: null, role: 'customer' })
     const blob = await setSessionRole('agent')
     expect(blob).toEqual({ email: 'a@b.co', role: 'agent' })
   })

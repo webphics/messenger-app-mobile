@@ -4,7 +4,7 @@ import { FloatingTabBar } from "@/components/nav/floating-tab-bar";
 
 import { useTabChrome } from "@/lib/use-tab-chrome";
 
-export default function ContactLayout() {
+export default function CustomerLayout() {
   const chrome = useTabChrome();
 
   return (

@@ -8,9 +8,9 @@ export type SessionBlob = {
   role: UserRole
 }
 
-const ROLES: UserRole[] = ['admin', 'agent', 'contact']
+const ROLES: UserRole[] = ['admin', 'agent', 'customer']
 
-const DEFAULT_BLOB: SessionBlob = { email: null, role: 'contact' }
+const DEFAULT_BLOB: SessionBlob = { email: null, role: 'customer' }
 
 let memory: SessionBlob = { ...DEFAULT_BLOB }
 
@@ -22,7 +22,7 @@ export function parseSessionBlob(raw: string | null): SessionBlob {
     const rec = parsed as Record<string, unknown>
     const role = ROLES.includes(rec.role as UserRole)
       ? (rec.role as UserRole)
-      : 'contact'
+      : 'customer'
     const emailRaw = rec.email
     const email =
       typeof emailRaw === 'string' && emailRaw.trim() !== ''

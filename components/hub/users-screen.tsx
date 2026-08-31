@@ -20,7 +20,7 @@ const CHIPS: { id: UserRoleChip; label: string }[] = [
   { id: "all", label: "All" },
   { id: "admin", label: "Admin" },
   { id: "agent", label: "Agent" },
-  { id: "contact", label: "Contact" },
+  { id: "customer", label: "Customer" },
 ];
 
 function keyExtractor(item: Person) {

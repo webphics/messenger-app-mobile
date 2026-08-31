@@ -1,5 +1,5 @@
 import { HelpSearchScreen } from '@/components/hub/help-search-screen'
 
-export default function ContactSearchScreen() {
+export default function CustomerSearchScreen() {
   return <HelpSearchScreen />
 }

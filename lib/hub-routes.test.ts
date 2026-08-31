@@ -8,7 +8,7 @@ import {
 
 describe('hub-routes', () => {
   test('ROLE_HREF covers all roles', () => {
-    expect(ROLE_HREF.contact).toBe('/(contact)')
+    expect(ROLE_HREF.customer).toBe('/(customer)')
     expect(ROLE_HREF.agent).toBe('/(agent)')
     expect(ROLE_HREF.admin).toBe('/(admin)')
   })

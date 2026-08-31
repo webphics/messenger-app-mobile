@@ -147,7 +147,7 @@ components:
 
 **Creative North Star: "The Clear Desk" (with Support Ember accents)**
 
-Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Ember appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Ember Mist). Ember Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.
+Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Customers, Agents, and Admins can finish a job without chrome noise. Enki Ember appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Ember Mist). Ember Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.
 
 Personality is **friendly and direct**: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is **hybrid** — hairline `line` borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). This phase locks **light chrome only** (`Uniwind.setTheme('light')`); dark tokens exist in CSS for later but must not drive UI now.
 
@@ -219,7 +219,7 @@ Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2
 
 ## Layout
 
-Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px). Hub/inbox lists stack soft cards with ~12–14px gaps, not hairline separator rows. Headerless screens (hub, search, chat) share `screenTopPad(insets.top)` = safe-area top + 12px. Bottom chrome respects safe-area + the floating tab capsule, shared by Agent, Admin, and Contact. Hide scrollbars. Offers carousel: edge pad 16 both ends, ~78% card width with next-slide peek.
+Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px). Hub/inbox lists stack soft cards with ~12–14px gaps, not hairline separator rows. Headerless screens (hub, search, chat) share `screenTopPad(insets.top)` = safe-area top + 12px. Bottom chrome respects safe-area + the floating tab capsule, shared by Agent, Admin, and Customer. Hide scrollbars. Offers carousel: edge pad 16 both ends, ~78% card width with next-slide peek.
 
 ### Named Rules
 **The Safe Desk Rule.** Content stays inside safe areas; Android edge-to-edge + inset padding is mandatory — do not invent a second status-bar stack.
@@ -285,10 +285,10 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Error:** Danger text and border cues; no scary full-bleed red panels.
 
 ### Navigation
-- **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Contact header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
+- **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Customer header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
 - **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Icon-only — no visible text label. Active item = Ember Mist inner pill behind the Enki Ember icon; idle = Muted icon, no pill. Unassigned / Conversations may show Enki Ember count badges. Destination names live in the accessible name (`aria-label`/`accessibilityLabel`) only, not as rendered text — the stack header title (e.g. **Messages**) is independent of that accessible name. Host tab bar chrome is transparent — the capsule is the only visible nav.
 - **Stacks:** Flat header (no shadow), Graphite title in Manrope-SemiBold, surface background.
-- **Contact:** Same floating capsule as Agent/Admin — tabs Home | Messages | Help.
+- **Customer:** Same floating capsule as Agent/Admin — tabs Home | Messages | Help.
 
 ### Hub ops (Agent / Admin)
 - Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not Enki Ember value tint.
@@ -341,7 +341,7 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Don't** ship Messenger-dark chrome, nsave maroon, or red outgoing bubbles.
 - **Don't** build stories, case-status steppers, or Casewire branding.
 - **Don't** put role labels in the header wordmark or theme whole hubs per role color.
-- **Don't** show the agent avatar stack on the Contact hub.
+- **Don't** show the agent avatar stack on the Customer hub.
 - **Don't** stack Enki Ember on unread time + badge + Offers avatar in the same row.
 - **Don't** put overlay-weight shadow on the resting composer.
 - **Don't** enable system dark mode for app chrome this phase.

@@ -31,7 +31,7 @@ const LINKS: {
   nav: "navigate" | "push";
 }[] = [
   {
-    href: "/(contact)/messages",
+    href: "/(customer)/messages",
     label: "Message Support",
     hint: "Chat directly with an available support agent",
     a11y: "Message Support",
@@ -39,7 +39,7 @@ const LINKS: {
     nav: "navigate",
   },
   {
-    href: "/(contact)/(home)/search",
+    href: "/(customer)/(home)/search",
     label: "Search for Help",
     hint: "Instant answers and troubleshooting guides",
     a11y: "Search for help",
@@ -47,7 +47,7 @@ const LINKS: {
     nav: "push",
   },
   {
-    href: "/(contact)/(home)/faq",
+    href: "/(customer)/(home)/faq",
     label: "Frequently Asked Questions",
     hint: "Common queries on passwords, billing, and access",
     a11y: "Frequently asked questions",
