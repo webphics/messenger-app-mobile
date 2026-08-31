@@ -3,10 +3,10 @@ import { LogOut, Trash2 } from "@/components/icons";
 import { Alert, ScrollView, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 
-import { RoleSwitch } from "@/components/settings/role-switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { useAuth } from "@/lib/auth-context";
 import { getDevUser } from "@/lib/dev-user";
 import { initials } from "@/lib/display";
 import { hubEyebrow } from "@/lib/hub-chrome";
@@ -15,12 +15,18 @@ import {
   makeRefreshControl,
   useSimulatedRefresh,
 } from "@/lib/simulated-refresh";
-import { getSession, signOutSession } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
 export function SettingsScreen() {
   const me = getDevUser();
-  const session = getSession();
+  const { state, signOut } = useAuth();
+  // The signed-in person, read from the provider rather than the module mirror so
+  // this card re-renders the moment they sign out instead of showing their name
+  // and email until the navigation lands.
+  const account = state.status === "signed-in" ? state.user : null;
+  // Falls back to the mock person only when there is no signed-in name to show,
+  // so this card never pairs a fixture's name with a real email address.
+  const displayName = account?.name ?? me.displayName;
   const reduceMotion = useReducedMotion();
   const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
 
@@ -34,9 +40,8 @@ export function SettingsScreen() {
           text: "Delete Account",
           style: "destructive",
           onPress: () => {
-            void signOutSession().then(() => {
-              router.replace("/(auth)/sign-in");
-            });
+            void signOut();
+            router.replace("/(auth)/sign-in");
           },
         },
       ],
@@ -53,34 +58,27 @@ export function SettingsScreen() {
         entering={settleDownEnter(!!reduceMotion)}
         className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
       >
-        <Avatar alt={me.displayName} className="size-14">
+        <Avatar alt={displayName} className="size-14">
           <AvatarFallback className="bg-primary-soft">
             <Text variant="headline" className="text-primary">
-              {initials(me.displayName)}
+              {initials(displayName)}
             </Text>
           </AvatarFallback>
         </Avatar>
 
         <View className="min-w-0 flex-1">
           <Text variant="headline" className="text-ink" numberOfLines={1}>
-            {me.displayName}
+            {displayName}
           </Text>
           <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
-            {session.email || "support@company.internal"}
+            {account?.email ?? ""}
           </Text>
           <View className="mt-1.5 self-start rounded-full bg-primary-soft px-2.5 py-0.5">
             <Text variant="label" className="font-bold uppercase tracking-wider text-primary">
-              {hubEyebrow(session.role)}
+              {hubEyebrow(account?.role ?? "customer")}
             </Text>
           </View>
         </View>
-      </Animated.View>
-
-      <Animated.View
-        entering={settleDownEnter(!!reduceMotion, 40)}
-        className="mt-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
-      >
-        <RoleSwitch />
       </Animated.View>
 
       <Animated.View
@@ -100,9 +98,8 @@ export function SettingsScreen() {
           variant="outline"
           className="min-h-12 border-danger/30 active:bg-danger/10"
           onPress={() => {
-            void signOutSession().then(() => {
-              router.replace("/(auth)/sign-in");
-            });
+            void signOut();
+            router.replace("/(auth)/sign-in");
           }}
         >
           <LogOut color={colors.danger} size={18} />

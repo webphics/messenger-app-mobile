@@ -34,6 +34,20 @@ _Avoid_: Dashboard, home feed
 Uppercase eyebrow on the hub greeting block: SUPPORT, AGENT, or ADMIN. Not the header wordmark.
 _Avoid_: Customer Hub, Agent Dashboard, Executive Overview (as UI labels)
 
+### Session
+
+**Session token**:
+The signed Better Auth session token this client holds in the device keychain and sends as `Authorization: Bearer`. Opaque to the app — it is never parsed, only stored, sent, and discarded.
+_Avoid_: JWT, access token, API key, auth cookie
+
+**Hydration**:
+Reading the stored Session token at cold start and exchanging it for the signed-in Customer, Agent, or Admin. Ends in one of three states: signed in, signed out, or unreachable.
+_Avoid_: Bootstrapping, session restore, rehydrate
+
+**Unreachable**:
+The Hydration outcome where a Session token exists but the API could not be reached. Distinct from signed out: the token is kept and the person is not sent to sign-in.
+_Avoid_: Offline, error, disconnected
+
 **Unassigned pool**:
 Conversations with no assignee, visible to Agent and Admin.
 _Avoid_: Queue (unless referring to ordering), inbox (inbox is the conversation list)

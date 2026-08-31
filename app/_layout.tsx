@@ -29,6 +29,7 @@ import { Appearance, AppState, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
+import { AuthProvider } from "@/lib/auth-context";
 import { colors } from "@/lib/tokens";
 
 Uniwind.setTheme("light");
@@ -91,26 +92,28 @@ export default function RootLayout() {
       {Platform.OS === "android" ? (
         <NavigationBar hidden={false} style="dark" />
       ) : null}
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.bg },
-          animation: "default",
-          gestureEnabled: true,
-        }}
-      >
-        <Stack.Screen
-          name="chat/[id]"
-          options={{
+      <AuthProvider>
+        <Stack
+          screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: colors.bg },
+            animation: "default",
+            gestureEnabled: true,
           }}
-        />
-        <Stack.Screen
-          name="(auth)"
-          options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
-        />
-      </Stack>
+        >
+          <Stack.Screen
+            name="chat/[id]"
+            options={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.bg },
+            }}
+          />
+          <Stack.Screen
+            name="(auth)"
+            options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+          />
+        </Stack>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }

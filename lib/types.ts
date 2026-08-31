@@ -1,5 +1,16 @@
 export type UserRole = 'admin' | 'agent' | 'customer'
 
+/**
+ * The signed-in person as the API reports them. The role is server-owned: it
+ * arrives on this payload and the client has no way to set it.
+ */
+export type SessionUser = {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+}
+
 export type Person = {
   id: string
   displayName: string

@@ -28,6 +28,7 @@ export { default as ChevronLeft } from "lucide-react-native/icons/chevron-left";
 export { default as ChevronRight } from "lucide-react-native/icons/chevron-right";
 export { default as ChevronUp } from "lucide-react-native/icons/chevron-up";
 export { default as Clock } from "lucide-react-native/icons/clock";
+export { default as CloudOff } from "lucide-react-native/icons/cloud-off";
 export { default as Copy } from "lucide-react-native/icons/copy";
 export { default as CornerUpLeft } from "lucide-react-native/icons/corner-up-left";
 export { default as Eye } from "lucide-react-native/icons/eye";
