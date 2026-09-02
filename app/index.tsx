@@ -1,11 +1,11 @@
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
 import { UnreachableScreen } from "@/components/auth/unreachable-screen";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { useAuth } from "@/lib/auth-context";
-import { ROLE_HREF } from "@/lib/hub-routes";
+import { launchDestination } from "@/lib/launch-route";
 
 /**
  * How long the launch animation stays up *after it is actually on screen*.
@@ -20,24 +20,15 @@ export default function Index() {
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const navigatedRef = useRef(false);
 
-  /**
-   * Where Hydration says this person belongs. Null while it is still running, and
-   * while it ended Unreachable — that outcome is a screen here, not a route.
-   */
-  const targetHref: Href | null =
-    state.status === "signed-in"
-      ? ROLE_HREF[state.user.role]
-      : state.status === "hydrating" || state.status === "unreachable"
-        ? null
-        : "/(auth)/sign-in";
+  // Where Hydration says this person belongs. The mapping is `lib/launch-route`;
+  // what is left here is only the timing around it.
+  const destination = launchDestination(state);
+  const targetHref = destination.kind === "navigate" ? destination.href : null;
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, MINIMUM_DISPLAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
-
+  // Started from `animationReady`, never from mount. `AppLoadingScreen` reports
+  // ready when the WebP has decoded, and reports it anyway if the decode stalls
+  // past its own 2.5s failsafe — so the worst case here is 4.5s, still inside the
+  // root layout's 6s splash backstop.
   useEffect(() => {
     if (!animationReady) return;
     const timer = setTimeout(() => {
@@ -46,7 +37,11 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, [animationReady]);
 
-  const isFinishing = Boolean(minTimeElapsed && targetHref);
+  // Both halves have to be true, in either order: Hydration finishing early does
+  // not cut the animation short, and Hydration finishing late is not cut off.
+  // Asked of the destination rather than of `targetHref`, so that the two
+  // non-navigating outcomes stay distinguishable here as well.
+  const isFinishing = minTimeElapsed && destination.kind === "navigate";
 
   const handleReady = useCallback(() => {
     setAnimationReady(true);
@@ -62,7 +57,7 @@ export default function Index() {
   // Gated on `animationReady` rather than shown the instant Hydration fails:
   // `AppLoadingScreen` owns hiding the native splash, so unmounting it before it
   // has reported ready would leave the splash up until the root layout's backstop.
-  if (state.status === "unreachable" && animationReady) {
+  if (destination.kind === "unreachable" && animationReady) {
     return <UnreachableScreen />;
   }
 
