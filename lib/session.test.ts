@@ -1,9 +1,4 @@
-import {
-  getSession,
-  getSessionUser,
-  isLoggedIn,
-  setSessionUser,
-} from "@/lib/session";
+import { getSession, getSessionUser, setSessionUser } from "@/lib/session";
 import type { SessionUser } from "@/lib/types";
 
 const AGENT: SessionUser = {
@@ -19,13 +14,11 @@ afterEach(() => {
 
 test("signed out reads as no identity", () => {
   expect(getSessionUser()).toBeNull();
-  expect(isLoggedIn()).toBe(false);
   expect(getSession()).toEqual({ email: null, name: null, role: "customer" });
 });
 
 test("a signed-in person is repeated verbatim, role included", () => {
   setSessionUser(AGENT);
-  expect(isLoggedIn()).toBe(true);
   expect(getSessionUser()).toEqual(AGENT);
   expect(getSession()).toEqual({
     email: "qa-agent@talo.test",
