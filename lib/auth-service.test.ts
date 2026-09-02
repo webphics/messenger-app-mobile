@@ -8,8 +8,10 @@ import {
   authenticatedRequest,
   hydrateAuth,
   onSessionExpired,
+  requestMagicLink,
   signInWithPassword,
   signOut,
+  verifyMagicLink,
 } from "@/lib/auth-service";
 import {
   clearRetiredCredential,
@@ -34,6 +36,16 @@ jest.mock("@/lib/api-client", () => {
 
 jest.mock("@/lib/legacy-session", () => ({
   purgeMockSession: jest.fn(async () => undefined),
+}));
+
+// The origin is read from `.env` or the app's own scheme, and Jest has neither.
+// Pinned to an HTTPS origin so the assertions below are about what travels with
+// the request rather than about which build produced it. The build that has no
+// origin at all is a whole-module condition, so it gets its own file:
+// `lib/auth-service-unconfigured.test.ts`.
+jest.mock("@/lib/magic-link-config", () => ({
+  ...jest.requireActual("@/lib/magic-link-config"),
+  MAGIC_LINK_ORIGIN: "https://app.example.com",
 }));
 
 jest.mock("@/lib/keychain", () => ({
@@ -425,5 +437,141 @@ describe("authenticatedRequest", () => {
 
     await authenticatedRequest(CONVERSATIONS);
     expect(heard).not.toHaveBeenCalled();
+  });
+});
+
+describe("requesting a magic link", () => {
+  const SENT = { reached: true as const, status: 200, body: { data: true }, sessionCookie: null };
+
+  test("the API is asked to send, and told where this build's links have to point", async () => {
+    request.mockResolvedValueOnce(SENT);
+
+    await expect(requestMagicLink("first-timer@talo.test")).resolves.toEqual({ kind: "sent" });
+
+    expect(request).toHaveBeenCalledWith("/auth/magic-link", {
+      method: "POST",
+      body: { email: "first-timer@talo.test", url: "https://app.example.com" },
+    });
+  });
+
+  test("a typed address is trimmed, the way a password sign-in's is", async () => {
+    request.mockResolvedValueOnce(SENT);
+
+    await requestMagicLink("  first-timer@talo.test \n");
+
+    expect(request).toHaveBeenCalledWith(
+      "/auth/magic-link",
+      expect.objectContaining({ body: { email: "first-timer@talo.test", url: "https://app.example.com" } }),
+    );
+  });
+
+  test("asking for a link touches no credential", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    request.mockResolvedValueOnce(SENT);
+
+    await requestMagicLink("first-timer@talo.test");
+
+    // Nothing is established and nothing is refused, so there is nothing here to
+    // store and nothing to erase — including the session of whoever is signed in.
+    expect(getSessionCookie()).toBe(STORED);
+    expect(getSessionUser()).toEqual(PARSED_USER);
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(clearCookie).not.toHaveBeenCalled();
+  });
+
+  test("another link can be asked for without anything being reset first", async () => {
+    request.mockResolvedValue(SENT);
+
+    await expect(requestMagicLink("first-timer@talo.test")).resolves.toEqual({ kind: "sent" });
+    await expect(requestMagicLink("first-timer@talo.test")).resolves.toEqual({ kind: "sent" });
+
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("verifying a magic link", () => {
+  test("a verified link stores the Session cookie exactly as a password does", async () => {
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await expect(verifyMagicLink("tok-en")).resolves.toEqual({
+      kind: "signed-in",
+      cookie: ISSUED,
+      user: PARSED_USER,
+    });
+
+    expect(request).toHaveBeenCalledWith("/auth/magic-link/verify?token=tok-en");
+    expect(writeCookie).toHaveBeenCalledWith(ISSUED);
+    expect(getSessionCookie()).toBe(ISSUED);
+    expect(getSessionUser()).toEqual(PARSED_USER);
+  });
+
+  test("a token is escaped, so it cannot append a second query parameter", async () => {
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await verifyMagicLink("a&callbackURL=https://evil.test");
+
+    expect(request).toHaveBeenCalledWith(
+      "/auth/magic-link/verify?token=a%26callbackURL%3Dhttps%3A%2F%2Fevil.test",
+    );
+  });
+
+  test("a refused link leaves nothing behind", async () => {
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: { code: "invalid_magic_link", message: "This magic link is invalid." },
+      sessionCookie: null,
+    });
+
+    await expect(verifyMagicLink("spent")).resolves.toEqual({
+      kind: "unauthorised",
+      message: "This magic link is invalid.",
+    });
+
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
+    expect(getSessionUser()).toBeNull();
+  });
+
+  test("a two-factor account is refused here with nothing stored, as on the password path", async () => {
+    request.mockResolvedValueOnce(ok({ twoFactorRedirect: true }, ISSUED));
+
+    await expect(verifyMagicLink("tok-en")).resolves.toEqual({ kind: "two-factor" });
+
+    // The challenge's cookie is a half-signed-in credential this app has no
+    // second step for. Keeping it would be worse than refusing.
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
+  });
+
+  test("a link tapped with no network changes nothing at all", async () => {
+    request.mockResolvedValueOnce({ reached: false });
+
+    await expect(verifyMagicLink("tok-en")).resolves.toEqual({ kind: "transport-failure" });
+
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(clearCookie).not.toHaveBeenCalled();
+  });
+
+  test("a sign-out that overtakes a verification does not sign anyone back in", async () => {
+    let release: (() => void) | null = null;
+    const arrived = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    request.mockImplementationOnce(async () => {
+      await arrived;
+      return ok(USER, ISSUED);
+    });
+
+    const verifying = verifyMagicLink("tok-en");
+    await signOut();
+    release!();
+    await verifying;
+
+    // The epoch moved while the request was out, so the credential it came back
+    // with is stale — writing it would leave a live cookie for the next launch.
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
   });
 });

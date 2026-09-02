@@ -44,6 +44,21 @@ _Avoid_: Session token, JWT, access token, bearer token
 The double-submit value fetched from the API and sent as `X-CSRF-Token` on every mutation, alongside the `csrf-token` cookie it is paired with. Not bound to a session — one is fetched, cached, and reused until the API rejects it.
 _Avoid_: XSRF token, nonce, anti-forgery token
 
+**Magic link**:
+A single-use, short-lived sign-in link emailed on request, spent by opening it on the device. The only
+way a Customer account comes into existence on this client — the API has no registration endpoint, and
+verifying a first link creates the account; staff accounts are made by an Admin on web. Requesting one
+says the same thing for every address, because saying otherwise would disclose who has an account.
+Verifying one ends in the same Session cookie a password sign-in ends in.
+_Avoid_: Magic email, passwordless login, OTP, one-time code (there is no code to type)
+
+**Link origin**:
+Where the Magic link points, sent to the API with the request because the API serves the web client
+too and its links go elsewhere. Configuration — an app scheme now, an HTTPS domain in production —
+never a value written into the client. The path it is joined to, `/auth/magic-link`, is fixed on both
+sides, so only the origin ever changes.
+_Avoid_: Deep link URL, callback URL, redirect URI
+
 **Hydration**:
 Reading the stored Session cookie at cold start and exchanging it for the signed-in Customer, Agent, or Admin. Ends in one of three states: signed in, signed out, or unreachable.
 _Avoid_: Bootstrapping, session restore, rehydrate

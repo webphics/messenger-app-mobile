@@ -24,6 +24,24 @@ export type HttpOutcome =
     }
   | { reached: false };
 
+/**
+ * What asking for a magic link came back as.
+ *
+ * Not an `AuthOutcome`: nothing here establishes or refuses a credential, so
+ * none of it belongs in the auth state machine. Requesting a link is a message
+ * being sent, and the only three answers are that it went, that the server said
+ * no, and that nobody heard back.
+ *
+ * There is deliberately no outcome for *this address has no account*. The API
+ * answers a first-time email exactly as it answers a known one — verifying the
+ * link is what creates the Customer account — and anything here that could tell
+ * them apart would turn a sign-in form into a way of asking who has an account.
+ */
+export type MagicLinkRequestOutcome =
+  | { kind: "sent" }
+  | { kind: "refused"; message: string }
+  | { kind: "transport-failure" };
+
 export type AuthOutcome =
   | { kind: "signed-in"; cookie: string; user: SessionUser }
   | { kind: "two-factor" }
@@ -38,7 +56,24 @@ const ROLES: readonly UserRole[] = ["admin", "agent", "customer"];
 
 const DEFAULT_REFUSAL = "Could not sign in. Check your email and password.";
 
+/**
+ * The same job as `DEFAULT_REFUSAL`, for the half of sign-in where nothing was
+ * typed. Telling someone to check their password after they tapped a link would
+ * point them at a credential this path does not use.
+ *
+ * Exported because the verification screen needs the same backstop for a
+ * refusal that reached it without a message, and two near-identical sentences —
+ * one shadowing the other depending on which module got there first — is how a
+ * product ends up saying two things about one event.
+ */
+export const LINK_REFUSED_NOTICE =
+  "This sign-in link could not be verified. Request a new one.";
+
 const DEFAULT_SERVER_ERROR = "The server could not handle that right now. Try again.";
+
+/** What to say when the server turned a link request away without saying why. */
+const DEFAULT_LINK_REQUEST_REFUSAL =
+  "Could not send a sign-in link right now. Try again in a moment.";
 
 /**
  * The statuses that mean *this credential is no good*, as opposed to *the server
@@ -105,7 +140,11 @@ function isTwoFactorChallenge(data: Record<string, unknown> | null): boolean {
 }
 
 /** Classify a non-2xx answer, carrying the server's own words so it explains itself. */
-function refusal(status: number, body: unknown): AuthOutcome {
+function refusal(
+  status: number,
+  body: unknown,
+  defaultRefusal = DEFAULT_REFUSAL,
+): AuthOutcome {
   const error = asRecord(body);
   const message = nonEmptyString(error?.message);
 
@@ -114,19 +153,28 @@ function refusal(status: number, body: unknown): AuthOutcome {
   }
 
   return CREDENTIAL_REFUSED.has(status)
-    ? { kind: "unauthorised", message: message ?? DEFAULT_REFUSAL }
+    ? { kind: "unauthorised", message: message ?? defaultRefusal }
     : { kind: "server-error", message: message ?? DEFAULT_SERVER_ERROR };
 }
 
 /**
- * Read a `POST /auth/login` response.
+ * Read a response that was supposed to establish a session.
  *
  * A success is only a success when a Session cookie came with it: the API sets
  * one exactly on responses that established a credential, so a
  * 200-with-a-user-and-no-cookie is a response this client cannot act on rather
  * than a sign-in it should celebrate.
+ *
+ * Shared by the two ways in, because the API answers them with the same shape:
+ * `POST /auth/login` and `GET /auth/magic-link/verify` both return the user in
+ * an envelope, both set the cookie in a header, and both raise the two-factor
+ * challenge as a 200. Only the words for an unexplained refusal differ, since
+ * one path has a password to check and the other does not.
  */
-export function interpretSignIn(outcome: HttpOutcome): AuthOutcome {
+function interpretIssuedSession(
+  outcome: HttpOutcome,
+  defaultRefusal: string,
+): AuthOutcome {
   if (!outcome.reached) return { kind: "transport-failure" };
 
   const data = envelopeData(outcome.body);
@@ -135,7 +183,7 @@ export function interpretSignIn(outcome: HttpOutcome): AuthOutcome {
   if (isTwoFactorChallenge(data)) return { kind: "two-factor" };
 
   if (outcome.status < 200 || outcome.status >= 300) {
-    return refusal(outcome.status, outcome.body);
+    return refusal(outcome.status, outcome.body, defaultRefusal);
   }
 
   const user = parseSessionUser(data);
@@ -143,6 +191,70 @@ export function interpretSignIn(outcome: HttpOutcome): AuthOutcome {
   if (!user || !cookie) return { kind: "malformed" };
 
   return { kind: "signed-in", cookie, user };
+}
+
+/** Read a `POST /auth/login` response. */
+export function interpretSignIn(outcome: HttpOutcome): AuthOutcome {
+  return interpretIssuedSession(outcome, DEFAULT_REFUSAL);
+}
+
+/**
+ * Read a `GET /auth/magic-link/verify` response.
+ *
+ * Every way this can end is already an `AuthOutcome`, which is the point: a
+ * verified link is the same fact as an accepted password, so it reaches the auth
+ * state machine through the events that were already there rather than through a
+ * second seam. An account with two-factor enabled is refused here for the same
+ * reason it is refused on the password path — the API's two-factor hook fires on
+ * this route too, so the challenge arrives and this client has nowhere to take it.
+ *
+ * The API cannot tell an expired link from an already-used one — both are a
+ * token that is no longer good — and answers both with `invalid_magic_link` and
+ * one sentence covering the two. Carried through verbatim, because inventing a
+ * distinction the server did not make would be a guess shown as a fact.
+ */
+export function interpretMagicLinkVerify(outcome: HttpOutcome): AuthOutcome {
+  return interpretIssuedSession(outcome, LINK_REFUSED_NOTICE);
+}
+
+/**
+ * Read a `POST /auth/magic-link` response.
+ *
+ * The envelope's `data` is the API's own `status` for the request, and a 2xx
+ * alone is not enough: a `false` there is the server declining to claim it
+ * accepted the request, which is not something to answer with a confirmation
+ * naming an address.
+ *
+ * It is worth being exact about how much `true` promises, because it is less
+ * than it looks. The API hands the mail off fire-and-forget — `sendMagicLink`
+ * in `auth.factory.ts` catches and logs its own failure — so `true` means the
+ * link was minted and handed to the mailer, not that anything was delivered.
+ * Nothing better exists to ask for, and the screen's answer is worded to match:
+ * it says where a link was sent, and offers another, rather than promising one
+ * has arrived.
+ */
+export function interpretMagicLinkRequest(
+  outcome: HttpOutcome,
+): MagicLinkRequestOutcome {
+  if (!outcome.reached) return { kind: "transport-failure" };
+
+  if (outcome.status < 200 || outcome.status >= 300) {
+    const error = asRecord(outcome.body);
+    const code = error?.code;
+    const message = nonEmptyString(error?.message);
+
+    return {
+      kind: "refused",
+      message:
+        code === CSRF_REFUSED_CODE
+          ? CSRF_MESSAGE
+          : (message ?? DEFAULT_LINK_REQUEST_REFUSAL),
+    };
+  }
+
+  return asRecord(outcome.body)?.data === true
+    ? { kind: "sent" }
+    : { kind: "refused", message: DEFAULT_LINK_REQUEST_REFUSAL };
 }
 
 /**

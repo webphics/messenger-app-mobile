@@ -14,11 +14,14 @@ import {
   INITIAL_AUTH_STATE,
   type AuthState,
 } from "@/lib/auth-machine";
+import type { MagicLinkRequestOutcome } from "@/lib/auth-response";
 import {
   hydrateAuth,
   onSessionExpired,
+  requestMagicLink as sendMagicLink,
   signInWithPassword,
   signOut as endSession,
+  verifyMagicLink as spendMagicLink,
 } from "@/lib/auth-service";
 
 /**
@@ -34,6 +37,17 @@ type AuthContextValue = {
   state: AuthState;
   /** Resolves once the attempt has settled. Ignored while one is already in flight. */
   signIn: (email: string, password: string) => Promise<void>;
+  /**
+   * Spend a magic link's token. Drives the same events as `signIn`, because a
+   * verified link and an accepted password are the same fact.
+   */
+  verifyMagicLink: (token: string) => Promise<void>;
+  /**
+   * Ask for a sign-in link. Deliberately outside the state machine: no session
+   * is established or refused, so the screen owns the outcome and the answer is
+   * returned rather than dispatched.
+   */
+  requestMagicLink: (email: string) => Promise<MagicLinkRequestOutcome>;
   signOut: () => Promise<void>;
   /** Try hydration again after an Unreachable cold start. */
   retry: () => void;
@@ -84,6 +98,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * The same three lines as `signIn`, and the same guard, because the machine
+   * cannot tell the two apart and should not: one event stream, one place a
+   * second attempt is refused, one set of table tests describing both.
+   */
+  const verifyMagicLink = useCallback(async (token: string) => {
+    if (submitting.current) return;
+    submitting.current = true;
+    dispatch({ type: "submit" });
+
+    try {
+      dispatch({ type: "settled", outcome: await spendMagicLink(token) });
+    } finally {
+      submitting.current = false;
+    }
+  }, []);
+
+  const requestMagicLink = useCallback(
+    (email: string) => sendMagicLink(email),
+    [],
+  );
+
   const signOut = useCallback(async () => {
     // Dispatched first: the person is signed out from this moment, whatever the
     // server says, and an in-flight sign-in can no longer sign them back in.
@@ -96,8 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ state, signIn, signOut, retry }),
-    [state, signIn, signOut, retry],
+    () => ({ state, signIn, verifyMagicLink, requestMagicLink, signOut, retry }),
+    [state, signIn, verifyMagicLink, requestMagicLink, signOut, retry],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

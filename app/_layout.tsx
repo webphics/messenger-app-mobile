@@ -114,6 +114,13 @@ export default function RootLayout() {
             name="(auth)"
             options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
           />
+          {/* The magic link's landing route. Named here so a cold start opened by
+              a link gets the same chrome as every other screen rather than the
+              navigator's defaults. */}
+          <Stack.Screen
+            name="auth/magic-link"
+            options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+          />
         </Stack>
       </AuthProvider>
     </GestureHandlerRootView>
