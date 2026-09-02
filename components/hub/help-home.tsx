@@ -16,6 +16,7 @@ import {
   useSimulatedRefresh,
 } from "@/lib/simulated-refresh";
 import { colors, screenBottomPad } from "@/lib/tokens";
+import { CUSTOMER_HREF } from "@/lib/hub-routes";
 
 // Capsule clearance: max(insets.bottom, 8) + 8 gap + ~60dp capsule height.
 const CAPSULE_CLEARANCE = 88;
@@ -31,7 +32,7 @@ const LINKS: {
   nav: "navigate" | "push";
 }[] = [
   {
-    href: "/(customer)/messages",
+    href: CUSTOMER_HREF.messages,
     label: "Message Support",
     hint: "Chat directly with an available support agent",
     a11y: "Message Support",
@@ -39,7 +40,7 @@ const LINKS: {
     nav: "navigate",
   },
   {
-    href: "/(customer)/(home)/search",
+    href: CUSTOMER_HREF.search,
     label: "Search for Help",
     hint: "Instant answers and troubleshooting guides",
     a11y: "Search for help",
@@ -47,7 +48,7 @@ const LINKS: {
     nav: "push",
   },
   {
-    href: "/(customer)/(home)/faq",
+    href: CUSTOMER_HREF.faq,
     label: "Frequently Asked Questions",
     hint: "Common queries on passwords, billing, and access",
     a11y: "Frequently asked questions",
