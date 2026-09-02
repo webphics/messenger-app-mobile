@@ -14,7 +14,7 @@ import {
   INITIAL_AUTH_STATE,
   type AuthState,
 } from "@/lib/auth-machine";
-import type { MagicLinkRequestOutcome } from "@/lib/auth-response";
+import type { AuthOutcome, MagicLinkRequestOutcome } from "@/lib/auth-response";
 import {
   hydrateAuth,
   onSessionExpired,
@@ -98,34 +98,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => onSessionExpired(() => dispatch({ type: "expired" })), []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    if (submitting.current) return;
-    submitting.current = true;
-    dispatch({ type: "submit" });
-
-    try {
-      dispatch({ type: "settled", outcome: await signInWithPassword(email, password) });
-    } finally {
-      submitting.current = false;
-    }
-  }, []);
-
   /**
-   * The same three lines as `signIn`, and the same guard, because the machine
-   * cannot tell the two apart and should not: one event stream, one place a
-   * second attempt is refused, one set of table tests describing both.
+   * Run one attempt at establishing a session, whatever it is an attempt at.
+   *
+   * A password and a verified link are the same fact to the machine, so they are
+   * the same three dispatches here: submit, await, settle. Written once because
+   * two copies would be two places for the double-submit guard to be got wrong,
+   * and the table tests in `lib/auth-machine.test.ts` describe one event stream.
+   *
+   * Google is not routed through this: its `submit` has to wait until the
+   * account sheet has actually returned something. See `signInWithGoogle`.
    */
-  const verifyMagicLink = useCallback(async (token: string) => {
+  const runAttempt = useCallback(async (attempt: () => Promise<AuthOutcome>) => {
     if (submitting.current) return;
     submitting.current = true;
     dispatch({ type: "submit" });
 
     try {
-      dispatch({ type: "settled", outcome: await spendMagicLink(token) });
+      dispatch({ type: "settled", outcome: await attempt() });
     } finally {
       submitting.current = false;
     }
   }, []);
+
+  const signIn = useCallback(
+    (email: string, password: string) =>
+      runAttempt(() => signInWithPassword(email, password)),
+    [runAttempt],
+  );
+
+  const verifyMagicLink = useCallback(
+    (token: string) => runAttempt(() => spendMagicLink(token)),
+    [runAttempt],
+  );
 
   /**
    * The third way in, and the same guard again. The event it ends on is chosen
