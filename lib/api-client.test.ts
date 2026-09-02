@@ -357,6 +357,18 @@ describe("a CSRF refusal", () => {
     expect(outcome).toMatchObject({ status: 403 });
   });
 
+  test("does not replay the body when the refresh itself fails", async () => {
+    enqueue(csrfResponse("stale", "stale-cookie"), csrfRefusal(), response(500, null));
+
+    const outcome = await apiRequest("/auth/login", { method: "POST", body: { email: "a@b.co" } });
+
+    // One send, not two. A retry with no pair to carry is a guaranteed refusal,
+    // so it buys nothing and costs a second delivery of a non-idempotent body —
+    // the same harm `isCsrfRefusal` refuses codeless 403s to avoid.
+    expect(calls.filter((call) => call.url.endsWith("/auth/login"))).toHaveLength(1);
+    expect(outcome).toMatchObject({ status: 403 });
+  });
+
   test("a refusal that survives the retry keeps the API's own words", async () => {
     enqueue(csrfResponse(), csrfRefusal(), csrfResponse("fresh", "fresh-cookie"), csrfRefusal());
 

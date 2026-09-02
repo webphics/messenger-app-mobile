@@ -249,7 +249,14 @@ export async function apiRequest(
   // a second refusal is returned as it stands.
   if (answer && mutation && isCsrfRefusal(answer)) {
     clearCsrfPair();
-    answer = await send(attempt, await ensureCsrfPair());
+    const refreshed = await ensureCsrfPair();
+
+    // Only retry with something to retry *with*. A refetch that failed leaves
+    // nothing to carry, and a second send stripped of the pair is the same
+    // refusal already in hand — bought at the price of delivering a
+    // non-idempotent body twice, which is exactly what `isCsrfRefusal` declines
+    // codeless 403s to avoid. The first answer stands.
+    if (refreshed) answer = await send(attempt, refreshed);
   }
 
   if (!answer) return { reached: false };
