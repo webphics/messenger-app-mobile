@@ -64,6 +64,25 @@ type LinkRequest = {
 
 const NO_LINK_REQUEST: LinkRequest = { sentTo: null, sending: false, failure: null };
 
+/**
+ * One field's validation message, in the shape every field on this screen uses.
+ *
+ * A live region rather than plain text, so a message that appears under a field
+ * someone has already moved past is still announced.
+ */
+function FieldError({ message }: { message: string | null }) {
+  if (!message) return null;
+
+  return (
+    <View className="mt-1.5 flex-row items-center gap-1.5" accessibilityLiveRegion="polite">
+      <AlertCircle color={colors.danger} size={14} />
+      <Text variant="label" className="min-w-0 flex-1 font-medium text-danger">
+        {message}
+      </Text>
+    </View>
+  );
+}
+
 export function SignInForm() {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -105,6 +124,21 @@ export function SignInForm() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [linkRequest, setLinkRequest] = useState<LinkRequest>(NO_LINK_REQUEST);
   const sendingLink = linkRequest.sending;
+  /**
+   * Whether anything at all is out — the one guard every control on this screen
+   * shares.
+   *
+   * The three requests are not independent even though only two of them touch
+   * the machine. Asking for a link mid-sign-in writes to state on a screen that
+   * is about to be replaced by a Hub; signing in mid-link-request lands a
+   * confirmation on a screen nobody is looking at. And a control that accepts a
+   * press it will drop is worse than one that says it is busy.
+   *
+   * Which control is *spinning* stays separate: that has to be the one that was
+   * pressed, or the button someone did not touch reads as busy to the eye and to
+   * a screen reader alike.
+   */
+  const anyRequestOut = busy || sendingLink;
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   /**
@@ -130,7 +164,7 @@ export function SignInForm() {
   }, [state]);
 
   async function onSubmit() {
-    if (busy) return;
+    if (anyRequestOut) return;
     // Only the failure. It outranks the machine's notice, so left standing it
     // would outlive the attempt it described and speak over this one. A standing
     // confirmation is not cleared: a link did go to that address, and still has.
@@ -168,7 +202,7 @@ export function SignInForm() {
    * that email" would hand anyone who can type a way to find out who has one.
    */
   async function onRequestLink() {
-    if (sendingLink) return;
+    if (anyRequestOut) return;
 
     const trimmed = email.trim();
     if (!emailLooksValid(trimmed)) {
@@ -202,7 +236,7 @@ export function SignInForm() {
    * through, so falling back to another method is not a retype.
    */
   async function onGoogleSignIn() {
-    if (busy) return;
+    if (anyRequestOut) return;
 
     setPending("google");
     try {
@@ -322,17 +356,7 @@ export function SignInForm() {
                 setLinkRequest(NO_LINK_REQUEST);
               }}
             />
-            {emailError ? (
-              <View
-                className="mt-1.5 flex-row items-center gap-1.5"
-                accessibilityLiveRegion="polite"
-              >
-                <AlertCircle color={colors.danger} size={14} />
-                <Text variant="label" className="font-medium text-danger">
-                  {emailError}
-                </Text>
-              </View>
-            ) : null}
+            <FieldError message={emailError} />
           </View>
 
           <View className="mt-4">
@@ -373,17 +397,7 @@ export function SignInForm() {
                 )}
               </TactilePressable>
             </View>
-            {passwordError ? (
-              <View
-                className="mt-1.5 flex-row items-center gap-1.5"
-                accessibilityLiveRegion="polite"
-              >
-                <AlertCircle color={colors.danger} size={14} />
-                <Text variant="label" className="font-medium text-danger">
-                  {passwordError}
-                </Text>
-              </View>
-            ) : null}
+            <FieldError message={passwordError} />
           </View>
 
           <SeedAccountPicker
@@ -394,7 +408,7 @@ export function SignInForm() {
             // spinner off the button, drop the guard that stops a second
             // request, and land the confirmation on an address the form no
             // longer holds.
-            disabled={busy || sendingLink}
+            disabled={anyRequestOut}
           />
 
           {notice ? (
@@ -418,8 +432,8 @@ export function SignInForm() {
             // which is also the second half of the double-submit guard. "An
             // attempt" includes a Google sheet that is open, which the machine
             // cannot see.
-            disabled={busy}
-            accessibilityState={{ disabled: busy, busy: passwordBusy }}
+            disabled={anyRequestOut}
+            accessibilityState={{ disabled: anyRequestOut, busy: passwordBusy }}
           >
             {passwordBusy ? (
               <ActivityIndicator size="small" color={colors.primaryForeground} />
@@ -465,8 +479,8 @@ export function SignInForm() {
             variant="outline"
             className="mt-4 min-h-12 w-full"
             onPress={() => void onRequestLink()}
-            disabled={sendingLink}
-            accessibilityState={{ disabled: sendingLink, busy: sendingLink }}
+            disabled={anyRequestOut}
+            accessibilityState={{ disabled: anyRequestOut, busy: sendingLink }}
           >
             {sendingLink ? (
               <ActivityIndicator size="small" color={colors.primary} />
@@ -508,14 +522,14 @@ export function SignInForm() {
             // Disabled while any attempt is out, not only this one: the machine
             // refuses a second submit anyway, and a button that accepts a press
             // it will drop is worse than one that says it is busy.
-            disabled={googleUnavailable !== null || busy}
+            disabled={googleUnavailable !== null || anyRequestOut}
             accessibilityLabel={
               googleUnavailable
                 ? "Continue with Google — not available in this build"
                 : "Continue with Google"
             }
             accessibilityState={{
-              disabled: googleUnavailable !== null || busy,
+              disabled: googleUnavailable !== null || anyRequestOut,
               busy: googleBusy,
             }}
           >
