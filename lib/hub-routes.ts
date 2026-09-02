@@ -11,6 +11,23 @@ export const ROLE_HREF: Record<UserRole, Href> = {
   admin: "/(admin)" as Href,
 };
 
+/**
+ * The Customer group's screens, named once.
+ *
+ * The other two groups reach their screens through the helpers below; the
+ * Customer Hub and Help home were spelling `/(customer)/…` out at each call
+ * site, which made the segment's name a thing eight files agreed about by
+ * coincidence. Renaming the route group is what finds them all — and it finds
+ * them at runtime, as a route that no longer resolves.
+ */
+export const CUSTOMER_HREF = {
+  messages: "/(customer)/messages" as Href,
+  help: "/(customer)/help" as Href,
+  settings: "/(customer)/(home)/settings" as Href,
+  search: "/(customer)/(home)/search" as Href,
+  faq: "/(customer)/(home)/faq" as Href,
+} as const;
+
 export function knowledgeListHref(group: "agent" | "admin"): Href {
   return group === "admin"
     ? ("/(admin)/knowledge" as Href)

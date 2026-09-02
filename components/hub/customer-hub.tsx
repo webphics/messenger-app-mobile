@@ -17,6 +17,7 @@ import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { latestInboxThread } from "@/lib/inbox-filter";
 import { getDevUser } from "@/lib/dev-user";
 import { CONVERSATIONS } from "@/lib/mock-data";
+import { CUSTOMER_HREF } from "@/lib/hub-routes";
 import { settleDownEnter } from "@/lib/motion-enter";
 import { getSession } from "@/lib/session";
 
@@ -28,7 +29,7 @@ export function CustomerHub() {
   return (
     <HubScroll>
       <View className="px-4">
-        <HubHeader settingsHref="/(customer)/(home)/settings" />
+        <HubHeader settingsHref={CUSTOMER_HREF.settings} />
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
@@ -47,13 +48,13 @@ export function CustomerHub() {
             icon={MessageCircle}
             title="Messages"
             hint="Get in touch"
-            onPress={() => router.navigate("/(customer)/messages")}
+            onPress={() => router.navigate(CUSTOMER_HREF.messages)}
           />
           <ActionTile
             icon={HelpCircle}
             title="Help"
             hint="Browse guides"
-            onPress={() => router.navigate("/(customer)/help")}
+            onPress={() => router.navigate(CUSTOMER_HREF.help)}
           />
         </Animated.View>
 
@@ -70,7 +71,7 @@ export function CustomerHub() {
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Search for help"
-            onPress={() => router.push("/(customer)/(home)/search")}
+            onPress={() => router.push(CUSTOMER_HREF.search)}
             className="mt-4 flex-row items-center gap-3.5 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-md shadow-black/5"
           >
             <IconChip icon={Search} tone="neutral" size={32} />
@@ -88,7 +89,7 @@ export function CustomerHub() {
           title="Frequently Asked Questions"
           hint="Common questions — passwords, billing, access…"
           accessibilityLabel="Frequently asked questions"
-          onPress={() => router.push("/(customer)/(home)/faq")}
+          onPress={() => router.push(CUSTOMER_HREF.faq)}
         />
       </View>
     </HubScroll>
