@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { AlertCircle, Eye, EyeOff, Sparkles } from "@/components/icons";
+import { AlertCircle, Eye, EyeOff, MailCheck, Sparkles } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { hapticSelection, hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
+import { magicLinkRequestNotice } from "@/lib/magic-link-route";
 import { settleDownEnter, settleEnter } from "@/lib/motion-enter";
 import {
   emailLooksValid,
@@ -32,11 +33,38 @@ type AuthFormProps = {
   mode: "login" | "register";
 };
 
+/**
+ * Where the request for a sign-in link has got to.
+ *
+ * Held here rather than in the auth state machine because asking for a link
+ * establishes nothing and refuses nothing: nobody is signed in or out by it, and
+ * the machine has no state that would be true while an email is in the post.
+ *
+ * Three fields rather than a union, because they genuinely vary independently: a
+ * second link is in flight *while* the first one's confirmation still stands.
+ * Collapsing them would take the confirmation off the screen for the length of
+ * the resend and flip the button's label mid-spinner, so the control someone
+ * just pressed would read as a different one exactly while it was busy.
+ *
+ * `sentTo` is the address that was *typed*, never anything the server said back,
+ * because an answer that varied by whether the account existed is exactly what
+ * this flow must not have.
+ */
+type LinkRequest = {
+  /** The address the last confirmed link went to, or null when none has gone. */
+  sentTo: string | null;
+  sending: boolean;
+  /** What went wrong last time, or null. */
+  failure: string | null;
+};
+
+const NO_LINK_REQUEST: LinkRequest = { sentTo: null, sending: false, failure: null };
+
 export function AuthForm({ mode }: AuthFormProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { keyboardInset, contentRef, scrollProps } = useKeyboardAwareScroll();
-  const { state, signIn } = useAuth();
+  const { state, signIn, requestMagicLink } = useAuth();
   const register = mode === "register";
   const submitting = state.status === "submitting";
   const [email, setEmail] = useState("");
@@ -49,6 +77,8 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const score = passwordScore(password);
   const [localNotice, setLocalNotice] = useState<string | null>(null);
+  const [linkRequest, setLinkRequest] = useState<LinkRequest>(NO_LINK_REQUEST);
+  const sendingLink = linkRequest.sending;
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
@@ -62,11 +92,14 @@ export function AuthForm({ mode }: AuthFormProps) {
    * on an untouched registration form and outrank the explanation that form has
    * to give.
    */
-  const notice = register
-    ? localNotice
-    : state.status === "signed-out"
-      ? state.notice
-      : null;
+  const notice =
+    linkRequest.failure !== null
+      ? linkRequest.failure
+      : register
+        ? localNotice
+        : state.status === "signed-out"
+          ? state.notice
+          : null;
 
   // Navigating from the state rather than from the submit handler's return value
   // is what makes the destination the role the *server* assigned. Nothing on this
@@ -80,6 +113,10 @@ export function AuthForm({ mode }: AuthFormProps) {
   async function onSubmit() {
     if (submitting) return;
     setLocalNotice(null);
+    // Only the failure. It outranks the machine's notice, so left standing it
+    // would outlive the attempt it described and speak over this one. A standing
+    // confirmation is not cleared: a link did go to that address, and still has.
+    setLinkRequest((prev) => ({ ...prev, failure: null }));
 
     const nextEmail = emailLooksValid(email.trim()) ? null : "Enter a valid email address";
     // Only the sign-up form judges password shape. Refusing to send a password
@@ -105,18 +142,53 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
 
     if (register) {
-      // The API has no self-registration endpoint — staff accounts are created by
-      // an Admin, and a first-time email gets one by verifying a magic link. Say
-      // so, rather than posting these credentials at a sign-in route that can only
-      // answer "invalid email or password".
+      // The API has no self-registration endpoint — not disabled, absent — so
+      // there is nothing to post these credentials at. Point at the one way an
+      // account does come into existence on mobile, which is on this screen.
       hapticWarning();
       setLocalNotice(
-        "Accounts aren’t created in the app. Ask an admin to invite you, then sign in here.",
+        "Passwords can’t create an account here. Use “Email me a sign-in link” below — verifying your first link is what creates the account.",
       );
       return;
     }
 
     await signIn(email.trim(), password);
+  }
+
+  /**
+   * Ask for a sign-in link, and say where it went.
+   *
+   * Deliberately says the same thing for every address. The API answers a
+   * first-time email exactly as it answers a known one — verifying the link is
+   * what creates the Customer account — and a screen that said "no account with
+   * that email" would hand anyone who can type a way to find out who has one.
+   */
+  async function onRequestLink() {
+    if (sendingLink) return;
+    setLocalNotice(null);
+
+    const trimmed = email.trim();
+    if (!emailLooksValid(trimmed)) {
+      setEmailError("Enter a valid email address");
+      hapticWarning();
+      emailRef.current?.focus();
+      return;
+    }
+
+    setEmailError(null);
+    // The standing confirmation is kept, not cleared: while a second link is on
+    // its way the first one is still the true answer to "where did it go".
+    setLinkRequest((prev) => ({ ...prev, sending: true, failure: null }));
+
+    const message = magicLinkRequestNotice(await requestMagicLink(trimmed));
+    if (message) {
+      hapticWarning();
+      setLinkRequest((prev) => ({ ...prev, sending: false, failure: message }));
+      return;
+    }
+
+    hapticSuccess();
+    setLinkRequest({ sentTo: trimmed, sending: false, failure: null });
   }
 
   function onSuggest() {
@@ -212,6 +284,9 @@ export function AuthForm({ mode }: AuthFormProps) {
               onChangeText={(v) => {
                 setEmail(v);
                 setEmailError(null);
+                // A confirmation names an address. The moment that address stops
+                // being the one in the field, it is describing somewhere else.
+                setLinkRequest(NO_LINK_REQUEST);
               }}
             />
             {emailError ? (
@@ -425,6 +500,62 @@ export function AuthForm({ mode }: AuthFormProps) {
             {/* The label stays put while it spins, so the control never looks like a different one. */}
             <Text>{register ? "Create Account" : "Sign In"}</Text>
           </Button>
+
+          <View className="mt-6 flex-row items-center gap-3">
+            <View className="h-px flex-1 bg-line" />
+            <Text variant="label" className="text-muted">
+              or
+            </Text>
+            <View className="h-px flex-1 bg-line" />
+          </View>
+
+          {linkRequest.sentTo !== null ? (
+            <View
+              className="mt-4 flex-row items-start gap-2.5 rounded-2xl border border-line/70 bg-primary-soft/40 p-3.5"
+              accessibilityLiveRegion="polite"
+            >
+              <View className="mt-0.5">
+                <MailCheck color={colors.primary} size={16} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text variant="label" className="text-ink">
+                  Sign-in link sent
+                </Text>
+                {/* Names the address, and nothing else. The same sentence appears
+                    whether or not that address has an account. */}
+                <Text variant="meta" className="mt-1 text-muted">
+                  Check{" "}
+                  <Text variant="meta" className="font-semibold text-ink">
+                    {linkRequest.sentTo}
+                  </Text>
+                  {" and open the link on this device. It expires shortly — ask for another if it does."}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          <Button
+            variant="outline"
+            className="mt-4 min-h-12 w-full"
+            onPress={() => void onRequestLink()}
+            disabled={sendingLink}
+            accessibilityState={{ disabled: sendingLink, busy: sendingLink }}
+          >
+            {sendingLink ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : null}
+            {/* Reads as a repeat once one has gone, so asking again is an obvious
+                move rather than something that looks like starting over. */}
+            <Text className="text-ink">
+              {linkRequest.sentTo === null
+                ? "Email me a sign-in link"
+                : "Send another link"}
+            </Text>
+          </Button>
+
+          <Text variant="meta" className="mt-2.5 text-center text-muted">
+            No password needed. First time here? The link creates your account.
+          </Text>
         </Animated.View>
 
         <Animated.View entering={settleEnter(!!reduceMotion, 120)}>

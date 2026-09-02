@@ -42,6 +42,7 @@ export { default as Inbox } from "lucide-react-native/icons/inbox";
 export { default as Info } from "lucide-react-native/icons/info";
 export { default as LogOut } from "lucide-react-native/icons/log-out";
 export { default as Mail } from "lucide-react-native/icons/mail";
+export { default as MailCheck } from "lucide-react-native/icons/mail-check";
 export { default as Megaphone } from "lucide-react-native/icons/megaphone";
 export { default as MessageCircle } from "lucide-react-native/icons/message-circle";
 export { default as MessageSquare } from "lucide-react-native/icons/message-square";

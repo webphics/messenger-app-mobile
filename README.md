@@ -16,6 +16,19 @@ keychain, replaying it by hand on every request the way the web client does. Rol
 server, not from the client. Conversations are still mock data. Scope: `docs/scope.md`. Credential
 pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`.
 
+There is also no password: **a magic link is how a Customer account comes into existence on mobile.**
+The API has no registration endpoint, and verifying a first link is what creates the account — staff
+accounts are made by an Admin on web. `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` says where the link in the
+email points; leave it unset and the app uses its own scheme from `app.json`. Production wants an
+HTTPS origin with app-link association files served from it, which cannot be arranged against
+localhost — the in-app route that reads the token is the same either way, so that switch is
+configuration and manifest work.
+
+Testing the tap end to end needs a dev build: a custom scheme does not open from Expo&nbsp;Go, and
+several mail clients decline to linkify a non-HTTPS scheme. Requesting a link works in Expo Go; with
+no Brevo key configured the API prints the link to its own console, which is the quickest way to open
+one by hand.
+
 ## Builds
 
 `Actions → Build → Run workflow`, pick `android`, `ios`, or `both`. Manual only — nothing builds on push.

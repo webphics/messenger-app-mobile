@@ -6,11 +6,14 @@ import {
   type ApiRequestOptions,
 } from "@/lib/api-client";
 import {
+  interpretMagicLinkRequest,
+  interpretMagicLinkVerify,
   interpretSession,
   interpretSignIn,
   saysSessionExpired,
   type AuthOutcome,
   type HttpOutcome,
+  type MagicLinkRequestOutcome,
 } from "@/lib/auth-response";
 import {
   clearRetiredCredential,
@@ -19,6 +22,11 @@ import {
   writeSessionCookie,
 } from "@/lib/keychain";
 import { purgeMockSession } from "@/lib/legacy-session";
+import {
+  MAGIC_LINK_ORIGIN,
+  MAGIC_LINK_TOKEN_PARAM,
+  MAGIC_LINK_UNCONFIGURED_NOTICE,
+} from "@/lib/magic-link-config";
 import { setSessionUser } from "@/lib/session";
 
 /**
@@ -32,6 +40,8 @@ import { setSessionUser } from "@/lib/session";
 const SIGN_IN_PATH = "/auth/login";
 const SESSION_PATH = "/auth/session";
 const SIGN_OUT_PATH = "/auth/logout";
+const MAGIC_LINK_REQUEST_PATH = "/auth/magic-link";
+const MAGIC_LINK_VERIFY_PATH = "/auth/magic-link/verify";
 
 /**
  * Bumped every time the credential is deliberately discarded.
@@ -126,6 +136,58 @@ export async function signInWithPassword(
       method: "POST",
       body: { email: email.trim(), password },
     }),
+  );
+
+  await applyOutcome(outcome, startedAt);
+  return outcome;
+}
+
+/**
+ * Ask the API to email a sign-in link.
+ *
+ * The origin travels with the request rather than being configured on the
+ * server, because it is this build that knows where its own links have to point:
+ * the API appends `/auth/magic-link?token=…` to whatever it is given, and the
+ * same API serves the web client, whose links go somewhere else entirely.
+ *
+ * Nothing is stored and no credential changes hands, so there is no epoch to
+ * capture here and nothing for `applyOutcome` to apply. That is also why a
+ * request in flight cannot be invalidated by a sign-out: there is nothing in it
+ * to invalidate.
+ */
+export async function requestMagicLink(
+  email: string,
+): Promise<MagicLinkRequestOutcome> {
+  if (MAGIC_LINK_ORIGIN === null) {
+    return { kind: "refused", message: MAGIC_LINK_UNCONFIGURED_NOTICE };
+  }
+
+  return interpretMagicLinkRequest(
+    await apiRequest(MAGIC_LINK_REQUEST_PATH, {
+      method: "POST",
+      body: { email: email.trim(), url: MAGIC_LINK_ORIGIN },
+    }),
+  );
+}
+
+/**
+ * Spend a link's token for a session.
+ *
+ * The same shape as `signInWithPassword` on purpose, down to the epoch: this
+ * establishes a credential, so it has to store one, and a sign-out that overtook
+ * it must not leave a live cookie in the keychain. What arrives is an
+ * `AuthOutcome` like any other, which is what keeps the two ways of signing in
+ * on one seam instead of two.
+ *
+ * A GET, so the CSRF pre-flight is waived — the token in the query *is* the
+ * credential being presented, and the guard has nothing to add to a request that
+ * carries no session.
+ */
+export async function verifyMagicLink(token: string): Promise<AuthOutcome> {
+  const startedAt = credentialEpoch;
+  const query = `${MAGIC_LINK_TOKEN_PARAM}=${encodeURIComponent(token)}`;
+  const outcome = interpretMagicLinkVerify(
+    await apiRequest(`${MAGIC_LINK_VERIFY_PATH}?${query}`),
   );
 
   await applyOutcome(outcome, startedAt);

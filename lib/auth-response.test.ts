@@ -1,5 +1,7 @@
 import { CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import {
+  interpretMagicLinkRequest,
+  interpretMagicLinkVerify,
   interpretSession,
   interpretSignIn,
   parseSessionUser,
@@ -298,4 +300,166 @@ describe("saysSessionExpired", () => {
       expect(saysSessionExpired(answer(status))).toBe(false);
     },
   );
+});
+
+describe("interpretMagicLinkVerify", () => {
+  test("a spent token that came back with a credential is a sign-in", () => {
+    expect(interpretMagicLinkVerify(ok(envelope(apiUser({ role: "customer" }))))).toEqual({
+      kind: "signed-in",
+      cookie: ISSUED,
+      user: {
+        id: "ab05cfc4-5ee5-40fb-93af-564a773257e5",
+        name: "Admin",
+        email: "admin@talo.com",
+        role: "customer",
+      },
+    });
+  });
+
+  test("a first-time email arrives as a Customer, like any other new account", () => {
+    const outcome = interpretMagicLinkVerify(
+      ok(envelope(apiUser({ role: "customer", name: null, hasPassword: false }))),
+    );
+    expect(outcome).toMatchObject({ kind: "signed-in", user: { role: "customer" } });
+  });
+
+  test("an expired or already-used link is refused in the API's own words", () => {
+    // The API cannot tell the two apart — both are a token that is no longer
+    // good — and answers both with this one sentence.
+    const message =
+      "This magic link is invalid, expired, or has already been used. Please request a new one.";
+    expect(
+      interpretMagicLinkVerify({
+        reached: true,
+        status: 401,
+        body: { code: "invalid_magic_link", message },
+        sessionCookie: null,
+      }),
+    ).toEqual({ kind: "unauthorised", message });
+  });
+
+  test("a tampered token is refused rather than parsed", () => {
+    expect(
+      interpretMagicLinkVerify({
+        reached: true,
+        status: 400,
+        body: { code: "bad_request", message: "Authentication request is invalid." },
+        sessionCookie: null,
+      }),
+    ).toEqual({
+      kind: "server-error",
+      message: "Authentication request is invalid.",
+    });
+  });
+
+  test("a refusal the server did not explain does not send anyone to a password", () => {
+    const outcome = interpretMagicLinkVerify({
+      reached: true,
+      status: 401,
+      body: null,
+      sessionCookie: null,
+    });
+    expect(outcome).toEqual({
+      kind: "unauthorised",
+      message: "This sign-in link could not be verified. Request a new one.",
+    });
+  });
+
+  test("two-factor fires on this path too, and is refused the same way", () => {
+    const challenge = envelope({ twoFactorRedirect: true }, "Two-factor authentication required");
+    expect(interpretMagicLinkVerify(ok(challenge, null))).toEqual({ kind: "two-factor" });
+  });
+
+  test("a verified link with no cookie establishes nothing", () => {
+    expect(interpretMagicLinkVerify(ok(envelope(apiUser()), null))).toEqual({
+      kind: "malformed",
+    });
+  });
+
+  test("a link tapped with no network is a transport failure, not a bad link", () => {
+    expect(interpretMagicLinkVerify({ reached: false })).toEqual({
+      kind: "transport-failure",
+    });
+  });
+});
+
+describe("interpretMagicLinkRequest", () => {
+  function sent(path = "/auth/magic-link") {
+    return {
+      statusCode: 200,
+      message: "Magic link sent successfully",
+      data: true,
+      timestamp: "2026-08-31T17:49:52.972Z",
+      path,
+    };
+  }
+
+  test("the API confirming the send is a send", () => {
+    expect(interpretMagicLinkRequest(ok(sent(), null))).toEqual({ kind: "sent" });
+  });
+
+  test("a send carries nothing an address could differ by", () => {
+    // The API answers a first-time email exactly as it answers a known one — the
+    // Customer is created on verification — and this outcome has no room to
+    // reintroduce the difference. A field here saying which it was is how a
+    // sign-in form quietly becomes a way of asking who has an account.
+    expect(Object.keys(interpretMagicLinkRequest(ok(sent(), null)))).toEqual(["kind"]);
+  });
+
+  test("a 2xx that does not confirm the send is not a send", () => {
+    // Confirming an address that was never written to is the one failure this
+    // screen cannot recover from — nobody waits for a second email.
+    expect(interpretMagicLinkRequest(ok({ ...sent(), data: false }, null))).toEqual({
+      kind: "refused",
+      message: "Could not send a sign-in link right now. Try again in a moment.",
+    });
+    expect(interpretMagicLinkRequest(ok(null, null))).toMatchObject({ kind: "refused" });
+  });
+
+  test("a rate limit is repeated in the server's words", () => {
+    const message = "Too many login attempts. Please try again later.";
+    expect(
+      interpretMagicLinkRequest({
+        reached: true,
+        status: 429,
+        body: { code: "rate_limit_exceeded", message },
+        sessionCookie: null,
+      }),
+    ).toEqual({ kind: "refused", message });
+  });
+
+  test("a CSRF refusal says what a person can act on, not what the guard said", () => {
+    expect(
+      interpretMagicLinkRequest({
+        reached: true,
+        status: 403,
+        body: { code: CSRF_REFUSED_CODE, message: "invalid csrf token" },
+        sessionCookie: null,
+      }),
+    ).toEqual({
+      kind: "refused",
+      message:
+        "Could not start a secure connection to the server. Check your connection and try again.",
+    });
+  });
+
+  test("a refusal with nothing to say still says something", () => {
+    expect(
+      interpretMagicLinkRequest({
+        reached: true,
+        status: 500,
+        body: null,
+        sessionCookie: null,
+      }),
+    ).toEqual({
+      kind: "refused",
+      message: "Could not send a sign-in link right now. Try again in a moment.",
+    });
+  });
+
+  test("a request that never got an answer is a transport failure", () => {
+    expect(interpretMagicLinkRequest({ reached: false })).toEqual({
+      kind: "transport-failure",
+    });
+  });
 });
