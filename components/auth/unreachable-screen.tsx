@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,10 +53,9 @@ export function UnreachableScreen() {
         <Button
           variant="ghost"
           className="mt-2 min-h-11 w-full"
+          // `components/auth/session-end` does the navigating, here as in Settings.
           onPress={() => {
-            void signOut().then(() => {
-              router.replace("/(auth)/sign-in");
-            });
+            void signOut();
           }}
         >
           <Text className="text-muted">Sign out</Text>

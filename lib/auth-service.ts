@@ -3,11 +3,14 @@ import {
   clearCsrfPair,
   getSessionCookie,
   setSessionCookie,
+  type ApiRequestOptions,
 } from "@/lib/api-client";
 import {
   interpretSession,
   interpretSignIn,
+  saysSessionExpired,
   type AuthOutcome,
+  type HttpOutcome,
 } from "@/lib/auth-response";
 import {
   clearRetiredCredential,
@@ -147,4 +150,59 @@ export async function signOut(): Promise<void> {
   if (ending) {
     await apiRequest(SIGN_OUT_PATH, { method: "POST", cookie: ending });
   }
+}
+
+/**
+ * Whoever needs to know that the session ended without anyone asking for it.
+ *
+ * A `Set` rather than a single slot because nothing here owns the only listener:
+ * `AuthProvider` is the one today, and a provider remounting in development
+ * subscribes before the old one unsubscribes.
+ */
+const expiryListeners = new Set<() => void>();
+
+/** Listen for the Session cookie being rejected mid-use. Returns the way to stop. */
+export function onSessionExpired(listener: () => void): () => void {
+  expiryListeners.add(listener);
+  return () => {
+    expiryListeners.delete(listener);
+  };
+}
+
+/**
+ * Make a request as the signed-in person, and end the session if the server says
+ * the credential is dead.
+ *
+ * This exists so that no call site has to remember the rule, in the same spirit as
+ * the Session cookie being attached in one place rather than at every call. A
+ * screen asking for its data cannot forget to handle a 401, because handling one
+ * is not its job: it gets the answer it asked for, and the session ends around it.
+ *
+ * Local only, deliberately. A cookie the server just refused cannot be used to
+ * tell the server about itself, so unlike `signOut` there is nothing to send —
+ * `POST /auth/logout` would earn a second 401.
+ *
+ * Every call the later phases make to a session-protected endpoint comes through
+ * here rather than through `apiRequest`; the auth endpoints above do not, because
+ * each of them already interprets its own answer, and a 401 there is a refused
+ * password or a cold start that found a stale cookie rather than a session ending
+ * under someone.
+ */
+export async function authenticatedRequest(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<HttpOutcome> {
+  const startedAt = credentialEpoch;
+  const outcome = await apiRequest(path, options);
+
+  // The epoch check makes this report once. Several requests in flight when a
+  // session dies all come back unauthorised, and all but the first are stale by
+  // the time they land — announcing each would push a second navigation at a
+  // sign-in screen someone may already be typing on.
+  if (saysSessionExpired(outcome) && startedAt === credentialEpoch) {
+    await forgetCredential();
+    for (const listener of expiryListeners) listener();
+  }
+
+  return outcome;
 }

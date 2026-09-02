@@ -29,6 +29,7 @@ import { Appearance, AppState, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
+import { SessionEndRedirect } from "@/components/auth/session-end";
 import { AuthProvider } from "@/lib/auth-context";
 import { colors } from "@/lib/tokens";
 
@@ -93,6 +94,7 @@ export default function RootLayout() {
         <NavigationBar hidden={false} style="dark" />
       ) : null}
       <AuthProvider>
+        <SessionEndRedirect />
         <Stack
           screenOptions={{
             headerShown: false,

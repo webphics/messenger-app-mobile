@@ -45,6 +45,11 @@ Signed in = a Session cookie in `expo-secure-store` that `GET /auth/session` acc
 **server-owned** — it arrives on the session user and the app cannot set it. Sign-out clears the
 cookie and every cached identity, role included.
 
+A session ends two ways, and both land on sign-in. Signing out discards the cookie, tells the
+server, and completes even when that call fails. A session expiring — an authenticated request
+answered `401` — discards the cookie without telling a server that has already refused it. A `403`
+is not an expiry, and neither is a request that got no answer at all.
+
 Hydration at cold start has three outcomes: signed in, signed out, and **Unreachable** — a cookie
 exists but the API did not answer, which keeps the cookie and offers a retry rather than sending the
 person to sign-in. A 401 is not Unreachable: it clears the cookie.

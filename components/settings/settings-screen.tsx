@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { LogOut } from "@/components/icons";
 import { ScrollView, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -79,9 +78,10 @@ export function SettingsScreen() {
         <Button
           variant="outline"
           className="min-h-12 border-danger/30 active:bg-danger/10"
+          // No navigation here: `components/auth/session-end` takes every ending
+          // of a session to sign-in, so this path and an expiry land identically.
           onPress={() => {
             void signOut();
-            router.replace("/(auth)/sign-in");
           }}
         >
           <LogOut color={colors.danger} size={18} />
