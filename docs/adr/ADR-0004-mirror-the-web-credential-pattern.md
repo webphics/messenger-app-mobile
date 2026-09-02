@@ -19,8 +19,11 @@ outside the Zod envelope, the exception filter, and the CSRF layer.
 
 ## Consequences
 
-- **Cookies are handled by hand, not by a cookie jar.** Every request sets `credentials: "omit"` and
-  attaches `Cookie` explicitly. This is not incidental: React Native's `fetch` is backed by native
+- **Cookies are handled by hand, not by a cookie jar.** Every request sets `credentials: "omit"`, and
+  every request that carries a credential attaches `Cookie` explicitly. (The CSRF pre-flight,
+  `GET /csrf`, is the one request with no credential to attach — it is what fetches one. It still
+  omits credentials, so the native store cannot slip one in.) This is not incidental: React Native's
+  `fetch` is backed by native
   networking with its own cookie store, and on iOS a manually-set `Cookie` header can be silently
   overwritten by `NSHTTPCookieStorage`. Omitting credentials takes the native store out of the path
   so the header we set is the header that is sent. `@better-auth/expo` does the same thing for the

@@ -43,7 +43,3 @@ export function getSessionUser(): SessionUser | null {
 export function setSessionUser(user: SessionUser | null): void {
   current = user;
 }
-
-export function isLoggedIn(): boolean {
-  return current !== null;
-}
