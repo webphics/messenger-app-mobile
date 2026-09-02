@@ -44,6 +44,13 @@ _Avoid_: Session token, JWT, access token, bearer token
 The double-submit value fetched from the API and sent as `X-CSRF-Token` on every mutation, alongside the `csrf-token` cookie it is paired with. Not bound to a session — one is fetched, cached, and reused until the API rejects it.
 _Avoid_: XSRF token, nonce, anti-forgery token
 
+**Seed account**:
+An account the API's seeder created, offered as a chip on the sign-in screen so a developer can reach
+each Hub without three real accounts. Read from `EXPO_PUBLIC_DEV_SEED_ACCOUNTS` behind `__DEV__`, so it
+leaves a release bundle entirely. Picking one fills the form and nothing more — signing in is the
+ordinary password path, and the role that follows is whatever the API says the account holds.
+_Avoid_: Test account, demo account, role switcher (there is no control that changes your own role)
+
 **Magic link**:
 A single-use, short-lived sign-in link emailed on request, spent by opening it on the device. One of the
 two ways a Customer account comes into existence on this client — the API has no registration endpoint,
