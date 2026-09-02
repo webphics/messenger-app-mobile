@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { ActivityIndicator, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -6,6 +6,7 @@ import { CloudOff } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { confirmSignOut } from "@/lib/confirm-sign-out";
 import { settleDownEnter } from "@/lib/motion-enter";
 import { colors } from "@/lib/tokens";
 
@@ -16,11 +17,26 @@ import { colors } from "@/lib/tokens";
  * sending someone to retype a password because their train went into a tunnel
  * would be both wrong and annoying. Retry is the primary way out; signing out is
  * offered too, so this is never a dead end.
+ *
+ * Stays up while a retry is in flight — see `retrying` — rather than handing the
+ * screen back to the launch animation, which would replay two seconds of video
+ * in place of an answer about the press that just happened.
  */
-export function UnreachableScreen() {
+export function UnreachableScreen({
+  retrying,
+  onRetry,
+}: {
+  retrying: boolean;
+  /** Owned by `app/index`, which needs to know a retry started to stop the launch animation replaying. */
+  onRetry: () => void;
+}) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
-  const { retry, signOut } = useAuth();
+  const { signOut } = useAuth();
+
+  async function onSignOut() {
+    if (await confirmSignOut()) await signOut();
+  }
 
   return (
     <View
@@ -46,7 +62,17 @@ export function UnreachableScreen() {
           the server. Check your connection and try again.
         </Text>
 
-        <Button className="mt-7 min-h-12 w-full" onPress={retry}>
+        <Button
+          className="mt-7 min-h-12 w-full"
+          onPress={onRetry}
+          disabled={retrying}
+          accessibilityState={{ disabled: retrying, busy: retrying }}
+        >
+          {retrying ? (
+            <ActivityIndicator size="small" color={colors.primaryForeground} />
+          ) : null}
+          {/* The label stays put while it spins, so the control never looks like
+              a different one. */}
           <Text>Try again</Text>
         </Button>
 
@@ -55,8 +81,12 @@ export function UnreachableScreen() {
           className="mt-2 min-h-11 w-full"
           // `components/auth/session-end` does the navigating, here as in Settings.
           onPress={() => {
-            void signOut();
+            void onSignOut();
           }}
+          // Nothing may end the session out from under a hydration that is still
+          // out: it would race `applyOutcome` for the credential.
+          disabled={retrying}
+          accessibilityState={{ disabled: retrying }}
         >
           <Text className="text-muted">Sign out</Text>
         </Button>
