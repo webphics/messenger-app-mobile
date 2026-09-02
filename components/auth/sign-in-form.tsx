@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
-import { GOOGLE_OAUTH, GOOGLE_UNCONFIGURED_NOTICE } from "@/lib/google-config";
+import { GOOGLE_CONFIG } from "@/lib/google-config";
 import { hapticSelection, hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
@@ -82,11 +82,13 @@ export function SignInForm() {
    */
   const [pending, setPending] = useState<"password" | "google" | null>(null);
   /**
-   * A build with no OAuth client cannot sign anyone in with Google, and saying
-   * so beats an enabled button that fails at the account sheet. Read once at
-   * module load, so this never changes while the screen is up.
+   * The sentence explaining why Google is not on offer, or null when it is. A
+   * build with no OAuth client cannot sign anyone in with Google, and naming the
+   * variable beats an enabled button that fails at the account sheet. Read once
+   * at module load, so this never changes while the screen is up.
    */
-  const googleUnavailable = GOOGLE_OAUTH === null;
+  const googleUnavailable =
+    GOOGLE_CONFIG.kind === "unconfigured" ? GOOGLE_CONFIG.notice : null;
   const passwordBusy = pending === "password";
   const googleBusy = pending === "google";
   /**
@@ -506,14 +508,14 @@ export function SignInForm() {
             // Disabled while any attempt is out, not only this one: the machine
             // refuses a second submit anyway, and a button that accepts a press
             // it will drop is worse than one that says it is busy.
-            disabled={googleUnavailable || busy}
+            disabled={googleUnavailable !== null || busy}
             accessibilityLabel={
               googleUnavailable
                 ? "Continue with Google — not available in this build"
                 : "Continue with Google"
             }
             accessibilityState={{
-              disabled: googleUnavailable || busy,
+              disabled: googleUnavailable !== null || busy,
               busy: googleBusy,
             }}
           >
@@ -527,7 +529,7 @@ export function SignInForm() {
 
           {googleUnavailable ? (
             <Text variant="meta" className="mt-2 text-center text-muted">
-              {GOOGLE_UNCONFIGURED_NOTICE}
+              {googleUnavailable}
             </Text>
           ) : null}
         </Animated.View>

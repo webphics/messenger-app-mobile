@@ -63,15 +63,22 @@ EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=…apps.googleusercontent.com
 EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=…apps.googleusercontent.com
 ```
 
-Leave both unset and the app still starts — the Google button is disabled and says why. Set either to
-something that is not a client identifier and the app refuses to start, because there is no honest
-reading of a malformed one. iOS needs both; Android needs only the web one.
+**The web one is not a new value to invent.** It is the same OAuth client the web client sets as
+`NEXT_PUBLIC_GOOGLE_CLIENT_ID` and the API verifies against as `GOOGLE_CLIENT_ID` — copy it from
+either. If the three ever disagree, mobile is the one that is wrong.
 
-**The web client identifier in a mobile app is deliberate.** The API verifies a Google ID token's
-audience against the web client, and Google's native libraries mint the token with the web client as
+**And a web client identifier in a mobile app is deliberate.** The API verifies a Google ID token's
+audience against that one client, and Google's native libraries mint the token with the web client as
 the audience when given it — which is what lets mobile Google sign-in ship with no API change. Do not
 remove it. Full reasoning:
 `docs/adr/ADR-0005-the-google-audience-arrangement.md`.
+
+Leave either unset and the app still starts — the Google button is disabled and names the variable
+that is missing. That is the same call the web client makes: its client id is `.optional()` where the
+API URL is required, and it renders no Google section without one. Set either to something that is
+*not* a client identifier and the app refuses to start, because there is no honest reading of a
+malformed one. Android runs on the web client alone; iOS needs both, and until an iOS client exists
+the button is disabled there and says so.
 
 ### Android: the signing certificate fingerprint
 

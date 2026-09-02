@@ -1,6 +1,6 @@
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 
-import { GOOGLE_OAUTH } from "@/lib/google-config";
+import { GOOGLE_CONFIG } from "@/lib/google-config";
 import {
   interpretGoogleFailure,
   interpretGoogleResponse,
@@ -27,17 +27,19 @@ import {
 let configured = false;
 
 function configure(): boolean {
-  if (!GOOGLE_OAUTH) return false;
+  if (GOOGLE_CONFIG.kind !== "configured") return false;
   if (configured) return true;
 
+  const { webClientId, iosClientId } = GOOGLE_CONFIG.oauth;
   GoogleSignin.configure({
-    // Both, and the web one is not a mistake: it is what makes the ID token's
-    // audience the value the API already verifies against, so mobile Google
-    // sign-in needs no server change. Deleting it breaks verification in a way
-    // that looks like a credential problem. See `lib/google-config` and
+    // Both, and the web one is not a mistake: it is the same identifier the web
+    // client signs in with and the API verifies against, and handing it here is
+    // what makes the ID token's audience that value — so mobile Google sign-in
+    // needs no server change. Deleting it breaks verification in a way that
+    // looks like a credential problem. See `lib/google-config` and
     // `docs/adr/ADR-0005-the-google-audience-arrangement.md`.
-    webClientId: GOOGLE_OAUTH.webClientId,
-    ...(GOOGLE_OAUTH.iosClientId ? { iosClientId: GOOGLE_OAUTH.iosClientId } : {}),
+    webClientId,
+    ...(iosClientId ? { iosClientId } : {}),
   });
   configured = true;
   return true;
