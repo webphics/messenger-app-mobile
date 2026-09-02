@@ -16,6 +16,15 @@ and when given it they mint the ID token with the **web client as the audience**
 the value the API already verifies against. So the device produces a token that validates against
 the server's existing configuration, unchanged.
 
+This is not a mobile-only arrangement discovered here; it is mobile joining one that already exists.
+The web client signs in with the same OAuth client (`NEXT_PUBLIC_GOOGLE_CLIENT_ID`), obtains an ID
+token from Google Identity Services, and posts it to the same endpoint with the same body —
+`POST /auth/google`, `{ idToken }` (`login.actions.ts`). Mobile sends the same token, minted for the
+same audience, to the same route. **One OAuth client, one audience, three places that name it**
+(`GOOGLE_CLIENT_ID` on the API, `NEXT_PUBLIC_GOOGLE_CLIENT_ID` on web,
+`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` on mobile). If the three ever disagree, mobile is the one that is
+wrong.
+
 The alternative was to widen the API's accepted audience to a list — the web client plus an iOS
 client plus an Android client — and it was rejected. It buys nothing the arrangement above does not
 already give, and it costs a coordinated server release for a mobile feature, three secrets to keep
@@ -36,6 +45,12 @@ in step instead of one, and a verification step that is permanently harder to re
   against the Android OAuth client. A build signed with different credentials — a different machine,
   a rotated EAS keystore — produces a sign-in that fails with nothing on screen to explain it. See
   the README.
+- **Missing configuration is not a crash, on the web client's precedent.** The web client marks its
+  client id `.optional()` where `NEXT_PUBLIC_API_URL` is required, and renders no Google section
+  without one — Google is one way in among several, not the app. Mobile does the same: absent reports
+  `unconfigured` and the button is disabled naming the variable, while a *malformed* value throws at
+  import the way `lib/api-config` does. Throwing on absent would stop a checkout with no Google
+  credentials from starting at all, including in Expo Go, where everything but auth still runs.
 - **This is the arrangement's only proof.** It can only be confirmed against a real Google-issued
   token on a device; no test in either repo can check it. If it ever stops holding, the answer is to
   reopen the question, not to widen the audience on the server.
