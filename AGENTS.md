@@ -1,6 +1,6 @@
 Concise rules for building accessible, fast, delightful UIs. Use MUST/SHOULD/NEVER to guide decisions.
 
-**Project phase:** Phase **3a** (real auth — Bearer sessions, password + magic link) is current per `docs/scope.md`. Phase 5a (client media UI — local attachments) is done. Domain glossary: `CONTEXT.md`. Session transport: `docs/adr/ADR-0004-bearer-sessions-on-mobile.md`.
+**Project phase:** Phase **3a** (real auth — cookie sessions mirroring the web client, password + magic link) is current per `docs/scope.md`. Phase 5a (client media UI — local attachments) is done. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`.
 
 ## Interactions
 

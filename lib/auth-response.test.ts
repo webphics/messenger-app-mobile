@@ -32,8 +32,11 @@ function envelope(data: unknown, message = "Login successful") {
   };
 }
 
-function ok(body: unknown, sessionToken: string | null = "issued-token"): HttpOutcome {
-  return { reached: true, status: 200, body, sessionToken };
+const ISSUED = "better-auth.session_token=issued";
+const HELD = "better-auth.session_token=held";
+
+function ok(body: unknown, sessionCookie: string | null = ISSUED): HttpOutcome {
+  return { reached: true, status: 200, body, sessionCookie };
 }
 
 describe("parseSessionUser", () => {
@@ -79,7 +82,7 @@ describe("interpretSignIn", () => {
   test("a credential and a readable user is a sign-in", () => {
     expect(interpretSignIn(ok(envelope(apiUser())))).toEqual({
       kind: "signed-in",
-      token: "issued-token",
+      cookie: ISSUED,
       user: {
         id: "ab05cfc4-5ee5-40fb-93af-564a773257e5",
         name: "Admin",
@@ -98,7 +101,7 @@ describe("interpretSignIn", () => {
       { twoFactorRedirect: true, twoFactorMethods: ["totp"] },
       "Two-factor authentication required",
     );
-    // The API returns the challenge as a 200 and deliberately issues no token.
+    // The API returns the challenge as a 200 and deliberately sets no session cookie.
     expect(interpretSignIn(ok(challenge, null))).toEqual({ kind: "two-factor" });
   });
 
@@ -111,7 +114,7 @@ describe("interpretSignIn", () => {
         code: "invalid_credentials",
         message: "Invalid email or password.",
       },
-      sessionToken: null,
+      sessionCookie: null,
     };
     expect(interpretSignIn(outcome)).toEqual({
       kind: "unauthorised",
@@ -124,7 +127,7 @@ describe("interpretSignIn", () => {
       reached: true,
       status: 403,
       body: { code: "email_not_verified", message: "Email address must be verified." },
-      sessionToken: null,
+      sessionCookie: null,
     };
     expect(interpretSignIn(outcome)).toEqual({
       kind: "unauthorised",
@@ -144,7 +147,7 @@ describe("interpretSignIn", () => {
         reached: true,
         status,
         body: { message },
-        sessionToken: null,
+        sessionCookie: null,
       };
       expect(interpretSignIn(outcome)).toEqual({ kind: "server-error", message });
     },
@@ -159,7 +162,7 @@ describe("interpretSignIn", () => {
         code: "csrf_invalid",
         message: "Invalid CSRF token. Perhaps your browser blocked 3rd-party cookies.",
       },
-      sessionToken: null,
+      sessionCookie: null,
     };
     expect(interpretSignIn(outcome)).toEqual({
       kind: "server-error",
@@ -170,20 +173,20 @@ describe("interpretSignIn", () => {
 
   test("a refusal with no readable message still says something useful", () => {
     expect(
-      interpretSignIn({ reached: true, status: 401, body: null, sessionToken: null }),
+      interpretSignIn({ reached: true, status: 401, body: null, sessionCookie: null }),
     ).toEqual({
       kind: "unauthorised",
       message: "Could not sign in. Check your email and password.",
     });
     expect(
-      interpretSignIn({ reached: true, status: 503, body: null, sessionToken: null }),
+      interpretSignIn({ reached: true, status: 503, body: null, sessionCookie: null }),
     ).toEqual({
       kind: "server-error",
       message: "The server could not handle that right now. Try again.",
     });
   });
 
-  test("a success with no Session token is unusable, not a sign-in", () => {
+  test("a success with no Session cookie is unusable, not a sign-in", () => {
     expect(interpretSignIn(ok(envelope(apiUser()), null))).toEqual({ kind: "malformed" });
     expect(interpretSignIn(ok(envelope(apiUser()), "   "))).toEqual({ kind: "malformed" });
   });
@@ -202,16 +205,16 @@ describe("interpretSignIn", () => {
 });
 
 describe("interpretSession", () => {
-  test("carries the token being verified rather than expecting a new one", () => {
+  test("carries the cookie being verified rather than expecting a new one", () => {
     const outcome: HttpOutcome = {
       reached: true,
       status: 200,
       body: envelope(apiUser({ role: "agent" }), "Session retrieved successfully"),
-      sessionToken: null,
+      sessionCookie: null,
     };
-    expect(interpretSession(outcome, "held-token")).toEqual({
+    expect(interpretSession(outcome, HELD)).toEqual({
       kind: "signed-in",
-      token: "held-token",
+      cookie: HELD,
       user: {
         id: "ab05cfc4-5ee5-40fb-93af-564a773257e5",
         name: "Admin",
@@ -221,35 +224,35 @@ describe("interpretSession", () => {
     });
   });
 
-  test("a dead token is unauthorised", () => {
+  test("a dead cookie is unauthorised", () => {
     const outcome: HttpOutcome = {
       reached: true,
       status: 401,
       body: { statusCode: 401, code: "unauthorized", message: "Unauthorized" },
-      sessionToken: null,
+      sessionCookie: null,
     };
-    expect(interpretSession(outcome, "held-token")).toEqual({
+    expect(interpretSession(outcome, HELD)).toEqual({
       kind: "unauthorised",
       message: "Unauthorized",
     });
   });
 
-  test("an unanswered request is a transport failure, which is not the same as a dead token", () => {
-    expect(interpretSession({ reached: false }, "held-token")).toEqual({
+  test("an unanswered request is a transport failure, which is not the same as a dead cookie", () => {
+    expect(interpretSession({ reached: false }, HELD)).toEqual({
       kind: "transport-failure",
     });
   });
 
   test.each([500, 502, 503, 504, 429])(
-    "a %s is a server error, so the token survives a bad deploy",
+    "a %s is a server error, so the cookie survives a bad deploy",
     (status) => {
       const outcome: HttpOutcome = {
         reached: true,
         status,
         body: { message: "Service unavailable" },
-        sessionToken: null,
+        sessionCookie: null,
       };
-      expect(interpretSession(outcome, "held-token")).toEqual({
+      expect(interpretSession(outcome, HELD)).toEqual({
         kind: "server-error",
         message: "Service unavailable",
       });
@@ -262,7 +265,7 @@ describe("interpretSession", () => {
     ["a truncated user", envelope({ id: "abc" })],
     ["a legacy role value", envelope(apiUser({ role: "contact" }))],
   ])("a malformed success (%s) is reported as malformed", (_label, body) => {
-    const outcome: HttpOutcome = { reached: true, status: 200, body, sessionToken: null };
-    expect(interpretSession(outcome, "held-token")).toEqual({ kind: "malformed" });
+    const outcome: HttpOutcome = { reached: true, status: 200, body, sessionCookie: null };
+    expect(interpretSession(outcome, HELD)).toEqual({ kind: "malformed" });
   });
 });
