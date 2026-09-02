@@ -69,6 +69,17 @@ const DEFAULT_REFUSAL = "Could not sign in. Check your email and password.";
 export const LINK_REFUSED_NOTICE =
   "This sign-in link could not be verified. Request a new one.";
 
+/**
+ * What to say when the server refused a Google identity without saying why.
+ *
+ * Worded so it does not send anyone back to a control that cannot help. There is
+ * no password on this path to check and no link to request again, so the useful
+ * next move is a different account or a different method — retrying the same
+ * Google account against the same server will be refused again.
+ */
+export const GOOGLE_REFUSED_NOTICE =
+  "That Google account was not accepted. Try another account, or sign in with your email.";
+
 const DEFAULT_SERVER_ERROR = "The server could not handle that right now. Try again.";
 
 /** What to say when the server turned a link request away without saying why. */
@@ -215,6 +226,27 @@ export function interpretSignIn(outcome: HttpOutcome): AuthOutcome {
  */
 export function interpretMagicLinkVerify(outcome: HttpOutcome): AuthOutcome {
   return interpretIssuedSession(outcome, LINK_REFUSED_NOTICE);
+}
+
+/**
+ * Read a `POST /auth/google` response.
+ *
+ * The API answers this route with the same shape as `POST /auth/login` — the
+ * user in an envelope, the Session cookie in a header, the two-factor challenge
+ * as a 200 — because on the server both go through Better Auth and come back
+ * through `readAuthResponseHeaders`. So it is the same interpreter, and Google
+ * reaches the auth state machine through the events that were already there.
+ *
+ * Two-factor is not a special case here and must not become one: the API's
+ * two-factor hook fires on Google sign-in exactly as it does on a password, so
+ * an account with it enabled is refused with the same sentence rather than being
+ * quietly waved through a door the password path keeps shut.
+ *
+ * Only the backstop sentence differs, because a refusal here is not about a
+ * password anyone typed — nobody typed anything.
+ */
+export function interpretGoogleSignIn(outcome: HttpOutcome): AuthOutcome {
+  return interpretIssuedSession(outcome, GOOGLE_REFUSED_NOTICE);
 }
 
 /**

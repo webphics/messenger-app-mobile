@@ -1,5 +1,7 @@
 import { CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import {
+  GOOGLE_REFUSED_NOTICE,
+  interpretGoogleSignIn,
   interpretMagicLinkRequest,
   interpretMagicLinkVerify,
   interpretSession,
@@ -378,6 +380,91 @@ describe("interpretMagicLinkVerify", () => {
 
   test("a link tapped with no network is a transport failure, not a bad link", () => {
     expect(interpretMagicLinkVerify({ reached: false })).toEqual({
+      kind: "transport-failure",
+    });
+  });
+});
+
+describe("interpretGoogleSignIn", () => {
+  test("a Google identity the server accepted is a sign-in like any other", () => {
+    expect(interpretGoogleSignIn(ok(envelope(apiUser({ role: "customer" }))))).toEqual({
+      kind: "signed-in",
+      cookie: ISSUED,
+      user: {
+        id: "ab05cfc4-5ee5-40fb-93af-564a773257e5",
+        name: "Admin",
+        email: "admin@talo.com",
+        role: "customer",
+      },
+    });
+  });
+
+  // The second way a Customer account comes into existence on this client. The
+  // API creates one on first Google sign-in exactly as it does on a first link.
+  test("a first-time Google account arrives as a Customer", () => {
+    expect(
+      interpretGoogleSignIn(
+        ok(envelope(apiUser({ role: "customer", hasPassword: false }))),
+      ),
+    ).toMatchObject({ kind: "signed-in", user: { role: "customer" } });
+  });
+
+  // The API's two-factor hook fires on Google sign-in, so it must not be a
+  // way around the limitation the password path already explains.
+  test("two-factor fires on this path too, and is refused the same way", () => {
+    const challenge = envelope(
+      { twoFactorRedirect: true },
+      "Two-factor authentication required",
+    );
+    expect(interpretGoogleSignIn(ok(challenge, null))).toEqual({ kind: "two-factor" });
+  });
+
+  test("a rejected identity is refused in the API's own words", () => {
+    const message = "This account has been disabled.";
+    expect(
+      interpretGoogleSignIn({
+        reached: true,
+        status: 401,
+        body: { code: "unauthorized", message },
+        sessionCookie: null,
+      }),
+    ).toEqual({ kind: "unauthorised", message });
+  });
+
+  // Nobody typed a password on this path, so the backstop must not send anyone
+  // to check one.
+  test("a refusal the server did not explain does not send anyone to a password", () => {
+    expect(
+      interpretGoogleSignIn({
+        reached: true,
+        status: 401,
+        body: null,
+        sessionCookie: null,
+      }),
+    ).toEqual({ kind: "unauthorised", message: GOOGLE_REFUSED_NOTICE });
+  });
+
+  // The audience arrangement failing looks exactly like this: a token Google was
+  // happy to mint, refused by our own server. It is a refusal, not a crash.
+  test("a token the API would not verify establishes nothing", () => {
+    expect(
+      interpretGoogleSignIn({
+        reached: true,
+        status: 400,
+        body: { code: "bad_request", message: "Invalid Google ID token." },
+        sessionCookie: null,
+      }),
+    ).toEqual({ kind: "server-error", message: "Invalid Google ID token." });
+  });
+
+  test("an accepted identity with no cookie establishes nothing", () => {
+    expect(interpretGoogleSignIn(ok(envelope(apiUser()), null))).toEqual({
+      kind: "malformed",
+    });
+  });
+
+  test("a dead network between here and the API is not a bad account", () => {
+    expect(interpretGoogleSignIn({ reached: false })).toEqual({
       kind: "transport-failure",
     });
   });

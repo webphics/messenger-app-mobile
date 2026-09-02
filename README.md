@@ -11,23 +11,82 @@ pnpm expo start
 `EXPO_PUBLIC_API_URL` is required — the app refuses to start without it rather than defaulting to an
 address no device can reach. The Android emulator reaches the host at `http://10.0.2.2:8080`.
 
-Signing in is real: the API verifies the password and the app stores the Session cookie in the device
-keychain, replaying it by hand on every request the way the web client does. Role comes from the
-server, not from the client. Conversations are still mock data. Scope: `docs/scope.md`. Credential
+Signing in is real, three ways — password, magic link, and Google. The API verifies the credential
+and the app stores the Session cookie in the device keychain, replaying it by hand on every request
+the way the web client does. Role comes from the server, not from the client. Conversations are still mock data. Scope: `docs/scope.md`. Credential
 pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`.
 
-There is also no password: **a magic link is how a Customer account comes into existence on mobile.**
-The API has no registration endpoint, and verifying a first link is what creates the account — staff
-accounts are made by an Admin on web. `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` says where the link in the
+There is no registration form: **a magic link or a first Google sign-in is how a Customer account
+comes into existence on mobile.** The API has no registration endpoint, and verifying either is what
+creates the account — staff accounts are made by an Admin on web. `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` says where the link in the
 email points; leave it unset and the app uses its own scheme from `app.json`. Production wants an
 HTTPS origin with app-link association files served from it, which cannot be arranged against
 localhost — the in-app route that reads the token is the same either way, so that switch is
 configuration and manifest work.
 
-Testing the tap end to end needs a dev build: a custom scheme does not open from Expo&nbsp;Go, and
+Testing the tap end to end needs a development client: a custom scheme does not open from Expo&nbsp;Go, and
 several mail clients decline to linkify a non-HTTPS scheme. Requesting a link works in Expo Go; with
 no Brevo key configured the API prints the link to its own console, which is the quickest way to open
 one by hand.
+
+## Google sign-in, and the development client
+
+Google sign-in is the third way in, and it is the reason this project no longer develops entirely in
+Expo&nbsp;Go. It needs a native module, native modules do not run in Expo&nbsp;Go, so **exercising
+sign-in needs a development client installed on the device**. Everything else — every other screen in
+the app — still runs in Expo&nbsp;Go exactly as it did.
+
+| | Expo Go | Development client |
+| --- | --- | --- |
+| Password sign-in | yes | yes |
+| Requesting a magic link | yes | yes |
+| Opening a magic link (`enki://`) | no | yes |
+| Google sign-in | **no** | yes |
+| Everything after sign-in | yes | yes |
+
+Build one and install it once; after that `pnpm start` serves it the same way it serves Expo Go.
+
+```bash
+eas build --profile development --platform android
+```
+
+Use `--platform ios` for iOS. The `development` profile in `eas.json` is internal-distribution with
+`developmentClient: true`; Android comes back as an APK from the EAS install page, iOS needs a device
+registered with `eas device:create` first.
+
+### Configuration
+
+Two OAuth clients from the Google Cloud console, both supplied by `.env`:
+
+```
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=…apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=…apps.googleusercontent.com
+```
+
+Leave both unset and the app still starts — the Google button is disabled and says why. Set either to
+something that is not a client identifier and the app refuses to start, because there is no honest
+reading of a malformed one. iOS needs both; Android needs only the web one.
+
+**The web client identifier in a mobile app is deliberate.** The API verifies a Google ID token's
+audience against the web client, and Google's native libraries mint the token with the web client as
+the audience when given it — which is what lets mobile Google sign-in ship with no API change. Do not
+remove it. Full reasoning:
+`docs/adr/ADR-0005-the-google-audience-arrangement.md`.
+
+### Android: the signing certificate fingerprint
+
+Android's OAuth client is identified by the app's package name **plus the SHA-1 fingerprint of the
+certificate the build was signed with**. That fingerprint has to be registered against the Android
+OAuth client in the Google console, and the certificate belongs to EAS:
+
+```bash
+eas credentials --platform android
+```
+
+Read the SHA-1 from the keystore it shows and add it to the Android OAuth client. This is worth doing
+before writing anything else off as broken: a build signed with different credentials — a different
+machine, a rotated keystore, a local `pnpm build:apk` — produces a Google sign-in that fails with
+nothing on screen to explain it, because there is nothing to say.
 
 ## Builds
 

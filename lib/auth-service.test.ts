@@ -9,10 +9,12 @@ import {
   hydrateAuth,
   onSessionExpired,
   requestMagicLink,
+  signInWithGoogle,
   signInWithPassword,
   signOut,
   verifyMagicLink,
 } from "@/lib/auth-service";
+import { releaseGoogleSession, requestGoogleIdToken } from "@/lib/google-session";
 import {
   clearRetiredCredential,
   clearSessionCookie,
@@ -48,6 +50,15 @@ jest.mock("@/lib/magic-link-config", () => ({
   MAGIC_LINK_ORIGIN: "https://app.example.com",
 }));
 
+// The one boundary here that cannot run under Jest at all: the native module's
+// `TurboModuleRegistry.getEnforcing` throws at import when there is no native
+// side. Everything this feature actually decides is pure and tested in
+// `lib/google-auth.test.ts`; what is mocked away is the account sheet.
+jest.mock("@/lib/google-session", () => ({
+  requestGoogleIdToken: jest.fn(async () => ({ kind: "failed" })),
+  releaseGoogleSession: jest.fn(async () => undefined),
+}));
+
 jest.mock("@/lib/keychain", () => ({
   readSessionCookie: jest.fn(),
   writeSessionCookie: jest.fn(async () => true),
@@ -56,9 +67,17 @@ jest.mock("@/lib/keychain", () => ({
 }));
 
 const request = apiRequest as jest.MockedFunction<typeof apiRequest>;
+const googleToken = requestGoogleIdToken as jest.MockedFunction<
+  typeof requestGoogleIdToken
+>;
+const releaseGoogle = releaseGoogleSession as jest.MockedFunction<
+  typeof releaseGoogleSession
+>;
 const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCookie>;
 const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
 const clearCookie = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
+
+const ID_TOKEN = "eyJhbGciOiJSUzI1NiJ9.google-minted.signature";
 
 const STORED = "better-auth.session_token=stored";
 const ISSUED = "better-auth.session_token=issued";
@@ -221,6 +240,107 @@ describe("signInWithPassword", () => {
   });
 });
 
+describe("signInWithGoogle", () => {
+  test("trades the ID token for a session, and stores what comes back", async () => {
+    googleToken.mockResolvedValueOnce({ kind: "token", idToken: ID_TOKEN });
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await expect(signInWithGoogle()).resolves.toEqual({
+      kind: "settled",
+      outcome: { kind: "signed-in", cookie: ISSUED, user: PARSED_USER },
+    });
+
+    expect(request).toHaveBeenCalledWith("/auth/google", {
+      method: "POST",
+      body: { idToken: ID_TOKEN },
+    });
+    expect(writeCookie).toHaveBeenCalledWith(ISSUED);
+    expect(getSessionCookie()).toBe(ISSUED);
+    expect(getSessionUser()).toEqual(PARSED_USER);
+  });
+
+  test("a signed-in person keeps the Google session that signed them in", async () => {
+    googleToken.mockResolvedValueOnce({ kind: "token", idToken: ID_TOKEN });
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await signInWithGoogle();
+
+    expect(releaseGoogle).not.toHaveBeenCalled();
+  });
+
+  test("a dismissed account sheet leaves the device exactly as it found it", async () => {
+    googleToken.mockResolvedValueOnce({ kind: "cancelled" });
+
+    await expect(signInWithGoogle()).resolves.toEqual({ kind: "cancelled" });
+    expect(request).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
+    // Nothing was established, so there is nothing to undo. Releasing here would
+    // be an effect of closing a sheet, which is not a thing closing a sheet does.
+    expect(releaseGoogle).not.toHaveBeenCalled();
+  });
+
+  test("a device without Play services asks the API nothing either", async () => {
+    googleToken.mockResolvedValueOnce({ kind: "no-play-services" });
+
+    await expect(signInWithGoogle()).resolves.toEqual({ kind: "no-play-services" });
+    expect(request).not.toHaveBeenCalled();
+    expect(releaseGoogle).not.toHaveBeenCalled();
+  });
+
+  // Story 13, the half that lives here: Google said yes and our API said no, so
+  // nothing may be left holding either side of it.
+  test("a token the API refuses leaves nothing here and no Google session", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    googleToken.mockResolvedValueOnce({ kind: "token", idToken: ID_TOKEN });
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: { message: "Account disabled." },
+      sessionCookie: null,
+    });
+
+    await expect(signInWithGoogle()).resolves.toEqual({
+      kind: "settled",
+      outcome: { kind: "unauthorised", message: "Account disabled." },
+    });
+
+    expect(getSessionCookie()).toBeNull();
+    expect(getSessionUser()).toBeNull();
+    expect(clearCookie).toHaveBeenCalled();
+    // Otherwise the next tap skips the picker and presents the same refused
+    // account again, with no way to choose the one that would have worked.
+    expect(releaseGoogle).toHaveBeenCalled();
+  });
+
+  test("a two-factor account stores no credential and releases the Google session", async () => {
+    googleToken.mockResolvedValueOnce({ kind: "token", idToken: ID_TOKEN });
+    request.mockResolvedValueOnce(ok({ twoFactorRedirect: true }));
+
+    await expect(signInWithGoogle()).resolves.toEqual({
+      kind: "settled",
+      outcome: { kind: "two-factor" },
+    });
+
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
+    expect(releaseGoogle).toHaveBeenCalled();
+  });
+
+  test("a sign-out that overtakes the exchange does not sign anyone back in", async () => {
+    googleToken.mockResolvedValueOnce({ kind: "token", idToken: ID_TOKEN });
+    request.mockImplementationOnce(async () => {
+      await signOut();
+      return ok(USER, ISSUED);
+    });
+
+    await signInWithGoogle();
+
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
+  });
+});
+
 describe("signOut", () => {
   test("clears everything here, then tells the server which session ended", async () => {
     setSessionCookie(STORED);
@@ -270,6 +390,18 @@ describe("signOut", () => {
     await signOut();
     expect(request).not.toHaveBeenCalled();
     expect(clearCookie).toHaveBeenCalled();
+  });
+
+  // Without this the next person on a shared device is signed straight back in:
+  // the native session survives, so the account sheet never reappears.
+  test("the Google session is released too, whatever signed the person in", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    request.mockResolvedValueOnce(ok(true));
+
+    await signOut();
+
+    expect(releaseGoogle).toHaveBeenCalled();
   });
 });
 
