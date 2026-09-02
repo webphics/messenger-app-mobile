@@ -31,7 +31,7 @@ Success: each role reaches the right conversations and hub actions quickly, with
 ## Operating Context
 
 - This repo is the Expo iOS/Android client only. Next.js web, NestJS, and Postgres live elsewhere.
-- Current phase: mock auth + role hubs, plus Phase 5a local media UI (`Message.attachment`, no server upload). Session blob `{ email, role }` in AsyncStorage (`ism.session`); mock data; no real backend in-app.
+- Current phase: real auth against the API — password, Magic link and Google sign-in, the Session cookie in the device keychain, and the role served by the API rather than chosen locally. Plus Phase 5a local media UI (`Message.attachment`, no server upload). Conversations are still mock data; auth is the only part talking to a backend. The old `{ email, role }` AsyncStorage blob (`ism.session`) is gone and is purged on launch by `lib/legacy-session.ts`.
 - Terminology source of truth: `CONTEXT.md` (Enki, Customer, Contact list, Agent, Admin, Hub, Unassigned pool, Offers, Message, Attachment, Voice note).
 - Scope source of truth: `docs/scope.md` + current phase in `AGENTS.md`.
 

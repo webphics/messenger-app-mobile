@@ -10,7 +10,7 @@ import { settleDownEnter } from "@/lib/motion-enter";
 import { colors } from "@/lib/tokens";
 
 /**
- * The Unreachable cold start: a Session token is held, but the API did not answer.
+ * The Unreachable cold start: a Session cookie is held, but the API did not answer.
  *
  * Deliberately not the sign-in screen. The credential is probably still good, so
  * sending someone to retype a password because their train went into a tunnel
