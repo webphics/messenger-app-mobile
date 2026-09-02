@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { confirmSignOut } from "@/lib/confirm-sign-out";
 import { getDevUser } from "@/lib/dev-user";
 import { initials } from "@/lib/display";
 import { hubEyebrow } from "@/lib/hub-chrome";
@@ -29,6 +30,10 @@ export function SettingsScreen() {
   const reduceMotion = useReducedMotion();
   const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
 
+  async function onSignOut() {
+    if (await confirmSignOut()) await signOut();
+  }
+
   return (
     <ScrollView
       className="flex-1 bg-bg px-4 pt-4"
@@ -51,9 +56,15 @@ export function SettingsScreen() {
           <Text variant="headline" className="text-ink" numberOfLines={1}>
             {displayName}
           </Text>
-          <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
-            {account?.email ?? ""}
-          </Text>
+          {/* Dropped rather than emptied. There is no fixture address to fall
+              back to that would not be a lie, and an empty Text still takes a
+              line's height — so the card would carry a blank gap under the name
+              for the frame between signing out and the navigation landing. */}
+          {account?.email ? (
+            <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
+              {account.email}
+            </Text>
+          ) : null}
           <View className="mt-1.5 self-start rounded-full bg-primary-soft px-2.5 py-0.5">
             <Text variant="label" className="font-bold uppercase tracking-wider text-primary">
               {hubEyebrow(account?.role ?? "customer")}
@@ -81,7 +92,7 @@ export function SettingsScreen() {
           // No navigation here: `components/auth/session-end` takes every ending
           // of a session to sign-in, so this path and an expiry land identically.
           onPress={() => {
-            void signOut();
+            void onSignOut();
           }}
         >
           <LogOut color={colors.danger} size={18} />
