@@ -163,3 +163,23 @@ export function interpretSession(outcome: HttpOutcome, cookie: string): AuthOutc
 
   return { kind: "signed-in", cookie, user };
 }
+
+/**
+ * Whether an authenticated request's answer says the Session cookie is no longer
+ * accepted — the mid-session half of `#20`, where nobody typed anything and the
+ * only thing that changed is that seven days went by.
+ *
+ * Only a 401, and deliberately narrower than `CREDENTIAL_REFUSED` above. That set
+ * serves the sign-in and session endpoints, where a 403 can only be about the
+ * credential being presented. On an ordinary authenticated request it is not: a
+ * role that may not touch this route, an unverified email, and the CSRF guard's
+ * own refusal all arrive as 403, and signing someone out for any of them would
+ * end a perfectly good session over a request they were never allowed to make.
+ *
+ * A request that never got an answer is not here at all, which is the line #19
+ * drew and this must not blur: unauthorised clears the cookie, a dead network
+ * does not.
+ */
+export function saysSessionExpired(outcome: HttpOutcome): boolean {
+  return outcome.reached && outcome.status === 401;
+}

@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth-machine";
 import {
   hydrateAuth,
+  onSessionExpired,
   signInWithPassword,
   signOut as endSession,
 } from "@/lib/auth-service";
@@ -63,6 +64,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       live = false;
     };
   }, [state.status]);
+
+  /**
+   * The other way a session ends. `lib/auth-service` has already discarded the
+   * credential by the time this runs — all that is left is to say so, which is
+   * what stops screens rendering empty states with nothing to explain them.
+   */
+  useEffect(() => onSessionExpired(() => dispatch({ type: "expired" })), []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (submitting.current) return;

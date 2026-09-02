@@ -1,7 +1,9 @@
+import { CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import {
   interpretSession,
   interpretSignIn,
   parseSessionUser,
+  saysSessionExpired,
   type HttpOutcome,
 } from "@/lib/auth-response";
 
@@ -268,4 +270,32 @@ describe("interpretSession", () => {
     const outcome: HttpOutcome = { reached: true, status: 200, body, sessionCookie: null };
     expect(interpretSession(outcome, HELD)).toEqual({ kind: "malformed" });
   });
+});
+
+describe("saysSessionExpired", () => {
+  function answer(status: number, body: unknown = null): HttpOutcome {
+    return { reached: true, status, body, sessionCookie: null };
+  }
+
+  test("a 401 is the session no longer being accepted", () => {
+    expect(saysSessionExpired(answer(401, { message: "Unauthorized" }))).toBe(true);
+  });
+
+  test("a request that never got an answer says nothing about the cookie", () => {
+    expect(saysSessionExpired({ reached: false })).toBe(false);
+  });
+
+  test("a 403 is a verdict on the request, not on the session", () => {
+    // The role is not allowed, the email is unverified, the CSRF pair was refused
+    // — none of which a fresh sign-in fixes, and all of which arrive as 403.
+    expect(saysSessionExpired(answer(403, { code: CSRF_REFUSED_CODE }))).toBe(false);
+    expect(saysSessionExpired(answer(403, { message: "Forbidden" }))).toBe(false);
+  });
+
+  test.each([200, 201, 204, 400, 404, 409, 429, 500, 502, 503])(
+    "a %s leaves the session alone",
+    (status) => {
+      expect(saysSessionExpired(answer(status))).toBe(false);
+    },
+  );
 });

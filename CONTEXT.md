@@ -52,6 +52,14 @@ _Avoid_: Bootstrapping, session restore, rehydrate
 The Hydration outcome where a Session cookie exists but the API could not be reached. Distinct from signed out: the cookie is kept and the person is not sent to sign-in.
 _Avoid_: Offline, error, disconnected
 
+**Session end**:
+Either of the two ways a session stops: signing out, deliberately, and Session expiry. Both discard the Session cookie and everything derived from it — role included — and both land on sign-in, whatever the person was looking at. Hydration's Unreachable outcome is not one: it keeps the cookie.
+_Avoid_: Session exit, teardown, logout (as the name for both)
+
+**Session expiry**:
+The involuntary Session end. The API's sessions are a seven-day sliding window with no refresh token, so a Session cookie simply stops being accepted; an authenticated request answered `401` discards it and returns the person to sign-in with an explanation, never to a screen that has quietly stopped loading. A `403` is not one — that is a verdict on the request, not on the session — and neither is a transport failure, which changes nothing.
+_Avoid_: Session timeout, token refresh
+
 **Unassigned pool**:
 Conversations with no assignee, visible to Agent and Admin.
 _Avoid_: Queue (unless referring to ordering), inbox (inbox is the conversation list)

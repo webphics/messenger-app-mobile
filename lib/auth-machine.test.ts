@@ -1,5 +1,6 @@
 import {
   authTransition,
+  EXPIRED_NOTICE,
   INITIAL_AUTH_STATE,
   OFFLINE_NOTICE,
   TWO_FACTOR_NOTICE,
@@ -133,6 +134,43 @@ describe("signing out", () => {
   });
 });
 
+describe("a session that expired mid-use", () => {
+  test("ends the session and says why, so no screen is left silently empty", () => {
+    expect(authTransition(AUTHENTICATED, { type: "expired" })).toEqual({
+      status: "signed-out",
+      notice: EXPIRED_NOTICE,
+    });
+  });
+
+  test("wins from every state, because the credential is already gone by then", () => {
+    // `lib/auth-service` discards the cookie before reporting, so any state left
+    // claiming a session would be claiming one that no longer exists — and a
+    // hydration or sign-in still in flight would otherwise land afterwards and
+    // sign someone in with nothing in the keychain behind it.
+    for (const state of EVERY_STATE) {
+      expect(authTransition(state, { type: "expired" })).toEqual({
+        status: "signed-out",
+        notice: EXPIRED_NOTICE,
+      });
+    }
+  });
+
+  test("a transport failure is not one of these, at either seam it can arrive by", () => {
+    // The line #19 drew, as the machine sees it: a request that got no answer
+    // reaches the machine as `transport-failure`, which keeps the cookie at
+    // hydration and only says so at sign-in. It never becomes `expired` —
+    // `saysSessionExpired` in `lib/auth-response` refuses to call it one, and
+    // `lib/auth-service` clears nothing for it.
+    expect(authTransition(HYDRATING, { type: "hydrated", outcome: OFFLINE })).toEqual(
+      UNREACHABLE,
+    );
+    expect(authTransition(SUBMITTING, { type: "settled", outcome: OFFLINE })).toEqual({
+      status: "signed-out",
+      notice: OFFLINE_NOTICE,
+    });
+  });
+});
+
 describe("retry", () => {
   test("an Unreachable start can be tried again", () => {
     expect(authTransition(UNREACHABLE, { type: "retry" })).toEqual(HYDRATING);
@@ -154,6 +192,7 @@ describe("as a whole", () => {
     { type: "settled", outcome: SIGNED_IN },
     { type: "settled", outcome: REFUSED },
     { type: "sign-out" },
+    { type: "expired" },
     { type: "retry" },
   ];
 
@@ -184,5 +223,19 @@ describe("as a whole", () => {
 
     state = authTransition(state, { type: "sign-out" });
     expect(state).toEqual(SIGNED_OUT);
+  });
+
+  test("a session that expires mid-use lands on sign-in with an explanation", () => {
+    let state: AuthState = INITIAL_AUTH_STATE;
+    state = authTransition(state, { type: "hydrated", outcome: SIGNED_IN });
+    expect(state).toEqual(AUTHENTICATED);
+
+    state = authTransition(state, { type: "expired" });
+    expect(state).toEqual({ status: "signed-out", notice: EXPIRED_NOTICE });
+
+    // And nothing of the previous person survives into the next sign-in.
+    state = authTransition(state, { type: "submit" });
+    state = authTransition(state, { type: "settled", outcome: { kind: "signed-in", cookie: SESSION_COOKIE, user: CUSTOMER } });
+    expect(state).toEqual({ status: "signed-in", user: CUSTOMER });
   });
 });

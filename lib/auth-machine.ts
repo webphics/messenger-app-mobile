@@ -28,6 +28,12 @@ export type AuthEvent =
   | { type: "submit" }
   | { type: "settled"; outcome: AuthOutcome }
   | { type: "sign-out" }
+  /**
+   * An authenticated request came back unauthorised: the Session cookie stopped
+   * being accepted while the app was in use. Not a `sign-out` — nobody asked, so
+   * the person is owed an explanation rather than a bare sign-in screen.
+   */
+  | { type: "expired" }
   /** Try hydration again after an Unreachable outcome. */
   | { type: "retry" };
 
@@ -41,6 +47,15 @@ export const INITIAL_AUTH_STATE: AuthState = { status: "hydrating" };
  */
 export const TWO_FACTOR_NOTICE =
   "This account uses two-factor authentication, which this app does not support yet. Sign in on the web app.";
+
+/**
+ * The API's sessions are a seven-day sliding window with no refresh token, so
+ * this is what time passing looks like from in here. Worded as something that
+ * happened rather than something they did wrong, and shown because the
+ * alternative — screens quietly emptying out — is the failure this exists to
+ * prevent.
+ */
+export const EXPIRED_NOTICE = "Your session expired. Sign in again.";
 
 export const OFFLINE_NOTICE =
   "Could not reach the server. Check your connection and try again.";
@@ -100,6 +115,17 @@ export function authTransition(state: AuthState, event: AuthEvent): AuthState {
     // Signing out wins from anywhere, including mid-request: the person asked.
     case "sign-out":
       return SIGNED_OUT;
+
+    // Wins from anywhere too, and for a harder reason than sign-out: by the time
+    // this arrives `lib/auth-service` has already discarded the credential. Any
+    // state that is not signed-out is then a state claiming a session that no
+    // longer exists — including a hydration or a sign-in still in flight, whose
+    // success would otherwise land afterwards and sign someone in with nothing in
+    // the keychain to back it. A 401 belonging to a session that had already ended
+    // never reaches here: the epoch check in `authenticatedRequest` drops it
+    // before it is reported, so anything that does arrive cleared a live cookie.
+    case "expired":
+      return { status: "signed-out", notice: EXPIRED_NOTICE };
 
     case "hydrated":
       return state.status === "hydrating" ? afterHydration(event.outcome) : state;

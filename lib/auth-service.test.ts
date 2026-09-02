@@ -4,7 +4,13 @@ import {
   getSessionCookie,
   setSessionCookie,
 } from "@/lib/api-client";
-import { hydrateAuth, signInWithPassword, signOut } from "@/lib/auth-service";
+import {
+  authenticatedRequest,
+  hydrateAuth,
+  onSessionExpired,
+  signInWithPassword,
+  signOut,
+} from "@/lib/auth-service";
 import {
   clearRetiredCredential,
   clearSessionCookie,
@@ -297,5 +303,127 @@ describe("a sign-out that lands mid-request", () => {
 
     expect(getSessionUser()).toBeNull();
     expect(getSessionCookie()).toBeNull();
+  });
+});
+
+describe("authenticatedRequest", () => {
+  const CONVERSATIONS = "/conversations";
+
+  function answer(status: number, body: unknown = null) {
+    return { reached: true as const, status, body, sessionCookie: null };
+  }
+
+  /** Sit where a screen would, listening for the session ending under it. */
+  function watchForExpiry() {
+    const heard = jest.fn();
+    return { heard, stop: onSessionExpired(heard) };
+  }
+
+  /** A live session, set up the way `signOut`'s tests do rather than by hydrating. */
+  function signedIn() {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+  }
+
+  beforeEach(() => {
+    // Not `clearAllMocks`, which leaves a `mockResolvedValueOnce` an earlier test
+    // queued but never consumed sitting at the front of the queue.
+    request.mockReset();
+  });
+
+  test("passes the request through and answers with what came back", async () => {
+    signedIn();
+    request.mockResolvedValueOnce(ok([{ id: "1" }]));
+
+    await expect(
+      authenticatedRequest(CONVERSATIONS, { method: "POST", body: { subject: "Hi" } }),
+    ).resolves.toEqual(ok([{ id: "1" }]));
+    expect(request).toHaveBeenLastCalledWith(CONVERSATIONS, {
+      method: "POST",
+      body: { subject: "Hi" },
+    });
+  });
+
+  test("a 401 clears the credential and tells whoever is listening", async () => {
+    signedIn();
+    const { heard, stop } = watchForExpiry();
+    request.mockResolvedValueOnce(answer(401, { message: "Unauthorized" }));
+
+    await authenticatedRequest(CONVERSATIONS);
+
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(getSessionCookie()).toBeNull();
+    expect(getSessionUser()).toBeNull();
+    expect(clearCookie).toHaveBeenCalled();
+    expect(clearCsrfPair).toHaveBeenCalled();
+    stop();
+  });
+
+  test("the credential is gone before the listener runs, so nothing it triggers carries it", async () => {
+    signedIn();
+    const stop = onSessionExpired(() => {
+      expect(getSessionCookie()).toBeNull();
+      expect(getSessionUser()).toBeNull();
+    });
+    request.mockResolvedValueOnce(answer(401));
+
+    await authenticatedRequest(CONVERSATIONS);
+    expect.assertions(2);
+    stop();
+  });
+
+  test("a transport failure signs nobody out — this is the line #19 drew", async () => {
+    signedIn();
+    const { heard, stop } = watchForExpiry();
+    request.mockResolvedValueOnce({ reached: false });
+
+    await expect(authenticatedRequest(CONVERSATIONS)).resolves.toEqual({ reached: false });
+
+    expect(heard).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBe(STORED);
+    expect(getSessionUser()).toEqual(PARSED_USER);
+    expect(clearCookie).not.toHaveBeenCalled();
+    stop();
+  });
+
+  test.each([403, 404, 409, 429, 500, 503])(
+    "a %s is about the request, not the session, so the credential survives",
+    async (status) => {
+      signedIn();
+      const { heard, stop } = watchForExpiry();
+      request.mockResolvedValueOnce(answer(status, { message: "No" }));
+
+      await authenticatedRequest(CONVERSATIONS);
+
+      expect(heard).not.toHaveBeenCalled();
+      expect(getSessionCookie()).toBe(STORED);
+      stop();
+    },
+  );
+
+  test("a second 401 from a request already in flight does not report twice", async () => {
+    signedIn();
+    const { heard, stop } = watchForExpiry();
+    request.mockResolvedValue(answer(401));
+
+    await Promise.all([
+      authenticatedRequest(CONVERSATIONS),
+      authenticatedRequest("/conversations/1"),
+    ]);
+
+    // The session ended once. Two reports would send two navigations at the
+    // sign-in screen, and the second would arrive after someone started typing.
+    expect(heard).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
+  test("a listener that has stopped hears nothing", async () => {
+    signedIn();
+    const { heard, stop } = watchForExpiry();
+    stop();
+    request.mockResolvedValueOnce(answer(401));
+
+    await authenticatedRequest(CONVERSATIONS);
+    expect(heard).not.toHaveBeenCalled();
   });
 });
