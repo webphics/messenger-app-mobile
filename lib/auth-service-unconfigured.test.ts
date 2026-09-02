@@ -16,6 +16,11 @@ jest.mock("@/lib/api-client", () => ({
   clearCsrfPair: jest.fn(),
 }));
 
+jest.mock("@/lib/google-session", () => ({
+  requestGoogleIdToken: jest.fn(async () => ({ kind: "failed" })),
+  releaseGoogleSession: jest.fn(async () => undefined),
+}));
+
 jest.mock("@/lib/keychain", () => ({
   readSessionCookie: jest.fn(async () => null),
   writeSessionCookie: jest.fn(async () => true),

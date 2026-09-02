@@ -6,6 +6,7 @@ import {
   type ApiRequestOptions,
 } from "@/lib/api-client";
 import {
+  interpretGoogleSignIn,
   interpretMagicLinkRequest,
   interpretMagicLinkVerify,
   interpretSession,
@@ -15,6 +16,11 @@ import {
   type HttpOutcome,
   type MagicLinkRequestOutcome,
 } from "@/lib/auth-response";
+import type { GoogleResult } from "@/lib/google-auth";
+import {
+  releaseGoogleSession,
+  requestGoogleIdToken,
+} from "@/lib/google-session";
 import {
   clearRetiredCredential,
   clearSessionCookie,
@@ -42,6 +48,7 @@ const SESSION_PATH = "/auth/session";
 const SIGN_OUT_PATH = "/auth/logout";
 const MAGIC_LINK_REQUEST_PATH = "/auth/magic-link";
 const MAGIC_LINK_VERIFY_PATH = "/auth/magic-link/verify";
+const GOOGLE_PATH = "/auth/google";
 
 /**
  * Bumped every time the credential is deliberately discarded.
@@ -143,6 +150,45 @@ export async function signInWithPassword(
 }
 
 /**
+ * Pick a Google account, and trade what Google mints for a session here.
+ *
+ * The same shape as `signInWithPassword` once there is a token — one request,
+ * one `AuthOutcome`, one `applyOutcome` — because past that point Google is not
+ * special. What is different is everything before it: the account sheet can be
+ * dismissed, and Play services can be missing, and neither of those is anything
+ * `AuthOutcome` can say. So this returns a `GoogleResult`, which `googleAuthEvent`
+ * turns into one of the events the machine already has.
+ *
+ * The native session is released when — and only when — an ID token was
+ * exchanged and no session came back. Nothing is released on a dismissed or
+ * failed sheet, because nothing was established to release.
+ */
+export async function signInWithGoogle(): Promise<GoogleResult> {
+  const attempt = await requestGoogleIdToken();
+  // Nothing was established, so there is nothing to undo — and a dismissed sheet
+  // in particular must leave the device exactly as it found it.
+  if (attempt.kind !== "token") return attempt;
+
+  const startedAt = credentialEpoch;
+  const outcome = interpretGoogleSignIn(
+    await apiRequest(GOOGLE_PATH, {
+      method: "POST",
+      body: { idToken: attempt.idToken },
+    }),
+  );
+
+  await applyOutcome(outcome, startedAt);
+  // The other half of "signed out rather than half signed in": `applyOutcome`
+  // has cleared this side, and this clears Google's. Without it the device is
+  // left holding an account our API refused, and the next tap skips the picker
+  // and presents that same identity again — leaving nobody able to choose the
+  // account that would have worked.
+  if (outcome.kind !== "signed-in") await releaseGoogleSession();
+
+  return { kind: "settled", outcome };
+}
+
+/**
  * Ask the API to email a sign-in link.
  *
  * The origin travels with the request rather than being configured on the
@@ -208,6 +254,11 @@ export async function signOut(): Promise<void> {
   const ending = getSessionCookie();
 
   await forgetCredential();
+  // Local, like `forgetCredential`, and before the network call for the same
+  // reason. Unconditional: nothing here records how the person signed in, and
+  // releasing a session that was never established is a no-op — whereas keeping
+  // one would sign the next person on a shared device straight back in.
+  await releaseGoogleSession();
 
   if (ending) {
     await apiRequest(SIGN_OUT_PATH, { method: "POST", cookie: ending });

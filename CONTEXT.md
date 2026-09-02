@@ -45,12 +45,38 @@ The double-submit value fetched from the API and sent as `X-CSRF-Token` on every
 _Avoid_: XSRF token, nonce, anti-forgery token
 
 **Magic link**:
-A single-use, short-lived sign-in link emailed on request, spent by opening it on the device. The only
-way a Customer account comes into existence on this client — the API has no registration endpoint, and
-verifying a first link creates the account; staff accounts are made by an Admin on web. Requesting one
-says the same thing for every address, because saying otherwise would disclose who has an account.
-Verifying one ends in the same Session cookie a password sign-in ends in.
+A single-use, short-lived sign-in link emailed on request, spent by opening it on the device. One of the
+two ways a Customer account comes into existence on this client — the API has no registration endpoint,
+and verifying a first link creates the account; the other way is Google sign-in, and staff accounts are
+made by an Admin on web. Requesting one says the same thing for every address, because saying otherwise
+would disclose who has an account. Verifying one ends in the same Session cookie a password sign-in ends in.
 _Avoid_: Magic email, passwordless login, OTP, one-time code (there is no code to type)
+
+**Google sign-in**:
+The third way in: the system account sheet, an ID token from Google, and the same Session cookie the
+other two end in. Needs a native module and so a Development client — it is the only part of the app
+that does not run in Expo Go. Signing in with Google for the first time creates a Customer account, so
+it is the second account-creation path beside the Magic link. Dismissing the sheet is a Cancellation,
+not a failure.
+_Avoid_: Google OAuth, social login, SSO, Sign in with Google (as the name in code)
+
+**Audience arrangement**:
+The reason mobile Google sign-in needs no API change: the app is configured with the *web* OAuth
+client alongside the platform one, so Google mints the ID token with the web client as its audience —
+the single value the API verifies against. Looks like a mistake in a mobile app and is not. See
+`docs/adr/ADR-0005-the-google-audience-arrangement.md`.
+_Avoid_: Client ID mismatch, aud fix, the web client workaround
+
+**Development client**:
+A build of this app that can run native modules, installed on a device in place of Expo Go and served
+by the same `pnpm start`. Required for Google sign-in and for opening a Magic link; nothing else in the
+app needs it. Built from the `development` profile in `eas.json`.
+_Avoid_: Dev build (as the name for the profile), custom client, standalone build (that is a release)
+
+**Cancellation**:
+Dismissing the Google account sheet. A distinct outcome from a failure: it surfaces no message, clears
+nothing that was typed, and returns to sign-in unchanged.
+_Avoid_: Abort, dismissal error, cancelled sign-in error
 
 **Link origin**:
 Where the Magic link points, sent to the API with the request because the API serves the web client

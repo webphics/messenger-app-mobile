@@ -30,12 +30,16 @@ Broadcasts are in-inbox announcements (later), not stories.
 0. Scaffold (done)
 1. Basic UI mock (done) — Customer hub, inbox, thread on mock data.
 2. Mock auth shell + role hubs (done) — login/register, AsyncStorage `{ email, role }`, splash/icon. Agent/Admin hub variants (mock knowledge / charts / add offer).
-3. **Real auth (current)** — cookie sessions against the NestJS API, mirroring the web client, stored in `expo-secure-store`.
+3. **Real auth (done)** — cookie sessions against the NestJS API, mirroring the web client, stored in `expo-secure-store`.
    - **3a. Password + magic link (done)** — `lib/api-client.ts`, `AuthContext`, real Hydration,
      magic-link deep link. Google button rendered disabled. 2FA out (see ADR-0004). The mock shell
      it replaced is gone with it: no register screen, no control that sets a role.
-   - **3b. Google sign-in (current)** — needs a native module, so an EAS `development` profile and a
-     dev client.
+   - **3b. Google sign-in (done)** — needed a native module, so an EAS `development` profile and a
+     Development client. Auth is the only part of the app that no longer runs in Expo Go. The ID token is
+     minted for the *web* OAuth client so the API's existing audience check accepts it unchanged —
+     see ADR-0005, and do not remove the web client identifier from the mobile configuration. 2FA
+     is refused here with the same sentence the password path uses, because the API's two-factor
+     hook fires on Google sign-in too.
 4. Realtime (socket.io) + REST (TanStack Query).
 5. Media, push, i18n, list virtualization.
    - 5a. Client media UI (local attachments) — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (done)
@@ -56,10 +60,11 @@ Hydration at cold start has three outcomes: signed in, signed out, and **Unreach
 exists but the API did not answer, which keeps the cookie and offers a retry rather than sending the
 person to sign-in. A 401 is not Unreachable: it clears the cookie.
 
-Self-registration does not exist; the API has no register endpoint. A first-time email gets an
-account by verifying a magic link. Staff accounts are created by an Admin on web. The register
-screen is gone rather than disabled — it posted nowhere — and the sign-in screen sends anyone
-without an account to the link instead.
+Self-registration does not exist; the API has no register endpoint. A Customer account comes into
+existence two ways, both of them sign-in: verifying a first magic link, and signing in with Google
+for the first time. Staff accounts are created by an Admin on web. The register screen is gone
+rather than disabled — it posted nowhere — and the sign-in screen sends anyone without an account to
+one of those two instead.
 
 The Settings role switcher is gone. It set the session's role from the client, which server-owned
 roles make a lie. What replaced it is a `__DEV__`-only picker on the sign-in screen for *which seed

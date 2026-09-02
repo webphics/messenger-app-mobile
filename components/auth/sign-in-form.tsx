@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
+import { GOOGLE_OAUTH, GOOGLE_UNCONFIGURED_NOTICE } from "@/lib/google-config";
 import { hapticSelection, hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
@@ -67,8 +68,34 @@ export function SignInForm() {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { keyboardInset, contentRef, scrollProps } = useKeyboardAwareScroll();
-  const { state, signIn, requestMagicLink } = useAuth();
+  const { state, signIn, signInWithGoogle, requestMagicLink } = useAuth();
   const submitting = state.status === "submitting";
+  /**
+   * Which of the two sign-in controls is waiting on something.
+   *
+   * One boolean per button would encode the same fact twice and let the two
+   * disagree. The machine has one submitting state and cannot have two — a
+   * second attempt of any kind must be refused while one is out — but the
+   * spinner and the busy state both have to sit on the control that was
+   * pressed, or the button someone did not touch is the one that reads as busy,
+   * to the eye and to a screen reader alike.
+   */
+  const [pending, setPending] = useState<"password" | "google" | null>(null);
+  /**
+   * A build with no OAuth client cannot sign anyone in with Google, and saying
+   * so beats an enabled button that fails at the account sheet. Read once at
+   * module load, so this never changes while the screen is up.
+   */
+  const googleUnavailable = GOOGLE_OAUTH === null;
+  const passwordBusy = pending === "password";
+  const googleBusy = pending === "google";
+  /**
+   * Read from `pending` as well as from the machine, because the two are not the
+   * same interval. The Google account sheet is up before anything has been
+   * submitted — deliberately, so dismissing it disturbs nothing — and no control
+   * on this screen may be pressable while it is.
+   */
+  const busy = submitting || pending !== null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -101,7 +128,7 @@ export function SignInForm() {
   }, [state]);
 
   async function onSubmit() {
-    if (submitting) return;
+    if (busy) return;
     // Only the failure. It outranks the machine's notice, so left standing it
     // would outlive the attempt it described and speak over this one. A standing
     // confirmation is not cleared: a link did go to that address, and still has.
@@ -122,7 +149,12 @@ export function SignInForm() {
       return;
     }
 
-    await signIn(email.trim(), password);
+    setPending("password");
+    try {
+      await signIn(email.trim(), password);
+    } finally {
+      setPending(null);
+    }
   }
 
   /**
@@ -158,6 +190,32 @@ export function SignInForm() {
 
     hapticSuccess();
     setLinkRequest({ sentTo: trimmed, sending: false, failure: null });
+  }
+
+  /**
+   * Hand off to Google, and let the machine decide what came back.
+   *
+   * Nothing typed is touched, on any path. A person who cancels the sheet or
+   * whose sign-in fails still has the email and password they were part-way
+   * through, so falling back to another method is not a retype.
+   */
+  async function onGoogleSignIn() {
+    if (busy) return;
+
+    setPending("google");
+    try {
+      // Cleared afterwards rather than before, and only when there was an
+      // attempt. A stale link failure outranks the machine's notice and would
+      // speak over a Google error, so it cannot stay; but a dismissed sheet is
+      // not an attempt, and clearing it then would make closing a sheet erase
+      // something. The standing confirmation is never cleared either way — a
+      // link did go to that address, and still has.
+      if (await signInWithGoogle()) {
+        setLinkRequest((prev) => ({ ...prev, failure: null }));
+      }
+    } finally {
+      setPending(null);
+    }
   }
 
   /**
@@ -334,7 +392,7 @@ export function SignInForm() {
             // spinner off the button, drop the guard that stops a second
             // request, and land the confirmation on an address the form no
             // longer holds.
-            disabled={submitting || sendingLink}
+            disabled={busy || sendingLink}
           />
 
           {notice ? (
@@ -354,12 +412,14 @@ export function SignInForm() {
           <Button
             className="mt-6 min-h-12 w-full"
             onPress={() => void onSubmit()}
-            // Enabled until the request starts, then disabled with a spinner —
-            // which is also the second half of the double-submit guard.
-            disabled={submitting}
-            accessibilityState={{ disabled: submitting, busy: submitting }}
+            // Enabled until an attempt starts, then disabled with a spinner —
+            // which is also the second half of the double-submit guard. "An
+            // attempt" includes a Google sheet that is open, which the machine
+            // cannot see.
+            disabled={busy}
+            accessibilityState={{ disabled: busy, busy: passwordBusy }}
           >
-            {submitting ? (
+            {passwordBusy ? (
               <ActivityIndicator size="small" color={colors.primaryForeground} />
             ) : null}
             {/* The label stays put while it spins, so the control never looks like a different one. */}
@@ -428,37 +488,48 @@ export function SignInForm() {
           </Text>
 
           {/*
-            Not yet, and it says so.
+            The promise the disabled button in 3a made, kept.
 
-            Google sign-in needs a native module and the development build that
-            comes with it (Phase 3b). It stays on screen because taking it away
-            would read as “not offered” rather than “coming” — but it is a real
-            `disabled` button with no `onPress`, so a tap fires nothing, goes
-            nowhere and cannot fail. Anything that merely *looked* like a button
-            would break AGENTS.md’s “if it looks clickable, it must be
-            clickable”; a disabled one is a control that is honestly shut.
-
-            The unavailability is in the accessible name and in the visible
-            “Soon” pill as well as the dimming, so it survives a screen reader
-            and a person who cannot see the dimming.
+            It is still a real `disabled` button rather than something that
+            merely looks like one when this build has no OAuth client
+            configured — AGENTS.md's "if it looks clickable, it must be
+            clickable" cuts both ways, and a control that is honestly shut beats
+            one that fires nothing. What changed is that the reason is now a
+            build problem rather than a roadmap, so it is named in a sentence
+            underneath instead of hidden behind a "Soon" pill: the person who
+            can fix it is the person who built it.
           */}
           <Button
             variant="outline"
             className="mt-3 min-h-12 w-full"
-            disabled
-            accessibilityLabel="Continue with Google — not available yet"
-            accessibilityState={{ disabled: true }}
+            onPress={() => void onGoogleSignIn()}
+            // Disabled while any attempt is out, not only this one: the machine
+            // refuses a second submit anyway, and a button that accepts a press
+            // it will drop is worse than one that says it is busy.
+            disabled={googleUnavailable || busy}
+            accessibilityLabel={
+              googleUnavailable
+                ? "Continue with Google — not available in this build"
+                : "Continue with Google"
+            }
+            accessibilityState={{
+              disabled: googleUnavailable || busy,
+              busy: googleBusy,
+            }}
           >
+            {googleBusy ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : null}
+            {/* The label stays put while it spins, so the control never looks
+                like a different one. */}
             <Text className="text-ink">Continue with Google</Text>
-            <View className="rounded-full bg-line px-2 py-0.5">
-              <Text
-                variant="label"
-                className="font-bold uppercase tracking-wider text-ink-soft"
-              >
-                Soon
-              </Text>
-            </View>
           </Button>
+
+          {googleUnavailable ? (
+            <Text variant="meta" className="mt-2 text-center text-muted">
+              {GOOGLE_UNCONFIGURED_NOTICE}
+            </Text>
+          ) : null}
         </Animated.View>
       </ScrollView>
     </View>

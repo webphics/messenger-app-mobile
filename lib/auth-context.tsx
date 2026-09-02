@@ -19,10 +19,12 @@ import {
   hydrateAuth,
   onSessionExpired,
   requestMagicLink as sendMagicLink,
+  signInWithGoogle as startGoogleSignIn,
   signInWithPassword,
   signOut as endSession,
   verifyMagicLink as spendMagicLink,
 } from "@/lib/auth-service";
+import { googleAuthEvent } from "@/lib/google-auth";
 
 /**
  * The only place the auth state machine is driven.
@@ -42,6 +44,16 @@ type AuthContextValue = {
    * verified link and an accepted password are the same fact.
    */
   verifyMagicLink: (token: string) => Promise<void>;
+  /**
+   * Pick a Google account and sign in with it. Drives the same events again.
+   *
+   * Resolves true when an attempt was actually made, and false when the account
+   * sheet was dismissed. The screen needs the difference: a dismissed sheet
+   * changes nothing at all, so anything it would otherwise tidy away on the way
+   * into an attempt — a standing message about a control someone pressed
+   * earlier — has to survive it.
+   */
+  signInWithGoogle: () => Promise<boolean>;
   /**
    * Ask for a sign-in link. Deliberately outside the state machine: no session
    * is established or refused, so the screen owns the outcome and the answer is
@@ -115,6 +127,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * The third way in, and the same guard again. The event it ends on is chosen
+   * by `googleAuthEvent` rather than here, so there is one place where a Google
+   * outcome becomes an auth fact and it is a pure function with a test file.
+   *
+   * `submit` is dispatched *after* the account sheet rather than before it,
+   * which is the one place this differs from the other two. The other two have
+   * something in hand the moment they start; this one may come back with
+   * nothing, and a `submit` already dispatched cannot be taken back — it has
+   * discarded whatever notice was standing, so a dismissed sheet would silently
+   * sweep away the sentence explaining a session that had just expired. The
+   * double-submit guard does not depend on the machine here: `submitting.current`
+   * is already held, and the account sheet is modal anyway.
+   */
+  const signInWithGoogle = useCallback(async () => {
+    if (submitting.current) return false;
+    submitting.current = true;
+
+    try {
+      const event = googleAuthEvent(await startGoogleSignIn());
+      // Null is a dismissed sheet: not an attempt, so there is nothing to
+      // announce and nothing on the screen to disturb.
+      if (!event) return false;
+
+      // Both in one turn. The reducer applies them in order against its own
+      // state, so `settled` arrives while the machine is submitting, which is
+      // the only state it accepts one from.
+      dispatch({ type: "submit" });
+      dispatch(event);
+      return true;
+    } finally {
+      submitting.current = false;
+    }
+  }, []);
+
   const requestMagicLink = useCallback(
     (email: string) => sendMagicLink(email),
     [],
@@ -132,8 +179,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ state, signIn, verifyMagicLink, requestMagicLink, signOut, retry }),
-    [state, signIn, verifyMagicLink, requestMagicLink, signOut, retry],
+    () => ({
+      state,
+      signIn,
+      verifyMagicLink,
+      signInWithGoogle,
+      requestMagicLink,
+      signOut,
+      retry,
+    }),
+    [
+      state,
+      signIn,
+      verifyMagicLink,
+      signInWithGoogle,
+      requestMagicLink,
+      signOut,
+      retry,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
