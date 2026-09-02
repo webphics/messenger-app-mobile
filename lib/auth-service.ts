@@ -1,10 +1,20 @@
-import { apiRequest, getBearerToken, setBearerToken } from "@/lib/api-client";
+import {
+  apiRequest,
+  clearCsrfPair,
+  getSessionCookie,
+  setSessionCookie,
+} from "@/lib/api-client";
 import {
   interpretSession,
   interpretSignIn,
   type AuthOutcome,
 } from "@/lib/auth-response";
-import { clearSessionToken, readSessionToken, writeSessionToken } from "@/lib/keychain";
+import {
+  clearRetiredCredential,
+  clearSessionCookie,
+  readSessionCookie,
+  writeSessionCookie,
+} from "@/lib/keychain";
 import { purgeMockSession } from "@/lib/legacy-session";
 import { setSessionUser } from "@/lib/session";
 
@@ -24,7 +34,7 @@ const SIGN_OUT_PATH = "/auth/logout";
  * Bumped every time the credential is deliberately discarded.
  *
  * A request that started before the bump is stale by the time it lands, and a
- * stale success must not write a token: a sign-out that arrived while a sign-in
+ * stale success must not write a cookie: a sign-out that arrived while a sign-in
  * was in flight would otherwise leave a live credential in the keychain and sign
  * the person back in at next launch. Sign-out is not reachable mid-sign-in in
  * today's screens, which is exactly why this is worth pinning down now rather
@@ -36,7 +46,7 @@ let credentialEpoch = 0;
  * Bring the keychain and the held credential in line with what just happened.
  *
  * A transport failure or an unreadable answer deliberately changes nothing: the
- * stored token may well still be good, and throwing it away because the train
+ * stored cookie may well still be good, and throwing it away because the train
  * went into a tunnel would sign the person out for the wrong reason.
  */
 async function applyOutcome(outcome: AuthOutcome, startedAt: number): Promise<void> {
@@ -44,9 +54,9 @@ async function applyOutcome(outcome: AuthOutcome, startedAt: number): Promise<vo
 
   switch (outcome.kind) {
     case "signed-in":
-      setBearerToken(outcome.token);
+      setSessionCookie(outcome.cookie);
       setSessionUser(outcome.user);
-      await writeSessionToken(outcome.token);
+      await writeSessionCookie(outcome.cookie);
       return;
     // Neither establishes a session, so neither may leave a credential behind.
     case "unauthorised":
@@ -63,39 +73,42 @@ async function applyOutcome(outcome: AuthOutcome, startedAt: number): Promise<vo
 
 async function forgetCredential(): Promise<void> {
   credentialEpoch += 1;
-  setBearerToken(null);
+  setSessionCookie(null);
+  clearCsrfPair();
   setSessionUser(null);
-  await clearSessionToken();
+  await clearSessionCookie();
 }
 
 /**
- * Cold start: read the stored Session token and find out who it belongs to.
+ * Cold start: read the stored Session cookie and find out who it belongs to.
  *
- * Returns null when there was no token to check — a first run, or after a sign-out.
+ * Returns null when there was no cookie to check — a first run, or after a sign-out.
  */
 export async function hydrateAuth(): Promise<AuthOutcome | null> {
   // Captured before the first await, so a sign-out arriving at any point during
   // hydration — including while the keychain read is outstanding — invalidates it.
   const startedAt = credentialEpoch;
   // Cold start is the one moment this app already reaches for stored identity, so
-  // it is where the mock shell's leftovers get swept up. Not awaited: nothing
-  // downstream reads that key, and a slow storage call must not delay sign-in.
+  // it is where earlier slices' leftovers get swept up. Neither is awaited:
+  // nothing downstream reads those keys, and a slow storage call must not delay
+  // sign-in.
   void purgeMockSession();
-  const token = await readSessionToken();
+  void clearRetiredCredential();
+  const cookie = await readSessionCookie();
 
-  // A sign-out that overtook the keychain read wins outright — holding the token
+  // A sign-out that overtook the keychain read wins outright — holding the cookie
   // it just deleted would attach a credential to every later request.
   if (startedAt !== credentialEpoch) return null;
 
-  if (!token) {
+  if (!cookie) {
     await forgetCredential();
     return null;
   }
 
   // Held before the request so `apiRequest` attaches it, same as every later call.
-  setBearerToken(token);
+  setSessionCookie(cookie);
 
-  const outcome = interpretSession(await apiRequest(SESSION_PATH), token);
+  const outcome = interpretSession(await apiRequest(SESSION_PATH), cookie);
   await applyOutcome(outcome, startedAt);
   return outcome;
 }
@@ -123,15 +136,15 @@ export async function signInWithPassword(
  * live credential held for as long as that request takes — and React Native's
  * `fetch` has no timeout, so on a dead network that is tens of seconds during
  * which the person has already been shown the sign-in screen and whatever they
- * do next would still carry the old token. The token is captured and handed to
+ * do next would still carry the old cookie. The cookie is captured and handed to
  * the logout call explicitly, so the server still learns which session ended.
  */
 export async function signOut(): Promise<void> {
-  const ending = getBearerToken();
+  const ending = getSessionCookie();
 
   await forgetCredential();
 
   if (ending) {
-    await apiRequest(SIGN_OUT_PATH, { method: "POST", bearer: ending });
+    await apiRequest(SIGN_OUT_PATH, { method: "POST", cookie: ending });
   }
 }

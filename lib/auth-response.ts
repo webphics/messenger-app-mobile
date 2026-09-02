@@ -1,3 +1,4 @@
+import { asRecord, CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import type { SessionUser, UserRole } from "@/lib/types";
 
 /**
@@ -18,15 +19,15 @@ export type HttpOutcome =
       status: number;
       /** Parsed JSON, or null when the body was absent or unparseable. */
       body: unknown;
-      /** The `set-auth-token` header, present only when the response issued a credential. */
-      sessionToken: string | null;
+      /** The Session cookie the response set, as a `name=value` pair. Null when it set none. */
+      sessionCookie: string | null;
     }
   | { reached: false };
 
 export type AuthOutcome =
-  | { kind: "signed-in"; token: string; user: SessionUser }
+  | { kind: "signed-in"; cookie: string; user: SessionUser }
   | { kind: "two-factor" }
-  /** The credential itself was refused. The only outcome that may erase a stored token. */
+  /** The credential itself was refused. The only outcome that may erase a stored cookie. */
   | { kind: "unauthorised"; message: string }
   /** The server answered, but not about this credential — a 500, a 429, a bad request. */
   | { kind: "server-error"; message: string }
@@ -44,31 +45,21 @@ const DEFAULT_SERVER_ERROR = "The server could not handle that right now. Try ag
  * is having a bad day*.
  *
  * The distinction is not cosmetic: `unauthorised` is what erases a stored Session
- * token, so folding a 500 or a 502 into it would sign someone out because a
+ * cookie, so folding a 500 or a 502 into it would sign someone out because a
  * deploy went wrong — the same wrongful sign-out that Unreachable exists to
  * prevent, arriving by a different door.
  */
 const CREDENTIAL_REFUSED = new Set([401, 403]);
 
 /**
- * The API's code for a request the CSRF guard turned away.
- *
- * It arrives as a 403, which would otherwise read as "your credential is no
- * good" — and this app can meet it: the guard waives Bearer requests, so only
- * sign-in is exposed, and only when its pre-flight failed to produce the
- * double-submit pair. Retyping a password cannot fix that, so saying so is the
- * difference between a person retrying usefully and a person retrying forever.
+ * A CSRF refusal arrives as a 403, which would otherwise read as "your credential
+ * is no good". `lib/api-client` already refreshes the pair and retries once, so a
+ * refusal that reaches here survived that — the pre-flight itself is failing.
+ * Retyping a password cannot fix that, so saying so is the difference between a
+ * person retrying usefully and a person retrying forever.
  */
-const CSRF_REFUSED_CODE = "csrf_invalid";
-
 const CSRF_MESSAGE =
   "Could not start a secure connection to the server. Check your connection and try again.";
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
 
 function nonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -130,9 +121,9 @@ function refusal(status: number, body: unknown): AuthOutcome {
 /**
  * Read a `POST /auth/login` response.
  *
- * A success is only a success when a Session token came with it: the API emits
- * `set-auth-token` exactly on responses that established a credential, so a
- * 200-with-a-user-and-no-token is a response this client cannot act on rather
+ * A success is only a success when a Session cookie came with it: the API sets
+ * one exactly on responses that established a credential, so a
+ * 200-with-a-user-and-no-cookie is a response this client cannot act on rather
  * than a sign-in it should celebrate.
  */
 export function interpretSignIn(outcome: HttpOutcome): AuthOutcome {
@@ -148,19 +139,19 @@ export function interpretSignIn(outcome: HttpOutcome): AuthOutcome {
   }
 
   const user = parseSessionUser(data);
-  const token = nonEmptyString(outcome.sessionToken);
-  if (!user || !token) return { kind: "malformed" };
+  const cookie = nonEmptyString(outcome.sessionCookie);
+  if (!user || !cookie) return { kind: "malformed" };
 
-  return { kind: "signed-in", token, user };
+  return { kind: "signed-in", cookie, user };
 }
 
 /**
- * Read a `GET /auth/session` response for a token this client already holds.
+ * Read a `GET /auth/session` response for a cookie this client already holds.
  *
- * The token is passed in rather than read off the response because this endpoint
+ * The cookie is passed in rather than read off the response because this endpoint
  * issues no new credential — the one being verified is the one that comes back.
  */
-export function interpretSession(outcome: HttpOutcome, token: string): AuthOutcome {
+export function interpretSession(outcome: HttpOutcome, cookie: string): AuthOutcome {
   if (!outcome.reached) return { kind: "transport-failure" };
 
   if (outcome.status < 200 || outcome.status >= 300) {
@@ -170,5 +161,5 @@ export function interpretSession(outcome: HttpOutcome, token: string): AuthOutco
   const user = parseSessionUser(envelopeData(outcome.body));
   if (!user) return { kind: "malformed" };
 
-  return { kind: "signed-in", token, user };
+  return { kind: "signed-in", cookie, user };
 }

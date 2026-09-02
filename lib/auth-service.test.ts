@@ -1,6 +1,16 @@
-import { apiRequest, getBearerToken, setBearerToken } from "@/lib/api-client";
+import {
+  apiRequest,
+  clearCsrfPair,
+  getSessionCookie,
+  setSessionCookie,
+} from "@/lib/api-client";
 import { hydrateAuth, signInWithPassword, signOut } from "@/lib/auth-service";
-import { clearSessionToken, readSessionToken, writeSessionToken } from "@/lib/keychain";
+import {
+  clearRetiredCredential,
+  clearSessionCookie,
+  readSessionCookie,
+  writeSessionCookie,
+} from "@/lib/keychain";
 import { purgeMockSession } from "@/lib/legacy-session";
 import { getSessionUser, setSessionUser } from "@/lib/session";
 
@@ -8,10 +18,11 @@ jest.mock("@/lib/api-client", () => {
   let held: string | null = null;
   return {
     apiRequest: jest.fn(),
-    setBearerToken: jest.fn((token: string | null) => {
-      held = token;
+    setSessionCookie: jest.fn((cookie: string | null) => {
+      held = cookie;
     }),
-    getBearerToken: jest.fn(() => held),
+    getSessionCookie: jest.fn(() => held),
+    clearCsrfPair: jest.fn(),
   };
 });
 
@@ -20,15 +31,19 @@ jest.mock("@/lib/legacy-session", () => ({
 }));
 
 jest.mock("@/lib/keychain", () => ({
-  readSessionToken: jest.fn(),
-  writeSessionToken: jest.fn(async () => true),
-  clearSessionToken: jest.fn(async () => true),
+  readSessionCookie: jest.fn(),
+  writeSessionCookie: jest.fn(async () => true),
+  clearSessionCookie: jest.fn(async () => true),
+  clearRetiredCredential: jest.fn(async () => undefined),
 }));
 
 const request = apiRequest as jest.MockedFunction<typeof apiRequest>;
-const readToken = readSessionToken as jest.MockedFunction<typeof readSessionToken>;
-const writeToken = writeSessionToken as jest.MockedFunction<typeof writeSessionToken>;
-const clearToken = clearSessionToken as jest.MockedFunction<typeof clearSessionToken>;
+const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCookie>;
+const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
+const clearCookie = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
+
+const STORED = "better-auth.session_token=stored";
+const ISSUED = "better-auth.session_token=issued";
 
 const USER = {
   id: "56e168f0-3b5a-49fb-b475-0063c78a2337",
@@ -45,100 +60,101 @@ const PARSED_USER = {
   role: "agent" as const,
 };
 
-function ok(data: unknown, sessionToken: string | null = null) {
-  return { reached: true as const, status: 200, body: { data }, sessionToken };
+function ok(data: unknown, sessionCookie: string | null = null) {
+  return { reached: true as const, status: 200, body: { data }, sessionCookie };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  setBearerToken(null);
+  setSessionCookie(null);
   setSessionUser(null);
-  writeToken.mockResolvedValue(true);
-  clearToken.mockResolvedValue(true);
+  writeCookie.mockResolvedValue(true);
+  clearCookie.mockResolvedValue(true);
 });
 
 describe("hydrateAuth", () => {
-  test("sweeps up the mock shell's stored session on the way past", async () => {
-    readToken.mockResolvedValueOnce(null);
+  test("sweeps up what earlier slices stored on the way past", async () => {
+    readCookie.mockResolvedValueOnce(null);
     await hydrateAuth();
     expect(purgeMockSession).toHaveBeenCalled();
+    expect(clearRetiredCredential).toHaveBeenCalled();
   });
 
-  test("no stored token means nothing to check", async () => {
-    readToken.mockResolvedValueOnce(null);
+  test("no stored cookie means nothing to check", async () => {
+    readCookie.mockResolvedValueOnce(null);
     await expect(hydrateAuth()).resolves.toBeNull();
     expect(request).not.toHaveBeenCalled();
-    expect(getBearerToken()).toBeNull();
+    expect(getSessionCookie()).toBeNull();
   });
 
-  test("a live token signs its owner in and is held for later requests", async () => {
-    readToken.mockResolvedValueOnce("stored-token");
+  test("a live cookie signs its owner in and is held for later requests", async () => {
+    readCookie.mockResolvedValueOnce(STORED);
     request.mockResolvedValueOnce(ok(USER));
 
     await expect(hydrateAuth()).resolves.toEqual({
       kind: "signed-in",
-      token: "stored-token",
+      cookie: STORED,
       user: PARSED_USER,
     });
     expect(request).toHaveBeenCalledWith("/auth/session");
-    expect(getBearerToken()).toBe("stored-token");
+    expect(getSessionCookie()).toBe(STORED);
     expect(getSessionUser()).toEqual(PARSED_USER);
   });
 
   test("the credential is held before the request, so it is the one presented", async () => {
-    readToken.mockResolvedValueOnce("stored-token");
+    readCookie.mockResolvedValueOnce(STORED);
     request.mockImplementationOnce(async () => {
-      expect(getBearerToken()).toBe("stored-token");
+      expect(getSessionCookie()).toBe(STORED);
       return ok(USER);
     });
     await hydrateAuth();
     expect.assertions(1);
   });
 
-  test("a rejected token is erased from the keychain", async () => {
-    readToken.mockResolvedValueOnce("stale-token");
+  test("a rejected cookie is erased from the keychain", async () => {
+    readCookie.mockResolvedValueOnce("better-auth.session_token=stale");
     request.mockResolvedValueOnce({
       reached: true,
       status: 401,
       body: { message: "Unauthorized" },
-      sessionToken: null,
+      sessionCookie: null,
     });
 
     await expect(hydrateAuth()).resolves.toMatchObject({ kind: "unauthorised" });
-    expect(clearToken).toHaveBeenCalled();
-    expect(getBearerToken()).toBeNull();
+    expect(clearCookie).toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
     expect(getSessionUser()).toBeNull();
   });
 
-  test("an unreachable API keeps the token rather than signing anyone out", async () => {
-    readToken.mockResolvedValueOnce("stored-token");
+  test("an unreachable API keeps the cookie rather than signing anyone out", async () => {
+    readCookie.mockResolvedValueOnce(STORED);
     request.mockResolvedValueOnce({ reached: false });
 
     await expect(hydrateAuth()).resolves.toEqual({ kind: "transport-failure" });
-    expect(clearToken).not.toHaveBeenCalled();
-    expect(getBearerToken()).toBe("stored-token");
+    expect(clearCookie).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBe(STORED);
   });
 });
 
 describe("signInWithPassword", () => {
   test("posts the credentials and stores what comes back", async () => {
-    request.mockResolvedValueOnce(ok(USER, "issued-token"));
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
 
     await expect(
       signInWithPassword("  qa-agent@talo.test  ", "hunter2"),
-    ).resolves.toEqual({ kind: "signed-in", token: "issued-token", user: PARSED_USER });
+    ).resolves.toEqual({ kind: "signed-in", cookie: ISSUED, user: PARSED_USER });
 
     expect(request).toHaveBeenCalledWith("/auth/login", {
       method: "POST",
       body: { email: "qa-agent@talo.test", password: "hunter2" },
     });
-    expect(writeToken).toHaveBeenCalledWith("issued-token");
-    expect(getBearerToken()).toBe("issued-token");
+    expect(writeCookie).toHaveBeenCalledWith(ISSUED);
+    expect(getSessionCookie()).toBe(ISSUED);
     expect(getSessionUser()).toEqual(PARSED_USER);
   });
 
   test("the password is sent as typed — only the email is trimmed", async () => {
-    request.mockResolvedValueOnce(ok(USER, "issued-token"));
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
     await signInWithPassword("a@b.co", "  spaces matter  ");
     expect(request).toHaveBeenCalledWith("/auth/login", {
       method: "POST",
@@ -151,14 +167,14 @@ describe("signInWithPassword", () => {
       reached: true,
       status: 401,
       body: { message: "Invalid email or password." },
-      sessionToken: null,
+      sessionCookie: null,
     });
 
     await expect(signInWithPassword("a@b.co", "wrong")).resolves.toEqual({
       kind: "unauthorised",
       message: "Invalid email or password.",
     });
-    expect(writeToken).not.toHaveBeenCalled();
+    expect(writeCookie).not.toHaveBeenCalled();
     expect(getSessionUser()).toBeNull();
   });
 
@@ -170,15 +186,15 @@ describe("signInWithPassword", () => {
     await expect(signInWithPassword("a@b.co", "right")).resolves.toEqual({
       kind: "two-factor",
     });
-    expect(writeToken).not.toHaveBeenCalled();
-    expect(clearToken).toHaveBeenCalled();
-    expect(getBearerToken()).toBeNull();
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(clearCookie).toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
     expect(getSessionUser()).toBeNull();
   });
 
   test("a keychain that refuses the write still signs the person in for this run", async () => {
-    request.mockResolvedValueOnce(ok(USER, "issued-token"));
-    writeToken.mockResolvedValueOnce(false);
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+    writeCookie.mockResolvedValueOnce(false);
 
     await expect(signInWithPassword("a@b.co", "right")).resolves.toMatchObject({
       kind: "signed-in",
@@ -189,28 +205,29 @@ describe("signInWithPassword", () => {
 
 describe("signOut", () => {
   test("clears everything here, then tells the server which session ended", async () => {
-    setBearerToken("held-token");
+    setSessionCookie(STORED);
     setSessionUser(PARSED_USER);
     request.mockResolvedValueOnce(ok(true));
 
     await signOut();
 
-    // The token is handed over explicitly because it is no longer held: nothing
+    // The cookie is handed over explicitly because it is no longer held: nothing
     // the person does while a slow logout is in flight may carry it.
     expect(request).toHaveBeenCalledWith("/auth/logout", {
       method: "POST",
-      bearer: "held-token",
+      cookie: STORED,
     });
-    expect(clearToken).toHaveBeenCalled();
-    expect(getBearerToken()).toBeNull();
+    expect(clearCookie).toHaveBeenCalled();
+    expect(clearCsrfPair).toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
     expect(getSessionUser()).toBeNull();
   });
 
   test("the credential is already gone by the time the server is told", async () => {
-    setBearerToken("held-token");
+    setSessionCookie(STORED);
     setSessionUser(PARSED_USER);
     request.mockImplementationOnce(async () => {
-      expect(getBearerToken()).toBeNull();
+      expect(getSessionCookie()).toBeNull();
       expect(getSessionUser()).toBeNull();
       return ok(true);
     });
@@ -220,21 +237,21 @@ describe("signOut", () => {
   });
 
   test("clears everything here even when the server cannot be told", async () => {
-    setBearerToken("held-token");
+    setSessionCookie(STORED);
     setSessionUser(PARSED_USER);
     request.mockResolvedValueOnce({ reached: false });
 
     await signOut();
 
-    expect(getBearerToken()).toBeNull();
+    expect(getSessionCookie()).toBeNull();
     expect(getSessionUser()).toBeNull();
-    expect(clearToken).toHaveBeenCalled();
+    expect(clearCookie).toHaveBeenCalled();
   });
 
   test("with no credential there is nothing to tell the server", async () => {
     await signOut();
     expect(request).not.toHaveBeenCalled();
-    expect(clearToken).toHaveBeenCalled();
+    expect(clearCookie).toHaveBeenCalled();
   });
 });
 
@@ -247,7 +264,7 @@ describe("a sign-out that lands mid-request", () => {
 
     request.mockImplementationOnce(async () => {
       await arrived;
-      return ok(USER, "issued-token");
+      return ok(USER, ISSUED);
     });
 
     const attempt = signInWithPassword("a@b.co", "right");
@@ -255,15 +272,15 @@ describe("a sign-out that lands mid-request", () => {
     release!();
     await attempt;
 
-    // The person asked to be signed out. Writing the token now would sign them
+    // The person asked to be signed out. Writing the cookie now would sign them
     // back in at the next cold start.
-    expect(writeToken).not.toHaveBeenCalled();
-    expect(getBearerToken()).toBeNull();
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBeNull();
     expect(getSessionUser()).toBeNull();
   });
 
   test("a hydration that succeeds after it signs nobody in", async () => {
-    readToken.mockResolvedValueOnce("stored-token");
+    readCookie.mockResolvedValueOnce(STORED);
     let release: (() => void) | null = null;
     const arrived = new Promise<void>((resolve) => {
       release = resolve;
@@ -279,6 +296,6 @@ describe("a sign-out that lands mid-request", () => {
     await attempt;
 
     expect(getSessionUser()).toBeNull();
-    expect(getBearerToken()).toBeNull();
+    expect(getSessionCookie()).toBeNull();
   });
 });

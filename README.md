@@ -11,10 +11,10 @@ pnpm expo start
 `EXPO_PUBLIC_API_URL` is required — the app refuses to start without it rather than defaulting to an
 address no device can reach. The Android emulator reaches the host at `http://10.0.2.2:8080`.
 
-Signing in is real: the API verifies the password and the app stores the Session token in the device
-keychain, sending it as `Authorization: Bearer`. Role comes from the server, not from the client.
-Conversations are still mock data. Scope: `docs/scope.md`. Session transport:
-`docs/adr/ADR-0004-bearer-sessions-on-mobile.md`.
+Signing in is real: the API verifies the password and the app stores the Session cookie in the device
+keychain, replaying it by hand on every request the way the web client does. Role comes from the
+server, not from the client. Conversations are still mock data. Scope: `docs/scope.md`. Credential
+pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`.
 
 ## Builds
 

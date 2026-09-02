@@ -36,16 +36,20 @@ _Avoid_: Customer Hub, Agent Dashboard, Executive Overview (as UI labels)
 
 ### Session
 
-**Session token**:
-The signed Better Auth session token this client holds in the device keychain and sends as `Authorization: Bearer`. Opaque to the app — it is never parsed, only stored, sent, and discarded.
-_Avoid_: JWT, access token, API key, auth cookie
+**Session cookie**:
+The Better Auth session cookie the API sets, held in the device keychain and replayed on every request as a `Cookie` header this client sets by hand. Opaque to the app — never parsed, only stored, sent, and discarded.
+_Avoid_: Session token, JWT, access token, bearer token
+
+**CSRF token**:
+The double-submit value fetched from the API and sent as `X-CSRF-Token` on every mutation, alongside the `csrf-token` cookie it is paired with. Not bound to a session — one is fetched, cached, and reused until the API rejects it.
+_Avoid_: XSRF token, nonce, anti-forgery token
 
 **Hydration**:
-Reading the stored Session token at cold start and exchanging it for the signed-in Customer, Agent, or Admin. Ends in one of three states: signed in, signed out, or unreachable.
+Reading the stored Session cookie at cold start and exchanging it for the signed-in Customer, Agent, or Admin. Ends in one of three states: signed in, signed out, or unreachable.
 _Avoid_: Bootstrapping, session restore, rehydrate
 
 **Unreachable**:
-The Hydration outcome where a Session token exists but the API could not be reached. Distinct from signed out: the token is kept and the person is not sent to sign-in.
+The Hydration outcome where a Session cookie exists but the API could not be reached. Distinct from signed out: the cookie is kept and the person is not sent to sign-in.
 _Avoid_: Offline, error, disconnected
 
 **Unassigned pool**:

@@ -19,7 +19,9 @@ const AGENT: SessionUser = {
 
 const CUSTOMER: SessionUser = { ...AGENT, role: "customer" };
 
-const SIGNED_IN: AuthOutcome = { kind: "signed-in", token: "token", user: AGENT };
+const SESSION_COOKIE = "better-auth.session_token=abc.def";
+
+const SIGNED_IN: AuthOutcome = { kind: "signed-in", cookie: SESSION_COOKIE, user: AGENT };
 const TWO_FACTOR: AuthOutcome = { kind: "two-factor" };
 const REFUSED: AuthOutcome = {
   kind: "unauthorised",
@@ -53,12 +55,12 @@ test("a cold start begins by hydrating", () => {
 
 describe("hydration", () => {
   const cases: [string, AuthOutcome | null, AuthState][] = [
-    ["no stored token signs nobody in", null, SIGNED_OUT],
-    ["a live token signs its owner in", SIGNED_IN, AUTHENTICATED],
-    ["a token the server rejected is dropped without an accusation", REFUSED, SIGNED_OUT],
-    ["a token the server never answered for is Unreachable, not signed out", OFFLINE, UNREACHABLE],
-    ["a server error keeps the token — a bad deploy is not a bad credential", SERVER_ERROR, UNREACHABLE],
-    ["an unreadable answer is Unreachable too — the token may still be good", MALFORMED, UNREACHABLE],
+    ["no stored cookie signs nobody in", null, SIGNED_OUT],
+    ["a live cookie signs its owner in", SIGNED_IN, AUTHENTICATED],
+    ["a cookie the server rejected is dropped without an accusation", REFUSED, SIGNED_OUT],
+    ["a cookie the server never answered for is Unreachable, not signed out", OFFLINE, UNREACHABLE],
+    ["a server error keeps the cookie — a bad deploy is not a bad credential", SERVER_ERROR, UNREACHABLE],
+    ["an unreadable answer is Unreachable too — the cookie may still be good", MALFORMED, UNREACHABLE],
     ["a challenge at hydration still refuses rather than half-authenticating", TWO_FACTOR, { status: "signed-out", notice: TWO_FACTOR_NOTICE }],
   ];
 
@@ -109,7 +111,7 @@ describe("a settled sign-in attempt", () => {
   });
 
   test("the role comes from the outcome, never from what the state held before", () => {
-    const asCustomer: AuthOutcome = { kind: "signed-in", token: "t", user: CUSTOMER };
+    const asCustomer: AuthOutcome = { kind: "signed-in", cookie: SESSION_COOKIE, user: CUSTOMER };
     expect(authTransition(SUBMITTING, { type: "settled", outcome: asCustomer })).toEqual({
       status: "signed-in",
       user: CUSTOMER,

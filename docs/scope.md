@@ -30,7 +30,7 @@ Broadcasts are in-inbox announcements (later), not stories.
 0. Scaffold (done)
 1. Basic UI mock (done) — Customer hub, inbox, thread on mock data.
 2. Mock auth shell + role hubs (done) — login/register, AsyncStorage `{ email, role }`, splash/icon. Agent/Admin hub variants (mock knowledge / charts / add offer).
-3. **Real auth (current)** — Bearer sessions against the NestJS API, `expo-secure-store`.
+3. **Real auth (current)** — cookie sessions against the NestJS API, mirroring the web client, stored in `expo-secure-store`.
    - **3a. Password + magic link** — `lib/api-client.ts`, `AuthContext`, real Hydration, magic-link
      deep link. Google button rendered disabled. 2FA out (see ADR-0004). (this slice)
    - 3b. Google sign-in — needs a native module, so an EAS `development` profile and a dev client.
@@ -41,13 +41,13 @@ Broadcasts are in-inbox announcements (later), not stories.
 
 ## Session
 
-Signed in = a Session token in `expo-secure-store` that `GET /auth/session` accepts. Role is
+Signed in = a Session cookie in `expo-secure-store` that `GET /auth/session` accepts. Role is
 **server-owned** — it arrives on the session user and the app cannot set it. Sign-out clears the
-token and every cached identity, role included.
+cookie and every cached identity, role included.
 
-Hydration at cold start has three outcomes: signed in, signed out, and **Unreachable** — a token
-exists but the API did not answer, which keeps the token and offers a retry rather than sending the
-person to sign-in. A 401 is not Unreachable: it clears the token.
+Hydration at cold start has three outcomes: signed in, signed out, and **Unreachable** — a cookie
+exists but the API did not answer, which keeps the cookie and offers a retry rather than sending the
+person to sign-in. A 401 is not Unreachable: it clears the cookie.
 
 Self-registration does not exist; the API has no register endpoint. A first-time email gets an
 account by verifying a magic link. Staff accounts are created by an Admin on web.

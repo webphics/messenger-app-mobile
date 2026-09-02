@@ -1,10 +1,11 @@
 import * as SecureStore from "expo-secure-store";
 
 import {
-  clearSessionToken,
-  readSessionToken,
-  SESSION_TOKEN_KEY,
-  writeSessionToken,
+  clearRetiredCredential,
+  clearSessionCookie,
+  readSessionCookie,
+  SESSION_COOKIE_KEY,
+  writeSessionCookie,
 } from "@/lib/keychain";
 
 jest.mock("expo-secure-store", () => ({
@@ -14,6 +15,8 @@ jest.mock("expo-secure-store", () => ({
 }));
 
 const store = SecureStore as jest.Mocked<typeof SecureStore>;
+
+const COOKIE = "better-auth.session_token=abc.def";
 
 /** What a missing native module actually throws, verbatim enough to be recognisable. */
 const NATIVE_MODULE_FAILURE = new Error(
@@ -26,57 +29,76 @@ beforeEach(() => {
   store.deleteItemAsync.mockReset();
 });
 
-describe("readSessionToken", () => {
-  test("returns the stored token", async () => {
-    store.getItemAsync.mockResolvedValueOnce("session-token-value");
-    await expect(readSessionToken()).resolves.toBe("session-token-value");
-    expect(store.getItemAsync).toHaveBeenCalledWith(SESSION_TOKEN_KEY);
+describe("readSessionCookie", () => {
+  test("returns the stored cookie", async () => {
+    store.getItemAsync.mockResolvedValueOnce(COOKIE);
+    await expect(readSessionCookie()).resolves.toBe(COOKIE);
+    expect(store.getItemAsync).toHaveBeenCalledWith(SESSION_COOKIE_KEY);
   });
 
   test("trims what the keystore returns", async () => {
-    store.getItemAsync.mockResolvedValueOnce("  token  ");
-    await expect(readSessionToken()).resolves.toBe("token");
+    store.getItemAsync.mockResolvedValueOnce(`  ${COOKIE}  `);
+    await expect(readSessionCookie()).resolves.toBe(COOKIE);
   });
 
-  test("an absent key reads as no token", async () => {
+  test("an absent key reads as no cookie", async () => {
     store.getItemAsync.mockResolvedValueOnce(null);
-    await expect(readSessionToken()).resolves.toBeNull();
+    await expect(readSessionCookie()).resolves.toBeNull();
   });
 
-  test("a blank stored value reads as no token, not as an empty credential", async () => {
+  test("a blank stored value reads as no cookie, not as an empty credential", async () => {
     store.getItemAsync.mockResolvedValueOnce("   ");
-    await expect(readSessionToken()).resolves.toBeNull();
+    await expect(readSessionCookie()).resolves.toBeNull();
   });
 
-  test("a native-module failure reads as no token rather than throwing", async () => {
+  test("a native-module failure reads as no cookie rather than throwing", async () => {
     store.getItemAsync.mockRejectedValueOnce(NATIVE_MODULE_FAILURE);
-    await expect(readSessionToken()).resolves.toBeNull();
+    await expect(readSessionCookie()).resolves.toBeNull();
   });
 });
 
-describe("writeSessionToken", () => {
+describe("writeSessionCookie", () => {
   test("stores under the namespaced key and reports success", async () => {
     store.setItemAsync.mockResolvedValueOnce(undefined);
-    await expect(writeSessionToken("fresh-token")).resolves.toBe(true);
-    expect(store.setItemAsync).toHaveBeenCalledWith(SESSION_TOKEN_KEY, "fresh-token");
+    await expect(writeSessionCookie(COOKIE)).resolves.toBe(true);
+    expect(store.setItemAsync).toHaveBeenCalledWith(SESSION_COOKIE_KEY, COOKIE);
   });
 
   test("a native-module failure reports failure rather than throwing", async () => {
     store.setItemAsync.mockRejectedValueOnce(NATIVE_MODULE_FAILURE);
-    await expect(writeSessionToken("fresh-token")).resolves.toBe(false);
+    await expect(writeSessionCookie(COOKIE)).resolves.toBe(false);
   });
 });
 
-describe("clearSessionToken", () => {
+describe("clearSessionCookie", () => {
   test("deletes the key and reports success", async () => {
     store.deleteItemAsync.mockResolvedValueOnce(undefined);
-    await expect(clearSessionToken()).resolves.toBe(true);
-    expect(store.deleteItemAsync).toHaveBeenCalledWith(SESSION_TOKEN_KEY);
+    await expect(clearSessionCookie()).resolves.toBe(true);
+    expect(store.deleteItemAsync).toHaveBeenCalledWith(SESSION_COOKIE_KEY);
   });
 
   test("a native-module failure reports failure rather than throwing", async () => {
     store.deleteItemAsync.mockRejectedValueOnce(NATIVE_MODULE_FAILURE);
-    await expect(clearSessionToken()).resolves.toBe(false);
+    await expect(clearSessionCookie()).resolves.toBe(false);
+  });
+});
+
+describe("clearRetiredCredential", () => {
+  test("removes what the previous slice left behind, under its own key", async () => {
+    store.deleteItemAsync.mockResolvedValueOnce(undefined);
+    await clearRetiredCredential();
+    expect(store.deleteItemAsync).toHaveBeenCalledWith("enki.session_token");
+  });
+
+  test("leaves the live credential alone", async () => {
+    store.deleteItemAsync.mockResolvedValueOnce(undefined);
+    await clearRetiredCredential();
+    expect(store.deleteItemAsync).not.toHaveBeenCalledWith(SESSION_COOKIE_KEY);
+  });
+
+  test("a native-module failure is silent rather than thrown", async () => {
+    store.deleteItemAsync.mockRejectedValueOnce(NATIVE_MODULE_FAILURE);
+    await expect(clearRetiredCredential()).resolves.toBeUndefined();
   });
 });
 
@@ -91,10 +113,29 @@ describe("round trip", () => {
       delete disk[key];
     });
 
-    await writeSessionToken("round-trip-token");
-    await expect(readSessionToken()).resolves.toBe("round-trip-token");
+    await writeSessionCookie(COOKIE);
+    await expect(readSessionCookie()).resolves.toBe(COOKIE);
 
-    await clearSessionToken();
-    await expect(readSessionToken()).resolves.toBeNull();
+    await clearSessionCookie();
+    await expect(readSessionCookie()).resolves.toBeNull();
+  });
+
+  test("clearing the retired key does not disturb the stored cookie", async () => {
+    const disk: Record<string, string> = {};
+    store.setItemAsync.mockImplementation(async (key, value) => {
+      disk[key] = value;
+    });
+    store.getItemAsync.mockImplementation(async (key) => disk[key] ?? null);
+    store.deleteItemAsync.mockImplementation(async (key) => {
+      delete disk[key];
+    });
+
+    disk["enki.session_token"] = "left over";
+    await writeSessionCookie(COOKIE);
+
+    await clearRetiredCredential();
+
+    expect(disk["enki.session_token"]).toBeUndefined();
+    await expect(readSessionCookie()).resolves.toBe(COOKIE);
   });
 });
