@@ -31,9 +31,11 @@ Broadcasts are in-inbox announcements (later), not stories.
 1. Basic UI mock (done) — Customer hub, inbox, thread on mock data.
 2. Mock auth shell + role hubs (done) — login/register, AsyncStorage `{ email, role }`, splash/icon. Agent/Admin hub variants (mock knowledge / charts / add offer).
 3. **Real auth (current)** — cookie sessions against the NestJS API, mirroring the web client, stored in `expo-secure-store`.
-   - **3a. Password + magic link** — `lib/api-client.ts`, `AuthContext`, real Hydration, magic-link
-     deep link. Google button rendered disabled. 2FA out (see ADR-0004). (this slice)
-   - 3b. Google sign-in — needs a native module, so an EAS `development` profile and a dev client.
+   - **3a. Password + magic link (done)** — `lib/api-client.ts`, `AuthContext`, real Hydration,
+     magic-link deep link. Google button rendered disabled. 2FA out (see ADR-0004). The mock shell
+     it replaced is gone with it: no register screen, no control that sets a role.
+   - **3b. Google sign-in (current)** — needs a native module, so an EAS `development` profile and a
+     dev client.
 4. Realtime (socket.io) + REST (TanStack Query).
 5. Media, push, i18n, list virtualization.
    - 5a. Client media UI (local attachments) — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (done)
@@ -55,8 +57,12 @@ exists but the API did not answer, which keeps the cookie and offers a retry rat
 person to sign-in. A 401 is not Unreachable: it clears the cookie.
 
 Self-registration does not exist; the API has no register endpoint. A first-time email gets an
-account by verifying a magic link. Staff accounts are created by an Admin on web.
+account by verifying a magic link. Staff accounts are created by an Admin on web. The register
+screen is gone rather than disabled — it posted nowhere — and the sign-in screen sends anyone
+without an account to the link instead.
 
 The Settings role switcher is gone. It set the session's role from the client, which server-owned
-roles make a lie; #22 brings it back as a `__DEV__`-only picker for *which seed account to sign in
-as*, which is a different control with the same shape.
+roles make a lie. What replaced it is a `__DEV__`-only picker on the sign-in screen for *which seed
+account to sign in as*: it fills the form from `EXPO_PUBLIC_DEV_SEED_ACCOUNTS`, and the role that
+arrives is the server's answer about that account. `__DEV__` is what keeps both the control and its
+configured credentials out of a shipped bundle.

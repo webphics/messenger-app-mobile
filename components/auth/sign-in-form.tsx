@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { AlertCircle, Eye, EyeOff, MailCheck, Sparkles } from "@/components/icons";
+import { AlertCircle, Eye, EyeOff, MailCheck } from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,6 +11,7 @@ import {
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { SeedAccountPicker } from "@/components/auth/seed-account-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
@@ -21,17 +22,19 @@ import { ROLE_HREF } from "@/lib/hub-routes";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { magicLinkRequestNotice } from "@/lib/magic-link-route";
 import { settleDownEnter, settleEnter } from "@/lib/motion-enter";
-import {
-  emailLooksValid,
-  passwordIsValid,
-  passwordScore,
-  suggestPassword,
-} from "@/lib/password";
+import { emailLooksValid } from "@/lib/email";
+import type { SeedAccount } from "@/lib/seed-accounts";
 import { colors, screenTopPad } from "@/lib/tokens";
 
-type AuthFormProps = {
-  mode: "login" | "register";
-};
+/**
+ * The only way into the app.
+ *
+ * There was a second screen beside this one — a registration form — and it
+ * posted nowhere, because the API has no self-registration endpoint. An account
+ * comes into existence one way on mobile: someone asks for a sign-in link and
+ * verifies it. So the link below is not a convenience, it is the sign-up path,
+ * and the copy where "create an account" used to link says so.
+ */
 
 /**
  * Where the request for a sign-in link has got to.
@@ -60,46 +63,33 @@ type LinkRequest = {
 
 const NO_LINK_REQUEST: LinkRequest = { sentTo: null, sending: false, failure: null };
 
-export function AuthForm({ mode }: AuthFormProps) {
+export function SignInForm() {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { keyboardInset, contentRef, scrollProps } = useKeyboardAwareScroll();
   const { state, signIn, requestMagicLink } = useAuth();
-  const register = mode === "register";
   const submitting = state.status === "submitting";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [confirmError, setConfirmError] = useState<string | null>(null);
-  const score = passwordScore(password);
-  const [localNotice, setLocalNotice] = useState<string | null>(null);
   const [linkRequest, setLinkRequest] = useState<LinkRequest>(NO_LINK_REQUEST);
   const sendingLink = linkRequest.sending;
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
   /**
    * What the last attempt came back with — the server's own words for a refusal,
    * the two-factor explanation, or a network message. Cleared by the machine the
-   * moment a new attempt starts.
-   *
-   * The machine's notice is about *signing in*, so it is not shown on the sign-up
-   * form: a refusal left over from a failed sign-in would otherwise greet someone
-   * on an untouched registration form and outrank the explanation that form has
-   * to give.
+   * moment a new attempt starts. A failed link request outranks it: it is the
+   * newer answer, and it describes the control that was pressed last.
    */
   const notice =
     linkRequest.failure !== null
       ? linkRequest.failure
-      : register
-        ? localNotice
-        : state.status === "signed-out"
-          ? state.notice
-          : null;
+      : state.status === "signed-out"
+        ? state.notice
+        : null;
 
   // Navigating from the state rather than from the submit handler's return value
   // is what makes the destination the role the *server* assigned. Nothing on this
@@ -112,43 +102,23 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function onSubmit() {
     if (submitting) return;
-    setLocalNotice(null);
     // Only the failure. It outranks the machine's notice, so left standing it
     // would outlive the attempt it described and speak over this one. A standing
     // confirmation is not cleared: a link did go to that address, and still has.
     setLinkRequest((prev) => ({ ...prev, failure: null }));
 
     const nextEmail = emailLooksValid(email.trim()) ? null : "Enter a valid email address";
-    // Only the sign-up form judges password shape. Refusing to send a password
-    // that fails today's rules would lock out an older account that met the
-    // rules when it was created — the server is the authority on what is valid.
-    const nextPassword =
-      register && !passwordIsValid(password)
-        ? "8+ characters, with uppercase, lowercase, number & symbol"
-        : password === ""
-          ? "Enter your password"
-          : null;
-    const nextConfirm = register && confirm !== password ? "Passwords do not match" : null;
+    // Shape is not judged here. Refusing to send a password that fails today's
+    // rules would lock out an older account that met the rules when it was
+    // created — the server is the authority on what is valid.
+    const nextPassword = password === "" ? "Enter your password" : null;
     setEmailError(nextEmail);
     setPasswordError(nextPassword);
-    setConfirmError(nextConfirm);
-    if (nextEmail || nextPassword || nextConfirm) {
+    if (nextEmail || nextPassword) {
       hapticWarning();
       // Move to the first thing that is wrong: the errors below the fold are
       // otherwise invisible on a short screen with the keyboard up.
-      const firstError = nextEmail ? emailRef : nextPassword ? passwordRef : confirmRef;
-      firstError.current?.focus();
-      return;
-    }
-
-    if (register) {
-      // The API has no self-registration endpoint — not disabled, absent — so
-      // there is nothing to post these credentials at. Point at the one way an
-      // account does come into existence on mobile, which is on this screen.
-      hapticWarning();
-      setLocalNotice(
-        "Passwords can’t create an account here. Use “Email me a sign-in link” below — verifying your first link is what creates the account.",
-      );
+      (nextEmail ? emailRef : passwordRef).current?.focus();
       return;
     }
 
@@ -165,7 +135,6 @@ export function AuthForm({ mode }: AuthFormProps) {
    */
   async function onRequestLink() {
     if (sendingLink) return;
-    setLocalNotice(null);
 
     const trimmed = email.trim();
     if (!emailLooksValid(trimmed)) {
@@ -191,16 +160,22 @@ export function AuthForm({ mode }: AuthFormProps) {
     setLinkRequest({ sentTo: trimmed, sending: false, failure: null });
   }
 
-  function onSuggest() {
-    const next = suggestPassword();
-    setPassword(next);
-    setConfirm(next);
+  /**
+   * Take a seed account's credentials into the form, and stop there.
+   *
+   * Not a sign-in: the fields fill, the person presses the same button as
+   * everyone else, and the role they land in is whatever the server says that
+   * account holds. See `components/auth/seed-account-picker`.
+   */
+  function onPickSeedAccount(account: SeedAccount) {
+    setEmail(account.email);
+    setPassword(account.password);
+    setEmailError(null);
     setPasswordError(null);
-    setConfirmError(null);
+    // A confirmation names an address, and this one has just changed.
+    setLinkRequest(NO_LINK_REQUEST);
     hapticSelection();
   }
-
-  const scoreLevel = score === "strong" ? 3 : score === "fair" ? 2 : score === "weak" ? 1 : 0;
 
   return (
     // Shrinking the scroll viewport is what keeps a focused field above the
@@ -251,12 +226,10 @@ export function AuthForm({ mode }: AuthFormProps) {
           className="mt-6 rounded-3xl border border-line/70 bg-surface p-5 shadow-md shadow-black/8"
         >
           <Text variant="headline" className="text-ink">
-            {register ? "Create an account" : "Welcome back"}
+            Welcome back
           </Text>
           <Text variant="label" className="mt-0.5 font-normal text-muted">
-            {register
-              ? "Sign up with your organization email"
-              : "Sign in to access your queue and chats"}
+            Sign in to access your queue and chats
           </Text>
 
           <View className="mt-5">
@@ -316,12 +289,10 @@ export function AuthForm({ mode }: AuthFormProps) {
                 autoCapitalize="none"
                 autoCorrect={false}
                 spellCheck={false}
-                autoComplete={register ? "new-password" : "current-password"}
-                textContentType={register ? "newPassword" : "password"}
-                returnKeyType={register ? "next" : "go"}
-                onSubmitEditing={() =>
-                  register ? confirmRef.current?.focus() : void onSubmit()
-                }
+                autoComplete="current-password"
+                textContentType="password"
+                returnKeyType="go"
+                onSubmitEditing={() => void onSubmit()}
                 value={password}
                 onChangeText={(v) => {
                   setPassword(v);
@@ -355,122 +326,16 @@ export function AuthForm({ mode }: AuthFormProps) {
             ) : null}
           </View>
 
-          {register ? (
-            <>
-              {/* Visual Password Strength Indicator */}
-              <View className="mt-3">
-                <View className="flex-row items-center justify-between">
-                  <Text variant="label" className="text-muted">
-                    Password strength
-                  </Text>
-                  <Text
-                    variant="label"
-                    className={`font-bold ${
-                      score === "strong"
-                        ? "text-success"
-                        : score === "fair"
-                          ? "text-amber"
-                          : score === "weak"
-                            ? "text-danger"
-                            : "text-muted"
-                    }`}
-                  >
-                    {score === "empty" ? "Required" : score.toUpperCase()}
-                  </Text>
-                </View>
-                <View className="mt-1.5 flex-row gap-1.5">
-                  <View
-                    className={`h-1.5 flex-1 rounded-full ${
-                      scoreLevel >= 1
-                        ? scoreLevel === 1
-                          ? "bg-danger"
-                          : scoreLevel === 2
-                            ? "bg-amber"
-                            : "bg-success"
-                        : "bg-line"
-                    }`}
-                  />
-                  <View
-                    className={`h-1.5 flex-1 rounded-full ${
-                      scoreLevel >= 2
-                        ? scoreLevel === 2
-                          ? "bg-amber"
-                          : "bg-success"
-                        : "bg-line"
-                    }`}
-                  />
-                  <View
-                    className={`h-1.5 flex-1 rounded-full ${
-                      scoreLevel >= 3 ? "bg-success" : "bg-line"
-                    }`}
-                  />
-                </View>
-              </View>
-
-              <View className="mt-4">
-                <Text variant="label" className="mb-1.5 text-ink">
-                  Confirm Password
-                </Text>
-                <View className="relative justify-center">
-                  <Input
-                    ref={confirmRef}
-                    className="h-12 rounded-2xl border-line/80 bg-line/35 pr-11 font-sans text-base text-ink"
-                    placeholder="••••••••"
-                    accessibilityLabel="Confirm password"
-                    secureTextEntry={!showConfirm}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    autoComplete="new-password"
-                    textContentType="newPassword"
-                    returnKeyType="go"
-                    onSubmitEditing={() => void onSubmit()}
-                    value={confirm}
-                    onChangeText={(v) => {
-                      setConfirm(v);
-                      setConfirmError(null);
-                    }}
-                  />
-                  <TactilePressable
-                    accessibilityRole="button"
-                    accessibilityLabel={showConfirm ? "Hide confirm password" : "Show confirm password"}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={() => setShowConfirm((prev) => !prev)}
-                    className="absolute right-3 size-8 items-center justify-center rounded-full"
-                  >
-                    {showConfirm ? (
-                      <EyeOff color={colors.inkSoft} size={18} />
-                    ) : (
-                      <Eye color={colors.muted} size={18} />
-                    )}
-                  </TactilePressable>
-                </View>
-                {confirmError ? (
-                  <View
-                    className="mt-1.5 flex-row items-center gap-1.5"
-                    accessibilityLiveRegion="polite"
-                  >
-                    <AlertCircle color={colors.danger} size={14} />
-                    <Text variant="label" className="font-medium text-danger">
-                      {confirmError}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-
-              <TactilePressable
-                accessibilityRole="button"
-                accessibilityLabel="Suggest secure password"
-                onPress={onSuggest}
-                className="mt-3.5 flex-row items-center gap-1.5 self-start rounded-xl bg-primary-soft/70 px-3 py-1.5"
-              >
-                <Sparkles color={colors.primary} size={14} />
-                <Text variant="label" className="font-bold text-primary">
-                  Suggest strong password
-                </Text>
-              </TactilePressable>
-            </>
-          ) : null}
+          <SeedAccountPicker
+            filled={{ email, password }}
+            onSelect={onPickSeedAccount}
+            // Inert while either request is out. Filling the form clears the
+            // link request's state, and doing that mid-flight would take the
+            // spinner off the button, drop the guard that stops a second
+            // request, and land the confirmation on an address the form no
+            // longer holds.
+            disabled={submitting || sendingLink}
+          />
 
           {notice ? (
             <View
@@ -498,7 +363,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               <ActivityIndicator size="small" color={colors.primaryForeground} />
             ) : null}
             {/* The label stays put while it spins, so the control never looks like a different one. */}
-            <Text>{register ? "Create Account" : "Sign In"}</Text>
+            <Text>Sign In</Text>
           </Button>
 
           <View className="mt-6 flex-row items-center gap-3">
@@ -553,25 +418,47 @@ export function AuthForm({ mode }: AuthFormProps) {
             </Text>
           </Button>
 
+          {/* Where “Don’t have an account? Create one” used to link to a form that
+              posted nowhere. Verifying a link is how an account is made, so the
+              sentence names that rather than sending anyone looking for a screen
+              that no longer exists. */}
           <Text variant="meta" className="mt-2.5 text-center text-muted">
-            No password needed. First time here? The link creates your account.
+            No account yet? No password needed — the link makes one when you open
+            it.
           </Text>
-        </Animated.View>
 
-        <Animated.View entering={settleEnter(!!reduceMotion, 120)}>
-          <TactilePressable
-            accessibilityRole="link"
-            onPress={() =>
-              router.replace(register ? "/(auth)/sign-in" : "/(auth)/register")
-            }
-            className="mt-6 min-h-11 items-center justify-center"
+          {/*
+            Not yet, and it says so.
+
+            Google sign-in needs a native module and the development build that
+            comes with it (Phase 3b). It stays on screen because taking it away
+            would read as “not offered” rather than “coming” — but it is a real
+            `disabled` button with no `onPress`, so a tap fires nothing, goes
+            nowhere and cannot fail. Anything that merely *looked* like a button
+            would break AGENTS.md’s “if it looks clickable, it must be
+            clickable”; a disabled one is a control that is honestly shut.
+
+            The unavailability is in the accessible name and in the visible
+            “Soon” pill as well as the dimming, so it survives a screen reader
+            and a person who cannot see the dimming.
+          */}
+          <Button
+            variant="outline"
+            className="mt-3 min-h-12 w-full"
+            disabled
+            accessibilityLabel="Continue with Google — not available yet"
+            accessibilityState={{ disabled: true }}
           >
-            <Text variant="meta" className="font-semibold text-primary">
-              {register
-                ? "Already have an account? Sign in"
-                : "Don't have an account? Create one"}
-            </Text>
-          </TactilePressable>
+            <Text className="text-ink">Continue with Google</Text>
+            <View className="rounded-full bg-line px-2 py-0.5">
+              <Text
+                variant="label"
+                className="font-bold uppercase tracking-wider text-ink-soft"
+              >
+                Soon
+              </Text>
+            </View>
+          </Button>
         </Animated.View>
       </ScrollView>
     </View>
