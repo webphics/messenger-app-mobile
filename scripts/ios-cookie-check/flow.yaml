@@ -1,0 +1,47 @@
+# Drives the simulator through the one journey that exercises the credential
+# layer: sign in, then cold start twice so the fake API's planted decoys have
+# something to poison. The assertions that matter are server-side, in
+# assert-report.mjs — this flow only has to make the requests happen.
+#
+# Selectors are the sign-in screen's own copy from components/auth/auth-form.tsx.
+# If that copy changes, this flow needs updating with it.
+appId: com.anonymous.enki
+---
+- launchApp:
+    clearState: true
+
+# Cleared state means no stored Session cookie, so the app lands on sign-in.
+- assertVisible: "Welcome back"
+
+- tapOn: "name@company.com"
+- inputText: "ci-agent@enki.test"
+- hideKeyboard
+
+- tapOn:
+    below: "Password"
+- inputText: "irrelevant-the-fake-api-accepts-anything"
+- hideKeyboard
+
+- tapOn: "Sign In"
+
+# The eyebrow is rendered from the role on the session payload, so this failing
+# means the app did not read the fake API's user — not merely that it is slow.
+- assertVisible:
+    text: "AGENT"
+    timeout: 20000
+
+# First cold start: hydrates from the keychain, and the response to that
+# hydration is where the after-login decoy gets planted.
+- stopApp
+- launchApp
+- assertVisible:
+    text: "AGENT"
+    timeout: 20000
+
+# Second cold start: the native store now holds the decoy while the keychain
+# holds the real value. This is the request that discriminates between them.
+- stopApp
+- launchApp
+- assertVisible:
+    text: "AGENT"
+    timeout: 20000
