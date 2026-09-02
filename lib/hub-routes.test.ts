@@ -4,6 +4,7 @@ import {
   knowledgeHref,
   knowledgeListHref,
   ROLE_HREF,
+  SIGN_IN_HREF,
 } from '@/lib/hub-routes'
 
 describe('hub-routes', () => {
@@ -11,6 +12,10 @@ describe('hub-routes', () => {
     expect(ROLE_HREF.customer).toBe('/(customer)')
     expect(ROLE_HREF.agent).toBe('/(agent)')
     expect(ROLE_HREF.admin).toBe('/(admin)')
+  })
+
+  test('SIGN_IN_HREF points at the auth group', () => {
+    expect(SIGN_IN_HREF).toBe('/(auth)/sign-in')
   })
 
   test('knowledgeListHref', () => {

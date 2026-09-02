@@ -2,6 +2,9 @@ import type { Href } from "expo-router";
 
 import type { UserRole } from "@/lib/types";
 
+/** Where anyone without a session goes. */
+export const SIGN_IN_HREF = "/(auth)/sign-in" as Href;
+
 export const ROLE_HREF: Record<UserRole, Href> = {
   customer: "/(customer)" as Href,
   agent: "/(agent)" as Href,
