@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { View } from "react-native";
 import {
   Redirect,
@@ -14,12 +14,12 @@ import { Text } from "@/components/ui/text";
 import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
 import { failureNotice } from "@/lib/conversation-failure";
 import { findOffersConversation } from "@/lib/conversation-state";
+import { useCustomerInbox } from "@/lib/customer-inbox";
 import { getDevUser } from "@/lib/dev-user";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { CONVERSATIONS, MESSAGES } from "@/lib/mock-data";
 import { canViewConversation } from "@/lib/rbac";
 import { getSession, getSessionUser } from "@/lib/session";
-import { useCustomerInbox } from "@/lib/use-customer-inbox";
 import { useThreadMessages } from "@/lib/use-thread-messages";
 import type { Conversation, Message } from "@/lib/types";
 
@@ -111,6 +111,20 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
     "customer",
     author,
   );
+
+  /**
+   * Opening a thread reads it.
+   *
+   * Keyed on the id rather than on the row, so the clear this causes — which
+   * replaces the row in the list every screen shares — does not ask for a second
+   * one. `markRead` is stable, and only a conversation this person may open is
+   * ever named.
+   */
+  const { markRead } = inbox;
+  const openedId = allowed ? conversation.id : null;
+  useEffect(() => {
+    if (openedId) markRead(openedId);
+  }, [openedId, markRead]);
 
   if (inbox.status === "loading") return <AppLoadingScreen />;
   if (inbox.status === "failed") {

@@ -150,6 +150,21 @@ How far a Message the viewer sent has travelled among the people in the Conversa
 Unsent message. A bubble shows one or the other, never both.
 _Avoid_: Delivery state (that is the Unsent message's), tick, checkmark
 
+**Unread**:
+What a Conversation holds for the viewer that they have not read yet. The list endpoint counts it
+(`unreadCount`); every other path declines to, and a row that arrived by one of those falls back to
+whether the last Message was theirs or carries their read Receipt. The reader's side of the facts a
+Receipt reports to the sender. Shown as a count on the Conversation row, and summed across the list
+for the Messages tab badge — where an uncounted row that the fallback calls unread is worth one,
+because a badge that ignored it would disagree with the row beside it.
+_Avoid_: Badge (that is where it is shown), new messages, notification count
+
+**Mark as read**:
+Opening a Conversation, which clears its Unread and adds the opener's read Receipt to every Message
+in it. `POST /conversations/:id/read`. The badge clears before the API is told, because the person
+has read the thread whatever the server makes of it.
+_Avoid_: Acknowledge, seen, dismiss, clear notifications
+
 **Attachment**:
 A single file or recording on a Message — image, video, document, or voice note — identified by a local device URI in this client until a server exists. At most one Attachment per Message.
 _Avoid_: Upload, media blob, file message (as a type parallel to Message)

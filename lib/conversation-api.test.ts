@@ -6,6 +6,7 @@ import {
   listConversations,
   listMessages,
   listMyOrganizations,
+  markConversationRead,
   sendMessage,
 } from '@/lib/conversation-api'
 
@@ -396,5 +397,76 @@ describe('sendMessage', () => {
       'second-token',
     )
     expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'msg-2' }) })
+  })
+})
+
+describe('markConversationRead', () => {
+  const READ_ROW = { ...SUPPORT_ROW, lastMessageRead: true, unreadCount: null }
+
+  test('posts to the conversation read path, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope(READ_ROW))
+
+    const result = await markConversationRead('conv-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/read`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'conv-1' }) })
+  })
+
+  test('sends no body, which is all the endpoint takes', async () => {
+    enqueue(csrfResponse(), envelope(READ_ROW))
+
+    await markConversationRead('conv-1')
+
+    expect(calls[1]?.init.body).toBeUndefined()
+  })
+
+  test('carries the Session cookie beside the CSRF cookie', async () => {
+    enqueue(csrfResponse(), envelope(READ_ROW))
+
+    await markConversationRead('conv-1')
+
+    expect((calls[1]?.init.headers as Record<string, string>).Cookie).toBe(
+      'better-auth.session_token=abc.def; csrf-token=cookie-value',
+    )
+  })
+
+  test('escapes an id rather than letting it shape the path', async () => {
+    enqueue(csrfResponse(), envelope(READ_ROW))
+
+    await markConversationRead('conv 1/../secrets')
+
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/conv%201%2F..%2Fsecrets/read`)
+  })
+
+  test('reports a request that never arrived as unreachable', async () => {
+    enqueue(csrfResponse(), new TypeError('Network request failed'))
+
+    expect(await markConversationRead('conv-1')).toEqual({
+      ok: false,
+      failure: { kind: 'unreachable' },
+    })
+  })
+
+  test('reports a 401 as an expired session rather than a refusal', async () => {
+    enqueue(csrfResponse(), response(401, { statusCode: 401, message: 'Unauthorized' }))
+
+    expect(await markConversationRead('conv-1')).toEqual({
+      ok: false,
+      failure: { kind: 'unauthorised' },
+    })
+  })
+
+  test('repeats what the server said when it refused', async () => {
+    enqueue(csrfResponse(), response(404, { statusCode: 404, message: 'Conversation not found' }))
+
+    expect(await markConversationRead('missing')).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Conversation not found' },
+    })
   })
 })

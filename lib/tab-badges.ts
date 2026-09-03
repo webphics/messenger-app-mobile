@@ -22,3 +22,17 @@ export function conversationsTabBadge(
   const n = totalUnread(listInboxConversations(role, userId, conversations));
   return n > 0 ? n : undefined;
 }
+
+/**
+ * Unread across a Customer's own conversations; omit when empty.
+ *
+ * No role filter: the API scopes the list it sends, so every row in it is one
+ * this person may see — and re-checking would drop a group whose membership the
+ * Customer's payload does not name.
+ */
+export function customerMessagesBadge(
+  conversations: Conversation[],
+): number | undefined {
+  const n = totalUnread(conversations);
+  return n > 0 ? n : undefined;
+}
