@@ -1,17 +1,27 @@
 import {
   applyMessagePage,
+  applySentMessage,
+  beginSend,
+  draftMessage,
   emptyThread,
+  failSend,
   findOffersConversation,
+  findUnsent,
+  isLocalId,
   isConversationUnread,
   isMessageVisibleTo,
   isOutgoing,
   mergeConversation,
   mergeMessages,
   messageSenderName,
+  deliveryStates,
   sortConversations,
+  threadMessages,
   totalUnread,
   visibleMessages,
+  withoutPages,
 } from '@/lib/conversation-state'
+import type { DeliveryState, ThreadState } from '@/lib/conversation-state'
 import type {
   Conversation,
   CustomerMessage,
@@ -159,6 +169,7 @@ describe('applyMessagePage', () => {
 
     expect(applyMessagePage(emptyThread(), page, viewer)).toEqual({
       messages: page,
+      unsent: [],
       hasMore: true,
       cursor: 'a',
     })
@@ -185,11 +196,11 @@ describe('applyMessagePage', () => {
 
   test('an empty page is the end of the thread', () => {
     const state = applyMessagePage(
-      { messages: [], hasMore: true, cursor: 'a' },
+      { ...emptyThread(), cursor: 'a' },
       [],
       viewer,
     )
-    expect(state).toEqual({ messages: [], hasMore: false, cursor: 'a' })
+    expect(state).toEqual({ messages: [], unsent: [], hasMore: false, cursor: 'a' })
   })
 
   test('a page shortened by a withheld message is not the end of the thread', () => {
@@ -208,7 +219,7 @@ describe('applyMessagePage', () => {
 
   test('a page of nothing but withheld messages still moves the cursor', () => {
     const state = applyMessagePage(
-      { messages: [], hasMore: true, cursor: 'z' },
+      { ...emptyThread(), cursor: 'z' },
       [customerMessage('a', '2026-08-13T08:00:00.000Z', { messageType: 'system' })],
       viewer,
     )
@@ -359,5 +370,325 @@ describe('totalUnread', () => {
 
   test('counts a row the API declined to count as nothing rather than as NaN', () => {
     expect(totalUnread([conversation({ unreadCount: null })])).toBe(0)
+  })
+})
+
+describe('draftMessage', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+
+  test('a Customer draft is theirs rather than the company speaking', () => {
+    const message = draftMessage({
+      id: 'local-1',
+      body: 'Is my payout on the way?',
+      author,
+      sentAt: '2026-08-13T08:00:00.000Z',
+    })
+
+    expect(message).toEqual({
+      id: 'local-1',
+      body: 'Is my payout on the way?',
+      messageType: 'text',
+      createdAt: '2026-08-13T08:00:00.000Z',
+      replyTo: null,
+      reactions: [],
+      attachments: [],
+      receiptStatus: 'sent',
+      fromCompany: false,
+    })
+  })
+
+  test('a staff draft names its sender', () => {
+    const message = draftMessage({
+      id: 'local-1',
+      body: 'Looking now.',
+      author: { id: 'agent-1', name: 'Jonah Reed', role: 'agent' },
+      sentAt: '2026-08-13T08:00:00.000Z',
+    })
+
+    expect(message).toMatchObject({
+      sender: { id: 'agent-1', name: 'Jonah Reed', role: 'agent' },
+    })
+    expect('fromCompany' in message).toBe(false)
+  })
+
+  test('a reply carries the quoted id and a preview of it', () => {
+    const quoted = customerMessage('msg-1', '2026-08-13T08:00:00.000Z', {
+      body: 'x'.repeat(200),
+    })
+    const message = draftMessage({ id: 'local-1', body: 'Thanks', author, replyTo: quoted })
+
+    expect(message.replyTo).toEqual({ id: 'msg-1', preview: 'x'.repeat(140) })
+  })
+
+  test('an attachment makes it a media message', () => {
+    const message = draftMessage({
+      id: 'local-1',
+      body: '',
+      author,
+      attachments: [
+        {
+          type: 'image/png',
+          url: 'file:///receipt.png',
+          fileName: 'receipt.png',
+          size: 1024,
+          durationSeconds: null,
+          waveform: null,
+        },
+      ],
+    })
+
+    expect(message.messageType).toBe('media')
+  })
+})
+
+describe('isLocalId', () => {
+  test.each([
+    ['local-1757000000000-1', true],
+    ['0b4f1f2c-9d1e-4a5b-8c3d-2e1f0a9b8c7d', false],
+    ['', false],
+  ])('%s is local: %s', (id, expected) => {
+    expect(isLocalId(id)).toBe(expected)
+  })
+})
+
+describe('beginSend', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+
+  function draft(id: string, at: string) {
+    return draftMessage({ id, body: id, author, sentAt: at })
+  }
+
+  test('the message joins the thread marked as on its way', () => {
+    const state = beginSend(emptyThread(), draft('local-1', '2026-08-13T08:00:00.000Z'))
+
+    expect(state.unsent).toEqual([
+      { message: draft('local-1', '2026-08-13T08:00:00.000Z'), state: 'sending' },
+    ])
+    expect(state.messages).toEqual([])
+  })
+
+  test('sending again re-marks the message rather than stacking a second copy', () => {
+    const message = draft('local-1', '2026-08-13T08:00:00.000Z')
+    const failed = failSend(beginSend(emptyThread(), message), 'local-1')
+
+    expect(beginSend(failed, message).unsent).toEqual([{ message, state: 'sending' }])
+  })
+
+  test('leaves the pages it was given alone', () => {
+    const held = applyMessagePage(
+      emptyThread(),
+      [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
+      { role: 'customer', conversationType: 'support_dm' },
+    )
+    const state = beginSend(held, draft('local-1', '2026-08-13T08:01:00.000Z'))
+
+    expect(state.messages).toEqual(held.messages)
+    expect(state.cursor).toBe('msg-1')
+  })
+})
+
+describe('applySentMessage', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+  const echo = draftMessage({
+    id: 'local-1',
+    body: 'Is my payout on the way?',
+    author,
+    sentAt: '2026-08-13T08:01:00.000Z',
+  })
+  const stored = customerMessage('msg-2', '2026-08-13T08:01:00.500Z', {
+    body: 'Is my payout on the way?',
+    fromCompany: false,
+  })
+
+  test('the stored message takes the echo place rather than joining it', () => {
+    const state = applySentMessage(beginSend(emptyThread(), echo), 'local-1', stored)
+
+    expect(state.unsent).toEqual([])
+    expect(state.messages.map((m) => m.id)).toEqual(['msg-2'])
+  })
+
+  test('it lands after the history already held', () => {
+    const held = applyMessagePage(
+      emptyThread(),
+      [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
+      { role: 'customer', conversationType: 'support_dm' },
+    )
+    const state = applySentMessage(beginSend(held, echo), 'local-1', stored)
+
+    expect(state.messages.map((m) => m.id)).toEqual(['msg-1', 'msg-2'])
+  })
+
+  test('a refresh that already brought the stored message does not show it twice', () => {
+    const viewer = { role: 'customer', conversationType: 'support_dm' } as const
+    const raced = applyMessagePage(beginSend(emptyThread(), echo), [stored], viewer)
+    const state = applySentMessage(raced, 'local-1', stored)
+
+    expect(state.messages.map((m) => m.id)).toEqual(['msg-2'])
+    expect(state.unsent).toEqual([])
+  })
+
+  test('another message still sending is left where it is', () => {
+    const other = draftMessage({
+      id: 'local-2',
+      body: 'And the fee?',
+      author,
+      sentAt: '2026-08-13T08:02:00.000Z',
+    })
+    const state = applySentMessage(
+      beginSend(beginSend(emptyThread(), echo), other),
+      'local-1',
+      stored,
+    )
+
+    expect(state.unsent).toEqual([{ message: other, state: 'sending' }])
+  })
+
+  test('an answer for a message no longer held only adds the stored message', () => {
+    const state = applySentMessage(emptyThread(), 'local-1', stored)
+
+    expect(state.messages.map((m) => m.id)).toEqual(['msg-2'])
+    expect(state.unsent).toEqual([])
+  })
+
+  test('does not mutate what it was given', () => {
+    const before = beginSend(emptyThread(), echo)
+    applySentMessage(before, 'local-1', stored)
+
+    expect(before.unsent).toHaveLength(1)
+    expect(before.messages).toEqual([])
+  })
+})
+
+describe('failSend', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+  const echo = draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: 'x' })
+
+  test('a failed send keeps its bubble, marked', () => {
+    const state = failSend(beginSend(emptyThread(), echo), 'local-1')
+
+    expect(state.unsent).toEqual([{ message: echo, state: 'failed' }])
+    expect(threadMessages(state).map((m) => m.id)).toEqual(['local-1'])
+  })
+
+  test('marks only the message named', () => {
+    const other = draftMessage({ id: 'local-2', body: 'And', author, sentAt: 'y' })
+    const state = failSend(beginSend(beginSend(emptyThread(), echo), other), 'local-1')
+
+    expect(deliveryStates(state.unsent)).toEqual(
+      new Map([
+        ['local-1', 'failed'],
+        ['local-2', 'sending'],
+      ]),
+    )
+  })
+
+  test('a message nobody is holding changes nothing', () => {
+    const before = beginSend(emptyThread(), echo)
+    expect(failSend(before, 'local-9')).toEqual(before)
+  })
+})
+
+describe('the send lifecycle', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+  const echo = draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: 'x' })
+  const stored = customerMessage('msg-1', '2026-08-13T08:00:00.000Z', { fromCompany: false })
+
+  const sending = () => beginSend(emptyThread(), echo)
+  const failed = () => failSend(sending(), 'local-1')
+
+  /** Each row: where the thread was, what happened, what it shows and how it reads. */
+  test.each([
+    ['nothing sent yet', emptyThread, [], []],
+    ['the send starts', sending, ['local-1'], [['local-1', 'sending']]],
+    ['the send fails', failed, ['local-1'], [['local-1', 'failed']]],
+    ['the API answers', () => applySentMessage(sending(), 'local-1', stored), ['msg-1'], []],
+    ['a retry after a failure', () => beginSend(failed(), echo), ['local-1'], [['local-1', 'sending']]],
+    ['a retry that lands', () => applySentMessage(failed(), 'local-1', stored), ['msg-1'], []],
+    ['a refresh mid-send', () => withoutPages(sending()), ['local-1'], [['local-1', 'sending']]],
+  ] as [string, () => ThreadState, string[], [string, DeliveryState][]][])(
+    '%s',
+    (_name, build, shown, delivery) => {
+      const state = build()
+      expect(threadMessages(state).map((m) => m.id)).toEqual(shown)
+      expect([...deliveryStates(state.unsent)]).toEqual(delivery)
+    },
+  )
+})
+
+describe('findUnsent', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+  const echo = draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: 'x' })
+
+  test('finds a message still in flight', () => {
+    expect(findUnsent(beginSend(emptyThread(), echo), 'local-1')).toEqual({
+      message: echo,
+      state: 'sending',
+    })
+  })
+
+  test('is undefined once the API has answered for it', () => {
+    const sent = customerMessage('msg-1', '2026-08-13T08:00:00.000Z')
+    const state = applySentMessage(beginSend(emptyThread(), echo), 'local-1', sent)
+
+    expect(findUnsent(state, 'local-1')).toBeUndefined()
+  })
+})
+
+describe('threadMessages', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+
+  test('a message on its way sits after the history in time order', () => {
+    const held = applyMessagePage(
+      emptyThread(),
+      [
+        customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
+        customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
+      ],
+      { role: 'customer', conversationType: 'support_dm' },
+    )
+    const state = beginSend(
+      held,
+      draftMessage({ id: 'local-1', body: 'Hi', author, sentAt: '2026-08-13T08:02:00.000Z' }),
+    )
+
+    expect(threadMessages(state).map((m) => m.id)).toEqual(['msg-1', 'msg-2', 'local-1'])
+  })
+
+  test('a settled thread is its pages', () => {
+    const held = applyMessagePage(
+      emptyThread(),
+      [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
+      { role: 'customer', conversationType: 'support_dm' },
+    )
+
+    expect(threadMessages(held)).toEqual(held.messages)
+  })
+})
+
+describe('deliveryStates', () => {
+  test('a thread with nothing in flight reports nothing', () => {
+    expect(deliveryStates(emptyThread().unsent).size).toBe(0)
+  })
+})
+
+describe('withoutPages', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+
+  test('a refresh drops the pages and keeps the message still going out', () => {
+    const echo = draftMessage({ id: 'local-1', body: 'Hi', author, sentAt: 'x' })
+    const held = beginSend(
+      applyMessagePage(emptyThread(), [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')], {
+        role: 'customer',
+        conversationType: 'support_dm',
+      }),
+      echo,
+    )
+
+    expect(withoutPages(held)).toEqual({
+      messages: [],
+      unsent: [{ message: echo, state: 'sending' }],
+      hasMore: true,
+      cursor: undefined,
+    })
   })
 })

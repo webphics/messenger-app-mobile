@@ -1,5 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, CheckCheck, CornerUpLeft, Reply } from '@/components/icons'
+import {
+  AlertCircle,
+  Check,
+  CheckCheck,
+  CornerUpLeft,
+  Reply,
+  RotateCcw,
+} from '@/components/icons'
 import { Dimensions, Image, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
@@ -34,6 +41,7 @@ import {
   type OpenMenuPayload,
 } from '@/lib/overlay-frame'
 import { colors } from '@/lib/tokens'
+import type { DeliveryState } from '@/lib/conversation-state'
 import type {
   AttachmentKind,
   AttachmentView,
@@ -56,6 +64,13 @@ type MessageBubbleProps = {
   body: string
   outgoing: boolean
   status: ReceiptStatus
+  /**
+   * Set only while this device is still carrying the message. It replaces the
+   * receipt rather than sitting beside it: a message the server has not
+   * acknowledged has no receipt to show.
+   */
+  delivery?: DeliveryState
+  onRetrySend?: (messageId: string) => void
   senderName?: string
   quoted?: QuotedMessage
   reactions?: ReactionGroup[]
@@ -70,6 +85,65 @@ type MessageBubbleProps = {
 
 const SWIPE_REPLY = 56
 const LONG_PRESS_MS = 150
+
+/**
+ * What a message this device is still carrying says about itself.
+ *
+ * A failed send stays on screen and says so, rather than disappearing: the
+ * person wrote it, and a bubble that vanishes is indistinguishable from one that
+ * arrived. Tapping sends it again — the only next move there is, and the reason
+ * this is a control rather than a label.
+ *
+ * Both states read as words as well as colour, because a red tick and a grey one
+ * are the same tick to anyone who cannot tell them apart.
+ */
+function Delivery({
+  state,
+  messageId,
+  onRetry,
+}: {
+  state: DeliveryState
+  messageId: string
+  onRetry?: (messageId: string) => void
+}) {
+  if (state === 'sending') {
+    return (
+      <View className="mt-1 items-end pr-1">
+        <Text variant="label" className="text-muted">
+          Sending…
+        </Text>
+      </View>
+    )
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Not sent. Tap to send again."
+      accessibilityLiveRegion="polite"
+      onPress={() => onRetry?.(messageId)}
+      disabled={!onRetry}
+      hitSlop={12}
+      className="mt-1 flex-row items-center justify-end gap-1 self-end py-1 pr-1 active:opacity-60"
+    >
+      <AlertCircle color={colors.danger} size={12} />
+      <Text variant="label" className="text-danger">
+        Not sent
+      </Text>
+      {onRetry ? (
+        <>
+          <Text variant="label" className="text-danger">
+            ·
+          </Text>
+          <RotateCcw color={colors.danger} size={11} />
+          <Text variant="label" className="font-medium text-danger">
+            Retry
+          </Text>
+        </>
+      ) : null}
+    </Pressable>
+  )
+}
 
 function Receipt({
   status,
@@ -361,6 +435,8 @@ export const MessageBubble = memo(function MessageBubble({
   body,
   outgoing,
   status,
+  delivery,
+  onRetrySend,
   senderName,
   quoted,
   reactions = [],
@@ -683,7 +759,11 @@ export const MessageBubble = memo(function MessageBubble({
               />
             </View>
             ) : null}
-            <Receipt status={status} outgoing={outgoing} />
+            {outgoing && delivery ? (
+              <Delivery state={delivery} messageId={messageId} onRetry={onRetrySend} />
+            ) : (
+              <Receipt status={status} outgoing={outgoing} />
+            )}
           </Animated.View>
         </GestureDetector>
       </View>

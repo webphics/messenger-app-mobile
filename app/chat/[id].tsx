@@ -100,7 +100,17 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
     user !== null &&
     canViewConversation("customer", user.id, conversation);
 
-  const thread = useThreadMessages(allowed ? conversation : null, "customer");
+  const author = useMemo(
+    () =>
+      user ? ({ id: user.id, name: user.name, role: "customer" } as const) : null,
+    [user],
+  );
+
+  const thread = useThreadMessages(
+    allowed ? conversation : null,
+    "customer",
+    author,
+  );
 
   if (inbox.status === "loading") return <AppLoadingScreen />;
   if (inbox.status === "failed") {
@@ -124,13 +134,16 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
   return (
     <ThreadScreen
       conversation={conversation}
-      messages={thread.state.messages}
+      messages={thread.messages}
       viewer={{ id: user.id, name: user.name, role: "customer" }}
       organizationNames={inbox.organizationNames}
       onLoadOlder={thread.loadOlder}
       loadingOlder={thread.loadingOlder}
       refreshing={thread.refreshing}
       onRefresh={thread.refresh}
+      onSendMessage={thread.send}
+      delivery={thread.delivery}
+      onRetrySend={thread.retrySend}
     />
   );
 }

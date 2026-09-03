@@ -1,4 +1,10 @@
-import type { Conversation, ConversationType, Message, UserRole } from '@/lib/types'
+import type {
+  Conversation,
+  ConversationType,
+  Message,
+  MessageAttachment,
+  UserRole,
+} from '@/lib/types'
 import { isStaffMessage } from '@/lib/types'
 
 /**
@@ -7,15 +13,51 @@ import { isStaffMessage } from '@/lib/types'
  * Everything here is pure: state in, state out, no network and no React. It is
  * where the rules that would otherwise be scattered through screens live — which
  * messages a viewer may see, how a page of history joins the pages already held,
- * how far back the next page should ask for, and whether a row is unread.
+ * how far back the next page should ask for, whether a row is unread, and what
+ * becomes of a message someone typed while the request carrying it is out.
  *
  * The same functions are what the socket layer will fold events into (#31),
  * which is the reason merging is written as a merge rather than as an append.
  */
 
+/**
+ * How far a message typed on this device has got — which is not a receipt.
+ *
+ * `receiptStatus` is the server's word about a message it already holds; this is
+ * this device's word about one it may not hold yet. The two never overlap: an
+ * unsent message has no receipt until the API answers with one, and by then it
+ * is no longer unsent.
+ *
+ * Deliberately not called *outgoing*: `isOutgoing` already means "sent by the
+ * person reading it", which is what a bubble's `outgoing` prop is, and a message
+ * can be outgoing in that sense for the rest of its life.
+ */
+export type DeliveryState = 'sending' | 'failed'
+
+/** A message typed here, from the tap on send until the API confirms it. */
+export type UnsentMessage = {
+  /** Carries a local id. The one the API assigns replaces it rather than joining it. */
+  message: Message
+  state: DeliveryState
+}
+
+/** What the composer hands whatever is going to send it. */
+export type SendDraft = {
+  body: string
+  /** The message being answered, or null when this is not a reply. */
+  replyTo: Message | null
+}
+
 export type ThreadState = {
-  /** Oldest first, deduplicated by id. */
+  /** Oldest first, deduplicated by id. What the API has confirmed. */
   messages: Message[]
+  /**
+   * Sent from here and not yet confirmed, kept apart from the confirmed pages so
+   * that a page arriving mid-send — a refresh, a scroll into history — cannot
+   * overwrite one, and so that nothing has to guess whether an id is the
+   * server's.
+   */
+  unsent: UnsentMessage[]
   /** Whether asking for another page is still worth a request. */
   hasMore: boolean
   /**
@@ -26,7 +68,18 @@ export type ThreadState = {
 }
 
 export function emptyThread(): ThreadState {
-  return { messages: [], hasMore: true, cursor: undefined }
+  return { messages: [], unsent: [], hasMore: true, cursor: undefined }
+}
+
+/**
+ * The pages dropped and the unsent messages kept: what a refresh rebuilds from.
+ *
+ * A refresh re-reads the newest page and starts the thread over from it, which
+ * must not take a message still in flight down with it — the person typed it,
+ * can see it, and the request carrying it is still out.
+ */
+export function withoutPages(state: ThreadState): ThreadState {
+  return { ...emptyThread(), unsent: state.unsent }
 }
 
 /**
@@ -108,6 +161,7 @@ export function applyMessagePage(
   viewer: { role: UserRole; conversationType: ConversationType },
 ): ThreadState {
   return {
+    ...state,
     messages: mergeMessages(
       state.messages,
       visibleMessages(viewer.role, viewer.conversationType, page),
@@ -115,6 +169,147 @@ export function applyMessagePage(
     hasMore: page.length > 0,
     cursor: page[0]?.id ?? state.cursor,
   }
+}
+
+/**
+ * The prefix every id minted on this device carries.
+ *
+ * The API's ids are UUIDs, so a prefixed one cannot collide with a real message,
+ * and anything holding an id can tell whether the server has ever seen it. Two
+ * places need to: a bubble, which animates an echo in and not a fetched message,
+ * and a reply, which must not send the API a `replyToMessageId` no row answers to.
+ */
+export const LOCAL_ID_PREFIX = 'local-'
+
+export function isLocalId(id: string): boolean {
+  return id.startsWith(LOCAL_ID_PREFIX)
+}
+
+export type MessageAuthor = { id: string; name: string; role: UserRole }
+
+export type MessageDraft = {
+  /** Local; see `LOCAL_ID_PREFIX`. */
+  id: string
+  body: string
+  author: MessageAuthor
+  replyTo?: Message | null
+  attachments?: MessageAttachment[]
+  /** Defaults to now. Named so a test can fix it. */
+  sentAt?: string
+}
+
+/** How much of a quoted message a reply's preview carries. Matches the API's own. */
+const REPLY_PREVIEW_LENGTH = 140
+
+/**
+ * The bubble a send puts on screen before the API has answered for it.
+ *
+ * It is shaped as a `Message` because that is what a thread renders, and it
+ * carries `receiptStatus: 'sent'` because the type demands one — a lie that is
+ * never read, since a bubble showing a `DeliveryState` shows that instead of a
+ * receipt. The server's answer replaces this whole object rather than patching
+ * it, so nothing invented here outlives the round trip.
+ */
+export function draftMessage(draft: MessageDraft): Message {
+  const attachments = draft.attachments ?? []
+  const base = {
+    id: draft.id,
+    body: draft.body,
+    messageType: attachments.length > 0 ? ('media' as const) : ('text' as const),
+    createdAt: draft.sentAt ?? new Date().toISOString(),
+    replyTo: draft.replyTo
+      ? { id: draft.replyTo.id, preview: draft.replyTo.body.slice(0, REPLY_PREVIEW_LENGTH) }
+      : null,
+    reactions: [],
+    attachments,
+    receiptStatus: 'sent' as const,
+  }
+
+  return draft.author.role === 'customer'
+    ? { ...base, fromCompany: false }
+    : { ...base, sender: { id: draft.author.id, name: draft.author.name, role: draft.author.role } }
+}
+
+/**
+ * A send begins, or begins again.
+ *
+ * Keyed by id so a retry re-marks the message already on screen rather than
+ * stacking a second copy of it beneath the first.
+ */
+export function beginSend(state: ThreadState, message: Message): ThreadState {
+  return {
+    ...state,
+    unsent: [
+      ...state.unsent.filter((entry) => entry.message.id !== message.id),
+      { message, state: 'sending' },
+    ],
+  }
+}
+
+/**
+ * The API's answer to a send, folded into the thread.
+ *
+ * The echo is dropped in the same step the real message is merged, so the bubble
+ * is replaced rather than briefly doubled — the two have different ids and
+ * nothing else would ever remove the first.
+ *
+ * The merge is a merge and not an append because the answer can arrive after a
+ * page that already contains it: a refresh that overlapped the send comes back
+ * with the server's copy, and folding by id means the second arrival replaces
+ * the first instead of showing the person their message twice.
+ */
+export function applySentMessage(
+  state: ThreadState,
+  localId: string,
+  sent: Message,
+): ThreadState {
+  return {
+    ...state,
+    messages: mergeMessages(state.messages, [sent]),
+    unsent: state.unsent.filter((entry) => entry.message.id !== localId),
+  }
+}
+
+/**
+ * A send that did not land.
+ *
+ * The message stays where the person put it, marked, rather than vanishing —
+ * what they wrote is not the API's to discard, and a thread that quietly loses a
+ * bubble is indistinguishable from one that delivered it.
+ */
+export function failSend(state: ThreadState, localId: string): ThreadState {
+  return {
+    ...state,
+    unsent: state.unsent.map((entry) =>
+      entry.message.id === localId ? { ...entry, state: 'failed' } : entry,
+    ),
+  }
+}
+
+export function findUnsent(
+  state: ThreadState,
+  localId: string,
+): UnsentMessage | undefined {
+  return state.unsent.find((entry) => entry.message.id === localId)
+}
+
+/** Everything the thread shows: what the API confirmed, and what is still on its way. */
+export function threadMessages(state: ThreadState): Message[] {
+  return mergeMessages(
+    state.messages,
+    state.unsent.map((entry) => entry.message),
+  )
+}
+
+/** Shared so a settled thread hands its bubbles the same map every render. */
+const NOTHING_UNSENT: ReadonlyMap<string, DeliveryState> = new Map()
+
+/** How far each unconfirmed message has got, for the bubbles that render them. */
+export function deliveryStates(
+  unsent: UnsentMessage[],
+): ReadonlyMap<string, DeliveryState> {
+  if (unsent.length === 0) return NOTHING_UNSENT
+  return new Map(unsent.map((entry) => [entry.message.id, entry.state]))
 }
 
 /** Whether a message was sent by the person reading it. */

@@ -51,6 +51,7 @@ export { default as Pause } from "lucide-react-native/icons/pause";
 export { default as Play } from "lucide-react-native/icons/play";
 export { default as Plus } from "lucide-react-native/icons/plus";
 export { default as Reply } from "lucide-react-native/icons/reply";
+export { default as RotateCcw } from "lucide-react-native/icons/rotate-ccw";
 export { default as Search } from "lucide-react-native/icons/search";
 export { default as Send } from "lucide-react-native/icons/send";
 export { default as Settings } from "lucide-react-native/icons/settings";
