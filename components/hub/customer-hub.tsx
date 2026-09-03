@@ -12,13 +12,13 @@ import { OffersCarousel } from "@/components/hub/offers-carousel";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { useCustomerInbox } from "@/lib/customer-inbox";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { latestInboxThread } from "@/lib/inbox-filter";
 import { CUSTOMER_HREF } from "@/lib/hub-routes";
 import { settleDownEnter } from "@/lib/motion-enter";
 import { getSessionUser } from "@/lib/session";
-import { useCustomerInbox } from "@/lib/use-customer-inbox";
 
 export function CustomerHub() {
   const user = getSessionUser();

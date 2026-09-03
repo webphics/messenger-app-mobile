@@ -373,8 +373,55 @@ export function mergeConversation(
   if (index === -1) return sortConversations([...conversations, conversation])
 
   const next = [...conversations]
-  next[index] = conversation
+  next[index] = keepUnreadCount(conversations[index], conversation)
   return sortConversations(next)
+}
+
+/**
+ * The arriving row, keeping a count it did not bring.
+ *
+ * Only the list endpoint counts; every other path answers `null`, which means
+ * "not counted" and never "nothing unread". Without this, a Customer's support
+ * thread would lose its badge the moment get-or-create answered, because that
+ * answer arrives beside the list rather than instead of it.
+ */
+function keepUnreadCount(held: Conversation, arriving: Conversation): Conversation {
+  if (arriving.unreadCount !== null || held.unreadCount === null) return arriving
+  return { ...arriving, unreadCount: held.unreadCount }
+}
+
+/**
+ * One row, as it stands once the person has opened it.
+ *
+ * Both fields, because they are the two halves of the same fact and
+ * `isConversationUnread` reads whichever one the row has: a counted row goes to
+ * zero, and an uncounted one is read by receipt.
+ */
+function readRow(conversation: Conversation): Conversation {
+  if (conversation.unreadCount === 0 && conversation.lastMessageRead) return conversation
+  return { ...conversation, unreadCount: 0, lastMessageRead: true }
+}
+
+/**
+ * The list with one conversation marked as read.
+ *
+ * What the badge does the instant a thread opens, ahead of the API being told.
+ * Answers the list it was given when the row is absent or was already read,
+ * which is what keeps opening a read thread from re-rendering every row.
+ */
+export function withConversationRead(
+  conversations: Conversation[],
+  id: string,
+): Conversation[] {
+  const index = conversations.findIndex((row) => row.id === id)
+  if (index === -1) return conversations
+
+  const read = readRow(conversations[index])
+  if (read === conversations[index]) return conversations
+
+  const next = [...conversations]
+  next[index] = read
+  return next
 }
 
 /**
@@ -394,12 +441,20 @@ export function findOffersConversation(
   return conversations.find(isOffersConversation)
 }
 
-/** Unread across a list, for a tab badge. */
+/**
+ * Unread across a list, for a tab badge.
+ *
+ * A floor rather than a tally. Where the API counted, the count is the answer;
+ * where it declined to and the row is unread by receipt, the row is worth one,
+ * because the alternative is a badge that says nothing about a conversation the
+ * list beside it is showing as unread. It cannot say *how many* — nothing this
+ * client holds knows that — so it says at least one.
+ */
 export function totalUnread(conversations: Conversation[]): number {
-  return conversations.reduce(
-    (sum, conversation) => sum + Math.max(0, conversation.unreadCount ?? 0),
-    0,
-  )
+  return conversations.reduce((sum, conversation) => {
+    if (conversation.unreadCount !== null) return sum + Math.max(0, conversation.unreadCount)
+    return sum + (isConversationUnread(conversation) ? 1 : 0)
+  }, 0)
 }
 
 /** Whether this row is the Offers group. See `findOffersConversation`. */

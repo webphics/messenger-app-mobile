@@ -19,6 +19,7 @@ import {
   threadMessages,
   totalUnread,
   visibleMessages,
+  withConversationRead,
   withoutPages,
 } from '@/lib/conversation-state'
 import type { DeliveryState, ThreadState } from '@/lib/conversation-state'
@@ -340,6 +341,79 @@ describe('mergeConversation', () => {
   })
 })
 
+describe('keepUnreadCount, through mergeConversation', () => {
+  test.each([
+    ['a row that declines to count keeps the count the list gave it', 3, null, 3],
+    ['a row that counts replaces the count the list gave it', 3, 0, 0],
+    ['a count arrives where the list had none', null, 2, 2],
+    ['neither side counted, so neither does the merge', null, null, null],
+  ] as const)('%s', (_name, held, arriving, expected) => {
+    const merged = mergeConversation(
+      [conversation({ id: 'a', unreadCount: held })],
+      conversation({ id: 'a', unreadCount: arriving }),
+    )
+    expect(merged[0]?.unreadCount).toBe(expected)
+  })
+
+  test('a row the list never had keeps its own count, counted or not', () => {
+    const merged = mergeConversation([], conversation({ id: 'a', unreadCount: null }))
+    expect(merged[0]?.unreadCount).toBeNull()
+  })
+})
+
+describe('withConversationRead', () => {
+  const list = [
+    conversation({ id: 'a', unreadCount: 2, lastMessageRead: false }),
+    conversation({ id: 'b', unreadCount: 5, lastMessageRead: false }),
+  ]
+
+  test.each([
+    ['a counted unread row', 3, false],
+    ['a row the API declined to count, unread by receipt', null, false],
+    ['a row counted at zero the receipt still calls unread', 0, false],
+    ['a counted unread row whose receipt already says read', 3, true],
+  ] as const)('%s ends up read on both halves of the fact', (_name, unreadCount, lastMessageRead) => {
+    const [row] = withConversationRead(
+      [conversation({ id: 'a', unreadCount, lastMessageRead })],
+      'a',
+    )
+    expect(row).toMatchObject({ unreadCount: 0, lastMessageRead: true })
+    expect(isConversationUnread(row!)).toBe(false)
+  })
+
+  test('reads the row named and leaves every other one alone', () => {
+    const next = withConversationRead(list, 'a')
+    expect(next[0]).toMatchObject({ id: 'a', unreadCount: 0, lastMessageRead: true })
+    expect(next[1]).toBe(list[1])
+  })
+
+  test('changes nothing else about the row it reads', () => {
+    const held = [conversation({ id: 'a', unreadCount: 4, lastMessagePreview: 'Hello' })]
+    expect(withConversationRead(held, 'a')[0]).toMatchObject({
+      id: 'a',
+      lastMessagePreview: 'Hello',
+    })
+  })
+
+  test('clears the badge that row was contributing', () => {
+    expect(totalUnread(list)).toBe(7)
+    expect(totalUnread(withConversationRead(list, 'a'))).toBe(5)
+  })
+
+  test.each([
+    ['a row the list does not hold', 'missing'],
+    ['a row that was already read', 'read'],
+  ] as const)('answers the list it was given for %s', (_name, id) => {
+    const held = [...list, conversation({ id: 'read', unreadCount: 0, lastMessageRead: true })]
+    expect(withConversationRead(held, id)).toBe(held)
+  })
+
+  test('does not mutate what it was given', () => {
+    withConversationRead(list, 'a')
+    expect(list[0]).toMatchObject({ unreadCount: 2, lastMessageRead: false })
+  })
+})
+
 describe('findOffersConversation', () => {
   test('finds the group by its title', () => {
     const offers = conversation({ id: 'g1', type: 'group', title: 'Offers' })
@@ -368,8 +442,28 @@ describe('totalUnread', () => {
     ).toBe(5)
   })
 
-  test('counts a row the API declined to count as nothing rather than as NaN', () => {
-    expect(totalUnread([conversation({ unreadCount: null })])).toBe(0)
+  test.each([
+    ['an uncounted row the receipt calls read is worth nothing', true, false, 0],
+    ['an uncounted row the viewer sent last is worth nothing', false, true, 0],
+    ['an uncounted row unread by receipt is worth at least one', false, false, 1],
+  ] as const)('%s', (_name, lastMessageRead, lastMessageMine, expected) => {
+    expect(
+      totalUnread([conversation({ unreadCount: null, lastMessageRead, lastMessageMine })]),
+    ).toBe(expected)
+  })
+
+  test('never answers NaN for a row with no count', () => {
+    expect(Number.isFinite(totalUnread([conversation({ unreadCount: null })]))).toBe(true)
+  })
+
+  test('a badge and a row never disagree about whether there is something to read', () => {
+    const uncounted = conversation({
+      unreadCount: null,
+      lastMessageRead: false,
+      lastMessageMine: false,
+    })
+    expect(isConversationUnread(uncounted)).toBe(true)
+    expect(totalUnread([uncounted])).toBeGreaterThan(0)
   })
 })
 

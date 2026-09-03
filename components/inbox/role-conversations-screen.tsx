@@ -2,11 +2,11 @@ import { useMemo } from "react";
 
 import { InboxScreen } from "@/components/inbox/inbox-screen";
 import { failureNotice } from "@/lib/conversation-failure";
+import { useCustomerInbox } from "@/lib/customer-inbox";
 import { getDevUserId } from "@/lib/dev-user";
 import { listInboxConversations } from "@/lib/inbox-filter";
 import { CONVERSATIONS } from "@/lib/mock-data";
 import { getSession } from "@/lib/session";
-import { useCustomerInbox } from "@/lib/use-customer-inbox";
 
 type RoleConversationsScreenProps = {
   /** Agents read the shared queue but do not start threads from it. */

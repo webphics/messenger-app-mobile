@@ -12,11 +12,13 @@ import { Tabs } from "expo-router";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { useCustomerInbox } from "@/lib/customer-inbox";
 import { getDevUser } from "@/lib/dev-user";
 import { CONVERSATIONS } from "@/lib/mock-data";
 import { motion } from "@/lib/motion";
 import {
   conversationsTabBadge,
+  customerMessagesBadge,
   unassignedTabBadge,
 } from "@/lib/tab-badges";
 import { colors } from "@/lib/tokens";
@@ -31,15 +33,22 @@ const CAPSULE_PAD = 6;
 /**
  * The count on a tab, where there is one to show.
  *
+ * A Customer's is the real unread total the API sends with their conversation
+ * list, and it clears as soon as a thread is opened because the list it is
+ * counted from is the one `CustomerInboxProvider` holds for every screen.
+ *
  * The staff tabs still read the mock list, which is what their screens read
- * until #32. The Customer's Messages tab shows nothing: their conversations are
- * real as of #28, and a badge counted off mock rows would be the last piece of
- * invented chat data left on their screen. The real count is #30, which owns
- * unread and mark-as-read together.
+ * until #32.
  */
-function badgeForRoute(name: string): number | undefined {
+function badgeForRoute(
+  name: string,
+  /** A Customer's unread total, already summed. Undefined for every other role. */
+  customerUnread: number | undefined,
+): number | undefined {
   const user = getDevUser();
-  if (user.role === "customer") return undefined;
+  if (user.role === "customer") {
+    return name === "messages" ? customerUnread : undefined;
+  }
   if (name === "unassigned") return unassignedTabBadge(CONVERSATIONS);
   if (name === "conversations" || name === "messages") {
     return conversationsTabBadge(user.role, user.id, CONVERSATIONS);
@@ -60,6 +69,9 @@ export function FloatingTabBar({
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const tabCount = state.routes.length;
+  const inbox = useCustomerInbox();
+  const customerUnread =
+    inbox.status === "ready" ? customerMessagesBadge(inbox.conversations) : undefined;
 
   const tabWidth = useSharedValue(0);
   const activeIndex = useSharedValue(state.index);
@@ -107,7 +119,7 @@ export function FloatingTabBar({
           const { options } = descriptors[route.key];
           const color = focused ? colors.primary : colors.muted;
           const label = options.title ?? route.name;
-          const badge = badgeForRoute(route.name);
+          const badge = badgeForRoute(route.name, customerUnread);
 
           const onPress = () => {
             const event = navigation.emit({

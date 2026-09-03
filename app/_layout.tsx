@@ -31,6 +31,7 @@ import { Uniwind } from "uniwind";
 
 import { SessionEndRedirect } from "@/components/auth/session-end";
 import { AuthProvider } from "@/lib/auth-context";
+import { CustomerInboxProvider } from "@/lib/customer-inbox";
 import { colors } from "@/lib/tokens";
 
 Uniwind.setTheme("light");
@@ -95,33 +96,38 @@ export default function RootLayout() {
       ) : null}
       <AuthProvider>
         <SessionEndRedirect />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.bg },
-            animation: "default",
-            gestureEnabled: true,
-          }}
-        >
-          <Stack.Screen
-            name="chat/[id]"
-            options={{
+        {/* Inside the auth provider and outside the navigator: a Customer's
+            conversations are fetched once for every screen that reads them, and
+            the chat route sits beside the tab groups rather than inside one. */}
+        <CustomerInboxProvider>
+          <Stack
+            screenOptions={{
               headerShown: false,
               contentStyle: { backgroundColor: colors.bg },
+              animation: "default",
+              gestureEnabled: true,
             }}
-          />
-          <Stack.Screen
-            name="(auth)"
-            options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
-          />
-          {/* The magic link's landing route. Named here so a cold start opened by
-              a link gets the same chrome as every other screen rather than the
-              navigator's defaults. */}
-          <Stack.Screen
-            name="auth/magic-link"
-            options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
-          />
-        </Stack>
+          >
+            <Stack.Screen
+              name="chat/[id]"
+              options={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.bg },
+              }}
+            />
+            <Stack.Screen
+              name="(auth)"
+              options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+            />
+            {/* The magic link's landing route. Named here so a cold start opened by
+                a link gets the same chrome as every other screen rather than the
+                navigator's defaults. */}
+            <Stack.Screen
+              name="auth/magic-link"
+              options={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+            />
+          </Stack>
+        </CustomerInboxProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

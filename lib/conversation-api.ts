@@ -172,6 +172,23 @@ export async function sendMessage(
 }
 
 /**
+ * Tell the API this conversation has been read.
+ *
+ * The answer is the conversation, but it arrives with `unreadCount: null` like
+ * every row from outside the list endpoint, so there is nothing in it worth
+ * merging: what a caller wants from this is the effect, and `ok` is how it
+ * learns the effect happened. `lib/conversation-state`'s `withConversationRead`
+ * is what says so on screen, ahead of this and independently of it.
+ */
+export async function markConversationRead(id: string): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/read`,
+    { method: 'POST' },
+  )
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
  * The organizations the signed-in person belongs to.
  *
  * A Customer's support conversation is per-organization, so this is what names
