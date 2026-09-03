@@ -1,4 +1,5 @@
 import {
+  applyIncomingMessage,
   applyMessagePage,
   applySentMessage,
   beginSend,
@@ -20,8 +21,11 @@ import {
   totalUnread,
   visibleMessages,
   withConversationRead,
+  withIncomingMessage,
+  withoutConversation,
   withoutPages,
 } from '@/lib/conversation-state'
+import { parseMessageCreated } from '@/lib/realtime-events'
 import type { DeliveryState, ThreadState } from '@/lib/conversation-state'
 import type {
   Conversation,
@@ -784,5 +788,336 @@ describe('withoutPages', () => {
       hasMore: true,
       cursor: undefined,
     })
+  })
+})
+
+/**
+ * The socket half of the same rules the REST half is tested against above.
+ *
+ * The payloads are the API's own, read through `lib/realtime-events` so these
+ * are the objects the socket layer actually hands the merge — a synthetic event
+ * end to end, with no socket and no React anywhere near it.
+ */
+function messageCreatedEvent(
+  id: string,
+  createdAt: string,
+  message: Partial<CustomerMessage> = {},
+) {
+  const event = parseMessageCreated({
+    conversationId: 'conv-1',
+    message: {
+      id,
+      body: id,
+      messageType: 'text',
+      createdAt,
+      fromCompany: true,
+      replyTo: null,
+      reactions: [],
+      attachments: [],
+      receiptStatus: 'sent',
+      ...message,
+    },
+  })
+  if (!event) throw new Error('the fixture is not a payload this app can read')
+  return event
+}
+
+const CUSTOMER_VIEWER = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
+
+describe('applyIncomingMessage', () => {
+  test('puts a message that arrived over the socket in its place in the thread', () => {
+    const state: ThreadState = {
+      ...emptyThread(),
+      messages: [
+        customerMessage('a', '2026-08-13T08:00:00.000Z'),
+        customerMessage('c', '2026-08-13T08:02:00.000Z'),
+      ],
+    }
+
+    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
+    const next = applyIncomingMessage(state, event.message, CUSTOMER_VIEWER)
+
+    expect(next.messages.map((m) => m.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  test('the API’s duplicate of one message is still one message', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
+
+    const once = applyIncomingMessage(emptyThread(), event.message, CUSTOMER_VIEWER)
+    const twice = applyIncomingMessage(once, event.message, CUSTOMER_VIEWER)
+
+    expect(twice.messages.map((m) => m.id)).toEqual(['b'])
+  })
+
+  test('a resync that re-fetches the message adds nothing to it', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
+    const live = applyIncomingMessage(emptyThread(), event.message, CUSTOMER_VIEWER)
+
+    const resynced = applyMessagePage(
+      withoutPages(live),
+      [customerMessage('a', '2026-08-13T08:00:00.000Z'), event.message],
+      CUSTOMER_VIEWER,
+    )
+
+    expect(resynced.messages.map((m) => m.id)).toEqual(['a', 'b'])
+  })
+
+  test('a Customer’s Support DM never shows an assignment notice that arrives live', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z', { messageType: 'system' })
+    const state = emptyThread()
+
+    expect(applyIncomingMessage(state, event.message, CUSTOMER_VIEWER)).toBe(state)
+  })
+
+  test('an Agent does see it', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z', { messageType: 'system' })
+    const next = applyIncomingMessage(emptyThread(), event.message, {
+      id: 'agent-1',
+      role: 'agent',
+      conversationType: 'support_dm',
+    })
+
+    expect(next.messages.map((m) => m.id)).toEqual(['b'])
+  })
+
+  test('leaves the backwards cursor and hasMore alone', () => {
+    const state: ThreadState = { ...emptyThread(), cursor: 'a', hasMore: true }
+    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
+
+    const next = applyIncomingMessage(state, event.message, CUSTOMER_VIEWER)
+
+    expect(next.cursor).toBe('a')
+    expect(next.hasMore).toBe(true)
+  })
+
+  test('keeps a message still on its way out', () => {
+    const sending = beginSend(emptyThread(), customerMessage('local-1', '2026-08-13T08:03:00.000Z'))
+    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
+
+    expect(applyIncomingMessage(sending, event.message, CUSTOMER_VIEWER).unsent).toHaveLength(1)
+  })
+})
+
+describe('withIncomingMessage', () => {
+  const rows = [
+    conversation({ id: 'conv-1', lastMessageAt: '2026-08-13T08:00:00.000Z', unreadCount: 0 }),
+    conversation({ id: 'conv-2', lastMessageAt: '2026-08-13T09:00:00.000Z', unreadCount: 0 }),
+  ]
+
+  test('counts a staff reply as one more unread', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z', { body: 'On it' })
+    const next = withIncomingMessage(rows, 'conv-1', event.message, 'customer-1')
+
+    expect(next[0]).toMatchObject({
+      id: 'conv-1',
+      unreadCount: 1,
+      lastMessageAt: '2026-08-13T10:00:00.000Z',
+      lastMessagePreview: 'On it',
+      lastMessageMine: false,
+      lastMessageRead: false,
+      lastMessageReceiptStatus: null,
+    })
+  })
+
+  test('adds to a count that is already standing', () => {
+    const held = [conversation({ id: 'conv-1', unreadCount: 3 })]
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z')
+
+    expect(withIncomingMessage(held, 'conv-1', event.message, 'customer-1')[0].unreadCount).toBe(4)
+  })
+
+  test('the viewer’s own message from another device counts for nothing', () => {
+    const held = [conversation({ id: 'conv-1', unreadCount: 2 })]
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z', {
+      fromCompany: false,
+      receiptStatus: 'delivered',
+    })
+
+    expect(withIncomingMessage(held, 'conv-1', event.message, 'customer-1')[0]).toMatchObject({
+      unreadCount: 2,
+      lastMessageMine: true,
+      lastMessageRead: true,
+      lastMessageReceiptStatus: 'delivered',
+    })
+  })
+
+  test('an uncounted row stays uncounted, and reads as unread by receipt', () => {
+    const held = [conversation({ id: 'conv-1', unreadCount: null, lastMessageRead: true })]
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z')
+
+    const next = withIncomingMessage(held, 'conv-1', event.message, 'customer-1')
+
+    expect(next[0].unreadCount).toBeNull()
+    expect(isConversationUnread(next[0])).toBe(true)
+  })
+
+  test('moves the conversation to the top of the list', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z')
+
+    expect(
+      withIncomingMessage(rows, 'conv-1', event.message, 'customer-1').map((row) => row.id),
+    ).toEqual(['conv-1', 'conv-2'])
+  })
+
+  test('the tab badge follows, which is what makes it live', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z')
+
+    expect(totalUnread(rows)).toBe(0)
+    expect(totalUnread(withIncomingMessage(rows, 'conv-1', event.message, 'customer-1'))).toBe(1)
+  })
+
+  test('a message for a conversation this client has never heard of changes nothing', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z')
+
+    expect(withIncomingMessage(rows, 'conv-9', event.message, 'customer-1')).toBe(rows)
+  })
+
+  test('previews a long message at the length the API previews it', () => {
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z', { body: 'x'.repeat(200) })
+
+    expect(
+      withIncomingMessage(rows, 'conv-1', event.message, 'customer-1')[0].lastMessagePreview,
+    ).toHaveLength(140)
+  })
+})
+
+describe('withoutConversation', () => {
+  const rows = [conversation({ id: 'conv-1' }), conversation({ id: 'conv-2' })]
+
+  test('drops the conversation the server says is gone', () => {
+    expect(withoutConversation(rows, 'conv-1').map((row) => row.id)).toEqual(['conv-2'])
+  })
+
+  test('answers the same list when the row was never held', () => {
+    expect(withoutConversation(rows, 'conv-9')).toBe(rows)
+  })
+
+  test('a deletion this client hears twice is still one deletion', () => {
+    const once = withoutConversation(rows, 'conv-1')
+    expect(withoutConversation(once, 'conv-1')).toBe(once)
+  })
+})
+
+describe('applyIncomingMessage and the echo of a message sent from here', () => {
+  const viewer = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
+
+  function sending(body: string): ThreadState {
+    return beginSend(
+      emptyThread(),
+      draftMessage({
+        id: 'local-1',
+        body,
+        author: { id: 'customer-1', name: 'QA', role: 'customer' },
+        sentAt: '2026-08-13T08:00:00.000Z',
+      }),
+    )
+  }
+
+  test('the socket copy confirms it, so the thread shows one message and not two', () => {
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Any update?',
+      fromCompany: false,
+    })
+
+    const next = applyIncomingMessage(sending('Any update?'), event.message, viewer)
+
+    expect(next.unsent).toEqual([])
+    expect(threadMessages(next).map((m) => m.id)).toEqual(['server-1'])
+  })
+
+  test('the answer that lands afterwards has nothing left to remove', () => {
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Any update?',
+      fromCompany: false,
+    })
+    const confirmed = applyIncomingMessage(sending('Any update?'), event.message, viewer)
+
+    const settled = applySentMessage(confirmed, 'local-1', event.message)
+
+    expect(settled.unsent).toEqual([])
+    expect(settled.messages.map((m) => m.id)).toEqual(['server-1'])
+  })
+
+  test('a send whose request then fails is not marked failed, because it landed', () => {
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Any update?',
+      fromCompany: false,
+    })
+    const confirmed = applyIncomingMessage(sending('Any update?'), event.message, viewer)
+
+    expect(failSend(confirmed, 'local-1').unsent).toEqual([])
+  })
+
+  test('a send that already failed keeps its place, and its offer to go again', () => {
+    const failed = failSend(sending('Any update?'), 'local-1')
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Any update?',
+      fromCompany: false,
+    })
+
+    const next = applyIncomingMessage(failed, event.message, viewer)
+
+    expect(next.unsent).toEqual([{ message: expect.objectContaining({ id: 'local-1' }), state: 'failed' }])
+  })
+
+  test('a staff message with the same words confirms nothing', () => {
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Any update?',
+      fromCompany: true,
+    })
+
+    const next = applyIncomingMessage(sending('Any update?'), event.message, viewer)
+
+    expect(next.unsent).toHaveLength(1)
+  })
+
+  test('someone else’s message leaves a send of different words alone', () => {
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Something else',
+      fromCompany: false,
+    })
+
+    expect(applyIncomingMessage(sending('Any update?'), event.message, viewer).unsent).toHaveLength(
+      1,
+    )
+  })
+
+  test('two sends of the same words confirm one at a time, oldest first', () => {
+    const first = sending('Any update?')
+    const both = beginSend(
+      first,
+      draftMessage({
+        id: 'local-2',
+        body: 'Any update?',
+        author: { id: 'customer-1', name: 'QA', role: 'customer' },
+        sentAt: '2026-08-13T08:00:02.000Z',
+      }),
+    )
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:03.000Z', {
+      body: 'Any update?',
+      fromCompany: false,
+    })
+
+    const next = applyIncomingMessage(both, event.message, viewer)
+
+    expect(next.unsent.map((entry) => entry.message.id)).toEqual(['local-2'])
+  })
+
+  test('an attachment with no body confirms nothing, since every empty body matches', () => {
+    const attachmentEcho = beginSend(
+      emptyThread(),
+      draftMessage({
+        id: 'local-1',
+        body: '',
+        author: { id: 'customer-1', name: 'QA', role: 'customer' },
+        sentAt: '2026-08-13T08:00:00.000Z',
+      }),
+    )
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: '',
+      fromCompany: false,
+    })
+
+    expect(applyIncomingMessage(attachmentEcho, event.message, viewer).unsent).toHaveLength(1)
   })
 })

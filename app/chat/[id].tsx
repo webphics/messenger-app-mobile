@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { View } from "react-native";
 import {
   Redirect,
+  router,
   useGlobalSearchParams,
   useLocalSearchParams,
   usePathname,
@@ -10,15 +11,21 @@ import {
 
 import { ThreadScreen } from "@/components/chat/thread-screen";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
+import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
 import { failureNotice } from "@/lib/conversation-failure";
-import { findOffersConversation } from "@/lib/conversation-state";
+import { findOffersConversation, isOutgoing } from "@/lib/conversation-state";
 import { useCustomerInbox } from "@/lib/customer-inbox";
 import { getDevUser } from "@/lib/dev-user";
-import { ROLE_HREF } from "@/lib/hub-routes";
+import { CUSTOMER_HREF, ROLE_HREF } from "@/lib/hub-routes";
 import { CONVERSATIONS, MESSAGES } from "@/lib/mock-data";
 import { canViewConversation } from "@/lib/rbac";
+import {
+  useConversationRoom,
+  useRealtimeEvents,
+  type RealtimeEvent,
+} from "@/lib/realtime-context";
 import { getSession, getSessionUser } from "@/lib/session";
 import { useThreadMessages } from "@/lib/use-thread-messages";
 import type { Conversation, Message } from "@/lib/types";
@@ -69,6 +76,14 @@ export default function ChatScreen() {
   );
 }
 
+/**
+ * Why a thread is not here, and the way out of it.
+ *
+ * The way out matters more than it used to: a conversation can now be deleted
+ * out from under someone who is reading it, which swaps the thread for this
+ * without their doing anything. The header went with the thread, so without a
+ * control here the screen is a dead end with nothing on it.
+ */
 function ChatNotice({ title, hint }: { title: string; hint: string }) {
   return (
     <View
@@ -81,6 +96,13 @@ function ChatNotice({ title, hint }: { title: string; hint: string }) {
       <Text variant="meta" className="text-center text-muted">
         {hint}
       </Text>
+      <Button
+        variant="outline"
+        className="mt-4"
+        onPress={() => router.replace(CUSTOMER_HREF.messages)}
+      >
+        <Text>Back to Messages</Text>
+      </Button>
     </View>
   );
 }
@@ -125,6 +147,28 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
   useEffect(() => {
     if (openedId) markRead(openedId);
   }, [openedId, markRead]);
+
+  /**
+   * And so does a message that arrives while it is open.
+   *
+   * The list is shared, so without this the row behind the thread would collect
+   * a badge for a message the person is looking at, and it would still be there
+   * when they went back. This screen is the only thing that knows a thread is
+   * open, which is why the rule lives here rather than in the inbox.
+   *
+   * Their own message is not one of those. It arrives here too — the sender is
+   * in the conversation like everyone else — and reading what you just wrote is
+   * not a thing to tell the server about.
+   */
+  useRealtimeEvents((event: RealtimeEvent) => {
+    if (event.kind !== "message" || !openedId || !user) return;
+    if (event.conversationId !== openedId) return;
+    if (isOutgoing(event.message, user.id)) return;
+    markRead(openedId);
+  });
+
+  // Puts this device in the conversation's room for as long as the thread is up.
+  useConversationRoom(openedId);
 
   if (inbox.status === "loading") return <AppLoadingScreen />;
   if (inbox.status === "failed") {

@@ -40,7 +40,12 @@ Broadcasts are in-inbox announcements (later), not stories.
      see ADR-0005, and do not remove the web client identifier from the mobile configuration. 2FA
      is refused here with the same sentence the password path uses, because the API's two-factor
      hook fires on Google sign-in too.
-4. Realtime (socket.io) + REST (TanStack Query).
+4. Realtime (socket.io) + REST (TanStack Query). The Customer's half is real: conversations,
+   sending, unread, and live delivery over a cookie-authenticated socket. Two connections — a
+   global one and one per open conversation — mirroring the web client, with events folded into
+   the same pure functions a fetched page goes through, so a reconnect resync arrives as nothing
+   rather than as a second copy. Delivery is at-least-once and the client says so.
+   See `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`.
 5. Media, push, i18n, list virtualization.
    - 5a. Client media UI (local attachments) — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (done)
    - 5b. Push, i18n, list virtualization.
