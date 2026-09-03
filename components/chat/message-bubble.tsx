@@ -25,7 +25,7 @@ import {
   isImageOrVideo,
   type QuoteLayoutMode,
 } from '@/lib/message-attachment'
-import { replyCaption } from '@/lib/message-react'
+import { replyCaption, type ReactionGroup } from '@/lib/message-react'
 import { messageStatusLabel } from '@/lib/message-status'
 import { deskMessageEnter } from '@/lib/motion-enter'
 import { motion } from '@/lib/motion'
@@ -36,9 +36,8 @@ import {
 import { colors } from '@/lib/tokens'
 import type {
   AttachmentKind,
-  MessageAttachment,
-  MessageReaction,
-  MessageStatus,
+  AttachmentView,
+  ReceiptStatus,
 } from '@/lib/types'
 
 export type { OpenMenuPayload }
@@ -56,14 +55,14 @@ type MessageBubbleProps = {
   messageId: string
   body: string
   outgoing: boolean
-  status: MessageStatus
+  status: ReceiptStatus
   senderName?: string
   quoted?: QuotedMessage
-  reactions?: MessageReaction[]
+  reactions?: ReactionGroup[]
   currentUserId: string
   selected?: boolean
   enter?: boolean
-  attachment?: MessageAttachment
+  attachment?: AttachmentView
   onOpenMenu: (payload: OpenMenuPayload) => void
   onReply: (messageId: string) => void
   onToggleReaction: (messageId: string, emoji: string) => void
@@ -76,17 +75,16 @@ function Receipt({
   status,
   outgoing,
 }: {
-  status: MessageStatus
+  status: ReceiptStatus
   outgoing: boolean
 }) {
   if (!outgoing) return null
   const read = status === 'read'
-  const Icon = status === 'sent' || status === 'sending' ? Check : CheckCheck
+  const Icon = status === 'sent' ? Check : CheckCheck
   return (
     <View
       accessibilityLabel={messageStatusLabel(status)}
       className="mt-1 items-end pr-1"
-      style={{ opacity: status === 'sending' ? 0.4 : 1 }}
     >
       <Icon color={read ? colors.primary : colors.muted} size={13} />
     </View>
@@ -313,7 +311,7 @@ const ReactionBadge = memo(function ReactionBadge({
   currentUserId,
   onToggleReaction,
 }: {
-  reactions: MessageReaction[]
+  reactions: ReactionGroup[]
   outgoing: boolean
   currentUserId: string
   onToggleReaction: (emoji: string) => void

@@ -1,0 +1,35 @@
+import type { ApiFailure } from '@/lib/conversation-api'
+
+export type FailureNotice = { title: string; hint: string }
+
+/**
+ * What to put on screen when a conversation request failed.
+ *
+ * Four failures, four sentences, because the useful next move differs: a request
+ * that never arrived is worth retrying, a refusal is worth reading, and a body
+ * this client could not parse is worth saying is not the person's fault. An
+ * expired session gets a sentence too even though it is usually invisible — the
+ * auth layer is already moving to sign-in around it — so a screen that lingers
+ * for a frame does not read as an empty inbox.
+ */
+export function failureNotice(failure: ApiFailure): FailureNotice {
+  switch (failure.kind) {
+    case 'unreachable':
+      return {
+        title: 'Cannot reach the server',
+        hint: 'Check your connection and try again.',
+      }
+    case 'unauthorised':
+      return {
+        title: 'Your session ended',
+        hint: 'Sign in again to pick up where you left off.',
+      }
+    case 'refused':
+      return { title: 'Could not load conversations', hint: failure.message }
+    case 'malformed':
+      return {
+        title: 'Could not read the reply',
+        hint: 'The server answered with something this app did not understand.',
+      }
+  }
+}

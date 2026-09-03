@@ -8,23 +8,25 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
-import { conversationTitle, otherParticipant } from "@/lib/conversation-title";
+import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
 import { formatRelativeTime, initials } from "@/lib/display";
 import { settleEnter } from "@/lib/motion-enter";
-import { PEOPLE } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
 
 type RecentThreadCardProps = {
   conversation: Conversation;
-  selfId: string;
+  /** Names a Customer's own support thread, which carries no title of its own. */
+  organizationNames?: ReadonlyMap<string, string>;
 };
 
-export function RecentThreadCard({ conversation, selfId }: RecentThreadCardProps) {
+export function RecentThreadCard({
+  conversation,
+  organizationNames,
+}: RecentThreadCardProps) {
   const reduceMotion = useReducedMotion();
-  const title = conversationTitle(conversation, PEOPLE, selfId);
-  const other = otherParticipant(conversation, PEOPLE, selfId);
-  const online = conversation.id === "offers" ? false : Boolean(other?.isOnline);
+  const title = conversationTitle(conversation, organizationNames);
+  const online = conversationPeer(conversation)?.isOnline === true;
 
   return (
     <Animated.View entering={settleEnter(!!reduceMotion, 80)}>
@@ -52,7 +54,10 @@ export function RecentThreadCard({ conversation, selfId }: RecentThreadCardProps
             {title}
           </Text>
           <Text variant="meta" className="mt-0.5 text-muted" numberOfLines={1}>
-            {conversation.lastMessagePreview} · {formatRelativeTime(conversation.updatedAt)}
+            {conversation.lastMessagePreview?.trim() || "No messages yet"}
+            {conversation.lastMessageAt
+              ? ` · ${formatRelativeTime(conversation.lastMessageAt)}`
+              : ""}
           </Text>
         </View>
         <ChevronRight color={colors.muted} size={18} />

@@ -8,10 +8,10 @@ import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
 import { formatDurationMs } from '@/lib/message-attachment'
 import { colors } from '@/lib/tokens'
-import type { MessageAttachment } from '@/lib/types'
+import type { AttachmentView } from '@/lib/types'
 
 type VoiceNotePlayerProps = {
-  attachment: MessageAttachment
+  attachment: AttachmentView
   /** Bubble chrome (outgoing primary vs incoming). Composer staging uses false. */
   outgoing?: boolean
   /** Composer preview: slightly tighter + optional clear. */

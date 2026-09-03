@@ -11,6 +11,7 @@ export type SessionUser = {
   role: UserRole
 }
 
+/** A mock directory entry. Only the Agent and Admin screens still read this. */
 export type Person = {
   id: string
   displayName: string
@@ -20,32 +21,197 @@ export type Person = {
   lastActiveLabel: string
 }
 
-export type ConversationKind = 'direct' | 'group'
+/**
+ * The conversation and message shapes below mirror the API's responses in
+ * `conversations.schema.ts` rather than describing anything this client invents.
+ * Two things they mirror were lies in the mock shape they replace.
+ *
+ * They are discriminated twice. Once by `type` — a Support DM, a group, a staff
+ * DM, an announcement — and again by who is doing the looking: Staff receive
+ * assignee, customer and presence detail that a Customer's payload does not
+ * carry at all, and a message reaches Staff with a named `sender` where a
+ * Customer's Support DM message carries only `fromCompany`. A Customer reading a
+ * *group* receives the staff-shaped message: the sender is another member and
+ * naming them is the point. `isStaffConversation` and `isStaffMessage` are how a
+ * screen asks which of the two it is holding.
+ *
+ * And a message carries `attachments` — plural, and in the API's shape, where
+ * the URL is a server object rather than a device URI. `AttachmentView` is the
+ * separate local shape a bubble renders and the picker produces;
+ * `lib/attachment-view.ts` turns one into the other.
+ */
+
+export type ConversationType =
+  | 'support_dm'
+  | 'staff_dm'
+  | 'group'
+  | 'community_announcement'
+
+/** Assignment state of a Support DM. Null on every other conversation type. */
+export type SupportStatus = 'unassigned' | 'engaged' | 'closed'
+
+export type MessageType = 'text' | 'media' | 'voice' | 'system'
+
+/** How far a message the viewer sent has got. Not a local send state. */
+export type ReceiptStatus = 'sent' | 'delivered' | 'read'
+
+export type LabelColor =
+  | 'slate'
+  | 'red'
+  | 'orange'
+  | 'amber'
+  | 'green'
+  | 'teal'
+  | 'blue'
+  | 'violet'
+  | 'pink'
 
 export type Label = {
   id: string
   name: string
-  color: string
+  color: LabelColor
+  archived: boolean
 }
 
-export type Conversation = {
+/** A person named on a conversation. Presence is staff-facing and absent from a Customer's payload. */
+export type ConversationPerson = {
   id: string
-  kind: ConversationKind
-  subject: string | null
-  participantIds: string[]
-  assigneeId: string | null
-  labelIds: string[]
-  lastMessagePreview: string
-  updatedAt: string
-  unreadCount: number
+  name: string
+  isOnline?: boolean
+  lastOnlineAt?: string | null
 }
 
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read'
+export type ConversationStaffPerson = ConversationPerson & { role: UserRole }
+
+/** What every conversation row reports about its newest message, resolved for the viewer. */
+type ConversationBase = {
+  id: string
+  organizationId: string
+  lastMessageAt: string | null
+  lastMessagePreview: string | null
+  lastMessageMine: boolean
+  lastMessageReceiptStatus: ReceiptStatus | null
+  lastMessageRead: boolean
+  /** Null outside the list endpoint, where the API declines to count. */
+  unreadCount: number | null
+}
+
+/** What an Agent or an Admin receives, for any conversation type. */
+export type StaffConversation = ConversationBase & {
+  type: ConversationType
+  status: SupportStatus | null
+  title: string | null
+  description: string | null
+  avatarUrl: string | null
+  customer: ConversationPerson | null
+  assignedAgent: ConversationPerson | null
+  otherUser: ConversationStaffPerson | null
+  members: ConversationStaffPerson[]
+  labels: Label[]
+}
+
+/** A Customer's own support thread. Carries no assignee-facing detail at all. */
+export type CustomerSupportConversation = ConversationBase & {
+  type: 'support_dm'
+}
+
+export type CustomerGroupConversation = ConversationBase & {
+  type: 'group'
+  title: string
+  description: string | null
+  avatarUrl: string | null
+  members: ConversationStaffPerson[]
+}
+
+export type CustomerAnnouncementConversation = ConversationBase & {
+  type: 'community_announcement'
+  title: string
+  description: string | null
+  avatarUrl: string | null
+  members: ConversationStaffPerson[]
+}
+
+export type CustomerConversation =
+  | CustomerSupportConversation
+  | CustomerGroupConversation
+  | CustomerAnnouncementConversation
+
+export type Conversation = StaffConversation | CustomerConversation
+
+/**
+ * Which shape a conversation arrived in.
+ *
+ * `labels` is the discriminator because it is the one field only the staff
+ * payload carries on every type — `members` is absent from a Customer's Support
+ * DM and present on their group, and `status` is null on a staff group.
+ */
+export function isStaffConversation(
+  conversation: Conversation,
+): conversation is StaffConversation {
+  return 'labels' in conversation
+}
+
+/** An attachment as the API stores it: a server URL and a MIME type, not a device URI. */
+export type MessageAttachment = {
+  /** MIME type, e.g. `image/png`. */
+  type: string
+  url: string
+  fileName: string | null
+  size: number | null
+  durationSeconds: number | null
+  waveform: number[] | null
+}
+
+export type MessageReplyTo = {
+  id: string
+  preview: string | null
+}
+
+/** One reaction by one person. The API does not group them; `lib/message-react` does. */
+export type MessageReaction = {
+  emoji: string
+  userId: string
+}
+
+type MessageBase = {
+  id: string
+  /** Caption or plain text; empty when the message is only attachments. */
+  body: string
+  messageType: MessageType
+  createdAt: string
+  replyTo: MessageReplyTo | null
+  reactions: MessageReaction[]
+  attachments: MessageAttachment[]
+  receiptStatus: ReceiptStatus
+}
+
+/** What Staff receive, and what a Customer receives in a group. */
+export type StaffMessage = MessageBase & {
+  sender: ConversationStaffPerson
+}
+
+/** What a Customer receives in their Support DM: the company speaks as one voice. */
+export type CustomerMessage = MessageBase & {
+  fromCompany: boolean
+}
+
+export type Message = StaffMessage | CustomerMessage
+
+export function isStaffMessage(message: Message): message is StaffMessage {
+  return 'sender' in message
+}
 
 export type AttachmentKind = 'image' | 'video' | 'audio' | 'document'
 
-/** Local-URI attachment on a Message (no server upload this phase). */
-export type MessageAttachment = {
+/**
+ * An attachment as this app renders and captures it.
+ *
+ * The picker and the recorder produce one of these directly; an attachment that
+ * arrived from the API becomes one through `lib/attachment-view.ts`. It exists
+ * because a bubble needs a kind, a playable URI and a duration in milliseconds,
+ * while the API's shape carries a MIME type, a possibly-relative URL and seconds.
+ */
+export type AttachmentView = {
   kind: AttachmentKind
   uri: string
   name: string
@@ -57,24 +223,6 @@ export type MessageAttachment = {
   height?: number
   /** Downsampled 0..1 levels for voice-note waveforms (~32–64 bars). */
   peaks?: number[]
-}
-
-export type MessageReaction = {
-  emoji: string
-  userIds: string[]
-}
-
-export type Message = {
-  id: string
-  conversationId: string
-  senderId: string
-  /** Caption or plain text; may be empty when only an Attachment is present. */
-  body: string
-  createdAt: string
-  status: MessageStatus
-  replyToId?: string
-  reactions?: MessageReaction[]
-  attachment?: MessageAttachment
 }
 
 export type InternalNote = {
@@ -125,4 +273,10 @@ export type ChartMetric = {
   kind: ChartKind
   series: number[]
   slices?: ChartSlice[]
+}
+
+/** An organization the signed-in person belongs to, from `GET /memberships/mine`. */
+export type Organization = {
+  id: string
+  name: string
 }

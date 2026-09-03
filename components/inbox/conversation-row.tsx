@@ -7,32 +7,42 @@ import { PresenceDot } from "@/components/ui/presence-dot";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { conversationTitle, otherParticipant } from "@/lib/conversation-title";
+import {
+  isConversationUnread,
+  isOffersConversation,
+} from "@/lib/conversation-state";
+import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
 import { formatRelativeTime, initials } from "@/lib/display";
-import { getDevUserId } from "@/lib/dev-user";
 import { listItemEnter, popEnter } from "@/lib/motion-enter";
-import { PEOPLE } from "@/lib/mock-data";
 import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
 
 type ConversationRowProps = {
   conversation: Conversation;
   onPress: (conversationId: string) => void;
+  /** Names a Customer's own support thread, which carries no title of its own. */
+  organizationNames?: ReadonlyMap<string, string>;
   /** FlatList index — capped stagger onto the Clear Desk */
   index?: number;
 };
 
+/** A conversation nobody has written in yet is not broken; it says so. */
+const NO_MESSAGES = "No messages yet";
+
 export const ConversationRow = memo(function ConversationRow({
   conversation,
   onPress,
+  organizationNames,
   index = 0,
 }: ConversationRowProps) {
   const reduceMotion = useReducedMotion();
-  const title = conversationTitle(conversation, PEOPLE, getDevUserId());
-  const isOffers = conversation.id === "offers";
-  const other = otherParticipant(conversation, PEOPLE, getDevUserId());
-  const online = isOffers ? false : Boolean(other?.isOnline);
-  const hasUnread = conversation.unreadCount > 0;
+  const title = conversationTitle(conversation, organizationNames);
+  const broadcast =
+    isOffersConversation(conversation) ||
+    conversation.type === "community_announcement";
+  const online = conversationPeer(conversation)?.isOnline === true;
+  const hasUnread = isConversationUnread(conversation);
+  const unreadCount = conversation.unreadCount ?? 0;
 
   const handlePress = useCallback(() => {
     onPress(conversation.id);
@@ -48,7 +58,7 @@ export const ConversationRow = memo(function ConversationRow({
       >
         <View className="relative">
           <Avatar alt={title} className="size-13">
-            {isOffers ? (
+            {broadcast ? (
               <AvatarFallback className="bg-primary-soft">
                 <Megaphone color={colors.primary} size={22} />
               </AvatarFallback>
@@ -74,14 +84,16 @@ export const ConversationRow = memo(function ConversationRow({
             >
               {title}
             </Text>
-            <Text
-              variant="label"
-              className={
-                hasUnread ? "text-ink-soft" : "font-normal text-muted"
-              }
-            >
-              {formatRelativeTime(conversation.updatedAt)}
-            </Text>
+            {conversation.lastMessageAt ? (
+              <Text
+                variant="label"
+                className={
+                  hasUnread ? "text-ink-soft" : "font-normal text-muted"
+                }
+              >
+                {formatRelativeTime(conversation.lastMessageAt)}
+              </Text>
+            ) : null}
           </View>
           <Text
             variant="meta"
@@ -90,17 +102,17 @@ export const ConversationRow = memo(function ConversationRow({
             }
             numberOfLines={1}
           >
-            {conversation.lastMessagePreview}
+            {conversation.lastMessagePreview?.trim() || NO_MESSAGES}
           </Text>
         </View>
 
-        {hasUnread ? (
+        {hasUnread && unreadCount > 0 ? (
           <Animated.View
             entering={popEnter(!!reduceMotion)}
             className="min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5"
           >
             <Text variant="label" className="font-bold text-primary-foreground">
-              {conversation.unreadCount}
+              {unreadCount}
             </Text>
           </Animated.View>
         ) : null}

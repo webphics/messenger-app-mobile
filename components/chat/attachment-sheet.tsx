@@ -32,12 +32,12 @@ import {
 import { hapticLight, hapticSelection } from '@/lib/haptics'
 import { motion } from '@/lib/motion'
 import { colors, screenBottomPad } from '@/lib/tokens'
-import type { MessageAttachment } from '@/lib/types'
+import type { AttachmentView } from '@/lib/types'
 
 type AttachmentSheetProps = {
   visible: boolean
   onClose: () => void
-  onPicked: (attachment: MessageAttachment) => void
+  onPicked: (attachment: AttachmentView) => void
   onInsertText: (text: string) => void
 }
 

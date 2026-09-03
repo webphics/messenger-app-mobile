@@ -1,0 +1,279 @@
+import { API_BASE_URL } from '@/lib/api-config'
+import { clearCsrfPair, setSessionCookie } from '@/lib/api-client'
+import {
+  ensureSupportConversation,
+  getConversation,
+  listConversations,
+  listMessages,
+  listMyOrganizations,
+} from '@/lib/conversation-api'
+
+/**
+ * The two boundaries this file cannot cross under Jest, both reached through
+ * `authenticatedRequest`: the Google native module throws at import when there
+ * is no native side, and the keychain is where a refused cookie is forgotten.
+ * The transport itself is real — this file is about the requests that go out.
+ */
+jest.mock('@/lib/google-session', () => ({
+  requestGoogleIdToken: jest.fn(async () => ({ kind: 'failed' })),
+  releaseGoogleSession: jest.fn(async () => undefined),
+}))
+
+jest.mock('@/lib/keychain', () => ({
+  readSessionCookie: jest.fn(),
+  writeSessionCookie: jest.fn(async () => true),
+  clearSessionCookie: jest.fn(async () => true),
+  clearRetiredCredential: jest.fn(async () => undefined),
+}))
+
+jest.mock('@/lib/legacy-session', () => ({
+  purgeMockSession: jest.fn(async () => undefined),
+}))
+
+type FetchCall = { url: string; init: RequestInit }
+
+const calls: FetchCall[] = []
+
+/** Queued in order, the way `lib/api-client.test.ts` queues them: a mutation costs two requests. */
+let queue: (Response | Error)[] = []
+
+function enqueue(...responses: (Response | Error)[]): void {
+  queue.push(...responses)
+}
+
+function response(status: number, body: unknown, headers: Record<string, string> = {}): Response {
+  const lookup = new Map(
+    Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]),
+  )
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: { get: (name: string) => lookup.get(name.toLowerCase()) ?? null },
+    json: async () => {
+      if (body === undefined) throw new SyntaxError('Unexpected end of JSON input')
+      return body
+    },
+  } as unknown as Response
+}
+
+function envelope(data: unknown, status = 200): Response {
+  return response(status, { statusCode: status, message: 'Success', data })
+}
+
+function csrfResponse(): Response {
+  return response(
+    200,
+    { statusCode: 200, message: 'Success', data: 'csrf-token-value' },
+    { 'set-cookie': 'csrf-token=cookie-value; Path=/; HttpOnly' },
+  )
+}
+
+const SUPPORT_ROW = {
+  id: 'conv-1',
+  organizationId: 'org-1',
+  type: 'support_dm',
+  lastMessageAt: '2026-08-13T08:22:00.000Z',
+  lastMessagePreview: 'Checking the mail logs now.',
+  lastMessageMine: false,
+  lastMessageReceiptStatus: null,
+  lastMessageRead: false,
+  unreadCount: 2,
+}
+
+const MESSAGE_ROW = {
+  id: 'msg-1',
+  body: 'Hello',
+  messageType: 'text',
+  createdAt: '2026-08-13T08:00:00.000Z',
+  replyTo: null,
+  reactions: [],
+  attachments: [],
+  receiptStatus: 'sent',
+  fromCompany: false,
+}
+
+beforeEach(() => {
+  calls.length = 0
+  queue = []
+  setSessionCookie('better-auth.session_token=abc.def')
+  clearCsrfPair()
+  global.fetch = (async (url: string, init: RequestInit) => {
+    calls.push({ url, init })
+    const next = queue.shift()
+    if (next instanceof Error) throw next
+    return next ?? response(200, {})
+  }) as unknown as typeof fetch
+})
+
+describe('listConversations', () => {
+  test('asks for every conversation and reads the rows', async () => {
+    enqueue(envelope([SUPPORT_ROW]))
+
+    const result = await listConversations()
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/conversations`)
+    expect(calls[0]?.init.method).toBe('GET')
+    expect(result).toEqual({ ok: true, value: [expect.objectContaining({ id: 'conv-1' })] })
+  })
+
+  test('carries the Session cookie', async () => {
+    enqueue(envelope([]))
+
+    await listConversations()
+
+    expect((calls[0]?.init.headers as Record<string, string>).Cookie).toBe(
+      'better-auth.session_token=abc.def',
+    )
+  })
+
+  test('narrows by type when asked', async () => {
+    enqueue(envelope([]))
+
+    await listConversations({ type: 'group' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/conversations?type=group`)
+  })
+
+  test('reads an empty list as an empty list, not as a failure', async () => {
+    enqueue(envelope([]))
+
+    expect(await listConversations()).toEqual({ ok: true, value: [] })
+  })
+
+  test('reports a request that never arrived as unreachable', async () => {
+    enqueue(new TypeError('Network request failed'))
+
+    expect(await listConversations()).toEqual({ ok: false, failure: { kind: 'unreachable' } })
+  })
+
+  test('reports a 401 as an expired session rather than a refusal', async () => {
+    enqueue(response(401, { statusCode: 401, message: 'Unauthorized' }))
+
+    expect(await listConversations()).toEqual({ ok: false, failure: { kind: 'unauthorised' } })
+  })
+
+  test('repeats what the server said when it refused', async () => {
+    enqueue(response(403, { statusCode: 403, message: 'Email not verified.' }))
+
+    expect(await listConversations()).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Email not verified.' },
+    })
+  })
+
+  test('has something to say about a refusal that said nothing', async () => {
+    enqueue(response(500, undefined))
+
+    const result = await listConversations()
+
+    expect(result.ok).toBe(false)
+    expect(result.ok === false && result.failure.kind).toBe('refused')
+  })
+
+  test('reports a body with no envelope as malformed rather than as an empty inbox', async () => {
+    enqueue(response(200, [SUPPORT_ROW]))
+
+    expect(await listConversations()).toEqual({ ok: false, failure: { kind: 'malformed' } })
+  })
+})
+
+describe('getConversation', () => {
+  test('asks for one conversation by id', async () => {
+    enqueue(envelope(SUPPORT_ROW))
+
+    const result = await getConversation('conv-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/conversations/conv-1`)
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'conv-1' }) })
+  })
+
+  test('reports a row it cannot read as malformed', async () => {
+    enqueue(envelope({ id: 'conv-1' }))
+
+    expect(await getConversation('conv-1')).toEqual({
+      ok: false,
+      failure: { kind: 'malformed' },
+    })
+  })
+})
+
+describe('ensureSupportConversation', () => {
+  test('posts the organization, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope(SUPPORT_ROW))
+
+    const result = await ensureSupportConversation('org-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/support`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(calls[1]?.init.body).toBe(JSON.stringify({ organizationId: 'org-1' }))
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'conv-1' }) })
+  })
+
+  test('reads the existing conversation the API answers with on a repeat call', async () => {
+    enqueue(csrfResponse(), envelope(SUPPORT_ROW))
+    enqueue(envelope(SUPPORT_ROW))
+
+    await ensureSupportConversation('org-1')
+    const second = await ensureSupportConversation('org-1')
+
+    expect(second).toEqual({ ok: true, value: expect.objectContaining({ id: 'conv-1' }) })
+  })
+})
+
+describe('listMessages', () => {
+  test('asks for the newest page, capped at the API limit', async () => {
+    enqueue(envelope([MESSAGE_ROW]))
+
+    const result = await listMessages('conv-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/messages?limit=50`)
+    expect(result).toEqual({ ok: true, value: [expect.objectContaining({ id: 'msg-1' })] })
+  })
+
+  test('pages backwards from the oldest message held', async () => {
+    enqueue(envelope([]))
+
+    await listMessages('conv-1', { cursor: 'msg-9', limit: 20 })
+
+    expect(calls[0]?.url).toBe(
+      `${API_BASE_URL}/conversations/conv-1/messages?cursor=msg-9&limit=20`,
+    )
+  })
+
+  test('escapes an id rather than letting it shape the path', async () => {
+    enqueue(envelope([]))
+
+    await listMessages('conv 1/../secrets')
+
+    expect(calls[0]?.url).toBe(
+      `${API_BASE_URL}/conversations/conv%201%2F..%2Fsecrets/messages?limit=50`,
+    )
+  })
+
+  test('reads an empty page as the end of the thread rather than a failure', async () => {
+    enqueue(envelope([]))
+
+    expect(await listMessages('conv-1', { cursor: 'msg-1' })).toEqual({ ok: true, value: [] })
+  })
+})
+
+describe('listMyOrganizations', () => {
+  test('reads the rows the memberships endpoint wraps them in', async () => {
+    enqueue(envelope({ rows: [{ id: 'org-1', name: 'Talo' }] }))
+
+    const result = await listMyOrganizations()
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/memberships/mine`)
+    expect(result).toEqual({ ok: true, value: [{ id: 'org-1', name: 'Talo' }] })
+  })
+
+  test('reads no memberships as an empty list', async () => {
+    enqueue(envelope({ rows: [] }))
+
+    expect(await listMyOrganizations()).toEqual({ ok: true, value: [] })
+  })
+})

@@ -28,8 +28,18 @@ type FloatingTabBarProps = Parameters<
 /** Matches capsule `px-1.5` — indicator lives in the padded content box. */
 const CAPSULE_PAD = 6;
 
+/**
+ * The count on a tab, where there is one to show.
+ *
+ * The staff tabs still read the mock list, which is what their screens read
+ * until #32. The Customer's Messages tab shows nothing: their conversations are
+ * real as of #28, and a badge counted off mock rows would be the last piece of
+ * invented chat data left on their screen. The real count is #30, which owns
+ * unread and mark-as-read together.
+ */
 function badgeForRoute(name: string): number | undefined {
   const user = getDevUser();
+  if (user.role === "customer") return undefined;
   if (name === "unassigned") return unassignedTabBadge(CONVERSATIONS);
   if (name === "conversations" || name === "messages") {
     return conversationsTabBadge(user.role, user.id, CONVERSATIONS);

@@ -1,66 +1,91 @@
 import { conversationTitle } from '@/lib/conversation-title'
+import { findOffersConversation, sortConversations } from '@/lib/conversation-state'
 import { canViewConversation } from '@/lib/rbac'
-import type { Conversation, Label, Person, UserRole } from '@/lib/types'
+import { isStaffConversation } from '@/lib/types'
+import type { Conversation, UserRole } from '@/lib/types'
 
 export type InboxChip = 'all' | 'open' | 'resolved'
 
-export function isResolved(conversation: Conversation, labels: Label[]): boolean {
-  return conversation.labelIds.some(
-    (id) => labels.find((label) => label.id === id)?.name === 'Resolved',
-  )
+/**
+ * Whether a conversation is done with.
+ *
+ * The mock read this off a "Resolved" label an Agent attached by hand. The API
+ * has a field for it — a Support DM is `closed` or it is not — and labels are
+ * free-form colour tags that mean whatever an organization decides. A Customer's
+ * payload carries no status at all, which is why the Customer inbox does not
+ * offer this filter.
+ */
+export function isResolved(conversation: Conversation): boolean {
+  return isStaffConversation(conversation) && conversation.status === 'closed'
 }
 
+/**
+ * The conversations a role may see, out of a list this client already holds.
+ *
+ * Redundant against the API, which scopes every list it sends — kept for the
+ * Agent and Admin screens, which still read a local list until #32 wires them to
+ * the API.
+ */
 export function listInboxConversations(
   role: UserRole,
   userId: string,
   conversations: Conversation[],
 ): Conversation[] {
-  if (role === 'admin') return conversations
-  if (role === 'customer') {
-    return conversations.filter((c) => canViewConversation(role, userId, c))
-  }
-  return conversations.filter(
-    (c) => c.assigneeId === userId || c.participantIds.includes(userId),
+  return conversations.filter((conversation) => canViewConversation(role, userId, conversation))
+}
+
+/** The pickup queue: support threads nobody has engaged. */
+export function listUnassignedConversations(list: Conversation[]): Conversation[] {
+  return list.filter(
+    (conversation) =>
+      isStaffConversation(conversation) &&
+      conversation.type === 'support_dm' &&
+      conversation.status === 'unassigned',
   )
 }
 
-export function listUnassignedConversations(list: Conversation[]): Conversation[] {
-  return list.filter((c) => c.assigneeId === null)
-}
-
+/** The thread to offer on a hub. Offers is a broadcast, not a conversation someone is having. */
 export function latestInboxThread(
   role: UserRole,
   userId: string,
   conversations: Conversation[],
 ): Conversation | undefined {
-  return listInboxConversations(role, userId, conversations)
-    .filter((c) => c.id !== 'offers')
-    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0]
+  const offersId = findOffersConversation(conversations)?.id
+  return sortConversations(listInboxConversations(role, userId, conversations)).find(
+    (conversation) => conversation.id !== offersId,
+  )
 }
 
+/**
+ * The inbox list as the search field and the chips leave it, with Offers pinned.
+ *
+ * Pinned by identity rather than by sort order: Offers carries the company's
+ * announcements and belongs at the top whether or not it is the most recent
+ * thing that happened.
+ */
 export function filterConversations(
   list: Conversation[],
   query: string,
   chip: InboxChip,
-  labels: Label[],
-  people: Person[],
-  selfId: string,
+  organizationNames: ReadonlyMap<string, string> = new Map(),
 ): Conversation[] {
   const q = query.trim().toLowerCase()
-  const resolvedIds = new Set(
-    labels.filter((label) => label.name === 'Resolved').map((label) => label.id),
-  )
   const filtered = list.filter((conversation) => {
-    const resolved = conversation.labelIds.some((id) => resolvedIds.has(id))
+    const resolved = isResolved(conversation)
     if (chip === 'open' && resolved) return false
     if (chip === 'resolved' && !resolved) return false
     if (!q) return true
-    const title = conversationTitle(conversation, people, selfId).toLowerCase()
-    const preview = conversation.lastMessagePreview.toLowerCase()
-    const subject = (conversation.subject ?? '').toLowerCase()
-    return title.includes(q) || preview.includes(q) || subject.includes(q)
+
+    const title = conversationTitle(conversation, organizationNames).toLowerCase()
+    const preview = (conversation.lastMessagePreview ?? '').toLowerCase()
+    return title.includes(q) || preview.includes(q)
   })
-  const pinned = filtered.filter((c) => c.id === 'offers')
-  const rest = filtered.filter((c) => c.id !== 'offers')
-  return [...pinned, ...rest]
+
+  const offersId = findOffersConversation(filtered)?.id
+  if (!offersId) return filtered
+
+  return [
+    ...filtered.filter((conversation) => conversation.id === offersId),
+    ...filtered.filter((conversation) => conversation.id !== offersId),
+  ]
 }

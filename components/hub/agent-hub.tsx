@@ -38,7 +38,9 @@ export function AgentHub() {
   const reduceMotion = useReducedMotion();
   const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
   const unassignedCount = listUnassignedConversations(CONVERSATIONS).length;
-  const assignedCount = CONVERSATIONS.filter((c) => c.assigneeId === me.id).length;
+  const assignedCount = CONVERSATIONS.filter(
+    (conversation) => conversation.assignedAgent?.id === me.id,
+  ).length;
 
   return (
     <HubScroll>
@@ -112,7 +114,7 @@ export function AgentHub() {
             <Text variant="label" className="mb-2 uppercase tracking-wider text-muted">
               Recent Conversation
             </Text>
-            <RecentThreadCard conversation={recent} selfId={me.id} />
+            <RecentThreadCard conversation={recent} />
           </View>
         ) : null}
 

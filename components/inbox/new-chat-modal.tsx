@@ -175,17 +175,17 @@ function NewChatSheet({
     (person: Person) => {
       // Find if a 1-on-1 conversation exists with this person
       const existing = CONVERSATIONS.find(
-        (c) =>
-          c.kind === "direct" &&
-          c.participantIds.includes(person.id) &&
-          c.participantIds.includes(myId),
+        (conversation) =>
+          conversation.type !== "group" &&
+          (conversation.customer?.id === person.id ||
+            conversation.otherUser?.id === person.id),
       );
       const targetId =
         existing?.id ?? (person.role === "customer" ? "conv-unassigned" : "conv-assigned");
       onClose();
       onSelectChat(chatHref(targetId));
     },
-    [myId, onClose, onSelectChat],
+    [onClose, onSelectChat],
   );
 
   const renderItem = useCallback(

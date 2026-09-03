@@ -45,11 +45,11 @@ import {
 import { motion } from '@/lib/motion'
 import { settleDownEnter } from '@/lib/motion-enter'
 import { colors, screenBottomPad } from '@/lib/tokens'
-import type { AttachmentKind, MessageAttachment } from '@/lib/types'
+import type { AttachmentKind, AttachmentView } from '@/lib/types'
 
 export type ComposerSendPayload = {
   body: string
-  attachment?: MessageAttachment
+  attachment?: AttachmentView
 }
 
 export type ComposerReplyPreview = {
@@ -82,7 +82,7 @@ function StagedAttachmentChip({
   attachment,
   onClear,
 }: {
-  attachment: MessageAttachment
+  attachment: AttachmentView
   onClear: () => void
 }) {
   if (attachment.kind === 'audio') {
@@ -167,7 +167,7 @@ export function Composer({
   const insets = useSafeAreaInsets()
   const reduceMotion = useReducedMotion()
   const [attachOpen, setAttachOpen] = useState(false)
-  const [staged, setStaged] = useState<MessageAttachment | null>(null)
+  const [staged, setStaged] = useState<AttachmentView | null>(null)
   const [recording, setRecording] = useState(false)
   const [elapsedMs, setElapsedMs] = useState(0)
   const [livePeaks, setLivePeaks] = useState<number[]>(() =>
@@ -375,7 +375,7 @@ export function Composer({
     }
   }
 
-  function handlePicked(attachment: MessageAttachment) {
+  function handlePicked(attachment: AttachmentView) {
     setStaged(attachment)
   }
 
