@@ -26,12 +26,13 @@ const REALTIME_URL = `${API_BASE_URL}${REALTIME_NAMESPACE}`
 /**
  * Open one authenticated connection.
  *
- * `forceNew` is what makes a second call a second connection. Without it
- * `socket.io-client` multiplexes: the manager is cached by URL and the socket by
- * namespace, so asking twice for the same namespace answers with the *same*
- * socket both times — and the first screen to close a thread would then
- * disconnect the connection the whole app is listening on. The web client's two
- * `io()` calls collapse into one socket for exactly that reason.
+ * `forceNew` says out loud that the second caller wants a second connection.
+ * `socket.io-client` would give it one anyway — its manager cache is keyed by
+ * URL, and `lookup()` treats a namespace already open on the cached manager as
+ * a reason to build a new manager rather than hand back the socket it holds —
+ * but that is a subtlety of the library, not something a reader of this file
+ * should have to know before trusting that closing a thread cannot disconnect
+ * the connection the whole app is listening on.
  */
 export function connectRealtime(
   sessionCookie: string,

@@ -75,38 +75,44 @@ export function parseConversationDeleted(payload: unknown): string | null {
 }
 
 /**
- * How many message ids the filter below remembers.
+ * How many message ids the tally below remembers.
  *
  * Comfortably more than a burst of traffic can carry between two glances at the
  * screen, and small enough that the cost of holding it is nothing. A message
- * evicted from it and then delivered again would be counted twice; a
+ * evicted from it and then broadcast again would be counted twice; a
  * conversation that busy has already had the count corrected by the next
  * resync.
  */
 const REMEMBERED_MESSAGES = 200
 
 /**
- * Delivery is at-least-once, and this is what makes it once.
+ * Which messages have already been counted as unread.
  *
- * The API emits `message.created` to a single socket more than once — observed
- * against the running server, with one listener on one connection, for a message
- * sent once. Every consumer of an event is not safely idempotent: folding a
- * message into a thread by id is, but adding one to a conversation's unread
- * count is not, and a duplicate there is a badge that says two where the thread
- * shows one.
+ * One message arrives on `message.created` more than once, and the repeats are
+ * not duplicates: the API broadcasts a message when it is written and again
+ * each time its receipt advances — measured against the running server as two
+ * events about a second apart, the first carrying `receiptStatus: "sent"` and
+ * the second `"delivered"`. That is how a tick moves from sent to delivered to
+ * read on a bubble without anyone refreshing, and the thread wants every one of
+ * them: `mergeMessages` folds them in by id, so the later copy replaces the
+ * earlier rather than joining it.
  *
- * So the duplicate is dropped at the seam, once, rather than left for each
- * consumer to defend against separately. Bounded because a connection can live
- * for days: the oldest id is forgotten to make room, which is safe — a duplicate
- * arrives within milliseconds of its original, never two hundred messages later.
+ * An unread count is the one reader that cannot take them all, because adding
+ * is not idempotent — a receipt advancing would raise a badge that the thread
+ * shows nothing new for. So this is not a filter on delivery, which would swallow
+ * the receipts; it is the list's own memory of what it has already counted.
+ *
+ * Bounded, because a connection can live for days: the oldest id is forgotten
+ * to make room, which is safe — the repeats of a message arrive within seconds
+ * of it, never two hundred messages later.
  */
-export function createSeenMessages(limit: number = REMEMBERED_MESSAGES) {
+export function createCountedMessages(limit: number = REMEMBERED_MESSAGES) {
   const order: string[] = []
   const ids = new Set<string>()
 
   return {
-    /** True the first time an id is offered, false every time after. */
-    isNew(id: string): boolean {
+    /** True the first time an id is offered — the once it is worth counting. */
+    isFirst(id: string): boolean {
       if (ids.has(id)) return false
 
       ids.add(id)

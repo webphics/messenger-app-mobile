@@ -44,7 +44,8 @@ Broadcasts are in-inbox announcements (later), not stories.
    sending, unread, and live delivery over a cookie-authenticated socket. Two connections — a
    global one and one per open conversation — mirroring the web client, with events folded into
    the same pure functions a fetched page goes through, so a reconnect resync arrives as nothing
-   rather than as a second copy. Delivery is at-least-once and the client says so.
+   rather than as a second copy — as does the API's re-broadcast of a message whose receipt has
+   advanced, which is how a tick moves without a refresh.
    See `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`.
 5. Media, push, i18n, list virtualization.
    - 5a. Client media UI (local attachments) — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (done)

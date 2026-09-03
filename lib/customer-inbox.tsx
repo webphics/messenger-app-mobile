@@ -25,6 +25,7 @@ import {
   withoutConversation,
 } from '@/lib/conversation-state'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
+import { createCountedMessages } from '@/lib/realtime-events'
 import type { Conversation } from '@/lib/types'
 
 /**
@@ -170,6 +171,17 @@ function useCustomerInboxState(): CustomerInboxView {
    */
   const readWhileLoading = useRef(new Set<string>())
 
+  /**
+   * What the badge has already counted.
+   *
+   * A message is broadcast again whenever its receipt advances, and the thread
+   * wants every one of those. A count cannot take them: adding is not
+   * idempotent, and a tick moving from sent to delivered would raise a badge
+   * with nothing behind it. See `createCountedMessages`.
+   */
+  const counted = useRef<ReturnType<typeof createCountedMessages>>(undefined)
+  counted.current ??= createCountedMessages()
+
   const load = useCallback(async (mode: 'first' | 'refresh' | 'resync') => {
     const mine = ++generation.current
     loadOut.current = true
@@ -280,6 +292,10 @@ function useCustomerInboxState(): CustomerInboxView {
       void load('resync')
       return
     }
+
+    // A message already counted still reaches the thread, which merges the
+    // newer copy over the older by id; what it must not do is count twice.
+    if (event.kind === 'message' && !counted.current?.isFirst(event.message.id)) return
 
     setInbox((current) => {
       if (current.status !== 'ready') return current

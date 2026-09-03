@@ -12,7 +12,6 @@ import { getSessionCookie } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { connectRealtime } from '@/lib/realtime'
 import {
-  createSeenMessages,
   parseConversationDeleted,
   parseConversationUpdated,
   parseMessageCreated,
@@ -35,8 +34,12 @@ import type { Conversation, Message } from '@/lib/types'
  * Events reach screens through one subscription rather than through a socket
  * each: the list and the open thread both want `message.created`, and two
  * sockets listening for it would deliver it twice to a count that must go up
- * once. Everything a subscriber receives has already been read into this app's
- * types and deduplicated — see `createSeenMessages`.
+ * once. What a subscriber receives has been read into this app's types and
+ * nothing else — in particular nothing here decides that a message has been
+ * heard before. One message is broadcast again each time its receipt advances,
+ * which is how a tick moves without a refresh, and a filter here would swallow
+ * exactly that. The unread count keeps its own memory instead; see
+ * `createCountedMessages`.
  */
 
 export type RealtimeEvent =
@@ -160,7 +163,6 @@ function useRealtimeConnection(): RealtimeValue {
     if (!cookie) return
 
     const socket = connectRealtime(cookie)
-    const seen = createSeenMessages()
     let connectedBefore = false
 
     socket.on('connect', () => {
@@ -170,9 +172,7 @@ function useRealtimeConnection(): RealtimeValue {
 
     socket.on(REALTIME_EVENTS.messageCreated, (payload: unknown) => {
       const event = parseMessageCreated(payload)
-      // The API delivers this more than once for one message; the first arrival
-      // is the one that counts. See `createSeenMessages`.
-      if (!event || !seen.isNew(event.message.id)) return
+      if (!event) return
       emit({ kind: 'message', conversationId: event.conversationId, message: event.message })
     })
 
