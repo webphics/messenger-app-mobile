@@ -15,16 +15,22 @@ import { Text } from "@/components/ui/text";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { latestInboxThread } from "@/lib/inbox-filter";
-import { getDevUser } from "@/lib/dev-user";
-import { CONVERSATIONS } from "@/lib/mock-data";
 import { CUSTOMER_HREF } from "@/lib/hub-routes";
 import { settleDownEnter } from "@/lib/motion-enter";
-import { getSession } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
+import { useCustomerInbox } from "@/lib/use-customer-inbox";
 
 export function CustomerHub() {
-  const me = getDevUser();
+  const user = getSessionUser();
   const reduceMotion = useReducedMotion();
-  const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
+  const inbox = useCustomerInbox();
+  // The most recent real thread, or nothing at all while the list is still out
+  // or could not be fetched — the hub is not where a fetch failure is explained,
+  // Messages is, so a card that cannot be filled is simply absent.
+  const recent =
+    inbox.status === "ready" && user
+      ? latestInboxThread("customer", user.id, inbox.conversations)
+      : undefined;
 
   return (
     <HubScroll>
@@ -33,10 +39,10 @@ export function CustomerHub() {
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
-            {hubEyebrow(me.role)}
+            {hubEyebrow("customer")}
           </Text>
           <Text variant="display" className="mt-0.5 text-ink">
-            {hubGreeting(me.role, firstName(me.displayName))}
+            {hubGreeting("customer", firstName(user?.name ?? ""))}
           </Text>
         </Animated.View>
 
@@ -63,7 +69,12 @@ export function CustomerHub() {
             <Text variant="label" className="mb-2 uppercase tracking-wider text-muted">
               Recent Message
             </Text>
-            <RecentThreadCard conversation={recent} selfId={me.id} />
+            <RecentThreadCard
+              conversation={recent}
+              organizationNames={
+                inbox.status === "ready" ? inbox.organizationNames : undefined
+              }
+            />
           </View>
         ) : null}
 

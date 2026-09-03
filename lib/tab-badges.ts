@@ -1,4 +1,8 @@
-import { listInboxConversations, listUnassignedConversations } from "@/lib/inbox-filter";
+import { totalUnread } from "@/lib/conversation-state";
+import {
+  listInboxConversations,
+  listUnassignedConversations,
+} from "@/lib/inbox-filter";
 import type { Conversation, UserRole } from "@/lib/types";
 
 /** Unassigned pool size for the Unassigned tab badge; omit when empty. */
@@ -15,9 +19,6 @@ export function conversationsTabBadge(
   userId: string,
   conversations: Conversation[],
 ): number | undefined {
-  const n = listInboxConversations(role, userId, conversations).reduce(
-    (sum, c) => sum + c.unreadCount,
-    0,
-  );
+  const n = totalUnread(listInboxConversations(role, userId, conversations));
   return n > 0 ? n : undefined;
 }

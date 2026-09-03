@@ -101,7 +101,7 @@ export function AdminHub() {
             <Text variant="label" className="mb-2 uppercase tracking-wider text-muted">
               Recent Message
             </Text>
-            <RecentThreadCard conversation={recent} selfId={me.id} />
+            <RecentThreadCard conversation={recent} />
           </View>
         ) : null}
       </View>

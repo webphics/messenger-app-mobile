@@ -52,8 +52,11 @@ export const UserRow = memo(function UserRow({
   }
 
   function handleMessage() {
-    const thread = CONVERSATIONS.find((c) =>
-      c.participantIds.includes(person.id),
+    const thread = CONVERSATIONS.find(
+      (conversation) =>
+        conversation.customer?.id === person.id ||
+        conversation.assignedAgent?.id === person.id ||
+        conversation.members.some((member) => member.id === person.id),
     );
     if (thread) {
       router.push(`/chat/${thread.id}`);

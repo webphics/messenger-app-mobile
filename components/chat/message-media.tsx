@@ -19,10 +19,10 @@ import { fitImageSize, mediaCaptionColumnWidth } from '@/lib/image-layout'
 import { cn } from '@/lib/cn'
 import { attachmentKindLabel } from '@/lib/message-attachment'
 import { colors } from '@/lib/tokens'
-import type { MessageAttachment } from '@/lib/types'
+import type { AttachmentView } from '@/lib/types'
 
 type MessageMediaProps = {
-  attachment: MessageAttachment
+  attachment: AttachmentView
   outgoing: boolean
   caption?: string
 }
@@ -268,7 +268,7 @@ function DocumentAttachment({
   attachment,
   outgoing,
 }: {
-  attachment: MessageAttachment
+  attachment: AttachmentView
   outgoing: boolean
 }) {
   const size = formatBytes(attachment.size)

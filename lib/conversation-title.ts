@@ -1,20 +1,40 @@
-import type { Conversation, Person } from '@/lib/types'
+import { isStaffConversation } from '@/lib/types'
+import type { Conversation, ConversationPerson } from '@/lib/types'
 
-export function otherParticipant(
-  conversation: Conversation,
-  people: Person[],
-  selfId: string,
-): Person | undefined {
-  const otherId = conversation.participantIds.find((id) => id !== selfId)
-  return people.find((p) => p.id === otherId)
+/**
+ * What to call a conversation, and who to draw a presence dot for.
+ *
+ * A conversation does not carry a title in general — only groups and
+ * announcements have one. Everything else is named after the person on the other
+ * side, and who that is depends on who is looking: staff see the customer or the
+ * peer the API resolved for them, and a Customer's own Support DM names nobody
+ * at all. It is titled by the organization it belongs to instead, which is the
+ * only thing distinguishing one Customer's support threads from another's.
+ */
+
+const SUPPORT_FALLBACK = 'Support'
+
+/** The other person in a two-sided conversation, or null where there is not one. */
+export function conversationPeer(conversation: Conversation): ConversationPerson | null {
+  if (!isStaffConversation(conversation)) return null
+  if (conversation.type === 'support_dm') return conversation.customer
+  if (conversation.type === 'staff_dm') return conversation.otherUser
+  return null
 }
 
 export function conversationTitle(
   conversation: Conversation,
-  people: Person[],
-  selfId: string,
+  organizationNames: ReadonlyMap<string, string> = new Map(),
 ): string {
-  if (conversation.id === 'offers') return 'Offers'
-  if (conversation.kind === 'group') return conversation.subject ?? 'Group'
-  return otherParticipant(conversation, people, selfId)?.displayName ?? conversation.subject ?? 'Chat'
+  if (conversation.type === 'group' || conversation.type === 'community_announcement') {
+    return conversation.title?.trim() || (conversation.type === 'group' ? 'Group' : 'Announcements')
+  }
+
+  if (isStaffConversation(conversation)) {
+    const peer = conversationPeer(conversation)
+    if (peer) return peer.name
+    return conversation.title?.trim() || SUPPORT_FALLBACK
+  }
+
+  return organizationNames.get(conversation.organizationId)?.trim() || SUPPORT_FALLBACK
 }

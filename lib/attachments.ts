@@ -1,9 +1,9 @@
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 
-import type { AttachmentKind, MessageAttachment } from '@/lib/types'
+import type { AttachmentKind, AttachmentView } from '@/lib/types'
 
-export type PickedAttachment = MessageAttachment & {
+export type PickedAttachment = AttachmentView & {
   kind: Exclude<AttachmentKind, 'audio'>
 }
 

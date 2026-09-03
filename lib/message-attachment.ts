@@ -1,4 +1,16 @@
-import type { AttachmentKind, Message, MessageAttachment } from '@/lib/types'
+import type { AttachmentKind, AttachmentView } from '@/lib/types'
+
+/**
+ * What a bubble draws: the text, and the one attachment it renders beside it.
+ *
+ * Not a Message. A message carries several attachments and arrives in two
+ * role-shaped variants, and none of that changes how a preview line or a quote
+ * strip reads — those depend on the caption and the kind, and nothing else.
+ */
+export type BubbleContent = {
+  body: string
+  attachment?: AttachmentView
+}
 
 export const VOICE_NOTE_MAX_MS = 20 * 60 * 1000
 export const VOICE_NOTE_PEAK_BARS = 48
@@ -16,7 +28,7 @@ export function attachmentKindLabel(kind: AttachmentKind): string {
 
 /** Inbox / composer preview when body is empty or alongside a caption. */
 export function messagePreviewText(
-  message: Pick<Message, 'body' | 'attachment'>,
+  message: BubbleContent,
 ): string {
   const caption = message.body.replace(/\s+/g, ' ').trim()
   const attachment = message.attachment
@@ -33,7 +45,7 @@ export function messagePreviewText(
 
 /** Quote strip text (Messenger-style label + optional caption). */
 export function quoteAttachmentText(
-  message: Pick<Message, 'body' | 'attachment'>,
+  message: BubbleContent,
   max = 72,
 ): string {
   const text = messagePreviewText(message)
@@ -86,8 +98,8 @@ export function formatDurationMs(ms: number | null | undefined): string {
 }
 
 export function isImageOrVideo(
-  attachment: MessageAttachment | undefined,
-): attachment is MessageAttachment & { kind: 'image' | 'video' } {
+  attachment: AttachmentView | undefined,
+): attachment is AttachmentView & { kind: 'image' | 'video' } {
   return attachment?.kind === 'image' || attachment?.kind === 'video'
 }
 
@@ -100,8 +112,8 @@ export function isImageOrVideo(
 export type QuoteLayoutMode = 'fused-on-image' | 'header-only' | 'standard'
 
 export function quoteLayoutMode(
-  quoted: Pick<Message, 'body' | 'attachment'>,
-  reply: Pick<Message, 'body' | 'attachment'>,
+  quoted: BubbleContent,
+  reply: BubbleContent,
 ): QuoteLayoutMode {
   const quotedKind = quoted.attachment?.kind
   if (

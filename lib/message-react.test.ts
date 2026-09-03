@@ -1,34 +1,65 @@
-import { quotePreview, replyCaption, toggleReaction } from '@/lib/message-react'
+import { groupReactions, quotePreview, replyCaption, toggleReaction } from '@/lib/message-react'
 
 describe('toggleReaction', () => {
   test('adds the first reaction', () => {
-    expect(toggleReaction(undefined, '👍', 'u1')).toEqual([{ emoji: '👍', userIds: ['u1'] }])
+    expect(toggleReaction(undefined, '👍', 'u1')).toEqual([{ emoji: '👍', userId: 'u1' }])
   })
 
-  test('joins an existing emoji', () => {
-    expect(toggleReaction([{ emoji: '👍', userIds: ['u1'] }], '👍', 'u2')).toEqual([
-      { emoji: '👍', userIds: ['u1', 'u2'] },
+  test('joins an emoji someone else already used', () => {
+    expect(toggleReaction([{ emoji: '👍', userId: 'u1' }], '👍', 'u2')).toEqual([
+      { emoji: '👍', userId: 'u1' },
+      { emoji: '👍', userId: 'u2' },
     ])
   })
 
   test('toggles off the same emoji', () => {
-    expect(toggleReaction([{ emoji: '👍', userIds: ['u1'] }], '👍', 'u1')).toEqual([])
+    expect(toggleReaction([{ emoji: '👍', userId: 'u1' }], '👍', 'u1')).toEqual([])
   })
 
-  test('replaces a different emoji for the same user', () => {
+  test('replaces a different emoji by the same person', () => {
     expect(
       toggleReaction(
         [
-          { emoji: '👍', userIds: ['u1', 'u2'] },
-          { emoji: '❤️', userIds: ['u3'] },
+          { emoji: '👍', userId: 'u1' },
+          { emoji: '👍', userId: 'u2' },
+          { emoji: '❤️', userId: 'u3' },
         ],
         '❤️',
         'u1',
       ),
     ).toEqual([
-      { emoji: '👍', userIds: ['u2'] },
-      { emoji: '❤️', userIds: ['u3', 'u1'] },
+      { emoji: '👍', userId: 'u2' },
+      { emoji: '❤️', userId: 'u3' },
+      { emoji: '❤️', userId: 'u1' },
     ])
+  })
+})
+
+describe('groupReactions', () => {
+  test('gathers one chip per emoji, in the order they first appeared', () => {
+    expect(
+      groupReactions([
+        { emoji: '👍', userId: 'u1' },
+        { emoji: '❤️', userId: 'u2' },
+        { emoji: '👍', userId: 'u3' },
+      ]),
+    ).toEqual([
+      { emoji: '👍', userIds: ['u1', 'u3'] },
+      { emoji: '❤️', userIds: ['u2'] },
+    ])
+  })
+
+  test('counts one person once, however many times the payload names them', () => {
+    expect(
+      groupReactions([
+        { emoji: '👍', userId: 'u1' },
+        { emoji: '👍', userId: 'u1' },
+      ]),
+    ).toEqual([{ emoji: '👍', userIds: ['u1'] }])
+  })
+
+  test('reads no reactions as no chips', () => {
+    expect(groupReactions(undefined)).toEqual([])
   })
 })
 

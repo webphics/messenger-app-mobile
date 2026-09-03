@@ -1,7 +1,7 @@
 import { useNavigation, useRouter } from "expo-router";
-import { Inbox, MessageCircle, SquarePen } from "@/components/icons";
+import { CloudOff, Inbox, MessageCircle, SquarePen } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, View } from "react-native";
+import { ActivityIndicator, FlatList, View } from "react-native";
 
 import { ConversationRow } from "@/components/inbox/conversation-row";
 import { NewChatModal } from "@/components/inbox/new-chat-modal";
@@ -11,8 +11,6 @@ import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { cn } from "@/lib/cn";
 import { filterConversations, type InboxChip } from "@/lib/inbox-filter";
-import { getDevUserId } from "@/lib/dev-user";
-import { LABELS, PEOPLE } from "@/lib/mock-data";
 import { settleEnter } from "@/lib/motion-enter";
 import {
   makeRefreshControl,
@@ -62,11 +60,80 @@ function InboxEmpty({ showChips }: { showChips: boolean }) {
   );
 }
 
+/** The first fetch, with nothing to show yet. */
+function InboxLoading() {
+  return (
+    <View className="items-center px-4 py-16">
+      <ActivityIndicator color={colors.primary} />
+      <Text variant="meta" className="mt-4 text-muted">
+        Loading conversations…
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * The list could not be fetched.
+ *
+ * Says what happened and offers the one thing that can help, rather than leaving
+ * an empty list that reads as "you have no conversations" when the truth is that
+ * nobody managed to ask.
+ */
+function InboxError({
+  title,
+  hint,
+  onRetry,
+}: {
+  title: string;
+  hint: string;
+  onRetry?: () => void;
+}) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <Animated.View
+      entering={settleEnter(!!reduceMotion)}
+      accessibilityLiveRegion="polite"
+      className="items-center px-4 py-16"
+    >
+      <View className="size-14 items-center justify-center rounded-full bg-danger/10">
+        <CloudOff color={colors.danger} size={26} />
+      </View>
+      <Text variant="title" className="mt-4 text-ink">
+        {title}
+      </Text>
+      <Text variant="meta" className="mt-1 text-center text-muted">
+        {hint}
+      </Text>
+      {onRetry ? (
+        <TactilePressable
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          onPress={onRetry}
+          className="mt-4 min-h-11 justify-center rounded-full bg-primary px-5"
+        >
+          <Text variant="label" className="font-bold text-primary-foreground">
+            Try again
+          </Text>
+        </TactilePressable>
+      ) : null}
+    </Animated.View>
+  );
+}
+
 type InboxScreenProps = {
   conversations: Conversation[];
   showChips: boolean;
   showCompose: boolean;
   title: string;
+  /** Names a Customer's own support threads, which carry no title of their own. */
+  organizationNames?: ReadonlyMap<string, string>;
+  /** Set while the first fetch is out and there is nothing to show yet. */
+  loading?: boolean;
+  /** What went wrong, when the list could not be fetched at all. */
+  error?: { title: string; hint: string } | null;
+  refreshing?: boolean;
+  /** Absent for the lists still reading local data, which have nothing to refetch. */
+  onRefresh?: () => void;
 };
 
 export function InboxScreen({
@@ -74,6 +141,11 @@ export function InboxScreen({
   showChips,
   showCompose,
   title,
+  organizationNames,
+  loading = false,
+  error = null,
+  refreshing: refreshingProp,
+  onRefresh: onRefreshProp,
 }: InboxScreenProps) {
   const router = useRouter();
   const navigation = useNavigation();
@@ -81,9 +153,13 @@ export function InboxScreen({
   const [chip, setChip] = useState<InboxChip>("all");
   const [composeOpen, setComposeOpen] = useState(false);
   const [epoch, setEpoch] = useState(0);
-  const { refreshing, onRefresh } = useSimulatedRefresh(() => {
+  const simulated = useSimulatedRefresh(() => {
     setEpoch((n) => n + 1);
   });
+  // A list that fetches refreshes for real; one still reading local data keeps
+  // the gesture it had, which only replays the enter animation.
+  const refreshing = onRefreshProp ? refreshingProp === true : simulated.refreshing;
+  const onRefresh = onRefreshProp ?? simulated.onRefresh;
 
   useEffect(() => {
     navigation.setOptions({
@@ -110,11 +186,9 @@ export function InboxScreen({
       conversations,
       query,
       showChips ? chip : "all",
-      LABELS,
-      PEOPLE,
-      getDevUserId(),
+      organizationNames,
     );
-  }, [conversations, query, chip, showChips, epoch]);
+  }, [conversations, query, chip, showChips, organizationNames, epoch]);
 
   const openConversation = useCallback(
     (conversationId: string) => {
@@ -128,10 +202,11 @@ export function InboxScreen({
       <ConversationRow
         conversation={item}
         onPress={openConversation}
+        organizationNames={organizationNames}
         index={index}
       />
     ),
-    [openConversation],
+    [openConversation, organizationNames],
   );
 
   return (
@@ -188,7 +263,15 @@ export function InboxScreen({
         contentContainerClassName="px-4 py-3"
         ItemSeparatorComponent={InboxItemSeparator}
         renderItem={renderItem}
-        ListEmptyComponent={<InboxEmpty showChips={showChips} />}
+        ListEmptyComponent={
+          loading ? (
+            <InboxLoading />
+          ) : error ? (
+            <InboxError title={error.title} hint={error.hint} onRetry={onRefresh} />
+          ) : (
+            <InboxEmpty showChips={showChips} />
+          )
+        }
         refreshControl={makeRefreshControl(refreshing, onRefresh)}
       />
 
