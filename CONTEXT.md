@@ -112,6 +112,14 @@ _Avoid_: Session timeout, token refresh
 Conversations with no assignee, visible to Agent and Admin.
 _Avoid_: Queue (unless referring to ordering), inbox (inbox is the conversation list)
 
+**Engage**:
+An Agent or Admin claiming a conversation from the Unassigned pool, becoming its assignee. The API's `engage` action.
+_Avoid_: Claim, pick up, assign to self (assignment is what results, not the action's name)
+
+**Takeover**:
+An Agent or Admin taking assignment of a conversation away from its current assignee. Distinct from Transfer (Phase 4b): a Takeover is unilateral and names no destination other than the actor; a Transfer hands off to a chosen agent.
+_Avoid_: Reassign, steal, force-assign
+
 **Offers**:
 In-app promo carousel plus the shared group chat `id: 'offers'`. `"Sponsored"` is a section label only.
 _Avoid_: Stories, ads, sponsored content (as a product feature)
