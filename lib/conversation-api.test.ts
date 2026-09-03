@@ -6,6 +6,7 @@ import {
   listConversations,
   listMessages,
   listMyOrganizations,
+  sendMessage,
 } from '@/lib/conversation-api'
 
 /**
@@ -60,11 +61,11 @@ function envelope(data: unknown, status = 200): Response {
   return response(status, { statusCode: status, message: 'Success', data })
 }
 
-function csrfResponse(): Response {
+function csrfResponse(token = 'csrf-token-value', cookie = 'cookie-value'): Response {
   return response(
     200,
-    { statusCode: 200, message: 'Success', data: 'csrf-token-value' },
-    { 'set-cookie': 'csrf-token=cookie-value; Path=/; HttpOnly' },
+    { statusCode: 200, message: 'Success', data: token },
+    { 'set-cookie': `csrf-token=${cookie}; Path=/; HttpOnly` },
   )
 }
 
@@ -275,5 +276,125 @@ describe('listMyOrganizations', () => {
     enqueue(envelope({ rows: [] }))
 
     expect(await listMyOrganizations()).toEqual({ ok: true, value: [] })
+  })
+})
+
+describe('sendMessage', () => {
+  const SENT_ROW = {
+    ...MESSAGE_ROW,
+    id: 'msg-2',
+    body: 'Is my payout on the way?',
+    createdAt: '2026-08-13T08:05:00.000Z',
+  }
+
+  test('posts the body to the thread, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope(SENT_ROW, 201))
+
+    const result = await sendMessage('conv-1', { body: 'Is my payout on the way?' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/messages`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(calls[1]?.init.body).toBe(
+      JSON.stringify({ body: 'Is my payout on the way?', messageType: 'text' }),
+    )
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'msg-2' }) })
+  })
+
+  test('carries the Session cookie beside the CSRF cookie', async () => {
+    enqueue(csrfResponse(), envelope(SENT_ROW, 201))
+
+    await sendMessage('conv-1', { body: 'Hello' })
+
+    expect((calls[1]?.init.headers as Record<string, string>).Cookie).toBe(
+      'better-auth.session_token=abc.def; csrf-token=cookie-value',
+    )
+  })
+
+  test('names the message being answered when the send is a reply', async () => {
+    enqueue(csrfResponse(), envelope(SENT_ROW, 201))
+
+    await sendMessage('conv-1', { body: 'Thanks', replyToMessageId: 'msg-1' })
+
+    expect(calls[1]?.init.body).toBe(
+      JSON.stringify({ body: 'Thanks', messageType: 'text', replyToMessageId: 'msg-1' }),
+    )
+  })
+
+  test('omits the reply key rather than sending it empty, which the strict schema refuses', async () => {
+    enqueue(csrfResponse(), envelope(SENT_ROW, 201))
+
+    await sendMessage('conv-1', { body: 'Hello' })
+
+    expect(JSON.parse(String(calls[1]?.init.body))).not.toHaveProperty('replyToMessageId')
+  })
+
+  test('escapes an id rather than letting it shape the path', async () => {
+    enqueue(csrfResponse(), envelope(SENT_ROW, 201))
+
+    await sendMessage('conv 1/../secrets', { body: 'Hello' })
+
+    expect(calls[1]?.url).toBe(
+      `${API_BASE_URL}/conversations/conv%201%2F..%2Fsecrets/messages`,
+    )
+  })
+
+  test('reports a send that never arrived as unreachable', async () => {
+    enqueue(csrfResponse(), new TypeError('Network request failed'))
+
+    expect(await sendMessage('conv-1', { body: 'Hello' })).toEqual({
+      ok: false,
+      failure: { kind: 'unreachable' },
+    })
+  })
+
+  test('reports a 401 as an expired session rather than a refusal', async () => {
+    enqueue(csrfResponse(), response(401, { statusCode: 401, message: 'Unauthorized' }))
+
+    expect(await sendMessage('conv-1', { body: 'Hello' })).toEqual({
+      ok: false,
+      failure: { kind: 'unauthorised' },
+    })
+  })
+
+  test('repeats what the server said when it refused the message', async () => {
+    enqueue(
+      csrfResponse(),
+      response(400, { statusCode: 400, message: 'Body or attachments are required' }),
+    )
+
+    expect(await sendMessage('conv-1', { body: '' })).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Body or attachments are required' },
+    })
+  })
+
+  test('reports an answer it cannot read as malformed rather than as a message', async () => {
+    enqueue(csrfResponse(), envelope({ id: 'msg-2' }, 201))
+
+    expect(await sendMessage('conv-1', { body: 'Hello' })).toEqual({
+      ok: false,
+      failure: { kind: 'malformed' },
+    })
+  })
+
+  test('sends the message once more with a fresh token when the guard refused the first', async () => {
+    enqueue(
+      csrfResponse(),
+      response(403, { statusCode: 403, code: 'csrf_invalid', message: 'Invalid CSRF token.' }),
+      csrfResponse('second-token', 'second-cookie'),
+      envelope(SENT_ROW, 201),
+    )
+
+    const result = await sendMessage('conv-1', { body: 'Hello' })
+
+    expect(calls).toHaveLength(4)
+    expect((calls[3]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'second-token',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'msg-2' }) })
   })
 })

@@ -128,6 +128,20 @@ _Avoid_: Tab bar (that is the host navigator's own bar, kept invisible beneath),
 A unit of chat content in a Conversation: a text body and/or one Attachment. The body may be empty when the Message is only an Attachment; when both are present the body is a caption.
 _Avoid_: Post, chat item, media message (as a separate entity from Message)
 
+**Unsent message**:
+A Message from the tap on send until the API answers for it. It carries a local id, appears in the
+thread immediately, and its **Delivery state** reads *sending* or, when the request did not land,
+*failed* — a failed one stays on screen, says so, and offers to go again rather than disappearing.
+The API's answer replaces it whole: a server id, a server timestamp, and a Receipt. Not called
+*outgoing*, which in this app means a Message the viewer sent, whenever they sent it.
+_Avoid_: Outgoing message (that is "mine"), pending message, optimistic message, sending receipt
+
+**Receipt**:
+How far a Message the viewer sent has travelled among the people in the Conversation — `sent`,
+`delivered`, `read`. Issued by the API and never by this client, so a Message with no Receipt is an
+Unsent message. A bubble shows one or the other, never both.
+_Avoid_: Delivery state (that is the Unsent message's), tick, checkmark
+
 **Attachment**:
 A single file or recording on a Message — image, video, document, or voice note — identified by a local device URI in this client until a server exists. At most one Attachment per Message.
 _Avoid_: Upload, media blob, file message (as a type parallel to Message)

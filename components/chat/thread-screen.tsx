@@ -10,9 +10,14 @@ import { Text } from '@/components/ui/text'
 import { primaryAttachmentView, toMessageAttachment } from '@/lib/attachment-view'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
+  draftMessage,
+  isLocalId,
   isOutgoing,
+  LOCAL_ID_PREFIX,
   mergeMessages,
   messageSenderName,
+  type DeliveryState,
+  type SendDraft,
 } from '@/lib/conversation-state'
 import { useKeyboardInset } from '@/lib/keyboard-inset'
 import { formatDayLabel, shouldShowDayDivider } from '@/lib/message-day'
@@ -48,6 +53,16 @@ type ThreadScreenProps = {
   loadingOlder?: boolean
   refreshing?: boolean
   onRefresh?: () => void
+  /**
+   * Where a typed message goes.
+   *
+   * Absent on a thread that still has nowhere to send one, where the composer
+   * falls back to echoing locally so it is not a dead control.
+   */
+  onSendMessage?: (draft: SendDraft) => void
+  /** How far each message this device is still carrying has got, by id. */
+  delivery?: ReadonlyMap<string, DeliveryState>
+  onRetrySend?: (messageId: string) => void
 }
 
 type Row =
@@ -100,6 +115,9 @@ export function ThreadScreen({
   loadingOlder = false,
   refreshing = false,
   onRefresh,
+  onSendMessage,
+  delivery,
+  onRetrySend,
 }: ThreadScreenProps) {
   const keyboardInset = useKeyboardInset()
   const hostRef = useRef<View>(null)
@@ -240,23 +258,34 @@ export function ThreadScreen({
   )
 
   /**
-   * A message typed here appears here and goes no further.
+   * A message typed here.
    *
-   * Sending over REST is #29 and delivery over the socket is #31; this is the
-   * local echo Phase 5a left behind, kept so the composer is not a dead control
-   * in the meantime. It is deliberately not written as an optimistic send: there
-   * is nothing in flight for it to be optimistic about.
+   * Text goes to the API through `onSendMessage`, and the caller owns it from
+   * there — the bubble it puts on screen arrives back in `messages` with a
+   * delivery state, so nothing about a send is held twice.
+   *
+   * An attachment does not: the API's shape names an uploaded object and Phase
+   * 5a produces a device URI, so a message carrying one has nowhere to go and
+   * stays the local echo it has been since. Same for a thread with no
+   * `onSendMessage` at all — Agent and Admin, still on local data until #32.
    */
   function send(payload: ComposerSendPayload) {
     const body = payload.body.trim()
     if (!body && !payload.attachment) return
 
+    const quoted = replyTo
     setReplyTo(null)
     // MVCP keeps the prior newest row fixed; after layout, pin offset 0 so the
     // sent bubble clears the composer (autoscroll threshold alone skips if the
     // user had scrolled up slightly).
     stickToLatestRef.current = true
-    setLocal((held) => [...held, localEcho(payload, viewer, replyTo)])
+
+    if (onSendMessage && !payload.attachment) {
+      onSendMessage({ body, replyTo: quoted })
+      return
+    }
+
+    setLocal((held) => [...held, localEcho(payload, viewer, quoted)])
   }
 
   const onContentSizeChange = useCallback(() => {
@@ -289,14 +318,25 @@ export function ThreadScreen({
           reactions={groupReactions(item.message.reactions)}
           currentUserId={viewer.id}
           selected={menuId === item.message.id}
-          enter={item.message.id.startsWith(LOCAL_ID_PREFIX)}
+          enter={isLocalId(item.message.id)}
+          delivery={delivery?.get(item.message.id)}
+          onRetrySend={onRetrySend}
           onOpenMenu={openMenu}
           onReply={handleReply}
           onToggleReaction={handleToggleReaction}
         />
       )
     },
-    [handleReply, handleToggleReaction, viewer.id, menuId, openMenu, quotedById],
+    [
+      handleReply,
+      handleToggleReaction,
+      viewer.id,
+      menuId,
+      openMenu,
+      quotedById,
+      delivery,
+      onRetrySend,
+    ],
   )
 
   const host = (
@@ -383,28 +423,17 @@ export function ThreadScreen({
   )
 }
 
-/** Locally-echoed ids are prefixed so a bubble can tell one apart and animate it in. */
-const LOCAL_ID_PREFIX = 'local-'
-
+/** A message this screen shows and does not send. See `send`. */
 function localEcho(
   payload: ComposerSendPayload,
   viewer: ThreadViewer,
   replyTo: Message | null,
 ): Message {
-  const base = {
+  return draftMessage({
     id: `${LOCAL_ID_PREFIX}${Date.now()}`,
     body: payload.body.trim(),
-    messageType: payload.attachment ? ('media' as const) : ('text' as const),
-    createdAt: new Date().toISOString(),
-    replyTo: replyTo
-      ? { id: replyTo.id, preview: replyTo.body.slice(0, 140) }
-      : null,
-    reactions: [],
+    author: viewer,
+    replyTo,
     attachments: payload.attachment ? [toMessageAttachment(payload.attachment)] : [],
-    receiptStatus: 'sent' as const,
-  }
-
-  return viewer.role === 'customer'
-    ? { ...base, fromCompany: false }
-    : { ...base, sender: { id: viewer.id, name: viewer.name, role: viewer.role } }
+  })
 }

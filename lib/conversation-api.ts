@@ -3,6 +3,7 @@ import { asRecord } from '@/lib/api-envelope'
 import {
   parseConversation,
   parseConversations,
+  parseMessage,
   parseMessages,
   parseOrganizations,
 } from '@/lib/conversation-parse'
@@ -129,6 +130,45 @@ export async function listMessages(
     limit: options.limit ?? MESSAGE_PAGE_LIMIT,
   })}`
   return readOutcome(await authenticatedRequest(path), parseMessages)
+}
+
+export type SendMessageDraft = {
+  /** Trimmed by the caller; the API refuses an empty one. */
+  body: string
+  /** The message being answered, when the composer had a reply open. */
+  replyToMessageId?: string
+}
+
+/**
+ * Write one text message to a thread.
+ *
+ * The API answers with the message it stored, so what comes back is what every
+ * other device will see — a server id, the server's timestamp, and a receipt.
+ * That is what the thread keeps; the bubble the composer put on screen is only
+ * ever a stand-in for it.
+ *
+ * Text only. `SendMessageSchema` takes attachments too, but they name uploaded
+ * objects rather than the device URIs Phase 5a produces, so a message carrying
+ * one has nowhere to go until upload arrives.
+ */
+export async function sendMessage(
+  id: string,
+  draft: SendMessageDraft,
+): Promise<ApiResult<Message>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/messages`,
+    {
+      method: 'POST',
+      // The schema is `.strict()`, so a key it does not know refuses the whole
+      // request — `replyToMessageId` is omitted rather than sent as undefined.
+      body: {
+        body: draft.body,
+        messageType: 'text',
+        ...(draft.replyToMessageId ? { replyToMessageId: draft.replyToMessageId } : {}),
+      },
+    },
+  )
+  return readOutcome(outcome, parseMessage)
 }
 
 /**
