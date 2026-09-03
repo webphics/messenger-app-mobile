@@ -8,7 +8,7 @@ import type {
 import { isStaffMessage } from '@/lib/types'
 
 /**
- * What a REST answer means for what is on screen.
+ * What an answer means for what is on screen — whether it was asked for or not.
  *
  * Everything here is pure: state in, state out, no network and no React. It is
  * where the rules that would otherwise be scattered through screens live — which
@@ -16,8 +16,10 @@ import { isStaffMessage } from '@/lib/types'
  * how far back the next page should ask for, whether a row is unread, and what
  * becomes of a message someone typed while the request carrying it is out.
  *
- * The same functions are what the socket layer will fold events into (#31),
- * which is the reason merging is written as a merge rather than as an append.
+ * A REST page and a socket event fold in through the same functions, which is
+ * why merging was written as a merge rather than as an append: a resync after a
+ * reconnect re-fetches messages the socket has already delivered, and folding by
+ * id is what makes that arrive as nothing rather than as a second copy.
  */
 
 /**
@@ -115,6 +117,15 @@ export function visibleMessages(
   return messages.filter((message) => isMessageVisibleTo(role, conversationType, message))
 }
 
+/**
+ * Who is reading a thread, and what kind of thread it is.
+ *
+ * The pair decides what may be shown; the id decides what is theirs. Named
+ * because the same fields travel together into everything that folds a message
+ * into a thread, and a page and a socket event must not answer them differently.
+ */
+export type ThreadViewer = { role: UserRole; conversationType: ConversationType }
+
 function byCreatedAt(a: Message, b: Message): number {
   const difference = Date.parse(a.createdAt) - Date.parse(b.createdAt)
   // Two messages can share a timestamp on a busy thread; the id keeps the order
@@ -158,7 +169,7 @@ export function mergeMessages(existing: Message[], incoming: Message[]): Message
 export function applyMessagePage(
   state: ThreadState,
   page: Message[],
-  viewer: { role: UserRole; conversationType: ConversationType },
+  viewer: ThreadViewer,
 ): ThreadState {
   return {
     ...state,
@@ -169,6 +180,68 @@ export function applyMessagePage(
     hasMore: page.length > 0,
     cursor: page[0]?.id ?? state.cursor,
   }
+}
+
+/**
+ * A message that arrived over the socket, folded into the open thread.
+ *
+ * The same visibility rule and the same merge a fetched page goes through, for
+ * the same reasons — which is what makes a resync after a reconnect harmless:
+ * the page comes back holding the message the socket already delivered, and
+ * folding by id replaces it rather than showing it twice.
+ *
+ * `hasMore` and `cursor` are untouched. Both describe how far *back* the thread
+ * has read, and a message arriving at the newest end says nothing about that.
+ */
+export function applyIncomingMessage(
+  state: ThreadState,
+  message: Message,
+  viewer: ThreadViewer & { id: string },
+): ThreadState {
+  if (!isMessageVisibleTo(viewer.role, viewer.conversationType, message)) return state
+
+  return {
+    ...state,
+    messages: mergeMessages(state.messages, [message]),
+    unsent: withoutEcho(state.unsent, message, viewer.id),
+  }
+}
+
+/**
+ * The echo an arriving message is the confirmation of, dropped.
+ *
+ * A message this device sent comes back twice: once as the API's answer to the
+ * request that carried it, and once over the socket, because the sender is in
+ * the conversation too. Whichever arrives first is the moment the message is
+ * confirmed — and before this, the socket arriving first left the person looking
+ * at their own message twice, once delivered and once still marked *sending*,
+ * until the round trip caught up. On a slow connection that is not a flicker.
+ *
+ * Matched on the body rather than on an id, because there is no id to match on:
+ * a local id is this device's and the arriving one is the server's, and nothing
+ * relates them until the request answers. Only the viewer's own messages are
+ * considered, and only against a body that is not empty. Two identical messages
+ * in flight at once confirm in the order they were sent, which is the order they
+ * were written.
+ *
+ * Only a send still in flight is confirmed this way. One that has already failed
+ * keeps its place and its offer to go again: the person has been told about it,
+ * and taking it away on the strength of matching words would leave them with
+ * nothing to retry. A send that fails *after* an arrival confirmed it finds
+ * nothing left to mark, which is right — the socket has shown that it landed.
+ */
+function withoutEcho(
+  unsent: UnsentMessage[],
+  message: Message,
+  viewerId: string,
+): UnsentMessage[] {
+  if (unsent.length === 0 || message.body === '') return unsent
+  if (!isOutgoing(message, viewerId)) return unsent
+
+  const echo = unsent.find(
+    (entry) => entry.state === 'sending' && entry.message.body === message.body,
+  )
+  return echo ? unsent.filter((entry) => entry !== echo) : unsent
 }
 
 /**
@@ -422,6 +495,80 @@ export function withConversationRead(
   const next = [...conversations]
   next[index] = read
   return next
+}
+
+/** How much of a message a conversation row previews. The API's own length. */
+const PREVIEW_LENGTH = 140
+
+/**
+ * The list, with a message that has just arrived reflected on its row.
+ *
+ * The API sends `conversation.updated` beside every `message.created`, and that
+ * carries the row — but with `unreadCount: null`, because only the list endpoint
+ * counts. So the row's preview and its place in the order would update on their
+ * own and the badge would not: this is what moves the count, and it is the
+ * reason unread goes up while the list is open rather than at the next fetch.
+ *
+ * A message in a conversation this client has never heard of leaves the list
+ * exactly as it was. The `conversation.updated` beside it carries the whole row
+ * and adds it; inventing one from a message would mean guessing a type and an
+ * organization the payload does not carry.
+ */
+export function withIncomingMessage(
+  conversations: Conversation[],
+  conversationId: string,
+  message: Message,
+  viewerId: string,
+): Conversation[] {
+  const index = conversations.findIndex((row) => row.id === conversationId)
+  if (index === -1) return conversations
+
+  const held = conversations[index]
+  const mine = isOutgoing(message, viewerId)
+
+  const next = [...conversations]
+  next[index] = {
+    ...held,
+    lastMessageAt: message.createdAt,
+    lastMessagePreview: message.body.slice(0, PREVIEW_LENGTH),
+    lastMessageMine: mine,
+    // The row's receipt is about the viewer's own last message, so someone
+    // else's message leaves nothing to report.
+    lastMessageReceiptStatus: mine ? message.receiptStatus : null,
+    // A message the viewer wrote elsewhere is read by definition; anyone else's
+    // is not, whatever the row said a moment ago.
+    lastMessageRead: mine,
+    unreadCount: nextUnreadCount(held.unreadCount, mine),
+  }
+
+  return sortConversations(next)
+}
+
+/**
+ * Null stays null: it means the API declined to count, not that there is
+ * nothing. `isConversationUnread` reads the receipt instead for those rows, and
+ * the fields above have just told it the truth.
+ */
+function nextUnreadCount(held: number | null, mine: boolean): number | null {
+  if (held === null) return null
+  return mine ? held : held + 1
+}
+
+/**
+ * The list without one conversation.
+ *
+ * A hard delete leaves nothing to refetch, so the row is dropped rather than
+ * refreshed — a refresh would only find its way to a 404. Answers the list it
+ * was given when the row is not in it, so an event for a conversation this
+ * person never held re-renders nothing.
+ */
+export function withoutConversation(
+  conversations: Conversation[],
+  id: string,
+): Conversation[] {
+  return conversations.some((row) => row.id === id)
+    ? conversations.filter((row) => row.id !== id)
+    : conversations
 }
 
 /**

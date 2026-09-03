@@ -21,7 +21,10 @@ import {
   mergeConversation,
   sortConversations,
   withConversationRead,
+  withIncomingMessage,
+  withoutConversation,
 } from '@/lib/conversation-state'
+import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import type { Conversation } from '@/lib/types'
 
 /**
@@ -87,6 +90,18 @@ function drain(ids: Set<string>, conversations: Conversation[]): Conversation[] 
   for (const id of ids) next = withConversationRead(next, id)
   ids.clear()
   return next
+}
+
+/** One socket event, applied to the rows on screen. Pure; the state around it is not. */
+function applyToList(
+  conversations: Conversation[],
+  event: Exclude<RealtimeEvent, { kind: 'resync' }>,
+  viewerId: string | null,
+): Conversation[] {
+  if (event.kind === 'deleted') return withoutConversation(conversations, event.conversationId)
+  if (event.kind === 'conversation') return mergeConversation(conversations, event.conversation)
+  if (!viewerId) return conversations
+  return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }
 
 const CustomerInboxContext = createContext<CustomerInboxView | null>(null)
@@ -155,9 +170,12 @@ function useCustomerInboxState(): CustomerInboxView {
    */
   const readWhileLoading = useRef(new Set<string>())
 
-  const load = useCallback(async (mode: 'first' | 'refresh') => {
+  const load = useCallback(async (mode: 'first' | 'refresh' | 'resync') => {
     const mine = ++generation.current
     loadOut.current = true
+    // A resync is not something anyone asked for, so it shows nothing while it
+    // runs: the list on screen stays exactly as it is until the answer replaces
+    // it. A spinner appearing on its own would read as an error.
     if (mode === 'refresh') setRefreshing(true)
 
     const [organizations, list] = await Promise.all([
@@ -170,7 +188,10 @@ function useCustomerInboxState(): CustomerInboxView {
     if (!list.ok) {
       loadOut.current = false
       readWhileLoading.current.clear()
-      setInbox({ status: 'failed', failure: list.failure })
+      // A resync that failed leaves what is on screen alone. Nobody asked for
+      // it, the rows are still the last thing the API said, and replacing them
+      // with an error would turn a dropped connection into an empty inbox.
+      if (mode !== 'resync') setInbox({ status: 'failed', failure: list.failure })
       setRefreshing(false)
       return
     }
@@ -240,6 +261,33 @@ function useCustomerInboxState(): CustomerInboxView {
     // that knows which messages the receipt is missing from.
     void markConversationRead(id)
   }, [])
+
+  /**
+   * What the socket says, on the list.
+   *
+   * Every case is one call into `lib/conversation-state`, where what it means is
+   * decided and tested. A message moves the row and its count; a row the API
+   * re-sends replaces the one held, count included, since the API answers
+   * `unreadCount: null` everywhere but the list endpoint; a deleted conversation
+   * goes, because a hard delete leaves nothing to refetch.
+   *
+   * A message for a conversation this client has never held changes nothing —
+   * the `conversation.updated` the API sends beside it carries the whole row and
+   * adds it.
+   */
+  useRealtimeEvents((event: RealtimeEvent) => {
+    if (event.kind === 'resync') {
+      void load('resync')
+      return
+    }
+
+    setInbox((current) => {
+      if (current.status !== 'ready') return current
+
+      const conversations = applyToList(current.conversations, event, customerId)
+      return conversations === current.conversations ? current : { ...current, conversations }
+    })
+  })
 
   return useMemo(
     () => ({ ...inbox, refreshing, reload, markRead }),

@@ -165,6 +165,22 @@ in it. `POST /conversations/:id/read`. The badge clears before the API is told, 
 has read the thread whatever the server makes of it.
 _Avoid_: Acknowledge, seen, dismiss, clear notifications
 
+**Realtime connection**:
+The Socket.IO connection to the API's `/realtime` namespace, authenticated by the same Session
+cookie REST carries and opened once per signed-in person. There are two: a *global* one, live for
+as long as the session is, that carries every event; and a *conversation* one, open only while a
+thread is, whose job is room membership rather than listening. Nothing subscribes to the second.
+See `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`.
+_Avoid_: Websocket (that is the transport), realtime channel, socket connection (as two words for one thing)
+
+**Resync**:
+Re-reading from REST after the Realtime connection comes back, because whatever the API emitted
+while it was down was emitted to nobody. Never on a first connect, and never visible: nobody asked
+for it, so no spinner appears and a failed one leaves what is on screen alone. REST is the
+authority either way — a socket only ever saves it a round trip.
+_Avoid_: Refresh (that is the pull-to-refresh a person asks for), refetch, invalidate, reconnect
+(that is the socket's event, not what follows it)
+
 **Attachment**:
 A single file or recording on a Message — image, video, document, or voice note — identified by a local device URI in this client until a server exists. At most one Attachment per Message.
 _Avoid_: Upload, media blob, file message (as a type parallel to Message)

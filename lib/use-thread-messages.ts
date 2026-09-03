@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { listMessages, sendMessage, type ApiFailure } from '@/lib/conversation-api'
 import {
+  applyIncomingMessage,
   applyMessagePage,
   applySentMessage,
   beginSend,
@@ -19,6 +20,7 @@ import {
   type SendDraft,
   type ThreadState,
 } from '@/lib/conversation-state'
+import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import type { Conversation, Message, UserRole } from '@/lib/types'
 
 /**
@@ -159,14 +161,64 @@ export function useThreadMessages(
     void fetchPage(state.cursor, generation.current)
   }, [fetchPage, loading, loadingOlder, refreshing, state.cursor, state.hasMore])
 
-  /** A refresh re-reads the newest page and rebuilds the thread from it. */
-  const refresh = useCallback(() => {
-    if (!conversationId) return
-    const mine = ++generation.current
-    inFlight.current = false
-    setRefreshing(true)
-    void fetchPage(undefined, mine)
-  }, [conversationId, fetchPage])
+  /**
+   * Re-read the newest page and rebuild the thread from it.
+   *
+   * The mode is what separates the two callers: a pull-to-refresh, which the
+   * person asked for and expects to see, and a resync after a reconnect, which
+   * nobody asked for and which a spinner appearing on its own would make look
+   * like something going wrong.
+   */
+  const reload = useCallback(
+    (mode: 'refresh' | 'resync') => {
+      if (!conversationId) return
+      const mine = ++generation.current
+      inFlight.current = false
+      if (mode === 'refresh') setRefreshing(true)
+      void fetchPage(undefined, mine)
+    },
+    [conversationId, fetchPage],
+  )
+
+  const refresh = useCallback(() => reload('refresh'), [reload])
+
+  /**
+   * What the socket says, in the thread.
+   *
+   * A message merges by id, so the copy the socket delivered and the copy a
+   * later page brings back are one message — which is what makes the resync
+   * below safe to run over a thread that has been live the whole time.
+   *
+   * A reconnect re-reads the newest page rather than trusting what is held: the
+   * connection was down for some length of time and anything emitted into it
+   * went nowhere. It rebuilds from that page, exactly as a pull-to-refresh does,
+   * and shows nothing while it runs — nobody asked for it, and a spinner
+   * appearing on its own reads as something having gone wrong. History scrolled
+   * into before the drop is dropped with it; scrolling up asks for it again.
+   */
+  useRealtimeEvents((event: RealtimeEvent) => {
+    if (event.kind === 'resync') {
+      reload('resync')
+      return
+    }
+
+    // `conversation.updated` arrives beside every message and says nothing a
+    // thread needs: the message itself is already here, and re-reading the
+    // whole thread for a row's preview would put the largest request in the app
+    // on the path of every message anyone sends.
+    if (event.kind !== 'message') return
+    if (event.conversationId !== conversationId || !conversationType) return
+
+    setState((thread) =>
+      applyIncomingMessage(thread, event.message, {
+        // Empty for the roles still on local data, which send nothing and so
+        // have no echo to confirm.
+        id: author?.id ?? '',
+        role,
+        conversationType,
+      }),
+    )
+  })
 
   /**
    * Carry one message to the API and record what came back.
