@@ -1,5 +1,5 @@
 import {
-  createSeenMessages,
+  createCountedMessages,
   parseConversationDeleted,
   parseConversationUpdated,
   parseMessageCreated,
@@ -156,42 +156,44 @@ describe('parseConversationDeleted', () => {
   })
 })
 
-describe('createSeenMessages', () => {
-  it('is new once, and never again', () => {
-    const seen = createSeenMessages()
+describe('createCountedMessages', () => {
+  it('counts an id once, and never again', () => {
+    const counted = createCountedMessages()
 
-    expect(seen.isNew('m1')).toBe(true)
-    expect(seen.isNew('m1')).toBe(false)
-    expect(seen.isNew('m1')).toBe(false)
+    expect(counted.isFirst('m1')).toBe(true)
+    expect(counted.isFirst('m1')).toBe(false)
+    expect(counted.isFirst('m1')).toBe(false)
   })
 
-  it('drops the duplicate the API sends beside the original', () => {
-    const seen = createSeenMessages()
-    const delivered = ['m1', 'm1', 'm2', 'm2', 'm3']
+  it('counts one message once however many times its receipt advances', () => {
+    const counted = createCountedMessages()
+    // What the API broadcasts for two messages, the first of which was
+    // delivered and then read while the list was open.
+    const broadcasts = ['m1', 'm1', 'm1', 'm2', 'm2']
 
-    expect(delivered.filter((id) => seen.isNew(id))).toEqual(['m1', 'm2', 'm3'])
+    expect(broadcasts.filter((id) => counted.isFirst(id))).toEqual(['m1', 'm2'])
   })
 
   it('forgets the oldest id rather than growing without limit', () => {
-    const seen = createSeenMessages(2)
+    const counted = createCountedMessages(2)
 
-    expect(seen.isNew('m1')).toBe(true)
-    expect(seen.isNew('m2')).toBe(true)
-    expect(seen.isNew('m3')).toBe(true)
+    expect(counted.isFirst('m1')).toBe(true)
+    expect(counted.isFirst('m2')).toBe(true)
+    expect(counted.isFirst('m3')).toBe(true)
     // m1 was evicted to make room; m2 and m3 are still remembered.
-    expect(seen.isNew('m2')).toBe(false)
-    expect(seen.isNew('m3')).toBe(false)
-    expect(seen.isNew('m1')).toBe(true)
+    expect(counted.isFirst('m2')).toBe(false)
+    expect(counted.isFirst('m3')).toBe(false)
+    expect(counted.isFirst('m1')).toBe(true)
   })
 
   it('does not remember an id twice, so a repeat cannot fill the memory', () => {
-    const seen = createSeenMessages(2)
+    const counted = createCountedMessages(2)
 
-    seen.isNew('m1')
-    seen.isNew('m1')
-    seen.isNew('m2')
+    counted.isFirst('m1')
+    counted.isFirst('m1')
+    counted.isFirst('m2')
 
-    expect(seen.isNew('m1')).toBe(false)
-    expect(seen.isNew('m2')).toBe(false)
+    expect(counted.isFirst('m1')).toBe(false)
+    expect(counted.isFirst('m2')).toBe(false)
   })
 })

@@ -50,25 +50,36 @@ The alternative fix is on the API, which this repo does not hold: an origin head
 statement about itself, and treating its absence as the only acceptable answer from a native client
 is a check that gets more awkward the more native clients there are.
 
-## Two connections, and the second one is real
+## Two connections
 
 A global connection lives while someone is signed in and carries every event; a second is opened
 only while a thread is on screen, to put the device in that conversation's room — which is what the
-server checks before it accepts a typing signal. That mirrors the web client's shape, with one
-correction. The web's two `io()` calls collapse into a single socket: `socket.io-client` caches the
-manager by URL and the socket by namespace, so asking twice for `/realtime` answers with the same
-object, and the first screen to close a thread disconnects the connection the whole app is
-listening on. This client passes `forceNew` on the conversation connection, so what the code says is
-what exists.
+server checks before it accepts a typing signal. The same shape the web client has.
 
-## Delivery is at-least-once, so this client deduplicates
+The conversation connection passes `forceNew`. It would be a separate connection without it:
+`socket.io-client` caches its manager by URL, and `lookup()` treats a namespace already open on that
+manager as a reason to build a new one rather than hand back the socket it holds. The flag says so
+out loud, because the alternative is a reader having to know that rule before believing that closing
+a thread cannot disconnect the connection the whole app is listening on.
 
-The API emits `message.created` to a single socket more than once for one message — observed with
-one listener on one connection, with and without a room join. Folding a message into a thread by id
-is idempotent and does not care; adding one to an unread count is not, and a duplicate there is a
-badge that says two where the thread shows one. The duplicate is dropped once, at the socket seam
-(`createSeenMessages` in `lib/realtime-events.ts`), rather than left for each consumer to defend
-against separately.
+## One message is broadcast more than once, and the repeats are not duplicates
+
+`message.created` arrives more than once for a single message. They are not copies: the API
+broadcasts a message when it is written, and again each time its receipt advances. Measured against
+the running server, a staff reply reached a Customer's socket twice about a second apart, the first
+carrying `receiptStatus: "sent"` and the second `"delivered"` — `applyLiveReceipts` in the API's
+`conversations.service.ts` is what marks it delivered to everyone connected and read to everyone
+with the thread open.
+
+So every one of them is wanted. That is how a tick moves from sent to delivered to read on a bubble
+with nobody refreshing anything, and `mergeMessages` folds them in by id, the later copy replacing
+the earlier.
+
+The one reader that cannot take them all is an unread count, because adding is not idempotent: a
+receipt advancing would raise a badge with nothing behind it. So the memory of what has been counted
+belongs to the list and not to the socket (`createCountedMessages`, held by `lib/customer-inbox.tsx`).
+Putting it at the socket seam — which this client did at first — is the mistake that looks like the
+tidy one: it makes the count right and silently swallows every receipt update on the way.
 
 ## Consequences
 
