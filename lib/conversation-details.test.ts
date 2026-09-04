@@ -6,7 +6,6 @@ import {
   conversationPeerRole,
   conversationTypeLabel,
   labelChipColors,
-  LABEL_COLORS,
   offerableLabels,
 } from '@/lib/conversation-details'
 import type { Conversation, Label } from '@/lib/types'
@@ -73,7 +72,7 @@ describe('conversationDetailFields', () => {
   test('staff see status and the assignee on a Support DM', () => {
     expect(conversationDetailFields(staff())).toEqual([
       { label: 'Type', value: 'Support DM' },
-      { label: 'Status', value: 'Engaged' },
+      { label: 'Status', value: 'Assigned' },
       { label: 'Assigned agent', value: 'Ada' },
     ])
   })
@@ -84,6 +83,15 @@ describe('conversationDetailFields', () => {
     )
     expect(fields).toContainEqual({ label: 'Assigned agent', value: 'Unassigned' })
     expect(fields).toContainEqual({ label: 'Status', value: 'Unassigned' })
+  })
+
+  test('the state is named the way the thread header names it', () => {
+    // Not the API's `engaged`: the pill one tap away says Assigned, and a state
+    // that renames itself between two screens reads as two states.
+    expect(conversationDetailFields(staff({ status: 'engaged' }))).toContainEqual({
+      label: 'Status',
+      value: 'Assigned',
+    })
   })
 
   test('closed reads as Resolved, as it does everywhere else', () => {
@@ -171,8 +179,20 @@ describe('canReadNotes', () => {
 })
 
 describe('labelChipColors', () => {
+  const COLORS = [
+    'slate',
+    'red',
+    'orange',
+    'amber',
+    'green',
+    'teal',
+    'blue',
+    'violet',
+    'pink',
+  ] as const
+
   test('every colour the API can send has a chip', () => {
-    for (const color of LABEL_COLORS) {
+    for (const color of COLORS) {
       const chip = labelChipColors(color)
       expect(chip.wash).toMatch(/^#[0-9a-f]{8}$/)
       expect(chip.ink).toMatch(/^#[0-9a-f]{6}$/)

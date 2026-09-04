@@ -2,6 +2,8 @@ import {
   chatHref,
   chatIdFromRoute,
   chatIdFromSegments,
+  chatDetailsHref,
+  chatDetailsIdFromRoute,
   chatMediaHref,
   chatMediaIdFromRoute,
 } from '@/lib/chat-route-id'
@@ -74,5 +76,36 @@ describe('chatMediaIdFromRoute', () => {
   test('undefined off the media route', () => {
     expect(chatMediaIdFromRoute(undefined, '/chat/conv-assigned')).toBeUndefined()
     expect(chatMediaIdFromRoute(undefined, '/(customer)')).toBeUndefined()
+  })
+})
+
+describe('chatDetailsHref', () => {
+  test('typed dynamic href so native fills params.id', () => {
+    expect(chatDetailsHref('conv-assigned')).toEqual({
+      pathname: '/chat/details/[id]',
+      params: { id: 'conv-assigned' },
+    })
+  })
+})
+
+describe('chatDetailsIdFromRoute', () => {
+  test('prefers search params', () => {
+    expect(chatDetailsIdFromRoute('conv-assigned', '/chat/details/ignored')).toBe(
+      'conv-assigned',
+    )
+    expect(chatDetailsIdFromRoute(['conv-a'], '/chat/details/x')).toBe('conv-a')
+  })
+
+  test('falls back to the pathname, not to the word details', () => {
+    expect(chatDetailsIdFromRoute(undefined, '/chat/details/conv-assigned')).toBe(
+      'conv-assigned',
+    )
+    expect(chatDetailsIdFromRoute(undefined, '/chat/details')).toBeUndefined()
+    expect(chatDetailsIdFromRoute(undefined, '/chat/details/[id]')).toBeUndefined()
+  })
+
+  test('the two sections do not read each other’s routes', () => {
+    expect(chatDetailsIdFromRoute(undefined, '/chat/media/conv-a')).toBeUndefined()
+    expect(chatMediaIdFromRoute(undefined, '/chat/details/conv-a')).toBeUndefined()
   })
 })

@@ -9,9 +9,17 @@ import { colors, screenTopPad } from "@/lib/tokens";
 
 type InScreenHeaderProps = {
   children: ReactNode;
+  /**
+   * What Back does, where leaving is not simply leaving.
+   *
+   * Only the screen knows it has something unsaved on it, so only the screen can
+   * ask before it goes. Absent everywhere else, which is the common case: Back
+   * goes back.
+   */
+  onBack?: () => void;
 };
 
-export function InScreenHeader({ children }: InScreenHeaderProps) {
+export function InScreenHeader({ children, onBack }: InScreenHeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -23,7 +31,7 @@ export function InScreenHeader({ children }: InScreenHeaderProps) {
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Back"
-          onPress={() => router.back()}
+          onPress={() => (onBack ? onBack() : router.back())}
           className="size-11 items-center justify-center rounded-full"
         >
           <ChevronLeft color={colors.ink} size={24} />

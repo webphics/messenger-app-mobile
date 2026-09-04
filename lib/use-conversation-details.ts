@@ -39,14 +39,29 @@ export type NotesState =
   | { status: 'failed' }
   | { status: 'ready'; notes: ConversationNote[] }
 
+/**
+ * The organization's labels, and whether they arrived.
+ *
+ * Three answers rather than a list, for the reason `NotesState` has three: a
+ * failed fetch leaves nothing to offer, and an Add control that simply does not
+ * appear is indistinguishable from an organization that has defined no labels.
+ * One of those is worth a retry and the other is not.
+ */
+export type LabelsState =
+  /** Not a thread this person may label. */
+  | { status: 'unavailable' }
+  | { status: 'loading' }
+  | { status: 'failed' }
+  /** Every label in the organization, archived ones included. */
+  | { status: 'ready'; labels: Label[] }
+
 export type ConversationDetails = {
   /**
-   * Every label in the organization, archived ones included. Empty until the
-   * fetch lands, and empty for anyone who may not label. Which of them are worth
-   * *offering* on this thread is `offerableLabels`, which needs the conversation
-   * and so belongs where the conversation is.
+   * Which of them are worth *offering* on this thread is `offerableLabels`,
+   * which needs the conversation and so belongs where the conversation is.
    */
-  all: Label[]
+  labels: LabelsState
+  reloadLabels: () => void
   /** The label id with a request out for it, so its chip can say it is working. */
   labelBusy: string | null
   labelError: string | null
@@ -76,7 +91,7 @@ export function useConversationDetails({
   wantsNotes: boolean
   onUpdated: (conversation: Conversation) => void
 }): ConversationDetails {
-  const [all, setAll] = useState<Label[]>([])
+  const [labels, setLabels] = useState<LabelsState>({ status: 'unavailable' })
   const [labelBusy, setLabelBusy] = useState<string | null>(null)
   const [labelError, setLabelError] = useState<string | null>(null)
   const [notes, setNotes] = useState<NotesState>({ status: 'unavailable' })
@@ -105,24 +120,27 @@ export function useConversationDetails({
     }
   }, [conversationId])
 
-  useEffect(() => {
-    if (!wantsLabels) {
-      setAll([])
-      return
-    }
-    let cancelled = false
+  const loadLabels = useCallback(() => {
+    setLabels({ status: 'loading' })
     void (async () => {
       const result = await listLabels()
-      if (cancelled) return
-      // A label list that would not load leaves nothing to offer and says
-      // nothing about it: the chips already on the thread came with the
-      // conversation and are still there, which is the part that matters.
-      setAll(result.ok ? result.value : [])
+      setLabels(
+        result.ok ? { status: 'ready', labels: result.value } : { status: 'failed' },
+      )
     })()
-    return () => {
-      cancelled = true
+  }, [])
+
+  useEffect(() => {
+    if (!wantsLabels) {
+      setLabels({ status: 'unavailable' })
+      return
     }
-  }, [wantsLabels])
+    loadLabels()
+  }, [wantsLabels, loadLabels])
+
+  const reloadLabels = useCallback(() => {
+    if (wantsLabels) loadLabels()
+  }, [wantsLabels, loadLabels])
 
   const loadNotes = useCallback(
     (id: string) => {
@@ -205,7 +223,7 @@ export function useConversationDetails({
       setNoteError(null)
 
       void (async () => {
-        const result = await createNote(id, { text: trimmed })
+        const result = await createNote(id, trimmed)
         if (onScreen.current !== id) return
         setAddingNote(false)
 
@@ -224,7 +242,8 @@ export function useConversationDetails({
   )
 
   return {
-    all,
+    labels,
+    reloadLabels,
     labelBusy,
     labelError,
     attach,

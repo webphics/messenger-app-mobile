@@ -23,11 +23,21 @@ const TYPE_LABEL: Record<Conversation['type'], string> = {
   community_announcement: 'Announcement',
 }
 
+/**
+ * The thread's assignment state, in the words the pill above it already uses.
+ *
+ * The API's enum is `engaged`, and the web client prints it. This client's
+ * thread header has printed *Assigned* since the pill existed, and the two
+ * screens are one tap apart — a state that renames itself on the way between
+ * them reads as two states. CONTEXT.md's Engage entry is the tiebreak: Engage is
+ * the action, and assignment is what results, so the state is named for the
+ * result. Closed reads as Resolved for the same reason, in both places.
+ *
+ * See `statusPill` in `components/chat/thread-header.tsx`.
+ */
 const STATUS_LABEL = {
   unassigned: 'Unassigned',
-  engaged: 'Engaged',
-  // Closed reads as Resolved everywhere else in this client; it reads as
-  // Resolved here too, rather than teaching a second word for one state.
+  engaged: 'Assigned',
   closed: 'Resolved',
 } as const
 
@@ -159,16 +169,3 @@ const LABEL_HEX: Record<LabelColor, { wash: string; ink: string }> = {
 export function labelChipColors(color: LabelColor): { wash: string; ink: string } {
   return LABEL_HEX[color]
 }
-
-/** Every colour a new label may be given, in the order the API lists them. */
-export const LABEL_COLORS: LabelColor[] = [
-  'slate',
-  'red',
-  'orange',
-  'amber',
-  'green',
-  'teal',
-  'blue',
-  'violet',
-  'pink',
-]
