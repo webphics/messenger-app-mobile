@@ -270,3 +270,81 @@ else carrying more than one thing. Its duration and its bar levels were measured
 are carried across the upload by hand: the file endpoint received a file, so it reports a file.
 _Avoid_: Voice message, audio message, audio clip, mic message, voicemail
 
+
+### Local store
+
+**Store**:
+The one in-memory copy of everything the screens read — the Conversation list, the Messages of the
+threads that have been opened, the Outbox — kept on disk so a cold start has something to draw before
+the API answers. Reducers are the pure functions in `lib/conversation-state.ts`, unchanged: what is
+new is that every state they produce is written through to SQLite, and that a boot reads one back.
+Screens read the Store and never the network, and a socket event, a fetched page and a typed message
+all reach them the same way — through it. See
+`docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+_Avoid_: Cache (it is not an optimisation the app can ignore), database (that is where it is kept),
+local state, offline store (nothing here composes offline)
+
+**Restore**:
+Reading the Store back from SQLite at cold start, so the first frame after the Launch animation is
+the last thing this device knew rather than a spinner. Not Hydration, which is the *session's* cold
+start and belongs to auth: a boot does both, and they answer different questions — Hydration asks who
+this is, Restore asks what they were looking at. Restore has no failure a person sees; an unreadable
+database is discarded and the boot proceeds with nothing.
+_Avoid_: Hydration (that is auth's, and the collision is the reason this word exists), rehydrate,
+load from cache, warm start
+
+**Stale**:
+Restored data that the current session has not yet confirmed. Every cold start and every return to
+the foreground refetches, so staleness is measured in the seconds before that answer lands — but it
+is real, and it is the price of drawing something immediately. Reads tolerate it and sends tolerate
+it; Engage and Takeover do not, and re-read the conversation from the API before they fire, because
+the Unassigned pool is contested and a stale row there loses a race that a spinner would have won.
+_Avoid_: Out of date, dirty, invalid, expired (that is what a Session does)
+
+**Outbox**:
+Unsent messages that have outlived the process that typed them. An Unsent message has always
+survived a failed request; what the Store adds is surviving a restart, so a message typed on a train
+is still there tomorrow, still marked *failed*, still offering to go again. Never sent on its own:
+a message abandoned on Tuesday must not leave on Thursday without somebody tapping it.
+_Avoid_: Queue (nothing drains it), retry queue, pending messages, drafts (a draft was never sent)
+
+**Eviction**:
+Discarding the history the Store is not going to be asked for. Every Conversation row is kept, always
+— a partial list is a list that lies about what exists — but Messages are kept only for the twenty
+most recently active threads, fifty each, and Attachment files only up to a fixed budget, oldest
+used first. Asking for a page older than what was kept reads SQLite before it reads the API, which is
+the whole of the load this is meant to take off it.
+_Avoid_: Pruning, cleanup, garbage collection, cache invalidation (nothing here is invalidated)
+
+### Notifications
+
+**Push notification**:
+The banner the operating system draws when a Message arrives and this app is not in front of the
+person. Delivered by Expo's push service against a token this device registered, and *not* the same
+thing as the Notification row the API writes: a row is written for every recipient of every message,
+and only some of them are worth waking a phone for. Suppressed entirely when the app is foregrounded
+on the thread it is about. There is no background connection behind it and there is not going to be
+one — a Push notification is how a closed app learns anything at all.
+_Avoid_: Notification (bare — say which), local notification, alert, background message
+
+**Notification row**:
+The API's own record that something happened for a person, written by its `notifications` module and
+announced as `notification.created`. Older and broader than a Push notification, which is one
+*dispatch channel* for some of them. This client renders none of these rows and has no screen for
+them; it names them only so the two are not confused.
+_Avoid_: Notification (bare), in-app notification, activity, feed item
+
+**In-app banner**:
+What a Message gets instead of a Push notification when the app is open on some other screen: a
+strip at the top of the current screen naming the sender, tappable into the thread, gone on its own.
+Neither the OS's surface nor a second unread count — the Conversation row and the tab badge have
+already moved by the time it appears, and it exists to say *which* thread moved.
+_Avoid_: Toast (that is for something the person just did), snackbar, heads-up notification, alert
+
+**Mute**:
+Turning off a conversation's notifications, held by the API per person per conversation
+(`PUT`/`DELETE /notifications/mutes/:conversationId`) and applied before its recipient list is even
+frozen — so a mute suppresses the Notification row and the Push notification together, rather than
+hiding one after the fact. Reached from Conversation details.
+_Avoid_: Snooze (that ends by itself), block, unsubscribe, turn off notifications (that is the OS
+permission)
