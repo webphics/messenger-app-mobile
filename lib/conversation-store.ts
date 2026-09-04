@@ -2,15 +2,18 @@ import * as SQLite from 'expo-sqlite'
 
 import {
   fromConversationRows,
+  fromMessageRows,
   fromOrganizationRows,
+  messageOrder,
   toConversationRows,
+  toMessageRows,
   toOrganizationRows,
   NOTHING_RESTORED,
   STORE_SCHEMA_VERSION,
   type RestoredStore,
   type ThreadPaging,
 } from '@/lib/store-rows'
-import type { Conversation } from '@/lib/types'
+import type { Conversation, Message } from '@/lib/types'
 
 /**
  * The Store on disk: the only file in this app that knows SQLite exists.
@@ -39,6 +42,17 @@ import type { Conversation } from '@/lib/types'
  * Writes are the opposite. They happen on every state change, they must not be
  * on the render path, and nobody is waiting for them — so they are queued,
  * coalesced to the newest state per person, and run one transaction at a time.
+ *
+ * ## Two things are written, and they are written by different people
+ *
+ * The Conversation list is one unit and is replaced whole. A thread's Messages
+ * are per thread and are added to, because a Message that has been confirmed
+ * does not leave the thread it is in — what changes is its receipts, and an
+ * upsert by id says exactly that. So the two have separate queues, separate
+ * transactions and separate coalescing, and the only thing they share is the
+ * `conversations` row that carries a thread's paging: written whole by the list
+ * and one column at a time by the thread, which is why the paging is also held
+ * in memory here. See `frontiers`.
  */
 
 const DATABASE_NAME = 'enki-store.db'
@@ -64,6 +78,16 @@ const SCHEMA = `
     name TEXT NOT NULL,
     PRIMARY KEY (owner_id, id)
   );
+  CREATE TABLE messages (
+    id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    PRIMARY KEY (owner_id, conversation_id, id)
+  );
+  CREATE INDEX messages_by_thread
+    ON messages (owner_id, conversation_id, created_at DESC, id DESC);
   PRAGMA user_version = ${STORE_SCHEMA_VERSION};
 `
 
@@ -129,8 +153,6 @@ function schemaVersion(database: SQLite.SQLiteDatabase): number {
 export type StoreSnapshot = {
   conversations: readonly Conversation[]
   organizationNames: ReadonlyMap<string, string>
-  /** What the threads know about their own history. Nothing writes it yet. */
-  paging?: ReadonlyMap<string, ThreadPaging>
 }
 
 /** The newest state each person is waiting to have written. One entry, not a backlog. */
@@ -160,6 +182,87 @@ function markWritten(ownerId: string, snapshot: StoreSnapshot): void {
   })
 }
 
+/**
+ * How far back each thread has been read, by owner and then by conversation.
+ *
+ * The `conversations` row carries a thread's paging, and two different things
+ * change it: the list, which replaces every row whole whenever the API answers
+ * or the socket speaks, and the thread itself, which moves its own frontier when
+ * somebody scrolls back through it. Without this, the first would put the
+ * defaults back over the second every time a message arrived anywhere.
+ *
+ * Seeded by `restoreStore` from what is already on disk, so a list write that
+ * happens before any thread is opened writes back the frontiers the last run
+ * left rather than flattening them.
+ */
+const frontiers = new Map<string, Map<string, ThreadPaging>>()
+
+const NO_PAGING: ReadonlyMap<string, ThreadPaging> = new Map()
+
+function heldPaging(ownerId: string): ReadonlyMap<string, ThreadPaging> {
+  return frontiers.get(ownerId) ?? NO_PAGING
+}
+
+function holdPaging(ownerId: string, paging: ReadonlyMap<string, ThreadPaging>): void {
+  if (paging.size === 0) return
+  const held = frontiers.get(ownerId) ?? new Map<string, ThreadPaging>()
+  for (const [conversationId, thread] of paging) held.set(conversationId, thread)
+  frontiers.set(ownerId, held)
+}
+
+/**
+ * One thread's pending write.
+ *
+ * `replace` is what the screen says about the Messages it is handing over: that
+ * they are the thread now, rather than more of it. A thread whose newest page
+ * turned out not to continue what this device held has just thrown that history
+ * off the screen, and it has to leave the disk with it — paging back into it
+ * would otherwise read straight from what arrived into a fragment of what used
+ * to be, with unfetched history between them and no way to ask for it.
+ *
+ * Coalesced per thread, so a burst of arriving messages costs one transaction:
+ * the newest Messages replace the ones waiting, and `replace` survives the
+ * coalescing because a drop that has been decided cannot be undecided by the
+ * next message to land.
+ */
+type PendingThread = {
+  ownerId: string
+  conversationId: string
+  messages: readonly Message[] | null
+  replace: boolean
+  paging: ThreadPaging | null
+}
+
+/** The newest state each thread is waiting to have written, by owner and conversation. */
+const queuedThreads = new Map<string, PendingThread>()
+
+function threadKey(ownerId: string, conversationId: string): string {
+  return `${ownerId} ${conversationId}`
+}
+
+/**
+ * The Messages last known to be on disk for a thread, by identity.
+ *
+ * By object rather than by id, because a Message changes: a receipt advances, a
+ * reaction lands, and the merge that folds the newer copy in gives it a new
+ * identity while leaving every unchanged Message the identity it had. So this
+ * answers the only question a write needs — which of these rows is not the row
+ * already there — and a socket message arriving in a thread of three hundred
+ * costs one insert rather than three hundred.
+ */
+const writtenMessages = new Map<string, Map<string, Message>>()
+
+function markThreadWritten(
+  ownerId: string,
+  conversationId: string,
+  messages: readonly Message[],
+): void {
+  const key = threadKey(ownerId, conversationId)
+  const already = writtenMessages.get(key) ?? new Map<string, Message>()
+  for (const message of messages) already.set(message.id, message)
+  writtenMessages.set(key, already)
+}
+
 let draining: Promise<void> | null = null
 
 /**
@@ -186,6 +289,10 @@ export function restoreStore(ownerId: string): RestoredStore {
     // spend a transaction at the busiest moment of a cold start to change
     // nothing. See `saveStore`.
     markWritten(ownerId, { ...restored, organizationNames })
+    // The frontiers come back with the rows, so a list write that lands before
+    // anybody opens a thread writes back how far each one had been read rather
+    // than the defaults. See `frontiers`.
+    holdPaging(ownerId, restored.paging)
     return { ...restored, organizationNames }
   } catch {
     // A database that cannot be read is not going to start being readable, and
@@ -198,6 +305,131 @@ export function restoreStore(ownerId: string): RestoredStore {
 }
 
 /**
+ * A thread as this device last knew it: its newest Messages, and its frontier.
+ *
+ * `paging` is what the API had already said about how far back this thread
+ * goes, so a restart picks the scroll back up where it stopped instead of
+ * reading the whole thread again from the top. A row that has never recorded one
+ * — every row written before this existed — falls back to the oldest Message
+ * actually held, which is the same place by another route.
+ *
+ * Null when there is nothing here: no database, nothing stored for this thread,
+ * or a read that failed. All three mean the same to a caller, which is that this
+ * thread has to be fetched before it can be drawn.
+ */
+export type RestoredThread = { messages: Message[]; paging: ThreadPaging }
+
+/**
+ * The newest Messages this device holds for a thread, and how far back it read.
+ *
+ * Synchronous and bounded, for the same reason `restoreStore` is: the screen
+ * reads this while it is deciding what to draw, and a thread that has been
+ * scrolled back through for an hour must cost the same to open as one that has
+ * not. `limit` is a page, not a thread — what is below it stays on disk and is
+ * read by `restoreOlderMessages` when somebody scrolls into it.
+ */
+export function restoreThread(
+  ownerId: string,
+  conversationId: string,
+  limit: number,
+): RestoredThread | null {
+  const database = connect()
+  if (!database) return null
+
+  try {
+    const messages = fromMessageRows(
+      database.getAllSync(
+        `SELECT * FROM messages WHERE owner_id = ? AND conversation_id = ?
+         ORDER BY created_at DESC, id DESC LIMIT ?`,
+        ownerId,
+        conversationId,
+        limit,
+      ),
+    )
+    if (messages.length === 0) return null
+
+    const row = database.getFirstSync<{ has_more: number; cursor: string | null }>(
+      'SELECT has_more, cursor FROM conversations WHERE owner_id = ? AND id = ?',
+      ownerId,
+      conversationId,
+    )
+    const paging = threadPaging(row, messages)
+    // What was just read is what is on disk. Without this, opening a thread
+    // would write its whole Restored page straight back at the busiest moment
+    // there is. See `writtenMessages` and `frontiers`.
+    markThreadWritten(ownerId, conversationId, messages)
+    holdPaging(ownerId, new Map([[conversationId, paging]]))
+    return { messages, paging }
+  } catch {
+    // Same rule as `restoreStore`: a database that cannot be read is discarded
+    // rather than asked again on every scroll for the life of the install.
+    discard()
+    return null
+  }
+}
+
+/**
+ * What the row says about a thread's history, or what its Messages say instead.
+ *
+ * The fallback is the oldest Message held rather than nothing, because a cursor
+ * of nothing means "ask from the top" — which on a thread this device is already
+ * holding history for would fetch back down through every page it has.
+ */
+function threadPaging(
+  row: { has_more: number; cursor: string | null } | null,
+  messages: readonly Message[],
+): ThreadPaging {
+  return {
+    hasMore: row?.has_more !== 0,
+    cursor: typeof row?.cursor === 'string' ? row.cursor : messages[0]?.id,
+  }
+}
+
+/**
+ * The page of history this device holds before a Message it is already showing.
+ *
+ * What makes paging back off this phone a bounded query rather than a whole
+ * thread deserialised: one indexed read of one page, ordered by the same two
+ * columns the index is on. An empty answer is the whole answer — it means this
+ * device holds nothing further back, and whatever comes next is the API's to
+ * say.
+ *
+ * Ordered newest-first here and re-sorted on the way out by `fromMessageRows`,
+ * because `LIMIT` has to take the page nearest the one on screen and the thread
+ * has to be read oldest-first.
+ */
+export function restoreOlderMessages(
+  ownerId: string,
+  conversationId: string,
+  before: Message,
+  limit: number,
+): Message[] {
+  const database = connect()
+  if (!database) return []
+
+  const at = messageOrder(before.createdAt)
+  try {
+    return fromMessageRows(
+      database.getAllSync(
+        `SELECT * FROM messages
+         WHERE owner_id = ? AND conversation_id = ?
+           AND (created_at < ? OR (created_at = ? AND id < ?))
+         ORDER BY created_at DESC, id DESC LIMIT ?`,
+        ownerId,
+        conversationId,
+        at,
+        at,
+        before.id,
+        limit,
+      ),
+    )
+  } catch {
+    discard()
+    return []
+  }
+}
+
+/**
  * Close the connection and remove the file. The next use opens a fresh one.
  *
  * What was believed to be on disk is forgotten with it — the new database has
@@ -206,6 +438,8 @@ export function restoreStore(ownerId: string): RestoredStore {
  */
 function discard(): void {
   written.clear()
+  writtenMessages.clear()
+  frontiers.clear()
   try {
     connection?.closeSync()
     SQLite.deleteDatabaseSync(DATABASE_NAME)
@@ -241,15 +475,151 @@ export function saveStore(ownerId: string, snapshot: StoreSnapshot): Promise<voi
   return draining
 }
 
+/**
+ * Write a thread's confirmed Messages through, when the queue gets to it.
+ *
+ * `replace` says these Messages are the thread rather than more of it — see
+ * `PendingThread`. Everything else is an upsert by id, because a Message that
+ * has been confirmed does not leave the thread it is in: what changes is its
+ * receipts and its reactions, and replacing the row by id is exactly that.
+ *
+ * Same queue as the list, so the two cannot interleave inside one thread's
+ * transaction, and same fire-and-forget: the promise exists for tests.
+ */
+export function saveMessages(
+  ownerId: string,
+  conversationId: string,
+  messages: readonly Message[],
+  mode: 'merge' | 'replace' = 'merge',
+): Promise<void> {
+  const key = threadKey(ownerId, conversationId)
+  const pending = queuedThreads.get(key)
+
+  queuedThreads.set(key, {
+    ownerId,
+    conversationId,
+    messages,
+    // A drop that has been decided cannot be undecided by the next state to
+    // land on top of it before the queue is drained.
+    replace: mode === 'replace' || pending?.replace === true,
+    paging: pending?.paging ?? null,
+  })
+
+  draining ??= drain()
+  return draining
+}
+
+/**
+ * Record how far back a thread has been read.
+ *
+ * One column pair on the conversation's own row, updated in place rather than
+ * through the list: the list is replaced whole and by somebody else, and a
+ * thread that has just been scrolled back through is not a reason to rewrite
+ * every row this person has. Held in memory as well, so the next full write of
+ * the list carries it instead of flattening it. See `frontiers`.
+ */
+export function saveThreadPaging(
+  ownerId: string,
+  conversationId: string,
+  paging: ThreadPaging,
+): Promise<void> {
+  const held = frontiers.get(ownerId)?.get(conversationId)
+  if (held?.hasMore === paging.hasMore && held.cursor === paging.cursor) {
+    return draining ?? Promise.resolve()
+  }
+  holdPaging(ownerId, new Map([[conversationId, paging]]))
+
+  const key = threadKey(ownerId, conversationId)
+  const pending = queuedThreads.get(key)
+  queuedThreads.set(key, {
+    ownerId,
+    conversationId,
+    messages: pending?.messages ?? null,
+    replace: pending?.replace === true,
+    paging,
+  })
+
+  draining ??= drain()
+  return draining
+}
+
 async function drain(): Promise<void> {
   try {
-    while (queued.size > 0) {
-      const batch = [...queued]
+    while (queued.size > 0 || queuedThreads.size > 0) {
+      const lists = [...queued]
       queued.clear()
-      for (const [ownerId, pending] of batch) await write(ownerId, pending)
+      for (const [ownerId, pending] of lists) await write(ownerId, pending)
+
+      const threads = [...queuedThreads.values()]
+      queuedThreads.clear()
+      for (const pending of threads) await writeThread(pending)
     }
   } finally {
     draining = null
+  }
+}
+
+/**
+ * One thread's state change, one transaction.
+ *
+ * Only the Messages that are not already the rows on disk are written — by
+ * object identity, which is what the merge in `lib/conversation-state` leaves
+ * behind. See `writtenMessages`. A replace forgets all of that first, because
+ * the rows it is about to remove are exactly the ones that belief is about.
+ */
+async function writeThread(pending: PendingThread): Promise<void> {
+  const database = connect()
+  if (!database) return
+
+  const { ownerId, conversationId, messages, paging } = pending
+  const key = threadKey(ownerId, conversationId)
+  if (pending.replace) writtenMessages.delete(key)
+
+  const already = writtenMessages.get(key) ?? new Map<string, Message>()
+  const changed = (messages ?? []).filter((message) => already.get(message.id) !== message)
+  const rows = toMessageRows(ownerId, conversationId, changed)
+  // Nothing to say. A thread that has just been Restored reaches this on its
+  // first state change, and a transaction that writes the rows it read back
+  // over themselves is the one cost this whole arrangement exists to avoid.
+  if (rows.length === 0 && !paging && !pending.replace) return
+
+  try {
+    await database.withTransactionAsync(async () => {
+      if (pending.replace) {
+        await database.runAsync(
+          'DELETE FROM messages WHERE owner_id = ? AND conversation_id = ?',
+          ownerId,
+          conversationId,
+        )
+      }
+
+      for (const row of rows) {
+        await database.runAsync(
+          'INSERT OR REPLACE INTO messages (id, conversation_id, owner_id, created_at, payload) VALUES (?, ?, ?, ?, ?)',
+          row.id,
+          row.conversation_id,
+          row.owner_id,
+          row.created_at,
+          row.payload,
+        )
+      }
+
+      if (paging) {
+        await database.runAsync(
+          'UPDATE conversations SET has_more = ?, cursor = ? WHERE owner_id = ? AND id = ?',
+          paging.hasMore ? 1 : 0,
+          paging.cursor ?? null,
+          ownerId,
+          conversationId,
+        )
+      }
+    })
+
+    for (const message of messages ?? []) already.set(message.id, message)
+    writtenMessages.set(key, already)
+  } catch {
+    // Swallowed, like every other write here. Nothing is recorded as written, so
+    // the next state change writes these Messages again.
   }
 }
 
@@ -266,7 +636,7 @@ async function write(ownerId: string, snapshot: StoreSnapshot): Promise<void> {
   if (!database) return
 
   const { conversations, organizationNames } = snapshot
-  const rows = toConversationRows(ownerId, conversations, snapshot.paging)
+  const rows = toConversationRows(ownerId, conversations, heldPaging(ownerId))
   const organizations = toOrganizationRows(ownerId, organizationNames)
 
   try {
@@ -292,6 +662,18 @@ async function write(ownerId: string, snapshot: StoreSnapshot): Promise<void> {
           row.name,
         )
       }
+
+      // A conversation that has left the list takes its Messages with it. The
+      // list is the unit and the rows have just been replaced from it, so what
+      // is left over is a thread nothing on screen can reach — a deleted
+      // conversation, or one a membership was revoked on. Left behind, it would
+      // be readable by anything looking at this app's data directory long after
+      // the thread it belongs to stopped being this person's to open.
+      await database.runAsync(
+        'DELETE FROM messages WHERE owner_id = ? AND conversation_id NOT IN (SELECT id FROM conversations WHERE owner_id = ?)',
+        ownerId,
+        ownerId,
+      )
     })
     markWritten(ownerId, snapshot)
   } catch {
@@ -310,6 +692,7 @@ async function write(ownerId: string, snapshot: StoreSnapshot): Promise<void> {
  */
 export async function wipeStore(): Promise<void> {
   queued.clear()
+  queuedThreads.clear()
   // Nothing is left waiting, but a write already past the queue is still on its
   // way to the file this is about to remove.
   await draining?.catch(() => {})

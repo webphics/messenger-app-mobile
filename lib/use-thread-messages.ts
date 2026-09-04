@@ -4,8 +4,15 @@ import {
   listMessages,
   sendMessage,
   uploadAttachment,
+  MESSAGE_PAGE_LIMIT,
   type ApiFailure,
 } from '@/lib/conversation-api'
+import {
+  restoreOlderMessages,
+  restoreThread,
+  saveMessages,
+  saveThreadPaging,
+} from '@/lib/conversation-store'
 import { isDeviceUri, sendMessageType } from '@/lib/attachment-upload'
 import {
   attachmentKindFromType,
@@ -15,6 +22,7 @@ import {
 import {
   applyIncomingMessage,
   applyMessagePage,
+  applyNewestPage,
   applySentMessage,
   beginSend,
   beginUpload,
@@ -25,12 +33,14 @@ import {
   findUnsent,
   isLocalId,
   LOCAL_ID_PREFIX,
+  threadContinues,
   threadMessages,
-  withoutPages,
+  visibleMessages,
   type DeliveryState,
   type MessageAuthor,
   type SendDraft,
   type ThreadState,
+  type ThreadViewer,
 } from '@/lib/conversation-state'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
@@ -44,6 +54,18 @@ import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/t
  * becomes of a message between the tap on send and the API's answer. What is
  * left here is the part that cannot be pure — when to ask, and how to ignore an
  * answer that arrived for a thread nobody is looking at any more.
+ *
+ * ## The thread opens on what this device already knows
+ *
+ * A thread that has been opened before is Restored from SQLite while the screen
+ * is deciding what to draw, so its Messages are on the first frame rather than
+ * after a round trip, and a phone with no signal opens it at all. The fetch that
+ * follows confirms that rather than being the only thing that can draw it.
+ *
+ * Scrolling back reads this device before it reads the API: a page already held
+ * comes off the disk, and only history that was never fetched costs a request.
+ * What is on the way out — Messages typed here and not yet confirmed — is
+ * deliberately not part of any of this; the Outbox is its own ticket.
  */
 
 export type ThreadMessages = {
@@ -69,6 +91,14 @@ export type ThreadMessages = {
   dismissSendError: () => void
   loadOlder: () => void
   refresh: () => void
+  /**
+   * Ask for the first page again, after one that did not arrive.
+   *
+   * Not `refresh`: that is a pull, and it reports itself through the control the
+   * person pulled. This is a button on an empty thread, and what it has to show
+   * is the thread loading — which is the state it left when the request failed.
+   */
+  retry: () => void
   /** Write a message to the thread. Answers nothing: the outcome arrives as state. */
   send: (draft: SendDraft) => void
   /** Send a failed message again, in place. */
@@ -94,6 +124,41 @@ function sendFailureMessage(failure: ApiFailure): string | null {
   return null
 }
 
+/**
+ * What this device already holds for a thread, as a thread.
+ *
+ * Read while the screen is deciding what to draw rather than in an effect, so
+ * the Messages are on the first frame: an effect runs after its children have
+ * rendered, which would put one empty thread in front of the person before the
+ * thing this exists to avoid.
+ *
+ * Filtered on the way in, exactly as a page from the API is. The Store holds
+ * what was already visible — nothing withheld was ever written — but the rule
+ * that decides what a viewer may see is not one to hold in a single place and
+ * hope, and a database is the one input to this app that an older build of it
+ * wrote. See `isMessageVisibleTo`.
+ *
+ * The frontier comes back with the Messages, which is what makes the scroll back
+ * pick up where it stopped instead of reading the thread again from the top.
+ */
+function restoredThread(
+  ownerId: string | null,
+  conversationId: string | null,
+  viewer: ThreadViewer | null,
+): ThreadState {
+  if (!ownerId || !conversationId || !viewer) return emptyThread()
+
+  const held = restoreThread(ownerId, conversationId, MESSAGE_PAGE_LIMIT)
+  if (!held) return emptyThread()
+
+  return {
+    ...emptyThread(),
+    messages: visibleMessages(viewer.role, viewer.conversationType, held.messages),
+    hasMore: held.paging.hasMore,
+    cursor: held.paging.cursor,
+  }
+}
+
 export function useThreadMessages(
   conversation: Conversation | null,
   role: UserRole,
@@ -108,6 +173,13 @@ export function useThreadMessages(
 
   const conversationId = conversation?.id ?? null
   const conversationType = conversation?.type ?? null
+  /** Whose copy of this thread is on this device. A phone is shared; a Store is not. */
+  const ownerId = author?.id ?? null
+
+  const viewer = useMemo<ThreadViewer | null>(
+    () => (conversationType ? { role, conversationType } : null),
+    [role, conversationType],
+  )
 
   /** Which thread the answers coming back belong to, and which load of it. */
   const generation = useRef(0)
@@ -142,6 +214,46 @@ export function useThreadMessages(
   useEffect(() => {
     held.current = state
   }, [state])
+  /**
+   * The Message this device turned out to hold nothing before.
+   *
+   * `onEndReached` fires repeatedly while somebody keeps scrolling at the end of
+   * a thread, and the disk read below is synchronous. Nothing ever writes a
+   * Message *older* than the oldest one on screen without also putting it on
+   * screen, so once the disk has answered nothing about a Message the answer
+   * cannot change while that Message is still the oldest.
+   */
+  const drained = useRef<string | null>(null)
+
+  /**
+   * Which thread the state above describes.
+   *
+   * Adjusted during render rather than in an effect, because an effect runs
+   * after its children have already rendered: a thread this device is holding
+   * would get one frame of an empty list before its Messages appeared under the
+   * person. This is React's own way of adjusting state to a changed input — it
+   * re-renders before anything is committed — and it is what the shared
+   * Conversation list does for the same reason.
+   */
+  const [describes, setDescribes] = useState<string | null>(null)
+  if (describes !== conversationId) {
+    setDescribes(conversationId)
+    // Here rather than in the effect below, which runs a tick later: a request
+    // for the thread being left can answer inside that tick, and it would find
+    // a generation it still matched and a thread that is no longer the one it
+    // asked about. Bumping it twice costs nothing — the effect takes its own
+    // number afterwards, and all this does is strand answers nobody wants.
+    generation.current += 1
+    const restored = restoredThread(ownerId, conversationId, viewer)
+    setState(restored)
+    setFailure(null)
+    setSendError(null)
+    // A thread with nothing to draw is loading; one this device is holding is
+    // not, whatever the fetch underneath it goes on to do.
+    setLoading(conversationId !== null && restored.messages.length === 0)
+    setLoadingOlder(false)
+    setRefreshing(false)
+  }
 
   const fetchPage = useCallback(
     async (cursor: string | undefined, mine: number) => {
@@ -163,10 +275,9 @@ export function useThreadMessages(
 
       setFailure(null)
       setState((thread) =>
-        applyMessagePage(cursor ? thread : withoutPages(thread), page.value, {
-          role,
-          conversationType,
-        }),
+        cursor
+          ? applyMessagePage(thread, page.value, { role, conversationType })
+          : applyNewestPage(thread, page.value, { role, conversationType }),
       )
       setLoading(false)
       setLoadingOlder(false)
@@ -177,8 +288,6 @@ export function useThreadMessages(
 
   useEffect(() => {
     const mine = ++generation.current
-    setState(emptyThread())
-    setFailure(null)
     onScreen.current = conversationId
 
     if (!conversationId) {
@@ -186,7 +295,8 @@ export function useThreadMessages(
       return
     }
 
-    setLoading(true)
+    // Fetched even when this device Restored the thread: what is on screen is
+    // the last thing this phone knew, and the request is what confirms it.
     void fetchPage(undefined, mine)
 
     return () => {
@@ -197,12 +307,52 @@ export function useThreadMessages(
     }
   }, [conversationId, fetchPage])
 
+  /**
+   * The page before the one on screen — off this device first.
+   *
+   * A thread that has been scrolled back through before is already on the disk
+   * down to wherever it was left, and re-asking the API for it would spend a
+   * request and a wait on Messages this phone is holding. So the disk answers
+   * while it can, and the request is what happens when it runs out.
+   *
+   * The read is synchronous and bounded — one indexed page, keyed on the oldest
+   * Message on screen — and it goes through `applyMessagePage` like any other
+   * page, which is what walks `cursor` back with it. So when the disk does run
+   * out, the request that follows asks from the oldest Message this device
+   * holds rather than from the top of the thread.
+   *
+   * `hasMore` is the last word either way: a thread the API has already said has
+   * nothing before it stops asking, which is what keeps a fully-read thread from
+   * ending a scroll on a request that cannot be made with no signal.
+   */
   const loadOlder = useCallback(() => {
     if (loading || loadingOlder || refreshing) return
+
+    const oldest = state.messages[0]
+    if (ownerId && conversationId && viewer && oldest && drained.current !== oldest.id) {
+      const older = restoreOlderMessages(ownerId, conversationId, oldest, MESSAGE_PAGE_LIMIT)
+      if (older.length > 0) {
+        setState((thread) => applyMessagePage(thread, older, viewer))
+        return
+      }
+      drained.current = oldest.id
+    }
+
     if (!state.hasMore || !state.cursor) return
     setLoadingOlder(true)
     void fetchPage(state.cursor, generation.current)
-  }, [fetchPage, loading, loadingOlder, refreshing, state.cursor, state.hasMore])
+  }, [
+    conversationId,
+    fetchPage,
+    loading,
+    loadingOlder,
+    ownerId,
+    refreshing,
+    state.cursor,
+    state.hasMore,
+    state.messages,
+    viewer,
+  ])
 
   /**
    * Re-read the newest page and rebuild the thread from it.
@@ -213,17 +363,22 @@ export function useThreadMessages(
    * like something going wrong.
    */
   const reload = useCallback(
-    (mode: 'refresh' | 'resync') => {
+    (mode: 'refresh' | 'resync' | 'retry') => {
       if (!conversationId) return
       const mine = ++generation.current
       inFlight.current = false
       if (mode === 'refresh') setRefreshing(true)
+      if (mode === 'retry') {
+        setFailure(null)
+        setLoading(true)
+      }
       void fetchPage(undefined, mine)
     },
     [conversationId, fetchPage],
   )
 
   const refresh = useCallback(() => reload('refresh'), [reload])
+  const retry = useCallback(() => reload('retry'), [reload])
 
   /**
    * What the socket says, in the thread.
@@ -371,6 +526,51 @@ export function useThreadMessages(
     [conversationId, deliver],
   )
 
+  /**
+   * Every confirmed Message this thread reaches, written through to the Store.
+   *
+   * Observed here rather than written at each transition, the way the shared
+   * Conversation list does it: a fetched page, a page read back off the disk, a
+   * socket event and a send that has just been confirmed all end up in this one
+   * piece of state, so watching it persists all four — and the fifth, added by
+   * somebody who would have had no idea there was a writer to call.
+   *
+   * Confirmed only. `state.unsent` is not here and must not be: a Message this
+   * device is still carrying is its own word about something the server may
+   * never have heard, and the Outbox is its own ticket.
+   *
+   * `replace` is for the one case where the Messages are not more of the thread
+   * but a different run of it — a newest page that turned out not to continue
+   * what was held, because enough was said while this phone was away. What was
+   * dropped from the screen has to leave the disk with it; see `applyNewestPage`.
+   */
+  const persisted = useRef<{ id: string; messages: Message[] } | null>(null)
+  useEffect(() => {
+    if (!ownerId || !conversationId) return
+
+    const last = persisted.current
+    const replaced =
+      last?.id === conversationId && !threadContinues(last.messages, state.messages)
+    persisted.current = { id: conversationId, messages: state.messages }
+    void saveMessages(ownerId, conversationId, state.messages, replaced ? 'replace' : 'merge')
+  }, [conversationId, ownerId, state.messages])
+
+  /**
+   * And how far back it has been read.
+   *
+   * On the conversation's own row rather than beside the Messages, because there
+   * is exactly one of these per thread — see `lib/store-rows`. It is what makes
+   * a restart continue the scroll rather than start it again, and what stops a
+   * thread with nothing before it from asking after one.
+   */
+  useEffect(() => {
+    if (!ownerId || !conversationId) return
+    void saveThreadPaging(ownerId, conversationId, {
+      hasMore: state.hasMore,
+      cursor: state.cursor,
+    })
+  }, [conversationId, ownerId, state.cursor, state.hasMore])
+
   const messages = useMemo(() => threadMessages(state), [state])
   const delivery = useMemo(() => deliveryStates(state.unsent), [state.unsent])
 
@@ -387,6 +587,7 @@ export function useThreadMessages(
     dismissSendError,
     loadOlder,
     refresh,
+    retry,
     send,
     retrySend,
   }

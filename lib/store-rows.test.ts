@@ -1,13 +1,24 @@
 import {
   fromConversationRows,
+  fromMessageRows,
   fromOrganizationRows,
+  messageOrder,
   toConversationRows,
+  toMessageRows,
   toOrganizationRows,
   type ConversationRow,
+  type MessageRow,
   type ThreadPaging,
 } from '@/lib/store-rows'
-import { isStaffConversation } from '@/lib/types'
-import type { Conversation, CustomerConversation, StaffConversation } from '@/lib/types'
+import { isStaffConversation, isStaffMessage } from '@/lib/types'
+import type {
+  Conversation,
+  CustomerConversation,
+  CustomerMessage,
+  Message,
+  StaffConversation,
+  StaffMessage,
+} from '@/lib/types'
 
 function customerConversation(overrides: Partial<CustomerConversation> = {}): Conversation {
   return {
@@ -260,5 +271,204 @@ describe('organization rows', () => {
     ['nothing readable at all', null],
   ])('drops a row with %s', (_label, row) => {
     expect(fromOrganizationRows([row]).size).toBe(0)
+  })
+})
+
+function customerMessage(
+  id: string,
+  createdAt: string,
+  overrides: Partial<CustomerMessage> = {},
+): Message {
+  return {
+    id,
+    body: id,
+    messageType: 'text',
+    createdAt,
+    replyTo: null,
+    reactions: [],
+    attachments: [],
+    receiptStatus: 'sent',
+    fromCompany: true,
+    ...overrides,
+  }
+}
+
+function staffMessage(
+  id: string,
+  createdAt: string,
+  overrides: Partial<StaffMessage> = {},
+): Message {
+  return {
+    id,
+    body: id,
+    messageType: 'text',
+    createdAt,
+    replyTo: null,
+    reactions: [],
+    attachments: [],
+    receiptStatus: 'sent',
+    sender: { id: 'agent-1', name: 'Grace Hopper', role: 'agent' },
+    ...overrides,
+  }
+}
+
+/** A Message row as SQLite would hand it back, with what a test is not about filled in. */
+function messageRow(overrides: Record<string, unknown> = {}): unknown {
+  return {
+    id: 'msg-1',
+    conversation_id: 'conv-1',
+    owner_id: 'viewer-1',
+    created_at: Date.parse('2026-08-13T08:00:00.000Z'),
+    payload: JSON.stringify(customerMessage('msg-1', '2026-08-13T08:00:00.000Z')),
+    ...overrides,
+  }
+}
+
+describe('messageOrder', () => {
+  it('is the timestamp the column orders on', () => {
+    expect(messageOrder('2026-08-13T08:00:00.000Z')).toBe(Date.parse('2026-08-13T08:00:00.000Z'))
+  })
+
+  /**
+   * A `NaN` would reach SQLite as null and order unpredictably against every
+   * other row. A Message with an unreadable date is already broken; what must
+   * not happen is that it takes the page around it with it.
+   */
+  it('sorts a timestamp it cannot read to the beginning rather than to nowhere', () => {
+    expect(messageOrder('the day before yesterday')).toBe(0)
+  })
+})
+
+describe('toMessageRows', () => {
+  it('writes one row per Message, under the viewer and the thread it belongs to', () => {
+    const rows = toMessageRows('viewer-1', 'conv-1', [
+      customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
+    ])
+
+    expect(rows.map((each) => [each.id, each.conversation_id, each.owner_id])).toEqual([
+      ['msg-1', 'conv-1', 'viewer-1'],
+      ['msg-2', 'conv-1', 'viewer-1'],
+    ])
+  })
+
+  it('carries the timestamp as the column that orders it', () => {
+    const [only] = toMessageRows('viewer-1', 'conv-1', [
+      customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
+    ])
+
+    expect(only.created_at).toBe(Date.parse('2026-08-13T08:00:00.000Z'))
+  })
+
+  it('writes no rows for a thread with nothing in it', () => {
+    expect(toMessageRows('viewer-1', 'conv-1', [])).toEqual([])
+  })
+})
+
+describe('fromMessageRows', () => {
+  it('reads nothing back out of nothing', () => {
+    expect(fromMessageRows([])).toEqual([])
+  })
+
+  it('gives back the Messages that were written', () => {
+    const written = [
+      customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
+    ]
+
+    expect(fromMessageRows(toMessageRows('viewer-1', 'conv-1', written))).toEqual(written)
+  })
+
+  /**
+   * The row is the API's own payload, so both shapes have to survive the trip —
+   * a staff Message carries a `sender` and a Customer's carries `fromCompany`,
+   * and a bubble draws a different thing for each.
+   */
+  it('keeps a staff Message a staff Message', () => {
+    const written = staffMessage('msg-1', '2026-08-13T08:00:00.000Z')
+
+    const [read] = fromMessageRows(toMessageRows('viewer-1', 'conv-1', [written]))
+
+    expect(isStaffMessage(read)).toBe(true)
+    expect(read).toEqual(written)
+  })
+
+  it('keeps what a Message is carrying', () => {
+    const written = customerMessage('msg-1', '2026-08-13T08:00:00.000Z', {
+      body: 'Here it is',
+      messageType: 'media',
+      replyTo: { id: 'msg-0', preview: 'Where is it?' },
+      reactions: [{ emoji: '\u{1F44D}', userId: 'agent-1' }],
+      attachments: [
+        {
+          type: 'image/jpeg',
+          url: 'https://cdn.example.com/a.jpg',
+          fileName: 'a.jpg',
+          size: 1024,
+          durationSeconds: null,
+          waveform: null,
+        },
+      ],
+    })
+
+    expect(fromMessageRows(toMessageRows('viewer-1', 'conv-1', [written]))).toEqual([written])
+  })
+
+  /**
+   * Oldest first, whatever order the rows arrived in: a page is read back
+   * newest-first so that `LIMIT` takes the page nearest the one on screen, and
+   * the thread it joins is ordered the other way.
+   */
+  it('reads a page back oldest first', () => {
+    const rows = toMessageRows('viewer-1', 'conv-1', [
+      customerMessage('msg-3', '2026-08-13T08:02:00.000Z'),
+      customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
+    ])
+
+    expect(fromMessageRows(rows).map((each) => each.id)).toEqual(['msg-1', 'msg-2', 'msg-3'])
+  })
+
+  it('drops a row it cannot read rather than the page it is in', () => {
+    const rows = [
+      messageRow({ id: 'msg-1' }),
+      messageRow({ id: 'msg-2', payload: '{"id":' }),
+      messageRow({
+        id: 'msg-3',
+        payload: JSON.stringify(customerMessage('msg-3', '2026-08-13T08:02:00.000Z')),
+      }),
+    ]
+
+    expect(fromMessageRows(rows).map((each) => each.id)).toEqual(['msg-1', 'msg-3'])
+  })
+
+  it('drops a row whose payload is not a Message', () => {
+    expect(fromMessageRows([messageRow({ payload: JSON.stringify({ id: 'msg-1' }) })])).toEqual([])
+  })
+
+  it('drops a row with no payload at all', () => {
+    expect(fromMessageRows([{ id: 'msg-1' } as Partial<MessageRow>, null])).toEqual([])
+  })
+})
+
+/**
+ * The two halves of what a restart has to know about a thread: whether asking
+ * the API for another page is still worth a request, and where to ask from.
+ */
+describe('the paging a thread is written with', () => {
+  it('comes back the way it went in', () => {
+    const paging = new Map<string, ThreadPaging>([['conv-1', { hasMore: false, cursor: 'msg-40' }]])
+
+    const restored = fromConversationRows(
+      toConversationRows('viewer-1', [customerConversation()], paging),
+    )
+
+    expect(restored.paging.get('conv-1')).toEqual({ hasMore: false, cursor: 'msg-40' })
+  })
+
+  it('comes back as the defaults for a thread nobody has read back through', () => {
+    const restored = fromConversationRows(toConversationRows('viewer-1', [customerConversation()]))
+
+    expect(restored.paging.get('conv-1')).toEqual({ hasMore: true, cursor: undefined })
   })
 })

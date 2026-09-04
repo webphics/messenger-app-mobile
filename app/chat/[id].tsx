@@ -227,6 +227,9 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
       messages={thread.messages}
       viewer={{ id: user.id, name: user.name, role: user.role }}
       organizationNames={inbox.organizationNames}
+      loading={thread.loading}
+      failure={thread.failure}
+      onRetry={thread.retry}
       onLoadOlder={thread.loadOlder}
       loadingOlder={thread.loadingOlder}
       refreshing={thread.refreshing}

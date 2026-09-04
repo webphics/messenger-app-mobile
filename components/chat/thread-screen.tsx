@@ -20,6 +20,8 @@ import { Text } from '@/components/ui/text'
 import { attachmentViews, primaryAttachmentView } from '@/lib/attachment-view'
 import { rejectUploadReason } from '@/lib/attachment-upload'
 import { composerAccess, type ComposerAction } from '@/lib/composer-access'
+import type { ApiFailure } from '@/lib/conversation-api'
+import { failureNotice } from '@/lib/conversation-failure'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
   isLocalId,
@@ -59,6 +61,20 @@ type ThreadScreenProps = {
   messages: Message[]
   viewer: ThreadViewer
   organizationNames?: ReadonlyMap<string, string>
+  /** True only while the first page is out and there is nothing yet to draw. */
+  loading?: boolean
+  /**
+   * Why the thread could not be read, when it could not be.
+   *
+   * Only ever drawn over an empty thread. A page that failed while Messages are
+   * already on screen — a scroll into history with no signal, a refresh that did
+   * not land — takes nothing away from what is there and says nothing about it:
+   * the Messages are still the Messages, and an error over them would be about a
+   * request rather than about the thread.
+   */
+  failure?: ApiFailure | null
+  /** Ask for the first page again. Offered beside the reason it did not arrive. */
+  onRetry?: () => void
   /** Scrolling to the top of the thread asks for the page before it. */
   onLoadOlder?: () => void
   loadingOlder?: boolean
@@ -229,11 +245,78 @@ function SystemNotice({ body }: { body: string }) {
   )
 }
 
+/**
+ * A thread with nothing in it, and why.
+ *
+ * Over the list rather than inside it: an inverted `FlatList` renders its empty
+ * component through the same flip as its rows, which would stand this on its
+ * head. There is nothing under it to reach past — the list is empty, which is
+ * the only reason this is here.
+ *
+ * The header and the composer stay where they are. Somewhere to write and a way
+ * back are what keep a thread that could not be read from being a dead end, and
+ * an empty thread is often exactly right: a conversation nobody has said
+ * anything in yet.
+ */
+function ThreadEmpty({
+  loading,
+  failure,
+  onRetry,
+  readOnly,
+}: {
+  loading: boolean
+  failure: ApiFailure | null
+  onRetry?: () => void
+  readOnly: boolean
+}) {
+  if (loading && !failure) {
+    return (
+      <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
+        <ActivityIndicator accessibilityLabel="Loading messages…" />
+      </View>
+    )
+  }
+
+  const notice = failure
+    ? failureNotice(failure, 'Could not load this conversation')
+    : {
+        title: 'No messages yet',
+        hint: readOnly
+          ? 'Nothing has been posted here yet.'
+          : 'Write the first message to start this conversation.',
+      }
+
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      // Lets a pull-to-refresh through on an empty thread: nothing here is a
+      // touch responder except the button, and there is a list underneath.
+      pointerEvents="box-none"
+      className="absolute inset-0 items-center justify-center gap-1 px-8"
+    >
+      <Text variant="title" className="text-center text-ink">
+        {notice.title}
+      </Text>
+      <Text variant="meta" className="text-center text-muted">
+        {notice.hint}
+      </Text>
+      {failure && onRetry ? (
+        <Button variant="outline" className="mt-4" onPress={onRetry}>
+          <Text>Try again</Text>
+        </Button>
+      ) : null}
+    </View>
+  )
+}
+
 export function ThreadScreen({
   conversation,
   messages: fetched,
   viewer,
   organizationNames,
+  loading = false,
+  failure = null,
+  onRetry,
   onLoadOlder,
   loadingOlder = false,
   refreshing = false,
@@ -525,47 +608,59 @@ export function ThreadScreen({
 
   const host = (
     <View ref={hostRef} collapsable={false} className="flex-1">
-      <FlatList<ThreadRow>
-        ref={listRef}
-        inverted
-        className="flex-1"
-        scrollEnabled={!menuOpen}
-        extraData={menuId}
-        initialNumToRender={10}
-        maxToRenderPerBatch={8}
-        windowSize={5}
-        contentInsetAdjustmentBehavior="never"
-        contentContainerClassName="px-4 py-2"
-        data={rows}
-        keyExtractor={keyExtractor}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={onContentSizeChange}
-        // Inverted, so the end of the list is the top of the thread: this fires
-        // when someone scrolls back into history, which is when older pages load.
-        onEndReached={onLoadOlder}
-        onEndReachedThreshold={0.4}
-        ListFooterComponent={
-          loadingOlder ? (
-            <View className="items-center py-3">
-              <ActivityIndicator accessibilityLabel="Loading older messages…" />
-            </View>
-          ) : null
-        }
-        // Anchor mid-thread when rows insert. Without MVCP, composer height
-        // changes yank to offset 0. Without autoscrollToTopThreshold, new
-        // index-0 rows stay under the composer while you were near latest.
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-          autoscrollToTopThreshold: NEAR_LATEST_PX,
-        }}
-        renderItem={renderItem}
-        refreshControl={
-          onRefresh
-            ? makeRefreshControl(refreshing, onRefresh, { inverted: true })
-            : undefined
-        }
-      />
+      {/* Its own box, so what is drawn over an empty thread covers the list and
+          not the composer under it. */}
+      <View className="flex-1">
+        <FlatList<ThreadRow>
+          ref={listRef}
+          inverted
+          className="flex-1"
+          scrollEnabled={!menuOpen}
+          extraData={menuId}
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          contentInsetAdjustmentBehavior="never"
+          contentContainerClassName="px-4 py-2"
+          data={rows}
+          keyExtractor={keyExtractor}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={onContentSizeChange}
+          // Inverted, so the end of the list is the top of the thread: this fires
+          // when someone scrolls back into history, which is when older pages load.
+          onEndReached={onLoadOlder}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            loadingOlder ? (
+              <View className="items-center py-3">
+                <ActivityIndicator accessibilityLabel="Loading older messages…" />
+              </View>
+            ) : null
+          }
+          // Anchor mid-thread when rows insert. Without MVCP, composer height
+          // changes yank to offset 0. Without autoscrollToTopThreshold, new
+          // index-0 rows stay under the composer while you were near latest.
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+            autoscrollToTopThreshold: NEAR_LATEST_PX,
+          }}
+          renderItem={renderItem}
+          refreshControl={
+            onRefresh
+              ? makeRefreshControl(refreshing, onRefresh, { inverted: true })
+              : undefined
+          }
+        />
+        {rows.length === 0 ? (
+          <ThreadEmpty
+            loading={loading}
+            failure={failure}
+            onRetry={onRetry}
+            readOnly={readOnly}
+          />
+        ) : null}
+      </View>
       {notice ? <SendErrorNotice message={notice} onDismiss={dismissNotice} /> : null}
       {access.kind === 'read-only' ? (
         <ReadOnlyNotice
