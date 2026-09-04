@@ -25,6 +25,7 @@ import {
   type RealtimeEvent,
 } from "@/lib/realtime-context";
 import { getSession, getSessionUser } from "@/lib/session";
+import { useConversationAssignment } from "@/lib/use-conversation-assignment";
 import { useThreadMessages } from "@/lib/use-thread-messages";
 import type { Conversation, UserRole } from "@/lib/types";
 
@@ -140,7 +141,22 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
     [user],
   );
 
+  /** The conversation on screen, or null when there is none this person may open. */
+  const openedId = allowed ? conversation.id : null;
+
   const thread = useThreadMessages(allowed ? conversation : null, role, author);
+
+  /**
+   * Engaging a thread, and taking one over.
+   *
+   * The row the API answers with goes straight into the shared list, which is
+   * where `composerAccess` reads the assignment from — so the composer replaces
+   * the button without a refetch, and the pool screen behind loses the row in
+   * the same update. Every other staff session learns the same thing from the
+   * `conversation.updated` the API broadcasts.
+   */
+  const { addConversation } = inbox;
+  const assignment = useConversationAssignment(openedId, addConversation);
 
   /**
    * Opening a thread reads it.
@@ -151,7 +167,6 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
    * ever named.
    */
   const { markRead } = inbox;
-  const openedId = allowed ? conversation.id : null;
   useEffect(() => {
     if (openedId) markRead(openedId);
   }, [openedId, markRead]);
@@ -211,6 +226,9 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
       onSendMessage={thread.send}
       delivery={thread.delivery}
       onRetrySend={thread.retrySend}
+      onAssign={assignment.assign}
+      assigning={assignment.assigning}
+      assignError={assignment.error}
     />
   );
 }

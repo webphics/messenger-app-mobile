@@ -1,3 +1,4 @@
+import type { ReassignmentReason } from '@/lib/realtime-events'
 import type {
   Conversation,
   ConversationType,
@@ -5,7 +6,7 @@ import type {
   MessageAttachment,
   UserRole,
 } from '@/lib/types'
-import { isStaffMessage } from '@/lib/types'
+import { isStaffConversation, isStaffMessage } from '@/lib/types'
 
 /**
  * What an answer means for what is on screen — whether it was asked for or not.
@@ -582,6 +583,72 @@ function nextUnreadCount(
   if (held === null) return null
   if (mine || isSystemMessage(message)) return held
   return held + 1
+}
+
+/**
+ * A conversation that has just stopped being the viewer's.
+ *
+ * Named for what it carries rather than for the event that brings it, so the
+ * rule below is stated in terms of assignment and not in terms of a socket.
+ * `assignee` is who holds the thread now — null when nobody does.
+ */
+export type Reassignment = {
+  conversationId: string
+  reason: ReassignmentReason
+  assignee: { id: string; name: string } | null
+}
+
+/**
+ * The list, once a thread has been taken out of the viewer's hands.
+ *
+ * The event this applies is addressed rather than broadcast — the API sends
+ * `conversation.reassigned` to the previous assignee's user room and to nobody
+ * else — so "the viewer" and "the person who just lost it" are the same person,
+ * and the two outcomes follow from why they lost it.
+ *
+ * A Takeover or a Transfer leaves them able to see the thread: an Agent sees
+ * every Support DM in their organizations whoever holds it, which is what makes
+ * the unassigned pool and Takeover possible at all. So the row stays and only
+ * its assignment moves — off the Mine chip and the hub's assigned count, still
+ * in the inbox.
+ *
+ * A revoked membership does not. They are out of the organization, so the row
+ * goes: the thread returns to a pool they can no longer reach, every request
+ * they could make about it would be refused, and leaving it on screen would
+ * offer a thread that is not theirs to open. This is the case the event exists
+ * for — the `conversation.updated` that follows every other reassignment is
+ * emitted to the organization's rooms, which they have already been removed
+ * from, so nothing else would ever tell them.
+ *
+ * Answers the list it was given when the row is not in it, and when the row is
+ * a Customer's — a Customer is never sent this event, and their payload has no
+ * assignment to move.
+ */
+export function withReassignment(
+  conversations: Conversation[],
+  reassignment: Reassignment,
+): Conversation[] {
+  if (reassignment.reason === 'membership_revoked') {
+    return withoutConversation(conversations, reassignment.conversationId)
+  }
+
+  const index = conversations.findIndex((row) => row.id === reassignment.conversationId)
+  if (index === -1) return conversations
+
+  const held = conversations[index]
+  if (!isStaffConversation(held)) return conversations
+
+  const next = [...conversations]
+  next[index] = {
+    ...held,
+    // The name is all a row shows of an assignee; presence belongs to the
+    // `conversation.updated` that follows, which carries the whole row.
+    assignedAgent: reassignment.assignee
+      ? { id: reassignment.assignee.id, name: reassignment.assignee.name }
+      : null,
+    status: reassignment.assignee ? 'engaged' : 'unassigned',
+  }
+  return next
 }
 
 /**

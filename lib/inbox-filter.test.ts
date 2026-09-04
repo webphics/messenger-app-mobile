@@ -6,7 +6,9 @@ import {
   listInboxConversations,
   listUnassignedConversations,
 } from '@/lib/inbox-filter'
+import { mergeConversation, withReassignment } from '@/lib/conversation-state'
 import { CONVERSATIONS } from '@/lib/mock-data'
+import { isStaffConversation } from '@/lib/types'
 
 const assigned = CONVERSATIONS.find((c) => c.id === 'conv-assigned')!
 const unassigned = CONVERSATIONS.find((c) => c.id === 'conv-unassigned')!
@@ -86,6 +88,61 @@ describe('listUnassignedConversations', () => {
     expect(listUnassignedConversations(CONVERSATIONS).map((c) => c.id)).toEqual([
       unassigned.id,
     ])
+  })
+})
+
+/**
+ * What a staff session sees happen to its two lists when somebody else moves a
+ * conversation — the pool and the assigned list, each read out of the one list
+ * every screen shares, so a socket event moves both without a refetch.
+ */
+describe('an assignment that happened elsewhere', () => {
+  const holder = isStaffConversation(assigned) ? assigned.assignedAgent : null
+
+  test('a thread another Agent just engaged leaves the pool', () => {
+    // What `conversation.updated` carries, and what the inbox does with it.
+    const engagedElsewhere = {
+      ...unassigned,
+      status: 'engaged' as const,
+      assignedAgent: { id: 'agent-2', name: 'Priya Raman' },
+    }
+
+    expect(listUnassignedConversations(CONVERSATIONS).map((c) => c.id)).toContain(unassigned.id)
+    expect(
+      listUnassignedConversations(mergeConversation(CONVERSATIONS, engagedElsewhere)).map(
+        (c) => c.id,
+      ),
+    ).not.toContain(unassigned.id)
+  })
+
+  test('a thread taken over leaves the assignee’s own list', () => {
+    expect(holder).not.toBeNull()
+    expect(listAssignedConversations(holder!.id, CONVERSATIONS).map((c) => c.id)).toContain(
+      assigned.id,
+    )
+
+    const taken = withReassignment(CONVERSATIONS, {
+      conversationId: assigned.id,
+      reason: 'taken_over',
+      assignee: { id: 'admin-1', name: 'Admin' },
+    })
+
+    expect(listAssignedConversations(holder!.id, taken).map((c) => c.id)).not.toContain(
+      assigned.id,
+    )
+    // Still in the inbox: an Agent reads every Support DM in their organizations
+    // whoever holds it. It has moved off the Mine chip, not out of sight.
+    expect(taken.map((c) => c.id)).toContain(assigned.id)
+  })
+
+  test('a thread whose assignee left the organization goes back to the pool for everyone else', () => {
+    const returned = withReassignment(CONVERSATIONS, {
+      conversationId: assigned.id,
+      reason: 'taken_over',
+      assignee: null,
+    })
+
+    expect(listUnassignedConversations(returned).map((c) => c.id)).toContain(assigned.id)
   })
 })
 

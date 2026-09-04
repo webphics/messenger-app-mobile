@@ -1,6 +1,10 @@
 import { asRecord } from '@/lib/api-envelope'
-import { parseConversation, parseMessage } from '@/lib/conversation-parse'
-import type { Conversation, Message } from '@/lib/types'
+import {
+  parseConversation,
+  parseMessage,
+  parseStaffDirectoryUser,
+} from '@/lib/conversation-parse'
+import type { Conversation, Message, StaffDirectoryUser } from '@/lib/types'
 
 /**
  * What the API says over the socket, read into this app's types.
@@ -24,6 +28,7 @@ export const REALTIME_EVENTS = {
   messageCreated: 'message.created',
   conversationUpdated: 'conversation.updated',
   conversationDeleted: 'conversation.deleted',
+  conversationReassigned: 'conversation.reassigned',
   /** Outbound: asks the server to put this socket in the conversation's room. */
   conversationJoin: 'conversation.join',
   conversationLeave: 'conversation.leave',
@@ -63,6 +68,70 @@ export function parseMessageCreated(payload: unknown): MessageCreated | null {
 export function parseConversationUpdated(payload: unknown): Conversation | null {
   const record = asRecord(payload)
   return record ? parseConversation(record.conversation) : null
+}
+
+/**
+ * Why a conversation stopped being someone's.
+ *
+ * The API's `conversationReassignedReasons`. Two of them are somebody doing
+ * something — an Admin's Takeover, an assignee's Transfer — and the third is a
+ * consequence: an assignee whose membership of the organization was revoked
+ * loses every thread they held in it, and the threads go back to the pool.
+ */
+export type ReassignmentReason = 'taken_over' | 'transferred' | 'membership_revoked'
+
+const REASSIGNMENT_REASONS: readonly ReassignmentReason[] = [
+  'taken_over',
+  'transferred',
+  'membership_revoked',
+]
+
+export type ConversationReassigned = {
+  conversationId: string
+  reason: ReassignmentReason
+  /** Who holds it now, or nobody — a revocation returns it to the pool. */
+  currentAssignee: StaffDirectoryUser | null
+}
+
+/**
+ * A conversation taken out of the recipient's hands.
+ *
+ * Addressed rather than broadcast: the API emits this to one user room, the
+ * *previous* assignee's, and to nobody else. So the recipient is always the
+ * person who has just lost the thread, which is what lets
+ * `withReassignment` read it as being about them without the payload naming
+ * them.
+ *
+ * It is not the only word a staff session gets about a Takeover — a
+ * `conversation.updated` carrying the new assignee follows it to every staff
+ * socket in the organization, and that is what moves everyone *else's* list.
+ * This one exists because of the case where that broadcast cannot arrive: a
+ * revoked membership pulls the person out of the organization's rooms first, so
+ * the update is emitted past them and this is all they are told.
+ *
+ * `engagedStaff` and `engagedStaffCount` travel on the payload too. They name
+ * everyone who has ever held the thread, which the web client shows on the
+ * screen it puts up in place of the lost conversation; nothing on this client
+ * asks who came before, so nothing here reads them.
+ */
+export function parseConversationReassigned(payload: unknown): ConversationReassigned | null {
+  const record = asRecord(payload)
+  if (!record) return null
+
+  const conversationId = record.conversationId
+  if (typeof conversationId !== 'string' || conversationId === '') return null
+
+  const reason = REASSIGNMENT_REASONS.find((value) => value === record.reason)
+  if (!reason) return null
+
+  return {
+    conversationId,
+    reason,
+    // Null both when the API says null and when it says something unreadable:
+    // either way this client does not know who holds it, and the
+    // `conversation.updated` that follows a Takeover carries the row anyway.
+    currentAssignee: parseStaffDirectoryUser(record.currentAssignee),
+  }
 }
 
 /** A conversation that no longer exists. Nothing is left to fetch for it. */

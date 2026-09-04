@@ -2,6 +2,7 @@ import { API_BASE_URL } from '@/lib/api-config'
 import { clearCsrfPair, setSessionCookie } from '@/lib/api-client'
 import {
   createStaffDm,
+  engageConversation,
   ensureSupportConversation,
   getConversation,
   listConversations,
@@ -10,6 +11,7 @@ import {
   listStaffDirectory,
   markConversationRead,
   sendMessage,
+  takeOverConversation,
 } from '@/lib/conversation-api'
 
 /**
@@ -574,6 +576,131 @@ describe('createStaffDm', () => {
         kind: 'refused',
         message: 'You and this person do not share an organization.',
       },
+    })
+  })
+})
+
+/**
+ * The two assignment actions. One shape, so one table: a POST with no body,
+ * carrying the CSRF pair every mutation needs, answering with the conversation
+ * as it now stands.
+ */
+describe.each([
+  ['engageConversation', engageConversation, 'engage'] as const,
+  ['takeOverConversation', takeOverConversation, 'takeover'] as const,
+])('%s', (_name, call, path) => {
+  /**
+   * A staff row: only a staff payload carries `labels`, and only a staff payload
+   * carries the assignment these two actions change.
+   */
+  const ENGAGED_ROW = {
+    ...SUPPORT_ROW,
+    status: 'engaged',
+    title: null,
+    description: null,
+    avatarUrl: null,
+    customer: { id: 'cust-1', name: 'Luis Ferreira' },
+    assignedAgent: { id: 'me', name: 'Jonah Reed' },
+    otherUser: null,
+    members: [],
+    labels: [],
+  }
+
+  test(`posts to the conversation ${path} path, with the CSRF pair a mutation needs`, async () => {
+    enqueue(csrfResponse(), envelope(ENGAGED_ROW))
+
+    const result = await call('conv-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/${path}`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'conv-1' }) })
+  })
+
+  test('sends no body, which is all the endpoint takes', async () => {
+    enqueue(csrfResponse(), envelope(ENGAGED_ROW))
+
+    await call('conv-1')
+
+    expect(calls[1]?.init.body).toBeUndefined()
+  })
+
+  test('answers with the conversation as it now stands, so the composer can open on it', async () => {
+    enqueue(csrfResponse(), envelope(ENGAGED_ROW))
+
+    const result = await call('conv-1')
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        status: 'engaged',
+        assignedAgent: expect.objectContaining({ id: 'me', name: 'Jonah Reed' }),
+      }),
+    })
+  })
+
+  test('escapes an id rather than letting it shape the path', async () => {
+    enqueue(csrfResponse(), envelope(ENGAGED_ROW))
+
+    await call('conv 1/../secrets')
+
+    expect(calls[1]?.url).toBe(
+      `${API_BASE_URL}/conversations/conv%201%2F..%2Fsecrets/${path}`,
+    )
+  })
+
+  test('reports a request that never arrived as unreachable', async () => {
+    enqueue(csrfResponse(), new TypeError('Network request failed'))
+
+    expect(await call('conv-1')).toEqual({ ok: false, failure: { kind: 'unreachable' } })
+  })
+
+  test('reports a 401 as an expired session rather than a refusal', async () => {
+    enqueue(csrfResponse(), response(401, { statusCode: 401, message: 'Unauthorized' }))
+
+    expect(await call('conv-1')).toEqual({ ok: false, failure: { kind: 'unauthorised' } })
+  })
+})
+
+describe('the refusals the API answers an assignment with', () => {
+  test('somebody reached the thread first', async () => {
+    enqueue(
+      csrfResponse(),
+      response(409, {
+        statusCode: 409,
+        code: 'already_engaged',
+        message: 'This chat is already engaged.',
+      }),
+    )
+
+    expect(await engageConversation('conv-1')).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'This chat is already engaged.' },
+    })
+  })
+
+  /**
+   * An Agent's Takeover, which `assertCanTakeOver` refuses before it looks at
+   * the thread. Nothing offers an Agent this button — see
+   * `lib/composer-access.ts` — and a 403 is a verdict on the request rather than
+   * on the session, so it never signs anybody out.
+   */
+  test('an Agent asking to take over is forbidden, not signed out', async () => {
+    enqueue(
+      csrfResponse(),
+      response(403, {
+        statusCode: 403,
+        code: 'forbidden',
+        message: "You don't have permission to do that.",
+      }),
+    )
+
+    expect(await takeOverConversation('conv-1')).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: "You don't have permission to do that." },
     })
   })
 })

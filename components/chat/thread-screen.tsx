@@ -7,9 +7,10 @@ import { MessageActions } from '@/components/chat/message-actions'
 import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
 import { ThreadHeader } from '@/components/chat/thread-header'
 import { InScreenHeader } from '@/components/in-screen-header'
+import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { primaryAttachmentView, toMessageAttachment } from '@/lib/attachment-view'
-import { composerAccess } from '@/lib/composer-access'
+import { composerAccess, type ComposerAction } from '@/lib/composer-access'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
   draftMessage,
@@ -65,6 +66,18 @@ type ThreadScreenProps = {
   /** How far each message this device is still carrying has got, by id. */
   delivery?: ReadonlyMap<string, DeliveryState>
   onRetrySend?: (messageId: string) => void
+  /**
+   * Claim this thread, or take it from whoever holds it.
+   *
+   * Absent where nothing can be done about a read-only thread, which is the
+   * common case: a closed thread, an announcement, and an Agent looking at a
+   * conversation another Agent engaged all have a reason and no way out of it.
+   */
+  onAssign?: (action: ComposerAction) => void
+  /** True from the tap until the API answers, so the button says it is working. */
+  assigning?: boolean
+  /** What the API said when the last attempt was refused. */
+  assignError?: string | null
 }
 
 /** What a bubble draws out of a message: its caption and the one attachment shown beside it. */
@@ -80,23 +93,28 @@ function keyExtractor(item: ThreadRow) {
 const NEAR_LATEST_PX = 80
 
 /**
- * An Engage, Takeover or Transfer notice.
- *
- * Centred and unsided, because it is the thread's own record of what happened
- * to it rather than something either party said: giving it a bubble would put
- * an assignment event in somebody's mouth and a tick beside it. Staff only —
- * the API withholds these from a Customer, and `visibleMessages` drops them
- * again on the way in.
- */
-/**
  * Why there is no composer, where there is none.
  *
  * Sits where the composer would, because that is where someone looks to write —
  * an absent control with the explanation elsewhere reads as a thread that failed
  * to load rather than as one this person may only read.
  */
-function ReadOnlyNotice({ reason }: { reason: string }) {
+function ReadOnlyNotice({
+  reason,
+  action,
+  onAssign,
+  assigning = false,
+  error = null,
+}: {
+  reason: string
+  action?: ComposerAction
+  onAssign?: (action: ComposerAction) => void
+  assigning?: boolean
+  error?: string | null
+}) {
   const insets = useSafeAreaInsets()
+  const offered = action && onAssign ? action : null
+
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -106,10 +124,39 @@ function ReadOnlyNotice({ reason }: { reason: string }) {
       <Text variant="meta" className="text-center text-muted">
         {reason}
       </Text>
+      {error ? (
+        <Text variant="meta" className="mt-1 text-center text-danger">
+          {error}
+        </Text>
+      ) : null}
+      {offered ? (
+        <Button
+          // Kept enabled until the request starts, then disabled with a spinner
+          // beside the label it already had — the label is what says which of
+          // the two actions is under way.
+          disabled={assigning}
+          accessibilityLabel={offered.label}
+          accessibilityState={{ disabled: assigning, busy: assigning }}
+          className="mt-3"
+          onPress={() => onAssign?.(offered)}
+        >
+          {assigning ? <ActivityIndicator color="white" size="small" /> : null}
+          <Text>{offered.label}</Text>
+        </Button>
+      ) : null}
     </View>
   )
 }
 
+/**
+ * An Engage, Takeover or Transfer notice.
+ *
+ * Centred and unsided, because it is the thread's own record of what happened
+ * to it rather than something either party said: giving it a bubble would put
+ * an assignment event in somebody's mouth and a tick beside it. Staff only —
+ * the API withholds these from a Customer, and `visibleMessages` drops them
+ * again on the way in.
+ */
 function SystemNotice({ body }: { body: string }) {
   return (
     <View className="my-2 items-center px-6">
@@ -136,6 +183,9 @@ export function ThreadScreen({
   onSendMessage,
   delivery,
   onRetrySend,
+  onAssign,
+  assigning = false,
+  assignError = null,
 }: ThreadScreenProps) {
   const keyboardInset = useKeyboardInset()
   const hostRef = useRef<View>(null)
@@ -414,7 +464,13 @@ export function ThreadScreen({
         }
       />
       {access.kind === 'read-only' ? (
-        <ReadOnlyNotice reason={access.reason} />
+        <ReadOnlyNotice
+          reason={access.reason}
+          action={access.action}
+          onAssign={onAssign}
+          assigning={assigning}
+          error={assignError}
+        />
       ) : (
         <Composer
           value={draft}
