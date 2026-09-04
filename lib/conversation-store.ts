@@ -242,8 +242,15 @@ type PendingThread = {
 /** The newest state each thread is waiting to have written, by owner and conversation. */
 const queuedThreads = new Map<string, PendingThread>()
 
+/**
+ * The Map key for one thread: an owner and a conversation, joined.
+ *
+ * Both halves are ids — a UUID from the API, or a `local-` id from
+ * `lib/conversation-state` — and neither can contain a `|`, so the join is
+ * unambiguous. In memory only: no key here is ever written to disk.
+ */
 function threadKey(ownerId: string, conversationId: string): string {
-  return `${ownerId} ${conversationId}`
+  return `${ownerId}|${conversationId}`
 }
 
 /**
