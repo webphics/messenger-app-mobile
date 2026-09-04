@@ -6,18 +6,23 @@ export function chatHref(id: string): Href {
 }
 
 /**
- * The media gallery for one conversation.
+ * The two screens that hang off a thread: its details, and everything shared in
+ * it.
  *
- * A sibling route rather than a segment under `/chat/[id]`, because that path is
+ * Siblings of `/chat/[id]` rather than segments under it, because that path is
  * already a leaf: the thread owns `/chat/:id`, and nesting under it would make
  * the thread an `index` and rewrite every href in the app to gain nothing.
  *
- * The id it carries is the conversation's own, never the `offers` alias — the
+ * The id each carries is the conversation's own, never the `offers` alias — the
  * thread resolves that alias against the conversations this person is in, and
- * this route is only ever reached from a thread that has already done so.
+ * both routes are only ever reached from a thread that has already done so.
  */
 export function chatMediaHref(id: string): Href {
   return { pathname: '/chat/media/[id]', params: { id } }
+}
+
+export function chatDetailsHref(id: string): Href {
+  return { pathname: '/chat/details/[id]', params: { id } }
 }
 
 /** Resolve `/chat/:id` from search params, pathname, or segments (params often empty after Metro reload). */
@@ -40,21 +45,36 @@ export function chatIdFromSegments(segments: readonly string[]): string | undefi
 }
 
 /**
- * Resolve `/chat/media/:id`.
+ * Resolve `/chat/<section>/:id`.
  *
  * Its own reader rather than `chatIdFromRoute`, which would read the literal
- * `media` as the conversation id: the segment after `chat` is what that one
- * takes, and on this route that segment is the word itself.
+ * `media` or `details` as the conversation id: the segment after `chat` is what
+ * that one takes, and on these routes that segment is the section's name.
  */
-export function chatMediaIdFromRoute(
+function chatSectionIdFromRoute(
   raw: string | string[] | undefined,
   pathname: string,
+  section: string,
 ): string | undefined {
   const fromParams = Array.isArray(raw) ? raw[0] : raw
   if (fromParams && fromParams !== '[id]') return fromParams
   const parts = pathname.split('/').filter(Boolean)
-  if (parts[0] === 'chat' && parts[1] === 'media' && parts[2] && parts[2] !== '[id]') {
+  if (parts[0] === 'chat' && parts[1] === section && parts[2] && parts[2] !== '[id]') {
     return decodeURIComponent(parts[2])
   }
   return undefined
+}
+
+export function chatMediaIdFromRoute(
+  raw: string | string[] | undefined,
+  pathname: string,
+): string | undefined {
+  return chatSectionIdFromRoute(raw, pathname, 'media')
+}
+
+export function chatDetailsIdFromRoute(
+  raw: string | string[] | undefined,
+  pathname: string,
+): string | undefined {
+  return chatSectionIdFromRoute(raw, pathname, 'details')
 }

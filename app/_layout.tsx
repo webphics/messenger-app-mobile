@@ -121,8 +121,15 @@ export default function RootLayout() {
                   contentStyle: { backgroundColor: colors.bg },
                 }}
               />
-              {/* The gallery a thread's header opens. Beside `chat/[id]`
+              {/* The two screens a thread's header opens. Beside `chat/[id]`
                 rather than under it: the thread owns that path outright. */}
+              <Stack.Screen
+                name="chat/details/[id]"
+                options={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.bg },
+                }}
+              />
               <Stack.Screen
                 name="chat/media/[id]"
                 options={{

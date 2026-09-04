@@ -4,8 +4,11 @@ import {
   parseAttachment,
   parseConversation,
   parseConversations,
+  parseLabels,
   parseMessage,
   parseMessages,
+  parseNote,
+  parseNotes,
   parseOrganizations,
   parseStaffDirectory,
 } from '@/lib/conversation-parse'
@@ -15,7 +18,9 @@ import type { HttpOutcome } from '@/lib/auth-response'
 import type {
   AttachmentView,
   Conversation,
+  ConversationNote,
   ConversationType,
+  Label,
   Message,
   MessageAttachment,
   Organization,
@@ -366,3 +371,76 @@ export async function uploadAttachment(
 
 /** The multipart field `FileInterceptor('file', …)` reads on the API. */
 const UPLOAD_FIELD = 'file'
+
+/**
+ * Every label a staff member may put on a conversation.
+ *
+ * Organization-wide rather than per-conversation: the same set is offered on
+ * every thread, and which of them a thread wears is on the conversation itself —
+ * `Conversation.labels`, which the list endpoint already carries. Staff only;
+ * a Customer is refused.
+ */
+export async function listLabels(): Promise<ApiResult<Label[]>> {
+  return readOutcome(await authenticatedRequest('/conversations/labels'), parseLabels)
+}
+
+/**
+ * Put a label on a conversation, or take one off.
+ *
+ * Both answer with the conversation as it now stands, labels included, which is
+ * what goes back into the shared list — so a label added here is on the row in
+ * the inbox behind without a refetch, exactly as an Engage is.
+ */
+export async function attachLabel(
+  id: string,
+  labelId: string,
+): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/labels`,
+    { method: 'POST', body: { labelId } },
+  )
+  return readOutcome(outcome, parseConversation)
+}
+
+export async function detachLabel(
+  id: string,
+  labelId: string,
+): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/labels/${encodeURIComponent(labelId)}`,
+    { method: 'DELETE' },
+  )
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * The internal notes on a Support DM.
+ *
+ * Notes exist only on a Support DM — the API answers `404` for any other
+ * conversation type — and only for staff. The caller decides whether to ask;
+ * this only knows how.
+ */
+export async function listNotes(id: string): Promise<ApiResult<ConversationNote[]>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/notes`,
+  )
+  return readOutcome(outcome, parseNotes)
+}
+
+/** Write one. `messageId` names the message it is about, where there is one. */
+export async function createNote(
+  id: string,
+  note: { text: string; messageId?: string },
+): Promise<ApiResult<ConversationNote>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/notes`,
+    {
+      method: 'POST',
+      body: {
+        text: note.text,
+        ...(note.messageId ? { messageId: note.messageId } : {}),
+      },
+    },
+  )
+  return readOutcome(outcome, parseNote)
+}

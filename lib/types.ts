@@ -73,6 +73,21 @@ export type Label = {
   archived: boolean
 }
 
+/**
+ * An internal note on a Support DM.
+ *
+ * Staff-only, and never shown to the Customer — the API refuses one a Customer
+ * asks for, and nothing on a Customer's screens asks. `messageId` names the
+ * message it was written about, where it was written about one.
+ */
+export type ConversationNote = {
+  id: string
+  text: string
+  author: { id: string; name: string }
+  messageId: string | null
+  createdAt: string
+}
+
 /** A person named on a conversation. Presence is staff-facing and absent from a Customer's payload. */
 export type ConversationPerson = {
   id: string
