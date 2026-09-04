@@ -13,8 +13,12 @@ address no device can reach. The Android emulator reaches the host at `http://10
 
 Signing in is real, three ways — password, magic link, and Google. The API verifies the credential
 and the app stores the Session cookie in the device keychain, replaying it by hand on every request
-the way the web client does. Role comes from the server, not from the client. Conversations are still mock data. Scope: `docs/scope.md`. Credential
-pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`.
+the way the web client does. Role comes from the server, not from the client. Conversations are real — the list, the threads,
+sending, unread and live delivery over Socket.IO — and the Conversation list is kept in a SQLite
+Store on the device, so a cold start draws what this phone last knew before any request answers and
+a phone with no signal still opens on its conversations. Scope: `docs/scope.md`. Credential
+pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Where the screens read from:
+`docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 There is no registration form: **a magic link or a first Google sign-in is how a Customer account
 comes into existence on mobile.** The API has no registration endpoint, and verifying either is what

@@ -8,7 +8,12 @@ its Internal notes) and Shared in chat (Media / Docs / Voice / Links), both reac
 thread's header and both mirroring the web client's Conversation Details pane. #39 gave every
 round trip through `api-client` a deadline — fifteen seconds of silence, the CSRF pre-flight and
 the streamed upload included — so a hung request now ends as an ordinary transport failure rather
-than as a screen that waits forever; it is deliberately never a `401`. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`.
+than as a screen that waits forever; it is deliberately never a `401`. #40 opened the Store: `expo-sqlite`, a `conversations` table, and a
+cold start that Restores the Conversation list — the same rows, the same Unread counts, the same
+order, the tab badge with them — before anything renders, so a phone in airplane mode opens on what
+it last knew instead of on an empty inbox. Only Conversations so far; Messages, the Outbox and
+Eviction are their own tickets. The two new modules split at the native boundary: `store-rows` maps
+a Store to rows and back and imports nothing native, `conversation-store` owns SQLite alone. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 ## Interactions
 
