@@ -23,6 +23,7 @@ import {
 } from "@/lib/keychain";
 import { purgeMockSession } from "@/lib/legacy-session";
 import { getSessionUser, setSessionUser } from "@/lib/session";
+import { wipeStoreAndAttachments } from "@/lib/session-wipe";
 
 jest.mock("@/lib/api-client", () => {
   let held: string | null = null;
@@ -59,6 +60,13 @@ jest.mock("@/lib/google-session", () => ({
   releaseGoogleSession: jest.fn(async () => undefined),
 }));
 
+// The Store and the downloaded documents both sit behind native modules, and
+// what they do with a wipe is tested where each of them owns one. What matters
+// here is only which moments reach this at all.
+jest.mock("@/lib/session-wipe", () => ({
+  wipeStoreAndAttachments: jest.fn(async () => undefined),
+}));
+
 jest.mock("@/lib/keychain", () => ({
   readSessionCookie: jest.fn(),
   writeSessionCookie: jest.fn(async () => true),
@@ -76,6 +84,7 @@ const releaseGoogle = releaseGoogleSession as jest.MockedFunction<
 const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCookie>;
 const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
 const clearCookie = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
+const wipe = wipeStoreAndAttachments as jest.MockedFunction<typeof wipeStoreAndAttachments>;
 
 const ID_TOKEN = "eyJhbGciOiJSUzI1NiJ9.google-minted.signature";
 
@@ -107,6 +116,7 @@ beforeEach(() => {
   setSessionUser(null);
   writeCookie.mockResolvedValue(true);
   clearCookie.mockResolvedValue(true);
+  wipe.mockResolvedValue(undefined);
 });
 
 describe("hydrateAuth", () => {
@@ -402,6 +412,107 @@ describe("signOut", () => {
     await signOut();
 
     expect(releaseGoogle).toHaveBeenCalled();
+  });
+});
+
+/**
+ * What a Session end leaves on the device, which is nothing.
+ *
+ * The three moments are one path — `forgetCredential` — so these are about which
+ * of them arrive at it, and about the one that deliberately does not. What is
+ * actually destroyed is `lib/session-wipe`'s to say, and mocked away here.
+ */
+describe("a Session end takes the Store with it", () => {
+  test("signing out destroys what this device held", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    request.mockResolvedValueOnce(ok(true));
+
+    await signOut();
+
+    expect(wipe).toHaveBeenCalledTimes(1);
+  });
+
+  test("a Session expiry destroys it too", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: { message: "Unauthorized" },
+      sessionCookie: null,
+    });
+
+    await authenticatedRequest("/conversations");
+
+    expect(wipe).toHaveBeenCalledTimes(1);
+  });
+
+  test("a cookie the API refuses at cold start takes the previous person's with it", async () => {
+    readCookie.mockResolvedValueOnce("better-auth.session_token=stale");
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: { message: "Unauthorized" },
+      sessionCookie: null,
+    });
+
+    await hydrateAuth();
+
+    expect(wipe).toHaveBeenCalledTimes(1);
+  });
+
+  // The database on disk knows nothing about whose it is. A cold start that
+  // finds no cookie is a device nobody is signed in on, so anything a killed
+  // sign-out left behind goes before the next person can be shown it.
+  test("a cold start with no cookie leaves nothing for the next person", async () => {
+    readCookie.mockResolvedValueOnce(null);
+
+    await hydrateAuth();
+
+    expect(wipe).toHaveBeenCalledTimes(1);
+  });
+
+  // Not a Session end, and wiped anyway: nothing on this device belongs to a
+  // session that was never established. See `forgetCredential`.
+  test("a refused sign-in leaves nothing of an earlier one behind either", async () => {
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: { message: "Unauthorized" },
+      sessionCookie: null,
+    });
+
+    await signInWithPassword("a@b.co", "wrong");
+
+    expect(wipe).toHaveBeenCalledTimes(1);
+  });
+
+  test("an unreachable API keeps the Store, because it is the only thing to draw", async () => {
+    readCookie.mockResolvedValueOnce(STORED);
+    request.mockResolvedValueOnce({ reached: false });
+
+    await hydrateAuth();
+
+    expect(wipe).not.toHaveBeenCalled();
+  });
+
+  // The same rule signing out already follows when the server cannot be told.
+  test("a wipe that fails does not stop the session ending", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    wipe.mockRejectedValueOnce(new Error("database is locked"));
+    request.mockResolvedValueOnce(ok(true));
+
+    await expect(signOut()).resolves.toBeUndefined();
+
+    expect(getSessionCookie()).toBeNull();
+    expect(getSessionUser()).toBeNull();
+    expect(clearCookie).toHaveBeenCalled();
+    expect(request).toHaveBeenCalledWith("/auth/logout", {
+      method: "POST",
+      cookie: STORED,
+    });
   });
 });
 

@@ -43,7 +43,15 @@ opened, with its paging reset so it cannot restore a cursor pointing past histor
 The sweep runs after the write that grew the table and never on a timer, and never against the
 thread that write was for — that is the thread on screen, and taking its Messages would be a write
 that undoes itself. Split like the attachment budget: `store-eviction` is pure and table-tested,
-`conversation-store` owns the query and the transaction. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+`conversation-store` owns the query and the transaction. #46 made a Session end take the Store with
+it: every moment that discards the Session cookie — signing out, a Session expiry, a cold start that
+finds none, a refused sign-in — reaches one path, `session-wipe`, which destroys the database file
+and the downloaded documents together, so nothing of a person's Conversations outlives their session
+on this device and a shared phone hands the next person nothing. Hydration's Unreachable outcome
+deliberately does not, because a kept cookie is a kept Store. What a Wipe removes stays removed: the
+Store bars the people it was taken from until they Restore, so the moment between the credential
+going and the screens being told cannot write the list back. Android backup is disabled; the database
+is deliberately not encrypted. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 ## Interactions
 

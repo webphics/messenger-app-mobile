@@ -666,6 +666,100 @@ describe('wipeStore', () => {
   })
 })
 
+/**
+ * The half of a Wipe that is not the delete: that what it removed stays removed.
+ *
+ * A Session expiry discards the credential before the screens are told, so for a
+ * moment something still believing it is signed in can queue a write. These are
+ * about that moment.
+ */
+describe('a Wipe bars the people it took the Store from', () => {
+  it('refuses a write queued after it by somebody it just wiped', async () => {
+    const store = loadStore()
+    store.restoreStore('viewer-1')
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    await store.wipeStore()
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(store.restoreStore('viewer-1').conversations).toEqual([])
+  })
+
+  it('refuses their Messages too, which is where the words actually are', async () => {
+    const store = loadStore()
+    store.restoreStore('viewer-1')
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+
+    await store.wipeStore()
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
+  })
+
+  it('refuses a frontier, so nothing of the thread is recorded either', async () => {
+    const store = loadStore()
+    store.restoreStore('viewer-1')
+    await save(store, 'viewer-1', [conversation('conv-1')])
+    await store.wipeStore()
+
+    await store.saveThreadPaging('viewer-1', 'conv-1', { hasMore: false, cursor: 'c' })
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
+  })
+
+  // The bar is a Wipe's, not a permanent verdict: signing back in Restores, and
+  // Restoring is the moment the disk and this person are the same again.
+  it('lets somebody back in the moment they Restore', async () => {
+    const store = loadStore()
+    store.restoreStore('viewer-1')
+    await store.wipeStore()
+
+    // A sign-in Restores before anything writes — see `lib/conversation-inbox`.
+    store.restoreStore('viewer-1')
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(store.restoreStore('viewer-1').conversations).toHaveLength(1)
+  })
+
+  it('bars every person it wiped, not only the one who was on screen', async () => {
+    const store = loadStore()
+    store.restoreStore('viewer-1')
+    store.restoreStore('viewer-2')
+    await store.wipeStore()
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+    await save(store, 'viewer-2', [conversation('conv-9')])
+
+    expect(store.restoreStore('viewer-1').conversations).toEqual([])
+    expect(store.restoreStore('viewer-2').conversations).toEqual([])
+  })
+
+  // Nobody a Wipe never served can be somebody whose data it removed, so the bar
+  // has nothing to say about them.
+  it('says nothing about a person it never held anything for', async () => {
+    const store = loadStore()
+    store.restoreStore('viewer-1')
+    await store.wipeStore()
+
+    await save(store, 'viewer-2', [conversation('conv-9')])
+
+    expect(store.restoreStore('viewer-2').conversations).toHaveLength(1)
+  })
+
+  // The database this build cannot read is discarded and begun again, which is a
+  // reason to Restore nothing and never a reason to stop writing.
+  it('is not raised by a Restore that had to discard an unreadable database', async () => {
+    const store = loadStore()
+    mockFails.read = true
+    store.restoreStore('viewer-1')
+    mockFails.read = false
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(store.restoreStore('viewer-1').conversations).toHaveLength(1)
+  })
+})
+
 const THREAD_BEGAN = Date.parse('2026-08-13T08:00:00.000Z')
 
 function message(id: string, minute: number, overrides: Partial<CustomerMessage> = {}): Message {

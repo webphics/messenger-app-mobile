@@ -36,6 +36,15 @@ import { isDeviceUri } from '@/lib/attachment-upload'
 const CACHE_DIRECTORY = 'attachments'
 
 /**
+ * The one directory this module owns. Nothing outside it is ever listed,
+ * counted or deleted, which is what keeps a device URI an Upload is streaming
+ * from — and everything else sharing the system cache — out of reach.
+ */
+function cacheRoot(): Directory {
+  return new Directory(Paths.cache, CACHE_DIRECTORY)
+}
+
+/**
  * When this attachment was last read, written beside it.
  *
  * The filesystem records when a file was *modified*, which for a downloaded copy
@@ -267,7 +276,7 @@ function lastUsedAt(directory: Directory, files: readonly File[]): number {
  */
 export function evictAttachmentFiles(): void {
   try {
-    const root = new Directory(Paths.cache, CACHE_DIRECTORY)
+    const root = cacheRoot()
     if (!root.exists) return
 
     const entries: CachedAttachment[] = []
@@ -296,5 +305,37 @@ export function evictAttachmentFiles(): void {
     }
   } catch {
     // The cache stays over budget until the next download tries again.
+  }
+}
+
+/**
+ * Discard every downloaded document on this device.
+ *
+ * The directory rather than the copies in it, and every copy rather than one
+ * person's: nothing here records whose thread a document came from, and a
+ * Session end is exactly the moment nobody on this phone is entitled to any of
+ * them. Discarding is safe for the same reason eviction is — everything under
+ * `attachments` is re-fetchable by whoever can still open the thread it belongs
+ * to — and it is the same directory, so a device URI an Upload is streaming
+ * from is out of reach here too.
+ *
+ * A download still in flight is not waited for. It streams into a directory
+ * this has just removed and lands in a fresh one, so a Session end can leave a
+ * single document behind: one from the thread the person had open at the moment
+ * they signed out. Holding a sign-out open until a download the person no longer
+ * wants has finished is the worse trade, and that copy is taken by the next
+ * Session end and counted against the budget until then.
+ *
+ * Nothing throws, for the same reason nothing in `evictAttachmentFiles` does. A
+ * Session end that could fail is a Session end that could strand somebody on a
+ * screen they have already been signed out of.
+ */
+export function wipeAttachmentFiles(): void {
+  try {
+    const root = cacheRoot()
+    if (root.exists) root.delete()
+  } catch {
+    // The documents outlive the session by however long it takes the next one
+    // to end, or the system to reclaim a cache directory it owns anyway.
   }
 }
