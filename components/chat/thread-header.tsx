@@ -1,9 +1,14 @@
+import { router } from "expo-router";
 import { View } from "react-native";
 
+import { Image as ImageIcon } from "@/components/icons";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { chatMediaHref } from "@/lib/chat-route-id";
 import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
 import { initials } from "@/lib/display";
+import { colors } from "@/lib/tokens";
 import { isStaffConversation } from "@/lib/types";
 import type { Conversation } from "@/lib/types";
 
@@ -86,6 +91,20 @@ export function ThreadHeader({ conversation, organizationNames }: ThreadHeaderPr
           </Text>
         </View>
       ) : null}
+      {/*
+        The way into this conversation's media. In the header rather than in the
+        composer's attachment sheet, because that sheet is for adding a file and
+        this is for finding one that was already sent — and because a read-only
+        thread has no composer at all, while its media is still worth looking at.
+      */}
+      <TactilePressable
+        accessibilityRole="button"
+        accessibilityLabel="Media in this conversation"
+        onPress={() => router.push(chatMediaHref(conversation.id))}
+        className="size-11 shrink-0 items-center justify-center rounded-full"
+      >
+        <ImageIcon color={colors.ink} size={20} />
+      </TactilePressable>
     </View>
   );
 }
