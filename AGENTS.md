@@ -27,7 +27,15 @@ and the person is told who has it in words rather than shown a bare `403`. The v
 API's rule, mirrored once in `composer-access`. #43 stopped the screen jumping after the Launch
 animation: it now ends when it has played *and* the first Conversation fetch has settled — answered
 or failed, since with the Store there is something to draw either way — so the Hub arrives complete
-rather than filling in underneath the person a moment later. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+rather than filling in underneath the person a moment later. #44 took the Store from Conversations
+to Messages: a `messages` table holds one row per confirmed Message, a thread that has been opened
+before opens on what this device already holds rather than on a request, and scrolling back reads
+the disk a page at a time and asks the API only for history the phone does not have. The reducers
+did not change — `applyNewestPage` is the one addition, and it decides the single new question,
+whether the page that confirms a Restored thread continues it or begins after a gap in it. Unsent
+Messages are deliberately not persisted; the Outbox and Eviction are their own tickets. A thread
+with nothing to draw now says why — including that it could not be reached — instead of showing an
+empty list. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 ## Interactions
 

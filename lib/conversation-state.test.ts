@@ -1,6 +1,7 @@
 import {
   applyIncomingMessage,
   applyMessagePage,
+  applyNewestPage,
   applySentMessage,
   beginSend,
   beginUpload,
@@ -18,6 +19,7 @@ import {
   messageSenderName,
   deliveryStates,
   sortConversations,
+  threadContinues,
   threadMessages,
   totalUnread,
   visibleMessages,
@@ -1588,5 +1590,157 @@ describe('the two waits a send with a file goes through', () => {
 
     expect(findUnsent(failed, 'local-1')?.message.body).toBe('Hello')
     expect(deliveryStates(failed.unsent).get('local-1')).toBe('failed')
+  })
+})
+
+describe('threadContinues', () => {
+  const held = [
+    customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
+    customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
+  ]
+
+  it('is true when the two runs have a message in common', () => {
+    expect(
+      threadContinues(held, [
+        customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
+        customerMessage('msg-3', '2026-08-13T08:02:00.000Z'),
+      ]),
+    ).toBe(true)
+  })
+
+  it('is false when nothing is in common, however close the timestamps', () => {
+    expect(
+      threadContinues(held, [customerMessage('msg-3', '2026-08-13T08:01:00.001Z')]),
+    ).toBe(false)
+  })
+
+  /**
+   * A page holding only messages this viewer may not see is still evidence that
+   * the two runs meet, which is why the raw page is what this is asked about.
+   */
+  it('is true on a shared id whether or not the message would be shown', () => {
+    const notice = customerMessage('msg-2', '2026-08-13T08:01:00.000Z', {
+      messageType: 'system',
+    })
+
+    expect(threadContinues(held, [notice])).toBe(true)
+  })
+
+  it('is false for a thread holding nothing, which has nothing to continue', () => {
+    expect(threadContinues([], held)).toBe(false)
+  })
+
+  it('is false for a page holding nothing', () => {
+    expect(threadContinues(held, [])).toBe(false)
+  })
+})
+
+describe('applyNewestPage', () => {
+  const viewer = { role: 'customer', conversationType: 'support_dm' } as const
+
+  function restored(): ThreadState {
+    return {
+      ...emptyThread(),
+      messages: [
+        customerMessage('msg-8', '2026-08-13T08:08:00.000Z'),
+        customerMessage('msg-9', '2026-08-13T08:09:00.000Z'),
+      ],
+      hasMore: true,
+      cursor: 'msg-8',
+    }
+  }
+
+  it('begins a thread that is holding nothing, cursor and all', () => {
+    const page = [
+      customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
+    ]
+
+    expect(applyNewestPage(emptyThread(), page, viewer)).toEqual({
+      messages: page,
+      unsent: [],
+      hasMore: true,
+      cursor: 'msg-1',
+    })
+  })
+
+  /**
+   * The point of the whole arrangement: a thread Restored from this device has
+   * already been read back through, and the page that confirms it must not send
+   * the next scroll back over history the phone is holding.
+   */
+  it('leaves the frontier where it was when the page continues what is held', () => {
+    const page = [
+      customerMessage('msg-9', '2026-08-13T08:09:00.000Z'),
+      customerMessage('msg-10', '2026-08-13T08:10:00.000Z'),
+    ]
+
+    const next = applyNewestPage(restored(), page, viewer)
+
+    expect(next.cursor).toBe('msg-8')
+    expect(next.hasMore).toBe(true)
+    expect(next.messages.map((each) => each.id)).toEqual(['msg-8', 'msg-9', 'msg-10'])
+  })
+
+  it('takes the newer copy of a message it already held', () => {
+    const read = customerMessage('msg-9', '2026-08-13T08:09:00.000Z', {
+      receiptStatus: 'read',
+    })
+
+    const next = applyNewestPage(restored(), [read], viewer)
+
+    expect(next.messages.map((each) => each.receiptStatus)).toEqual(['sent', 'read'])
+  })
+
+  /**
+   * Enough was said while the phone was away that a whole page of it is new.
+   * What was held is a fragment of a thread this page no longer continues, and
+   * keeping it would draw one run of history straight into another with
+   * unfetched messages between them and no way to ask for them.
+   */
+  it('starts the thread over when the page does not continue what is held', () => {
+    const page = [
+      customerMessage('msg-90', '2026-08-14T08:00:00.000Z'),
+      customerMessage('msg-91', '2026-08-14T08:01:00.000Z'),
+    ]
+
+    expect(applyNewestPage(restored(), page, viewer)).toEqual({
+      messages: page,
+      unsent: [],
+      hasMore: true,
+      cursor: 'msg-90',
+    })
+  })
+
+  it('keeps a message still on its way when it starts the thread over', () => {
+    const sending = beginSend(restored(), customerMessage('local-1', '2026-08-13T08:11:00.000Z'))
+
+    const next = applyNewestPage(
+      sending,
+      [customerMessage('msg-90', '2026-08-14T08:00:00.000Z')],
+      viewer,
+    )
+
+    expect(next.unsent).toHaveLength(1)
+  })
+
+  it('empties a thread whose newest page has nothing in it', () => {
+    expect(applyNewestPage(restored(), [], viewer)).toEqual({
+      messages: [],
+      unsent: [],
+      hasMore: false,
+      cursor: undefined,
+    })
+  })
+
+  it('withholds a system notice from a Customer on the way in', () => {
+    const page = [
+      customerMessage('msg-9', '2026-08-13T08:09:00.000Z'),
+      customerMessage('msg-10', '2026-08-13T08:10:00.000Z', { messageType: 'system' }),
+    ]
+
+    const next = applyNewestPage(restored(), page, viewer)
+
+    expect(next.messages.map((each) => each.id)).toEqual(['msg-8', 'msg-9'])
   })
 })

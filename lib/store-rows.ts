@@ -1,6 +1,6 @@
-import { parseConversation } from '@/lib/conversation-parse'
-import { sortConversations } from '@/lib/conversation-state'
-import type { Conversation } from '@/lib/types'
+import { parseConversation, parseMessage } from '@/lib/conversation-parse'
+import { mergeMessages, sortConversations } from '@/lib/conversation-state'
+import type { Conversation, Message } from '@/lib/types'
 
 /**
  * The Store as rows, and rows back as a Store.
@@ -23,7 +23,7 @@ import type { Conversation } from '@/lib/types'
  * rather than migrating it, so a change here costs one cold start's worth of
  * Stale data and never a migration that can go wrong.
  */
-export const STORE_SCHEMA_VERSION = 1
+export const STORE_SCHEMA_VERSION = 2
 
 /**
  * How far back a thread has been read, as the Store holds it.
@@ -45,6 +45,24 @@ export type ConversationRow = {
   /** SQLite has no boolean; 1 unless a page has said otherwise. */
   has_more: number
   cursor: string | null
+}
+
+/**
+ * One row of the `messages` table.
+ *
+ * `created_at` is the ISO timestamp as a number rather than as the string the
+ * payload already carries, because it is the column a page reads back through:
+ * ordering and comparing epoch milliseconds is what SQLite is good at, and
+ * comparing ISO strings would rest on every timestamp the API has ever sent
+ * sharing one format.
+ */
+export type MessageRow = {
+  id: string
+  conversation_id: string
+  owner_id: string
+  created_at: number
+  /** The Message as the API sent it, serialised. Read back through `parseMessage`. */
+  payload: string
 }
 
 /** One row of the `organizations` table. */
@@ -160,6 +178,77 @@ function readPaging(row: unknown): ThreadPaging {
     hasMore: record?.has_more !== 0,
     cursor: typeof record?.cursor === 'string' ? record.cursor : undefined,
   }
+}
+
+/**
+ * Where a Message sits in its thread, as the column that orders it.
+ *
+ * A timestamp this build cannot read sorts to the beginning rather than to
+ * `NaN`, which SQLite would store as null and then order unpredictably. A
+ * Message with an unreadable date is already broken; what matters is that it
+ * cannot make the page around it unreadable too.
+ */
+export function messageOrder(createdAt: string): number {
+  const at = Date.parse(createdAt)
+  return Number.isFinite(at) ? at : 0
+}
+
+/**
+ * A thread's confirmed Messages as rows.
+ *
+ * Confirmed only. What is still on its way to the API — the Outbox — is
+ * deliberately not here: an unsent Message is this device's word about something
+ * the server may never have heard, and writing it beside history that the server
+ * did confirm would make the two indistinguishable on the way back in. It is its
+ * own table and its own ticket.
+ *
+ * Owned by a person and keyed by conversation, the way the conversation rows
+ * are, and for the same reason: the next person to sign in on this phone reads
+ * back nothing rather than somebody else's thread.
+ */
+export function toMessageRows(
+  ownerId: string,
+  conversationId: string,
+  messages: readonly Message[],
+): MessageRow[] {
+  return messages.map((message) => ({
+    id: message.id,
+    conversation_id: conversationId,
+    owner_id: ownerId,
+    created_at: messageOrder(message.createdAt),
+    payload: JSON.stringify(message),
+  }))
+}
+
+/**
+ * Rows back into a page of Messages, oldest first.
+ *
+ * Sorted through `mergeMessages` rather than by the column they were read in,
+ * so a page off this device and a page off the API are ordered by the same
+ * function and cannot drift apart — which matters here more than it does for a
+ * list, because the two are merged into one thread.
+ *
+ * An unreadable row is dropped rather than thrown over, the same rule
+ * `parseMessages` follows for a page from the API. One row this build cannot
+ * read is not grounds for telling somebody their thread is empty.
+ */
+export function fromMessageRows(rows: readonly unknown[]): Message[] {
+  const messages: Message[] = []
+
+  for (const row of rows) {
+    const payload = (row as Partial<MessageRow> | null)?.payload
+    if (typeof payload !== 'string') continue
+
+    try {
+      const message = parseMessage(JSON.parse(payload))
+      if (message) messages.push(message)
+    } catch {
+      // Not JSON at all: a truncated write, or a row from a schema this build
+      // has no idea about. Either way there is nothing here to draw.
+    }
+  }
+
+  return mergeMessages([], messages)
 }
 
 /**

@@ -1,5 +1,5 @@
-import { STORE_SCHEMA_VERSION } from '@/lib/store-rows'
-import type { Conversation } from '@/lib/types'
+import { messageOrder, STORE_SCHEMA_VERSION } from '@/lib/store-rows'
+import type { Conversation, CustomerMessage, Message } from '@/lib/types'
 
 /**
  * The database as a device would hold it: a file per name, a schema version
@@ -21,10 +21,19 @@ type MockRow = {
 
 type MockOrganizationRow = { id: string; owner_id: string; name: string }
 
+type MockMessageRow = {
+  id: string
+  conversation_id: string
+  owner_id: string
+  created_at: number
+  payload: string
+}
+
 type MockFile = {
   userVersion: number
   rows: MockRow[]
   organizations: MockOrganizationRow[]
+  messages: MockMessageRow[]
 }
 
 const mockFiles = new Map<string, MockFile>()
@@ -53,13 +62,22 @@ jest.mock('expo-sqlite', () => {
       mockStatements.push(source)
       if (source.includes('CREATE TABLE conversations')) this.file.rows = []
       if (source.includes('CREATE TABLE organizations')) this.file.organizations = []
+      if (source.includes('CREATE TABLE messages')) this.file.messages = []
       const stamped = /PRAGMA user_version = (\d+)/.exec(source)
       if (stamped) this.file.userVersion = Number(stamped[1])
     }
 
-    getFirstSync(source: string) {
+    getFirstSync(source: string, ...params: unknown[]) {
       if (source.trim() === 'PRAGMA user_version') {
         return { user_version: this.file.userVersion }
+      }
+      if (mockFails.read) throw new Error('database disk image is malformed')
+      mockStatements.push(source)
+      if (source.startsWith('SELECT has_more, cursor FROM conversations')) {
+        const row = this.file.rows.find(
+          (each) => each.owner_id === params[0] && each.id === params[1],
+        )
+        return row ? { has_more: row.has_more, cursor: row.cursor } : null
       }
       return null
     }
@@ -67,8 +85,30 @@ jest.mock('expo-sqlite', () => {
     getAllSync(source: string, ...params: unknown[]) {
       if (mockFails.read) throw new Error('database disk image is malformed')
       mockStatements.push(source)
+      if (source.includes('FROM messages')) return this.messagePage(source, params)
       const table = source.includes('FROM organizations') ? this.file.organizations : this.file.rows
       return table.filter((row) => row.owner_id === params[0])
+    }
+
+    /**
+     * The two reads a thread makes, in the order and with the bound the real
+     * index gives them: newest first, so `LIMIT` takes the page nearest the one
+     * on screen, and — when a Message is named — strictly before it.
+     */
+    private messagePage(source: string, params: unknown[]) {
+      const [ownerId, conversationId] = params as [string, string]
+      const held = this.file.messages
+        .filter((row) => row.owner_id === ownerId && row.conversation_id === conversationId)
+        .sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id))
+
+      if (!source.includes('created_at <')) {
+        return held.slice(0, params[2] as number)
+      }
+
+      const [, , at, , id, limit] = params as [string, string, number, number, string, number]
+      return held
+        .filter((row) => row.created_at < at || (row.created_at === at && row.id < id))
+        .slice(0, limit)
     }
 
     async runAsync(source: string, ...params: unknown[]) {
@@ -97,6 +137,45 @@ jest.mock('expo-sqlite', () => {
         const [id, owner_id, name] = params as [string, string, string]
         this.file.organizations.push({ id, owner_id, name })
       }
+
+      if (source.startsWith('DELETE FROM messages') && source.includes('NOT IN')) {
+        const [owner_id] = params as [string]
+        const kept = new Set(
+          this.file.rows.filter((row) => row.owner_id === owner_id).map((row) => row.id),
+        )
+        this.file.messages = this.file.messages.filter(
+          (row) => row.owner_id !== owner_id || kept.has(row.conversation_id),
+        )
+      } else if (source.startsWith('DELETE FROM messages')) {
+        const [owner_id, conversation_id] = params as [string, string]
+        this.file.messages = this.file.messages.filter(
+          (row) => row.owner_id !== owner_id || row.conversation_id !== conversation_id,
+        )
+      }
+      if (source.startsWith('INSERT OR REPLACE INTO messages')) {
+        const [id, conversation_id, owner_id, created_at, payload] = params as [
+          string,
+          string,
+          string,
+          number,
+          string,
+        ]
+        this.file.messages = this.file.messages.filter(
+          (row) =>
+            row.owner_id !== owner_id ||
+            row.conversation_id !== conversation_id ||
+            row.id !== id,
+        )
+        this.file.messages.push({ id, conversation_id, owner_id, created_at, payload })
+      }
+      if (source.startsWith('UPDATE conversations SET has_more')) {
+        const [has_more, cursor, owner_id, id] = params as [number, string | null, string, string]
+        const row = this.file.rows.find((each) => each.owner_id === owner_id && each.id === id)
+        if (row) {
+          row.has_more = has_more
+          row.cursor = cursor
+        }
+      }
       return { lastInsertRowId: 0, changes: 1 }
     }
 
@@ -104,13 +183,15 @@ jest.mock('expo-sqlite', () => {
     // is the one outcome a replace-everything write must never leave behind.
     async withTransactionAsync(task: () => Promise<void>) {
       mockCounts.transactions += 1
-      const conversations = [...this.file.rows]
+      const conversations = this.file.rows.map((row) => ({ ...row }))
       const organizations = [...this.file.organizations]
+      const messages = [...this.file.messages]
       try {
         await task()
       } catch (error) {
         this.file.rows = conversations
         this.file.organizations = organizations
+        this.file.messages = messages
         throw error
       }
     }
@@ -120,7 +201,7 @@ jest.mock('expo-sqlite', () => {
     openDatabaseSync(name: string) {
       if (mockFails.open) throw new Error('unable to open database file')
       if (!mockFiles.has(name)) {
-        mockFiles.set(name, { userVersion: 0, rows: [], organizations: [] })
+        mockFiles.set(name, { userVersion: 0, rows: [], organizations: [], messages: [] })
       }
       return new MockDatabase(name)
     },
@@ -166,8 +247,9 @@ function seed(
   userVersion: number,
   rows: MockRow[] = [],
   organizations: MockOrganizationRow[] = [],
+  messages: MockMessageRow[] = [],
 ) {
-  mockFiles.set(DATABASE_NAME, { userVersion, rows, organizations })
+  mockFiles.set(DATABASE_NAME, { userVersion, rows, organizations, messages })
 }
 
 const NO_NAMES: ReadonlyMap<string, string> = new Map()
@@ -527,5 +609,396 @@ describe('wipeStore', () => {
     await save(store, 'viewer-1', [conversation('conv-1')])
 
     expect(store.restoreStore('viewer-1').conversations).toHaveLength(1)
+  })
+})
+
+const THREAD_BEGAN = Date.parse('2026-08-13T08:00:00.000Z')
+
+function message(id: string, minute: number, overrides: Partial<CustomerMessage> = {}): Message {
+  const at = new Date(THREAD_BEGAN + minute * 60_000).toISOString()
+  return {
+    id,
+    body: id,
+    messageType: 'text',
+    createdAt: at,
+    replyTo: null,
+    reactions: [],
+    attachments: [],
+    receiptStatus: 'sent',
+    fromCompany: true,
+    ...overrides,
+  }
+}
+
+/** A run of Messages, oldest first, the way a thread holds them. */
+function thread(count: number, from = 1): Message[] {
+  return Array.from({ length: count }, (_, index) => message(`msg-${from + index}`, from + index))
+}
+
+function ids(messages: readonly Message[]): string[] {
+  return messages.map((each) => each.id)
+}
+
+function statementsFor(fragment: string): number {
+  return mockStatements.filter((source) => source.includes(fragment)).length
+}
+
+describe('restoreThread', () => {
+  it('has nothing for a thread this device has never held', async () => {
+    const store = loadStore()
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
+  })
+
+  it('gives back the Messages that were written', async () => {
+    const store = loadStore()
+    const written = thread(3)
+
+    await store.saveMessages('viewer-1', 'conv-1', written)
+
+    expect(ids(store.restoreThread('viewer-1', 'conv-1', 50)?.messages ?? [])).toEqual(ids(written))
+  })
+
+  /**
+   * A page, not a thread. What is below it stays on the disk and is read by
+   * `restoreOlderMessages` when somebody scrolls into it — which is what keeps
+   * opening a thread that has been read for an hour as cheap as opening one
+   * that has not.
+   */
+  it('reads back the newest page and no more', async () => {
+    const store = loadStore()
+
+    await store.saveMessages('viewer-1', 'conv-1', thread(10))
+
+    expect(ids(store.restoreThread('viewer-1', 'conv-1', 3)?.messages ?? [])).toEqual([
+      'msg-8',
+      'msg-9',
+      'msg-10',
+    ])
+  })
+
+  it('holds one viewer thread apart from another', async () => {
+    const store = loadStore()
+
+    await store.saveMessages('viewer-1', 'conv-1', thread(2))
+
+    expect(store.restoreThread('viewer-2', 'conv-1', 50)).toBeNull()
+  })
+
+  it('holds one thread apart from another', async () => {
+    const store = loadStore()
+
+    await store.saveMessages('viewer-1', 'conv-1', thread(2))
+
+    expect(store.restoreThread('viewer-1', 'conv-2', 50)).toBeNull()
+  })
+
+  it('gives back the frontier the thread recorded', async () => {
+    const store = loadStore()
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+    await store.saveMessages('viewer-1', 'conv-1', thread(2))
+    await store.saveThreadPaging('viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)?.paging).toEqual({
+      hasMore: false,
+      cursor: 'msg-1',
+    })
+  })
+
+  /**
+   * Every row written before there was a frontier to write. Falling back to
+   * nothing would mean "ask from the top", which on a thread this device is
+   * already holding history for would fetch back down through every page it has.
+   */
+  it('falls back to the oldest Message held when the row has no cursor', async () => {
+    const store = loadStore()
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)?.paging).toEqual({
+      hasMore: true,
+      cursor: 'msg-1',
+    })
+  })
+
+  it('has nothing when the database cannot be read, and discards it', async () => {
+    const store = loadStore()
+    await store.saveMessages('viewer-1', 'conv-1', thread(2))
+    mockFails.read = true
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
+    expect(mockDeleted).toContain(DATABASE_NAME)
+  })
+})
+
+describe('restoreOlderMessages', () => {
+  it('gives back the page before the Message it is asked about', async () => {
+    const store = loadStore()
+    const written = thread(10)
+    await store.saveMessages('viewer-1', 'conv-1', written)
+
+    const older = store.restoreOlderMessages('viewer-1', 'conv-1', written[7], 3)
+
+    expect(ids(older)).toEqual(['msg-5', 'msg-6', 'msg-7'])
+  })
+
+  it('gives back nothing at the bottom of what this device holds', async () => {
+    const store = loadStore()
+    const written = thread(3)
+    await store.saveMessages('viewer-1', 'conv-1', written)
+
+    expect(store.restoreOlderMessages('viewer-1', 'conv-1', written[0], 50)).toEqual([])
+  })
+
+  it('gives back nothing for a thread this device has never held', async () => {
+    const store = loadStore()
+
+    expect(store.restoreOlderMessages('viewer-1', 'conv-1', message('msg-9', 9), 50)).toEqual([])
+  })
+})
+
+describe('saveMessages', () => {
+  it('adds to a thread rather than replacing it', async () => {
+    const store = loadStore()
+
+    await store.saveMessages('viewer-1', 'conv-1', thread(2))
+    await store.saveMessages('viewer-1', 'conv-1', thread(2, 3))
+
+    expect(ids(store.restoreThread('viewer-1', 'conv-1', 50)?.messages ?? [])).toEqual([
+      'msg-1',
+      'msg-2',
+      'msg-3',
+      'msg-4',
+    ])
+  })
+
+  /**
+   * A Message that has been confirmed does not leave the thread it is in; what
+   * changes is its receipts. So the row is replaced by id rather than joined by
+   * a second copy of the same Message.
+   */
+  it('replaces a Message whose receipt has moved', async () => {
+    const store = loadStore()
+
+    await store.saveMessages('viewer-1', 'conv-1', [message('msg-1', 1)])
+    await store.saveMessages('viewer-1', 'conv-1', [
+      message('msg-1', 1, { receiptStatus: 'read' }),
+    ])
+
+    const held = store.restoreThread('viewer-1', 'conv-1', 50)?.messages ?? []
+    expect(held).toHaveLength(1)
+    expect(held[0].receiptStatus).toBe('read')
+  })
+
+  /**
+   * The one case where the Messages are not more of the thread but a different
+   * run of it. What was dropped from the screen has to leave the disk with it,
+   * or the next scroll back would read straight into a fragment of a thread
+   * with unfetched history between them.
+   */
+  it('drops what it replaces', async () => {
+    const store = loadStore()
+
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+    await store.saveMessages('viewer-1', 'conv-1', thread(2, 90), 'replace')
+
+    expect(ids(store.restoreThread('viewer-1', 'conv-1', 50)?.messages ?? [])).toEqual([
+      'msg-90',
+      'msg-91',
+    ])
+  })
+
+  it('leaves another thread alone when it replaces one', async () => {
+    const store = loadStore()
+
+    await store.saveMessages('viewer-1', 'conv-2', thread(2))
+    await store.saveMessages('viewer-1', 'conv-1', thread(1, 90), 'replace')
+
+    expect(store.restoreThread('viewer-1', 'conv-2', 50)?.messages).toHaveLength(2)
+  })
+
+  it('writes only what is not already the row on disk', async () => {
+    const store = loadStore()
+    const written = thread(3)
+    await store.saveMessages('viewer-1', 'conv-1', written)
+    mockStatements.length = 0
+
+    await store.saveMessages('viewer-1', 'conv-1', [...written, message('msg-4', 4)])
+
+    expect(statementsFor('INSERT OR REPLACE INTO messages')).toBe(1)
+  })
+
+  /**
+   * A thread that has just been Restored reaches its first state change holding
+   * exactly the rows it read. A transaction that writes them back over
+   * themselves is the one cost this whole arrangement exists to avoid.
+   */
+  it('writes nothing at all when a Restored thread has not changed', async () => {
+    const store = loadStore()
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+
+    const restored = store.restoreThread('viewer-1', 'conv-1', 50)
+    mockCounts.transactions = 0
+    await store.saveMessages('viewer-1', 'conv-1', restored?.messages ?? [])
+
+    expect(mockCounts.transactions).toBe(0)
+  })
+
+  /**
+   * A burst costs the transaction already under way plus one for the state that
+   * is finally true, rather than one per arriving Message.
+   */
+  it('coalesces a burst to the thread that is true when it gets there', async () => {
+    const store = loadStore()
+
+    void store.saveMessages('viewer-1', 'conv-1', thread(1))
+    void store.saveMessages('viewer-1', 'conv-1', thread(2))
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+
+    expect(mockCounts.transactions).toBe(2)
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)?.messages).toHaveLength(3)
+  })
+
+  /**
+   * A drop that has been decided cannot be undecided by the next state to land
+   * on top of it before the queue is drained.
+   */
+  it('keeps a replace that another state coalesced into', async () => {
+    const store = loadStore()
+
+    void store.saveMessages('viewer-1', 'conv-1', thread(3))
+    void store.saveMessages('viewer-1', 'conv-1', thread(1, 90), 'replace')
+    await store.saveMessages('viewer-1', 'conv-1', thread(2, 90))
+
+    expect(ids(store.restoreThread('viewer-1', 'conv-1', 50)?.messages ?? [])).toEqual([
+      'msg-90',
+      'msg-91',
+    ])
+  })
+
+  it('says nothing when the write fails', async () => {
+    const store = loadStore()
+    mockFails.write = true
+
+    await expect(store.saveMessages('viewer-1', 'conv-1', thread(2))).resolves.toBeUndefined()
+
+    mockFails.write = false
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
+  })
+
+  it('writes again after a write that failed', async () => {
+    const store = loadStore()
+    mockFails.write = true
+    await store.saveMessages('viewer-1', 'conv-1', thread(2))
+
+    mockFails.write = false
+    await store.saveMessages('viewer-1', 'conv-1', thread(2))
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)?.messages).toHaveLength(2)
+  })
+})
+
+describe('saveThreadPaging', () => {
+  /**
+   * The list is replaced whole whenever anything anywhere changes, and a
+   * frontier recorded by a thread has to survive that — otherwise every message
+   * that arrived in any conversation would send this one back to the top.
+   */
+  it('survives the list being written over it', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', [conversation('conv-1')])
+    await store.saveThreadPaging('viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
+
+    await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
+
+    expect(store.restoreStore('viewer-1').paging.get('conv-1')).toEqual({
+      hasMore: false,
+      cursor: 'msg-1',
+    })
+  })
+
+  it('survives a restart, and is written back by the next list write', async () => {
+    const first = loadStore()
+    await save(first, 'viewer-1', [conversation('conv-1')])
+    await first.saveThreadPaging('viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
+
+    const second = loadStore()
+    second.restoreStore('viewer-1')
+    await save(second, 'viewer-1', [conversation('conv-1')])
+
+    expect(second.restoreStore('viewer-1').paging.get('conv-1')).toEqual({
+      hasMore: false,
+      cursor: 'msg-1',
+    })
+  })
+
+  it('writes nothing when the frontier has not moved', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', [conversation('conv-1')])
+    await store.saveThreadPaging('viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
+    mockCounts.transactions = 0
+
+    await store.saveThreadPaging('viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
+
+    expect(mockCounts.transactions).toBe(0)
+  })
+})
+
+describe('a conversation that has left the list', () => {
+  /**
+   * The list is the unit. A thread nothing on screen can reach must not leave
+   * its Messages behind on the disk for anything looking at the data directory
+   * of this app to find.
+   */
+  it('takes its Messages with it', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
+    await store.saveMessages('viewer-1', 'conv-2', thread(3))
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(store.restoreThread('viewer-1', 'conv-2', 50)).toBeNull()
+  })
+
+  it('leaves the threads that are still in it alone', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)?.messages).toHaveLength(3)
+  })
+
+  it('leaves the threads of another person alone', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-2', [conversation('conv-9')])
+    await store.saveMessages('viewer-2', 'conv-9', thread(2))
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(store.restoreThread('viewer-2', 'conv-9', 50)?.messages).toHaveLength(2)
+  })
+})
+
+describe('wipeStore, with Messages on the disk', () => {
+  it('leaves none of them behind', async () => {
+    const store = loadStore()
+    await store.saveMessages('viewer-1', 'conv-1', thread(3))
+
+    await store.wipeStore()
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
+  })
+
+  it('does not let a write already on its way put them back', async () => {
+    const store = loadStore()
+
+    void store.saveMessages('viewer-1', 'conv-1', thread(3))
+    await store.wipeStore()
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
   })
 })

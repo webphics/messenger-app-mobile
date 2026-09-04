@@ -207,6 +207,73 @@ export function applyMessagePage(
 }
 
 /**
+ * The newest page of a thread, applied to whatever is already on screen.
+ *
+ * A thread that has just been Restored from this device is already holding
+ * Messages, and already knows how far back it has read — so the page that
+ * confirms it is not the page the thread begins from. What this decides is
+ * whether the two are the same run of history.
+ *
+ * They are, if they touch. A page of the newest fifty Messages fetched against a
+ * thread this phone was reading a moment ago overlaps it: the Messages in common
+ * merge by id, and the frontier stays where it was, because re-reading the
+ * newest page has asked the API nothing about how far back the thread goes.
+ * Moving `cursor` forward to this page's oldest Message would make the next
+ * scroll back re-read history the device is already holding.
+ *
+ * They are not, if nothing is in common. Enough was said while this phone was
+ * away that a whole page of it is new, and there is history between what is held
+ * and what has arrived that nobody has fetched. The Messages held are a fragment
+ * of a thread this page no longer continues, so they go — the alternative is a
+ * thread that reads straight from today into last month with a hole in between
+ * and no way to ask for it. That is `withoutPages`, which is what every fetch of
+ * the newest page did before there was anything to Restore.
+ */
+export function applyNewestPage(
+  state: ThreadState,
+  page: Message[],
+  viewer: ThreadViewer,
+): ThreadState {
+  if (!threadContinues(state.messages, page)) {
+    return applyMessagePage(withoutPages(state), page, viewer)
+  }
+
+  return {
+    ...state,
+    messages: mergeMessages(
+      state.messages,
+      visibleMessages(viewer.role, viewer.conversationType, page),
+    ),
+  }
+}
+
+/**
+ * Whether a newer run of Messages and the ones already held are one run of
+ * history, or whether something nobody has fetched fell between them.
+ *
+ * By id, rather than by comparing the two ends: an id shared between them is the
+ * proof that nothing fell between, and there is no arithmetic in it to be wrong
+ * about. A thread holding nothing continues anything — there is no history there
+ * to disconnect from.
+ *
+ * A page carrying only Messages this viewer may not see is a page with nothing
+ * in common with anything, which is why the raw page is compared rather than the
+ * filtered one: the ids are the evidence, and a System notice a Customer will
+ * never be shown is still evidence that the two pages meet.
+ *
+ * A thread holding nothing does not continue, and neither does a page holding
+ * nothing. Both send the page down the rebuild path deliberately: the first
+ * because a thread beginning from this page has to take its `cursor` from it,
+ * and the second because a newest page with nothing in it is a thread with
+ * nothing left in it.
+ */
+export function threadContinues(held: readonly Message[], page: readonly Message[]): boolean {
+  if (held.length === 0 || page.length === 0) return false
+  const ids = new Set(held.map((message) => message.id))
+  return page.some((message) => ids.has(message.id))
+}
+
+/**
  * A message that arrived over the socket, folded into the open thread.
  *
  * The same visibility rule and the same merge a fetched page goes through, for
