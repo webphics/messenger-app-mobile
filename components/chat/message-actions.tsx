@@ -25,7 +25,8 @@ type MessageActionsProps = {
   anchor: ReactionAnchor;
   onDismiss: () => void;
   onReact: (emoji: string) => void;
-  onReply: () => void;
+  /** Absent where the thread has no composer to open a reply in. */
+  onReply?: () => void;
 };
 
 export function MessageActions({
@@ -90,6 +91,9 @@ export function MessageActions({
         ))}
       </Animated.View>
 
+      {/* Absent where the thread is read-only: a Reply with no composer to open
+          would be a control that does nothing. */}
+      {onReply ? (
       <Animated.View
         pointerEvents="auto"
         style={[
@@ -117,6 +121,7 @@ export function MessageActions({
           </Text>
         </TactilePressable>
       </Animated.View>
+      ) : null}
     </View>
   );
 }

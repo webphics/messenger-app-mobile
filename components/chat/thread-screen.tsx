@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, BackHandler, Dimensions, FlatList, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
 import { MessageActions } from '@/components/chat/message-actions'
@@ -8,6 +9,7 @@ import { ThreadHeader } from '@/components/chat/thread-header'
 import { InScreenHeader } from '@/components/in-screen-header'
 import { Text } from '@/components/ui/text'
 import { primaryAttachmentView, toMessageAttachment } from '@/lib/attachment-view'
+import { composerAccess } from '@/lib/composer-access'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
   draftMessage,
@@ -86,6 +88,28 @@ const NEAR_LATEST_PX = 80
  * the API withholds these from a Customer, and `visibleMessages` drops them
  * again on the way in.
  */
+/**
+ * Why there is no composer, where there is none.
+ *
+ * Sits where the composer would, because that is where someone looks to write —
+ * an absent control with the explanation elsewhere reads as a thread that failed
+ * to load rather than as one this person may only read.
+ */
+function ReadOnlyNotice({ reason }: { reason: string }) {
+  const insets = useSafeAreaInsets()
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      className="border-t border-line/60 bg-surface px-4 pt-3"
+      style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+    >
+      <Text variant="meta" className="text-center text-muted">
+        {reason}
+      </Text>
+    </View>
+  )
+}
+
 function SystemNotice({ body }: { body: string }) {
   return (
     <View className="my-2 items-center px-6">
@@ -132,6 +156,16 @@ export function ThreadScreen({
    */
   const [local, setLocal] = useState<Message[]>([])
   const messages = useMemo(() => mergeMessages(fetched, local), [fetched, local])
+
+  /**
+   * Whether this person may write here.
+   *
+   * Reading and writing are different permissions on the staff side — one Agent
+   * holds a Support DM and the rest read it — so the composer is not a given.
+   * See `lib/composer-access.ts`, which mirrors the rule the API enforces.
+   */
+  const access = composerAccess(conversation, viewer)
+  const readOnly = access.kind === 'read-only'
 
   const isGroup =
     conversation.type === 'group' || conversation.type === 'community_announcement'
@@ -379,20 +413,24 @@ export function ThreadScreen({
             : undefined
         }
       />
-      <Composer
-        value={draft}
-        onChangeText={setDraft}
-        onSend={send}
-        replyTo={replyQuote}
-        onCancelReply={() => setReplyTo(null)}
-        keyboardInset={keyboardInset}
-      />
+      {access.kind === 'read-only' ? (
+        <ReadOnlyNotice reason={access.reason} />
+      ) : (
+        <Composer
+          value={draft}
+          onChangeText={setDraft}
+          onSend={send}
+          replyTo={replyQuote}
+          onCancelReply={() => setReplyTo(null)}
+          keyboardInset={keyboardInset}
+        />
+      )}
       {menu ? (
         <MessageActions
           anchor={menu}
           onDismiss={dismissMenu}
           onReact={(emoji) => handleToggleReaction(menu.messageId, emoji)}
-          onReply={() => handleReply(menu.messageId)}
+          onReply={readOnly ? undefined : () => handleReply(menu.messageId)}
         />
       ) : null}
     </View>
