@@ -18,6 +18,7 @@ import {
   type ApiFailure,
   type ApiResult,
 } from '@/lib/conversation-api'
+import { restoreStore, saveStore } from '@/lib/conversation-store'
 import {
   mergeConversation,
   sortConversations,
@@ -83,6 +84,33 @@ const NOBODY: ReadonlyMap<string, string> = new Map()
 
 /** Nobody to fetch for: an empty inbox rather than a pending one, so a screen reading this while signed out is not left on a spinner. */
 const IDLE: ConversationInbox = { status: 'ready', conversations: [], organizationNames: NOBODY }
+
+/**
+ * What this device already knows about this person, before anything is fetched.
+ *
+ * A cold start Restores the list rather than beginning on a spinner, so the
+ * first screen after the Launch animation is the last thing this phone knew —
+ * the same rows, the same Unread counts, the same order — and the fetch running
+ * underneath it confirms that rather than being the only thing that can draw
+ * anything. With no network the confirmation never comes and the rows stay,
+ * which is the whole point of them being on disk.
+ *
+ * A device with nothing to Restore — a first sign-in, a database this build does
+ * not recognise, a database that will not open — loads exactly as it did before.
+ * The three are deliberately indistinguishable here: Restore has no failure a
+ * person sees.
+ *
+ * Organization names come back with it, because they are what titles a
+ * Customer's Support DM: they arrive from a different endpoint but they change
+ * with the same load, and a list Restored without them would draw every support
+ * thread as `Support` and then rename it once that endpoint answered.
+ */
+function restored(viewerId: string): ConversationInbox {
+  const { conversations, organizationNames } = restoreStore(viewerId)
+  return conversations.length > 0
+    ? { status: 'ready', conversations, organizationNames }
+    : { status: 'loading' }
+}
 
 /**
  * A freshly fetched list, with every read this client made while it was out.
@@ -159,7 +187,7 @@ function useConversationInboxState(): ConversationInboxView {
   const [describes, setDescribes] = useState<string | null>(null)
   if (describes !== viewerId) {
     setDescribes(viewerId)
-    setInbox(viewerId ? { status: 'loading' } : IDLE)
+    setInbox(viewerId ? restored(viewerId) : IDLE)
     setRefreshing(false)
   }
 
@@ -219,7 +247,26 @@ function useConversationInboxState(): ConversationInboxView {
       // A resync that failed leaves what is on screen alone. Nobody asked for
       // it, the rows are still the last thing the API said, and replacing them
       // with an error would turn a dropped connection into an empty inbox.
-      if (mode !== 'resync') setInbox({ status: 'failed', failure: list.failure })
+      //
+      // So does a first load, now that there can be Restored rows behind it. A
+      // phone with no signal must not answer a cold start by throwing away the
+      // one thing it still had to show, and the error screen is what it would be
+      // throwing them away for.
+      //
+      // A refresh is neither. Somebody pulled it, and an action a person took
+      // has to say what became of it — so this stays exactly as it was, error
+      // screen and all, even though that costs the Restored rows. Keeping them
+      // *and* saying the refresh failed needs somewhere to say it that is not
+      // the empty-list slot the notice lives in today; that is a screen change
+      // rather than a Store one.
+      const keepRows = mode === 'first'
+      if (mode !== 'resync') {
+        setInbox((current) =>
+          keepRows && current.status === 'ready' && current.conversations.length > 0
+            ? current
+            : { status: 'failed', failure: list.failure },
+        )
+      }
       setRefreshing(false)
       return
     }
@@ -238,16 +285,22 @@ function useConversationInboxState(): ConversationInboxView {
         ? mergeConversation(list.value, support.value)
         : sortConversations(list.value)
 
-    setInbox({
+    setInbox((current) => ({
       status: 'ready',
       conversations: drain(readWhileLoading.current, merged),
-      organizationNames: new Map(
-        (organizations.ok ? organizations.value : []).map((organization) => [
-          organization.id,
-          organization.name,
-        ]),
-      ),
-    })
+      // The organizations are a second request, and the list is not held
+      // hostage to it: one that failed keeps the names already held rather than
+      // replacing them with none. A Customer whose list arrived and whose
+      // organizations did not would otherwise watch every Support thread lose
+      // its title — and, now that the names are Restored, lose it on disk too.
+      organizationNames: organizations.ok
+        ? new Map(
+            organizations.value.map((organization) => [organization.id, organization.name]),
+          )
+        : current.status === 'ready'
+          ? current.organizationNames
+          : NOBODY,
+    }))
     setRefreshing(false)
   }, [role])
 
@@ -341,6 +394,28 @@ function useConversationInboxState(): ConversationInboxView {
       return conversations === current.conversations ? current : { ...current, conversations }
     })
   })
+
+  /**
+   * Every state this list reaches, written through to the Store.
+   *
+   * Observed here rather than written at each transition, deliberately. A
+   * fetched page, a socket event, a mark-as-read and a get-or-create all end up
+   * in this one piece of state, so watching it persists all four — and the
+   * fifth, added a year from now by somebody who would have had no idea there
+   * was a writer to call.
+   *
+   * Off the render path: an effect, and a call that queues rather than writes.
+   * Nothing here is awaited and nothing here can fail — see
+   * `lib/conversation-store`. Keyed on the viewer, so a sign-out writes nothing
+   * over the rows of the person who just left.
+   */
+  useEffect(() => {
+    if (!viewerId || inbox.status !== 'ready') return
+    void saveStore(viewerId, {
+      conversations: inbox.conversations,
+      organizationNames: inbox.organizationNames,
+    })
+  }, [viewerId, inbox])
 
   return useMemo(
     () => ({ ...inbox, refreshing, reload, markRead, addConversation }),

@@ -94,6 +94,22 @@ Broadcasts are in-inbox announcements (later), not stories.
      Still web-only: creating, renaming and archiving a label, and jumping from a gallery item back
      to the message that carried it.
    - 5d. Push, i18n, list virtualization.
+6. The Store — one in-memory copy of everything the screens read, written through to SQLite on the
+   device and read back at the next cold start, so a launch draws the last thing this phone knew
+   instead of a spinner and the fetch underneath it confirms rather than reveals. See
+   `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+   - 6a. **The Conversation list survives a restart (done)** — `expo-sqlite`, one `conversations`
+     table carrying each row's payload plus the per-thread paging metadata, and a schema version in
+     `PRAGMA user_version` that is discarded rather than migrated when a build does not recognise it.
+     A cold start Restores the list before anything renders — the same rows, the same Unread counts,
+     the same order, the tab badge with them — and every later state, a socket event included, is
+     written through by observing the list rather than by calling a writer at each transition. Writes
+     are queued off the render path, coalesced to the newest state and one transaction each; a write
+     that fails is swallowed, because persistence is subordinate to the app working. Split at the
+     native boundary: `lib/store-rows` is pure and table-tested, `lib/conversation-store` owns SQLite
+     alone and is mocked at `expo-sqlite`.
+   - 6b. Messages, the Outbox, Eviction, wiping the Store on Session end, the splash gate, and real
+     reactions.
 
 ## Session
 
