@@ -1,4 +1,3 @@
-import type { ReassignmentReason } from '@/lib/realtime-events'
 import type {
   Conversation,
   ConversationType,
@@ -586,11 +585,26 @@ function nextUnreadCount(
 }
 
 /**
+ * Why a conversation stopped being someone's.
+ *
+ * The API's `conversationReassignedReasons`, owned here rather than beside the
+ * socket that carries them: two of them are somebody doing something — an
+ * Admin's Takeover, an assignee's Transfer — and the third is a consequence, an
+ * assignee whose membership of the organization was revoked losing every thread
+ * they held in it. All three are facts about assignment, and the rule below is
+ * the only thing that reads them.
+ */
+export type ReassignmentReason = 'taken_over' | 'transferred' | 'membership_revoked'
+
+/**
  * A conversation that has just stopped being the viewer's.
  *
  * Named for what it carries rather than for the event that brings it, so the
- * rule below is stated in terms of assignment and not in terms of a socket.
- * `assignee` is who holds the thread now — null when nobody does.
+ * rule below is stated in terms of assignment and not in terms of a socket —
+ * which is why `lib/realtime-events` answers one of these rather than a payload
+ * shape of its own. `assignee` is who holds the thread now, null when nobody
+ * does, and named as a person rather than as a directory row because a name and
+ * an id are all a conversation row shows of one.
  */
 export type Reassignment = {
   conversationId: string

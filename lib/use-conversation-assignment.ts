@@ -1,16 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import {
-  engageConversation,
-  takeOverConversation,
-  type ApiFailure,
-} from '@/lib/conversation-api'
+import { engageConversation, takeOverConversation } from '@/lib/conversation-api'
 import { assignmentRefusal } from '@/lib/conversation-failure'
 import type { ComposerAction } from '@/lib/composer-access'
 import type { Conversation } from '@/lib/types'
 
 /**
- * Claiming a thread, and taking one.
+ * Engaging a thread, and taking one over.
  *
  * Both are the same shape — one POST, one conversation back, one row folded into
  * the list every screen shares — so they are one hook with the action naming
@@ -94,23 +90,11 @@ export function useConversationAssignment(
           notify.current(result.value)
           return
         }
-        setError(refusalFor(action, result.failure))
+        setError(assignmentRefusal(result.failure))
       })()
     },
     [conversationId],
   )
 
   return { assign, assigning, error }
-}
-
-/**
- * What to say when the API refused.
- *
- * An expired session says nothing here: the auth layer is already on its way to
- * sign-in, and a sentence about engaging would arrive on a screen that is
- * leaving.
- */
-function refusalFor(action: ComposerAction, failure: ApiFailure): string | null {
-  if (failure.kind === 'unauthorised') return null
-  return assignmentRefusal(action.kind, failure)
 }

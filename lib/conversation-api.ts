@@ -243,7 +243,7 @@ export async function listMyOrganizations(): Promise<ApiResult<Organization[]>> 
 }
 
 /**
- * Claim an unassigned Support DM. The API's `engage` action.
+ * Engage an unassigned Support DM. The API's `engage` action.
  *
  * Answers with the conversation as it now stands — engaged, with the caller as
  * its assignee — which is what a list folds in so the composer opens without a

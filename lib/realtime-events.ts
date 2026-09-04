@@ -4,7 +4,8 @@ import {
   parseMessage,
   parseStaffDirectoryUser,
 } from '@/lib/conversation-parse'
-import type { Conversation, Message, StaffDirectoryUser } from '@/lib/types'
+import type { Reassignment, ReassignmentReason } from '@/lib/conversation-state'
+import type { Conversation, Message } from '@/lib/types'
 
 /**
  * What the API says over the socket, read into this app's types.
@@ -70,37 +71,19 @@ export function parseConversationUpdated(payload: unknown): Conversation | null 
   return record ? parseConversation(record.conversation) : null
 }
 
-/**
- * Why a conversation stopped being someone's.
- *
- * The API's `conversationReassignedReasons`. Two of them are somebody doing
- * something — an Admin's Takeover, an assignee's Transfer — and the third is a
- * consequence: an assignee whose membership of the organization was revoked
- * loses every thread they held in it, and the threads go back to the pool.
- */
-export type ReassignmentReason = 'taken_over' | 'transferred' | 'membership_revoked'
-
 const REASSIGNMENT_REASONS: readonly ReassignmentReason[] = [
   'taken_over',
   'transferred',
   'membership_revoked',
 ]
 
-export type ConversationReassigned = {
-  conversationId: string
-  reason: ReassignmentReason
-  /** Who holds it now, or nobody — a revocation returns it to the pool. */
-  currentAssignee: StaffDirectoryUser | null
-}
-
 /**
  * A conversation taken out of the recipient's hands.
  *
  * Addressed rather than broadcast: the API emits this to one user room, the
  * *previous* assignee's, and to nobody else. So the recipient is always the
- * person who has just lost the thread, which is what lets
- * `withReassignment` read it as being about them without the payload naming
- * them.
+ * person who has just lost the thread, which is what lets `withReassignment`
+ * read it as being about them without the payload naming them.
  *
  * It is not the only word a staff session gets about a Takeover — a
  * `conversation.updated` carrying the new assignee follows it to every staff
@@ -109,12 +92,15 @@ export type ConversationReassigned = {
  * revoked membership pulls the person out of the organization's rooms first, so
  * the update is emitted past them and this is all they are told.
  *
- * `engagedStaff` and `engagedStaffCount` travel on the payload too. They name
- * everyone who has ever held the thread, which the web client shows on the
- * screen it puts up in place of the lost conversation; nothing on this client
- * asks who came before, so nothing here reads them.
+ * Answers a `Reassignment` — the domain's shape, not a second one beside it —
+ * so nothing has to translate between the two on the way to the list, and part
+ * of the payload is dropped in doing so. `engagedStaff` and `engagedStaffCount`
+ * name everyone who has ever held the thread, which the web client shows on the
+ * screen it puts up in place of the lost conversation; nothing here asks who
+ * came before. The assignee's `role` goes the same way: a conversation row names
+ * an assignee and never says what they are.
  */
-export function parseConversationReassigned(payload: unknown): ConversationReassigned | null {
+export function parseConversationReassigned(payload: unknown): Reassignment | null {
   const record = asRecord(payload)
   if (!record) return null
 
@@ -124,13 +110,15 @@ export function parseConversationReassigned(payload: unknown): ConversationReass
   const reason = REASSIGNMENT_REASONS.find((value) => value === record.reason)
   if (!reason) return null
 
+  // Nobody, both when the API says null and when it says something unreadable:
+  // either way this client does not know who holds it, and the
+  // `conversation.updated` that follows a Takeover carries the row anyway.
+  const assignee = parseStaffDirectoryUser(record.currentAssignee)
+
   return {
     conversationId,
     reason,
-    // Null both when the API says null and when it says something unreadable:
-    // either way this client does not know who holds it, and the
-    // `conversation.updated` that follows a Takeover carries the row anyway.
-    currentAssignee: parseStaffDirectoryUser(record.currentAssignee),
+    assignee: assignee && { id: assignee.id, name: assignee.name },
   }
 }
 

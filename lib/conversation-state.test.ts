@@ -27,8 +27,12 @@ import {
   withReassignment,
 } from '@/lib/conversation-state'
 import { parseConversationReassigned, parseMessageCreated } from '@/lib/realtime-events'
-import type { DeliveryState, Reassignment, ThreadState } from '@/lib/conversation-state'
-import type { ReassignmentReason } from '@/lib/realtime-events'
+import type {
+  DeliveryState,
+  Reassignment,
+  ReassignmentReason,
+  ThreadState,
+} from '@/lib/conversation-state'
 import type {
   Conversation,
   CustomerMessage,
@@ -1214,11 +1218,7 @@ describe('withReassignment', () => {
     })
 
     expect(parsed).not.toBeNull()
-    const next = withReassignment([supportRow()], {
-      conversationId: parsed!.conversationId,
-      reason: parsed!.reason,
-      assignee: parsed!.currentAssignee,
-    })
+    const next = withReassignment([supportRow()], parsed!)
 
     expect(next[0]).toMatchObject({
       status: 'engaged',

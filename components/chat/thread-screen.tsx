@@ -30,6 +30,7 @@ import {
   type BubbleContent,
 } from '@/lib/message-attachment'
 import { groupReactions, toggleReaction } from '@/lib/message-react'
+import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
 import { buildThreadRows, type ThreadRow } from '@/lib/thread-rows'
 import {
@@ -140,7 +141,9 @@ function ReadOnlyNotice({
           className="mt-3"
           onPress={() => onAssign?.(offered)}
         >
-          {assigning ? <ActivityIndicator color="white" size="small" /> : null}
+          {assigning ? (
+            <ActivityIndicator color={colors.primaryForeground} size="small" />
+          ) : null}
           <Text>{offered.label}</Text>
         </Button>
       ) : null}

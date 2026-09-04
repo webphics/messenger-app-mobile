@@ -11,13 +11,13 @@ import {
 import { getSessionCookie } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { connectRealtime } from '@/lib/realtime'
+import type { Reassignment } from '@/lib/conversation-state'
 import {
   parseConversationDeleted,
   parseConversationReassigned,
   parseConversationUpdated,
   parseMessageCreated,
   REALTIME_EVENTS,
-  type ConversationReassigned,
 } from '@/lib/realtime-events'
 import type { Conversation, Message } from '@/lib/types'
 
@@ -54,7 +54,7 @@ export type RealtimeEvent =
    * to the person who lost it and to nobody else; see
    * `parseConversationReassigned`.
    */
-  | { kind: 'reassigned'; reassignment: ConversationReassigned }
+  | { kind: 'reassigned'; reassignment: Reassignment }
   /**
    * The connection came back after dropping. Whatever was emitted while it was
    * down was emitted to nobody, so what is held is unverifiable and has to be
