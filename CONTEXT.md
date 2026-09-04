@@ -202,6 +202,15 @@ _Avoid_: Stories, ads, sponsored content (as a product feature)
 The looping transparent character animation on the cold-start screen, shown while the session hydrates. Rendered from an animated WebP; the surface behind it is the app background, not part of the asset.
 _Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface this screen dismisses), loading video, chroma-keyed video
 
+**Launch gate**:
+What has to be true before the Launch animation ends: it has played its two seconds, *and* the first
+Conversation fetch has **settled**. Settled means answered **or** failed — with the Store there is
+something to draw either way, and an animation held open on a bad network is the failure the gate
+exists to prevent. Both halves count in either order. Hydration's Unreachable outcome is not part of
+it: that is a screen with a retry on it rather than a Hub to hand over. The decision is
+`lib/launch-route`; what bounds the wait when there is nothing Restored is the Request deadline.
+_Avoid_: Splash gate, minimum display (that is only the animation's own half), loading gate
+
 **Tab capsule**:
 The floating rounded nav bar at the bottom of every role. Icon-only — destination names live in the accessible name, not on screen.
 _Avoid_: Tab bar (that is the host navigator's own bar, kept invisible beneath), dock, bottom nav

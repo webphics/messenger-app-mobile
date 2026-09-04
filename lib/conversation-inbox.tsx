@@ -29,7 +29,7 @@ import {
 } from '@/lib/conversation-state'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { createCountedMessages } from '@/lib/realtime-events'
-import type { Conversation, Organization, UserRole } from '@/lib/types'
+import type { Conversation, ConversationFetch, Organization, UserRole } from '@/lib/types'
 
 /**
  * Everything a signed-in person's screens read, fetched once and held in one place.
@@ -66,6 +66,18 @@ export type ConversationInbox =
 export type ConversationInboxView = ConversationInbox & {
   /** Pull-to-refresh. Distinct from a first load, which has nothing to show yet. */
   refreshing: boolean
+  /**
+   * How the fetch behind this list is doing — what the Launch animation waits on.
+   *
+   * `outstanding` until a load settles and then whichever way it settled. It
+   * only goes back when the viewer does — nothing about *this* person is
+   * un-answered once it has been answered. Distinct from `status`, which a
+   * Restored list makes `ready` before anything has been asked of the API: the
+   * very case this exists to tell apart.
+   *
+   * See `lib/launch-route`, which is where it decides something.
+   */
+  conversationFetch: ConversationFetch
   reload: () => void
   /**
    * Say this conversation has been read, on screen and then to the API.
@@ -174,6 +186,7 @@ function useConversationInboxState(): ConversationInboxView {
 
   const [inbox, setInbox] = useState<ConversationInbox>(IDLE)
   const [refreshing, setRefreshing] = useState(false)
+  const [conversationFetch, setConversationFetch] = useState<ConversationFetch>('outstanding')
 
   /**
    * Whose inbox the state above currently describes.
@@ -189,6 +202,10 @@ function useConversationInboxState(): ConversationInboxView {
     setDescribes(viewerId)
     setInbox(viewerId ? restored(viewerId) : IDLE)
     setRefreshing(false)
+    // Whoever this is now, nothing has been fetched for them yet — Restored rows
+    // included, which is the point: they are what this phone last knew, not what
+    // the API has just said.
+    setConversationFetch('outstanding')
   }
 
   /**
@@ -244,6 +261,11 @@ function useConversationInboxState(): ConversationInboxView {
     if (!list.ok) {
       loadOut.current = false
       readWhileLoading.current.clear()
+      // Settled, which is all the Launch animation asked. Recorded for every
+      // mode rather than the first load alone: a resync bumps the generation and
+      // strands the load it interrupted, so the gate has to be released by
+      // whichever one actually comes back.
+      setConversationFetch('failed')
       // A resync that failed leaves what is on screen alone. Nobody asked for
       // it, the rows are still the last thing the API said, and replacing them
       // with an error would turn a dropped connection into an empty inbox.
@@ -279,6 +301,7 @@ function useConversationInboxState(): ConversationInboxView {
 
     if (generation.current !== mine) return
     loadOut.current = false
+    setConversationFetch('answered')
 
     const merged =
       support?.ok === true
@@ -418,7 +441,7 @@ function useConversationInboxState(): ConversationInboxView {
   }, [viewerId, inbox])
 
   return useMemo(
-    () => ({ ...inbox, refreshing, reload, markRead, addConversation }),
-    [inbox, refreshing, reload, markRead, addConversation],
+    () => ({ ...inbox, refreshing, conversationFetch, reload, markRead, addConversation }),
+    [inbox, refreshing, conversationFetch, reload, markRead, addConversation],
   )
 }

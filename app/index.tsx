@@ -5,6 +5,7 @@ import { View } from "react-native";
 import { UnreachableScreen } from "@/components/auth/unreachable-screen";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { useAuth } from "@/lib/auth-context";
+import { useConversationInbox } from "@/lib/conversation-inbox";
 import { launchDestination } from "@/lib/launch-route";
 
 /**
@@ -16,6 +17,11 @@ const MINIMUM_DISPLAY_MS = 2000;
 
 export default function Index() {
   const { state, retry } = useAuth();
+  // The other half of the gate — see `lib/launch-route` for what it decides.
+  // Read from the shared inbox rather than fetched here: this is the same load
+  // every screen after this one reads, and asking for it twice would be two
+  // lists with one of them thrown away.
+  const { conversationFetch } = useConversationInbox();
   const [animationReady, setAnimationReady] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   /**
@@ -37,15 +43,21 @@ export default function Index() {
   const [retryStarted, setRetryStarted] = useState(false);
   const navigatedRef = useRef(false);
 
-  // Where Hydration says this person belongs. The mapping is `lib/launch-route`;
-  // what is left here is only the timing around it.
-  const destination = launchDestination(state);
+  // Where Hydration says this person belongs, and whether there is yet anything
+  // to show them there. The mapping is `lib/launch-route`; what is left here is
+  // only the timing around it.
+  const destination = launchDestination(state, conversationFetch);
   const targetHref = destination.kind === "navigate" ? destination.href : null;
 
   // Started from `animationReady`, never from mount. `AppLoadingScreen` reports
   // ready when the WebP has decoded, and reports it anyway if the decode stalls
-  // past its own 2.5s failsafe — so the worst case here is 4.5s, still inside the
-  // root layout's 6s splash backstop.
+  // past its own 2.5s failsafe.
+  //
+  // That same report is what hides the native splash, which is all the root
+  // layout's 6s backstop is about — so the backstop still sits beyond every path
+  // through this gate however long the fetch takes. What the fetch can extend is
+  // the animation over the top of it, and only as far as `lib/api-client`'s
+  // Request deadline.
   useEffect(() => {
     if (!animationReady) return;
     const timer = setTimeout(() => {
@@ -54,10 +66,10 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, [animationReady]);
 
-  // Both halves have to be true, in either order: Hydration finishing early does
-  // not cut the animation short, and Hydration finishing late is not cut off.
-  // Asked of the destination rather than of `targetHref`, so that the two
-  // non-navigating outcomes stay distinguishable here as well.
+  // Both halves have to be true, in either order: an answer arriving early does
+  // not cut the animation short, and one arriving late is not cut off. Asked of
+  // the destination rather than of `targetHref`, so that the two non-navigating
+  // outcomes stay distinguishable here as well.
   const isFinishing = minTimeElapsed && destination.kind === "navigate";
 
   const handleReady = useCallback(() => {
@@ -85,6 +97,11 @@ export default function Index() {
   // with its button busy rather than the launch animation coming back. A retry
   // that finds the API down again lands on `unreachable`, so this goes false and
   // the button is pressable once more.
+  //
+  // `wait` now covers the list still coming as well as Hydration still running,
+  // so a retry that succeeds keeps the button busy until there is a Hub to hand
+  // over. That is the same promise the gate makes on a cold start, kept on the
+  // one path where the animation is already gone.
   const retrying = retryStarted && destination.kind === "wait";
 
   // Once the animation is gone, nothing is left to call `onFinish`, so the

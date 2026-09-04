@@ -125,8 +125,19 @@ Broadcasts are in-inbox announcements (later), not stories.
      the path a reclaimed cache already took. Split the same way as 6a: `lib/attachment-budget` is
      pure and table-tested, `lib/attachment-cache` owns the filesystem and is mocked at
      `expo-file-system`.
-   - 6c. Messages, the Outbox, the Store's own Eviction, wiping the Store on Session end, the splash
-     gate, and real reactions.
+   - 6c. **The splash ends when the list is ready (done)** — the Launch animation used to end as
+     soon as it had played and Hydration had settled, but the Conversations are fetched *after*
+     Hydration — three requests for a Customer — so the Hub arrived empty and filled in underneath
+     the person. The gate now takes both: played, and the first Conversation fetch *settled*. Settled
+     means answered **or** failed, because with the Store there is something to draw either way and
+     an animation held open on a bad network is the failure this prevents; on a first-ever launch
+     with nothing to Restore, `lib/api-client`'s request deadline is what bounds the wait. The
+     decision stays in `lib/launch-route`, whose table grew rather than the screen's timers; the
+     inbox reports the fetch separately from its `status`, which a Restored list makes `ready`
+     before anything has been asked of the API. Unreachable is untouched — it is a screen with a
+     retry on it, not a route, and it is not folded in with the fetch gate.
+   - 6d. Messages, the Outbox, the Store's own Eviction, wiping the Store on Session end, and real
+     reactions.
 
 ## Session
 
