@@ -322,10 +322,22 @@ _Avoid_: Queue (nothing drains it), retry queue, pending messages, drafts (a dra
 **Eviction**:
 Discarding the history the Store is not going to be asked for. Every Conversation row is kept, always
 — a partial list is a list that lies about what exists — but Messages are kept only for the twenty
-most recently active threads, fifty each, and Attachment files only up to a fixed budget, oldest
-used first. Asking for a page older than what was kept reads SQLite before it reads the API, which is
-the whole of the load this is meant to take off it.
-_Avoid_: Pruning, cleanup, garbage collection, cache invalidation (nothing here is invalidated)
+most recently active threads, fifty each, and Attachment files only up to a fixed budget — 250 MB —
+oldest used first. Asking for a page older than what was kept reads SQLite before it reads the API,
+which is the whole of the load this is meant to take off it.
+
+*Used* means last **read**, not last downloaded, so a document opened every week outlives one
+fetched yesterday and never touched. The filesystem records only when a file was modified, so being
+read writes a marker beside it — the `.used` file — and that marker is what the order is made of. A
+copy with no marker is ordered by when it arrived, which is the honest answer for one cached by an
+earlier build. Discarding is always safe here: everything is re-fetchable, and a file that is gone
+costs a download.
+
+An entry being downloaded right now is **pinned**: counted against the budget, never discarded to
+meet it. Only the `attachments` directory is ever read, so no device URI an Upload is streaming from
+can be reached at all.
+_Avoid_: Pruning, cleanup, garbage collection, cache invalidation (nothing here is invalidated),
+trimming (the operation is `evictAttachmentFiles`)
 
 ### Notifications
 

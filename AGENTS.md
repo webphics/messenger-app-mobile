@@ -13,7 +13,13 @@ cold start that Restores the Conversation list — the same rows, the same Unrea
 order, the tab badge with them — before anything renders, so a phone in airplane mode opens on what
 it last knew instead of on an empty inbox. Only Conversations so far; Messages, the Outbox and
 Eviction are their own tickets. The two new modules split at the native boundary: `store-rows` maps
-a Store to rows and back and imports nothing native, `conversation-store` owns SQLite alone. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+a Store to rows and back and imports nothing native, `conversation-store` owns SQLite alone. #41 took
+the half of Eviction that touches no SQLite: the downloaded copies of documents are bounded at
+250 MB, and a download landing past that discards the least recently *read* files until it fits —
+last read rather than last downloaded, which is why a hit writes a marker beside the file. A
+download still arriving is pinned, the sweep reads `attachments` and nothing else, and every
+filesystem failure in it is swallowed. Split the same way: `attachment-budget` is pure and
+table-tested, `attachment-cache` owns the filesystem. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 ## Interactions
 
