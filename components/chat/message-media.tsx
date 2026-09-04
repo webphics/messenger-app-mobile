@@ -1,24 +1,16 @@
 import { AlertCircle, FileText, RotateCcw } from '@/components/icons'
 import { useCallback, useEffect, useState } from 'react'
-import {
-  Alert,
-  Image,
-  Linking,
-  Pressable,
-  View,
-  useWindowDimensions,
-} from 'react-native'
+import { Image, Pressable, View, useWindowDimensions } from 'react-native'
 import { useVideoPlayer, VideoView } from 'expo-video'
-import * as Sharing from 'expo-sharing'
 
 import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
 import { Text } from '@/components/ui/text'
-import { ensureCachedFile } from '@/lib/attachment-cache'
 import { formatBytes } from '@/lib/attachments'
 import { fitImageSize, mediaCaptionColumnWidth } from '@/lib/image-layout'
 import { cn } from '@/lib/cn'
 import { attachmentKindLabel } from '@/lib/message-attachment'
+import { useOpenDocument } from '@/lib/use-open-document'
 import { colors } from '@/lib/tokens'
 import type { AttachmentView } from '@/lib/types'
 
@@ -368,58 +360,14 @@ function DocumentAttachment({
   outgoing: boolean
 }) {
   const size = formatBytes(attachment.size)
-  const [opening, setOpening] = useState(false)
-
-  /**
-   * Hand the document to whatever on this device can read it.
-   *
-   * A document the API is holding is downloaded first. Neither route out of here
-   * takes an `https` URL: `Sharing.shareAsync` wants a file this device holds,
-   * and an Android intent for a remote URL lands in a browser rather than in a
-   * reader. `ensureCachedFile` answers immediately for a document already cached
-   * and for one still local to an outgoing bubble, so the download is paid for
-   * once per file and never for one this device produced.
-   *
-   * The download is the part that can take a moment, so the row says it is
-   * working and refuses a second tap while it is — a person tapping twice on a
-   * slow connection should not start two of these.
-   */
-  const open = useCallback(async () => {
-    if (opening) return
-    setOpening(true)
-    try {
-      const cached = await ensureCachedFile(attachment.uri, attachment.name)
-      if (!cached.ok) {
-        Alert.alert(
-          'Could not download file',
-          'The file could not be fetched. Check your connection and try again.',
-        )
-        return
-      }
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(cached.uri)
-        return
-      }
-      const can = await Linking.canOpenURL(cached.uri)
-      if (can) {
-        await Linking.openURL(cached.uri)
-        return
-      }
-      Alert.alert('Cannot open file', 'No app is available to open this document.')
-    } catch {
-      Alert.alert('Cannot open file', 'Something went wrong opening this document.')
-    } finally {
-      setOpening(false)
-    }
-  }, [attachment.name, attachment.uri, opening])
+  const { open, opening } = useOpenDocument(attachment)
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open ${attachment.name || attachmentKindLabel('document')}`}
       accessibilityState={{ busy: opening }}
-      onPress={() => void open()}
+      onPress={open}
       className="min-w-[180px] flex-row items-center gap-3"
     >
       <View
