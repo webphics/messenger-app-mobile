@@ -2,9 +2,12 @@ import type { Href } from "expo-router";
 
 import type { AuthState } from "@/lib/auth-machine";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
+import type { ConversationFetch } from "@/lib/types";
 
 /**
- * Where a cold start sends you, as a pure function of auth state.
+ * Whether the Launch animation may end yet, as a pure function of the two things
+ * that decide it: where Hydration landed, and what the first Conversation fetch
+ * has done.
  *
  * Kept out of the launch screen because the decision worth being sure about is
  * the mapping, not the timers and refs around it. Hydration's third outcome is
@@ -12,10 +15,16 @@ import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
  * the easy mistake, since both mean "no user to show" — is the wrongful sign-out
  * `lib/auth-service` keeps the cookie to avoid. As a table, that is one row
  * rather than a state you reproduce by unplugging a laptop.
+ *
+ * The fetch is the second half because Hydration is not the last thing that has
+ * to happen before there is a Hub to hand over. The Conversations are fetched
+ * *after* it — three requests for a Customer — and they reliably outlast the
+ * animation, so leaving on Hydration alone hands over a Hub that fills in
+ * underneath the person a moment later.
  */
 
 export type LaunchDestination =
-  /** Hydration has not settled. Keep the launch animation up. */
+  /** Hydration has not settled, or the list is still coming. Keep the launch animation up. */
   | { kind: "wait" }
   | { kind: "navigate"; href: Href }
   /** A Session cookie is held but the API did not answer: a screen here, not a route. */
@@ -25,16 +34,26 @@ const WAIT: LaunchDestination = { kind: "wait" };
 const UNREACHABLE: LaunchDestination = { kind: "unreachable" };
 const TO_SIGN_IN: LaunchDestination = { kind: "navigate", href: SIGN_IN_HREF };
 
-export function launchDestination(state: AuthState): LaunchDestination {
+export function launchDestination(
+  state: AuthState,
+  conversationFetch: ConversationFetch,
+): LaunchDestination {
   switch (state.status) {
     case "hydrating":
       return WAIT;
     // The role is the server's, read off the session — never anything this
     // client picked or remembered.
+    //
+    // The one status the fetch has a say in, because it is the only one with a
+    // Hub behind it to arrive empty.
     case "signed-in":
-      return { kind: "navigate", href: ROLE_HREF[state.user.role] };
+      return conversationFetch === "outstanding"
+        ? WAIT
+        : { kind: "navigate", href: ROLE_HREF[state.user.role] };
     case "unreachable":
       return UNREACHABLE;
+    // No session, so no list was ever asked for: whatever the fetch says, it is
+    // not about this person.
     case "signed-out":
       return TO_SIGN_IN;
     // Not reachable from a cold start — a submit only ever comes from the

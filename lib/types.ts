@@ -154,6 +154,20 @@ export type CustomerConversation =
 export type Conversation = StaffConversation | CustomerConversation
 
 /**
+ * How the Conversation fetch behind the list is doing — the second half of the
+ * Launch gate.
+ *
+ * `failed` is a settled outcome, not a held one: with the Store there is
+ * something to draw either way, and an animation held open on a bad network is
+ * the failure the gate exists to prevent. The two are kept apart rather than
+ * collapsed to a boolean so the gate's table can say which is which.
+ *
+ * Produced by `lib/conversation-inbox` and read by `lib/launch-route`; here
+ * rather than in either, so neither has to import the other.
+ */
+export type ConversationFetch = 'outstanding' | 'answered' | 'failed'
+
+/**
  * Which shape a conversation arrived in.
  *
  * `labels` is the discriminator because it is the one field only the staff
