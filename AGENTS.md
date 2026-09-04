@@ -33,9 +33,17 @@ before opens on what this device already holds rather than on a request, and scr
 the disk a page at a time and asks the API only for history the phone does not have. The reducers
 did not change — `applyNewestPage` is the one addition, and it decides the single new question,
 whether the page that confirms a Restored thread continues it or begins after a gap in it. Unsent
-Messages are deliberately not persisted; the Outbox and Eviction are their own tickets. A thread
+Messages are deliberately not persisted; the Outbox is its own ticket. A thread
 with nothing to draw now says why — including that it could not be reached — instead of showing an
-empty list. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+empty list. #45 finished Eviction, the half ADR-0008 left: every Conversation row is kept always,
+Messages only for the twenty most recently active threads and fifty each, ranked by the
+conversation's own `lastMessageAt` — which is why the row now carries it as a column rather than
+only inside its payload. A thread that lost its Messages still appears in the list and fetches when
+opened, with its paging reset so it cannot restore a cursor pointing past history it no longer has.
+The sweep runs after the write that grew the table and never on a timer, and never against the
+thread that write was for — that is the thread on screen, and taking its Messages would be a write
+that undoes itself. Split like the attachment budget: `store-eviction` is pure and table-tested,
+`conversation-store` owns the query and the transaction. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 ## Interactions
 

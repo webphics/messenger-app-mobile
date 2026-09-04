@@ -1,6 +1,11 @@
 import * as SQLite from 'expo-sqlite'
 
 import {
+  planEviction,
+  RETAINED_MESSAGES_PER_THREAD,
+  type StoredThread,
+} from '@/lib/store-eviction'
+import {
   fromConversationRows,
   fromMessageRows,
   fromOrganizationRows,
@@ -70,6 +75,7 @@ const SCHEMA = `
     payload TEXT NOT NULL,
     has_more INTEGER NOT NULL DEFAULT 1,
     cursor TEXT,
+    activity_at INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (owner_id, id)
   );
   CREATE TABLE organizations (
@@ -620,7 +626,127 @@ async function writeThread(pending: PendingThread): Promise<void> {
   } catch {
     // Swallowed, like every other write here. Nothing is recorded as written, so
     // the next state change writes these Messages again.
+    return
   }
+
+  // After the write that grew the table, and only then: a thread's Messages are
+  // the one thing that makes it bigger, so this is where the growth is. A write
+  // that only moved a frontier moved no rows.
+  if (rows.length > 0) await evict(database, ownerId, conversationId)
+}
+
+/**
+ * Bring the Store back inside its limits, after the write that grew it.
+ *
+ * Reads `messages` and the activity of the rows beside them, hands the counting
+ * to `planEviction`, and applies what comes back. What is kept and what goes is
+ * decided there, without a database — see `lib/store-eviction` for the rule and
+ * the table it is tested against.
+ *
+ * Conversations are untouched by construction: a plan is a list of threads to
+ * take Messages from, and there is no statement here that could reach the
+ * `conversations` table for anything but the paging of a thread it just emptied.
+ *
+ * That paging is reset with the Messages, and it has to be. A cursor is where
+ * the next page reads backwards *from*, so one left pointing past history this
+ * device no longer holds would make the next scroll ask the API for the page
+ * before something already gone — and read straight over everything between,
+ * with no way left to ask for it.
+ *
+ * Nothing here throws. A count that will not read, a delete the database
+ * refuses: each is swallowed, and the cost is a Store that stays larger than it
+ * meant to until the next thread is written.
+ */
+async function evict(
+  database: SQLite.SQLiteDatabase,
+  ownerId: string,
+  writtenTo: string,
+): Promise<void> {
+  try {
+    const plan = planEviction(storedThreads(database, ownerId), { spare: writtenTo })
+    const evicted = [...plan.drop, ...plan.shorten]
+    if (evicted.length === 0) return
+
+    await database.withTransactionAsync(async () => {
+      for (const conversationId of plan.drop) {
+        await database.runAsync(
+          'DELETE FROM messages WHERE owner_id = ? AND conversation_id = ?',
+          ownerId,
+          conversationId,
+        )
+      }
+
+      for (const conversationId of plan.shorten) {
+        await database.runAsync(
+          `DELETE FROM messages WHERE owner_id = ? AND conversation_id = ? AND id NOT IN
+             (SELECT id FROM messages WHERE owner_id = ? AND conversation_id = ?
+              ORDER BY created_at DESC, id DESC LIMIT ?)`,
+          ownerId,
+          conversationId,
+          ownerId,
+          conversationId,
+          RETAINED_MESSAGES_PER_THREAD,
+        )
+      }
+
+      // The same statement a thread's own frontier is written with, given the
+      // defaults `emptyThread` would hand a conversation nobody has opened.
+      for (const conversationId of evicted) {
+        await database.runAsync(
+          'UPDATE conversations SET has_more = ?, cursor = ? WHERE owner_id = ? AND id = ?',
+          1,
+          null,
+          ownerId,
+          conversationId,
+        )
+      }
+    })
+
+    for (const conversationId of evicted) {
+      // What was removed on purpose must not be put back by the next write, and
+      // the frontier held in memory is the one a full write of the list would
+      // otherwise carry back over the reset above. Forgetting it *is* the reset:
+      // a thread with no frontier held is written with the defaults.
+      writtenMessages.delete(threadKey(ownerId, conversationId))
+      frontiers.get(ownerId)?.delete(conversationId)
+    }
+  } catch {
+    // The Store stays over its limits until the next thread is written.
+  }
+}
+
+/**
+ * Every thread this device holds Messages for, with the activity they are
+ * ranked by.
+ *
+ * One grouped read over the index the thread pages already use. The activity is
+ * the *conversation's* — the column `toConversationRows` writes — rather than
+ * the newest Message held, because the two part company on exactly the threads
+ * worth keeping. See `StoredThread`.
+ */
+function storedThreads(database: SQLite.SQLiteDatabase, ownerId: string): StoredThread[] {
+  const rows = database.getAllSync<{
+    conversation_id: string
+    message_count: number
+    activity_at: number | null
+  }>(
+    `SELECT m.conversation_id AS conversation_id, COUNT(*) AS message_count,
+            c.activity_at AS activity_at
+     FROM messages m
+     LEFT JOIN conversations c ON c.owner_id = m.owner_id AND c.id = m.conversation_id
+     WHERE m.owner_id = ?
+     GROUP BY m.conversation_id`,
+    ownerId,
+  )
+
+  return rows.map((row) => ({
+    conversationId: row.conversation_id,
+    // A thread whose conversation has left the list is ranked as the oldest
+    // thing there is. The list write removes its Messages anyway; this is only
+    // what happens if it is still here when a sweep runs.
+    activityAt: typeof row.activity_at === 'number' ? row.activity_at : 0,
+    messageCount: row.message_count,
+  }))
 }
 
 /**
@@ -644,12 +770,13 @@ async function write(ownerId: string, snapshot: StoreSnapshot): Promise<void> {
       await database.runAsync('DELETE FROM conversations WHERE owner_id = ?', ownerId)
       for (const row of rows) {
         await database.runAsync(
-          'INSERT INTO conversations (id, owner_id, payload, has_more, cursor) VALUES (?, ?, ?, ?, ?)',
+          'INSERT INTO conversations (id, owner_id, payload, has_more, cursor, activity_at) VALUES (?, ?, ?, ?, ?, ?)',
           row.id,
           row.owner_id,
           row.payload,
           row.has_more,
           row.cursor,
+          row.activity_at,
         )
       }
 

@@ -576,7 +576,16 @@ export function isConversationUnread(conversation: Conversation): boolean {
   return !conversation.lastMessageMine && !conversation.lastMessageRead
 }
 
-function activityAt(conversation: Conversation): number {
+/**
+ * When a conversation was last active, in epoch milliseconds, with a
+ * conversation nobody has written in yet reporting 0.
+ *
+ * Exported because two things order by it and they must not drift apart: the
+ * list on screen, and the Store's Eviction — which keeps the history of the
+ * threads a person keeps coming back to, and so has to mean the same thing by
+ * "recent" that the list does.
+ */
+export function conversationActivityAt(conversation: Conversation): number {
   return conversation.lastMessageAt ? Date.parse(conversation.lastMessageAt) : 0
 }
 
@@ -589,7 +598,7 @@ function activityAt(conversation: Conversation): number {
  */
 export function sortConversations(conversations: Conversation[]): Conversation[] {
   return [...conversations].sort((a, b) => {
-    const difference = activityAt(b) - activityAt(a)
+    const difference = conversationActivityAt(b) - conversationActivityAt(a)
     return difference !== 0 ? difference : a.id.localeCompare(b.id)
   })
 }
