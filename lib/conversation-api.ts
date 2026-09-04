@@ -1,6 +1,7 @@
 import { authenticatedRequest } from '@/lib/auth-service'
 import { asRecord } from '@/lib/api-envelope'
 import {
+  parseAttachment,
   parseConversation,
   parseConversations,
   parseMessage,
@@ -8,11 +9,15 @@ import {
   parseOrganizations,
   parseStaffDirectory,
 } from '@/lib/conversation-parse'
+import { UNSUPPORTED_TYPE_MESSAGE, uploadMimeType } from '@/lib/attachment-upload'
+import { storedAttachment } from '@/lib/attachment-view'
 import type { HttpOutcome } from '@/lib/auth-response'
 import type {
+  AttachmentView,
   Conversation,
   ConversationType,
   Message,
+  MessageAttachment,
   Organization,
   StaffDirectoryUser,
 } from '@/lib/types'
@@ -176,10 +181,18 @@ export async function listMessages(
 }
 
 export type SendMessageDraft = {
-  /** Trimmed by the caller; the API refuses an empty one. */
+  /** Trimmed by the caller. The API refuses a message with neither body nor attachments. */
   body: string
   /** The message being answered, when the composer had a reply open. */
   replyToMessageId?: string
+  /**
+   * Already uploaded. Every URL here names an object the API stored, which is
+   * what `uploadAttachment` answers with — a device URI would be accepted by the
+   * schema and then be unreachable from every other device.
+   */
+  attachments?: MessageAttachment[]
+  /** `text` unless said otherwise; see `sendMessageType`. */
+  messageType?: 'text' | 'media' | 'voice'
 }
 
 /**
@@ -190,9 +203,10 @@ export type SendMessageDraft = {
  * That is what the thread keeps; the bubble the composer put on screen is only
  * ever a stand-in for it.
  *
- * Text only. `SendMessageSchema` takes attachments too, but they name uploaded
- * objects rather than the device URIs Phase 5a produces, so a message carrying
- * one has nowhere to go until upload arrives.
+ * Attachments name objects the API already holds. `uploadAttachment` is what
+ * puts them there, and it runs first: a send is the last step of an attachment's
+ * journey rather than the start of it, so a message never reaches a thread
+ * pointing at a file only one device can open.
  */
 export async function sendMessage(
   id: string,
@@ -205,9 +219,15 @@ export async function sendMessage(
       // The schema is `.strict()`, so a key it does not know refuses the whole
       // request — `replyToMessageId` is omitted rather than sent as undefined.
       body: {
-        body: draft.body,
-        messageType: 'text',
+        // `body` is optional on the schema and `min(1)` when present, so an
+        // attachment sent without a caption omits the key rather than sending
+        // the empty string the composer had.
+        ...(draft.body === '' ? {} : { body: draft.body }),
+        messageType: draft.messageType ?? 'text',
         ...(draft.replyToMessageId ? { replyToMessageId: draft.replyToMessageId } : {}),
+        ...(draft.attachments && draft.attachments.length > 0
+          ? { attachments: draft.attachments.map(sendableAttachment) }
+          : {}),
       },
     },
   )
@@ -278,3 +298,71 @@ export async function takeOverConversation(id: string): Promise<ApiResult<Conver
   )
   return readOutcome(outcome, parseConversation)
 }
+
+
+/**
+ * The attachment schema a send takes, which is not the one a message answers with.
+ *
+ * `AttachmentDtoSchema` is `.nullable()` on the optional fields and
+ * `SendMessageSchema`'s copy is `.optional()`, so the null a parsed message
+ * carries for "the API did not say" would be refused on the way back in. Each
+ * one is dropped rather than translated: there is no third state, and an absent
+ * key and a null mean the same thing to both ends.
+ */
+function sendableAttachment(attachment: MessageAttachment): Record<string, unknown> {
+  return {
+    type: attachment.type,
+    url: attachment.url,
+    ...(attachment.fileName == null ? {} : { fileName: attachment.fileName }),
+    ...(attachment.size == null ? {} : { size: attachment.size }),
+    ...(attachment.durationSeconds == null
+      ? {}
+      : { durationSeconds: attachment.durationSeconds }),
+    ...(attachment.waveform == null || attachment.waveform.length === 0
+      ? {}
+      : { waveform: attachment.waveform }),
+  }
+}
+
+/**
+ * Put one file this device holds into the API's object store.
+ *
+ * Multipart, to `POST /conversations/:id/files` — the endpoint the web client
+ * uploads through, under the same field name (`file`) and the same allowlist.
+ * The file is streamed from disk rather than read into this process's memory,
+ * which is not what `fetch` would do with it; see
+ * `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`.
+ *
+ * The answer names the stored object, and `storedAttachment` puts back the three
+ * things a file cannot carry: a voice note's duration, its waveform, and the
+ * name somebody chose.
+ *
+ * A type the allowlist does not hold is refused before the upload rather than
+ * after it — the client cannot send a file it has no type to declare, and the
+ * refusal is worth more early than late. `rejectUploadReason` is the same rule
+ * one step earlier still, at the composer, where it can be acted on; this is the
+ * floor beneath it. Either way the caller gets `refused`, in the same shape the
+ * API's own refusal takes, so one path handles all three.
+ */
+export async function uploadAttachment(
+  conversationId: string,
+  attachment: AttachmentView,
+): Promise<ApiResult<MessageAttachment>> {
+  const type = uploadMimeType(attachment)
+  if (!type) {
+    return { ok: false, failure: { kind: 'refused', message: UNSUPPORTED_TYPE_MESSAGE } }
+  }
+
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(conversationId)}/files`,
+    { method: 'POST', file: { uri: attachment.uri, field: UPLOAD_FIELD, type } },
+  )
+
+  const result = readOutcome(outcome, parseAttachment)
+  if (!result.ok) return result
+
+  return { ok: true, value: storedAttachment(result.value, attachment) }
+}
+
+/** The multipart field `FileInterceptor('file', …)` reads on the API. */
+const UPLOAD_FIELD = 'file'

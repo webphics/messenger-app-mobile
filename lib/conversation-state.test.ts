@@ -3,6 +3,7 @@ import {
   applyMessagePage,
   applySentMessage,
   beginSend,
+  beginUpload,
   draftMessage,
   emptyThread,
   failSend,
@@ -1349,8 +1350,8 @@ describe('applyIncomingMessage and the echo of a message sent from here', () => 
     expect(next.unsent.map((entry) => entry.message.id)).toEqual(['local-2'])
   })
 
-  test('an attachment with no body confirms nothing, since every empty body matches', () => {
-    const attachmentEcho = beginSend(
+  test('an empty body confirms nothing, because every empty body matches', () => {
+    const emptyEcho = beginSend(
       emptyThread(),
       draftMessage({
         id: 'local-1',
@@ -1364,6 +1365,228 @@ describe('applyIncomingMessage and the echo of a message sent from here', () => 
       fromCompany: false,
     })
 
-    expect(applyIncomingMessage(attachmentEcho, event.message, viewer).unsent).toHaveLength(1)
+    expect(applyIncomingMessage(emptyEcho, event.message, viewer).unsent).toHaveLength(1)
+  })
+
+  /**
+   * The one case an empty body cannot answer, and the reason a message carrying
+   * attachments is matched on them instead: by the time the send is out, the
+   * unsent copy holds what the upload answered with, and the arriving copy names
+   * the same stored objects.
+   */
+  test('a photo with no caption is confirmed by the object it names', () => {
+    const stored = {
+      type: 'image/jpeg',
+      url: '/uploads/chat/9f1c.jpg',
+      fileName: 'IMG_0001.jpg',
+      size: 2048,
+      durationSeconds: null,
+      waveform: null,
+    }
+    const sendingPhoto = beginSend(
+      emptyThread(),
+      draftMessage({
+        id: 'local-1',
+        body: '',
+        author: { id: 'customer-1', name: 'QA', role: 'customer' },
+        sentAt: '2026-08-13T08:00:00.000Z',
+        attachments: [stored],
+      }),
+    )
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: '',
+      fromCompany: false,
+      messageType: 'media',
+      attachments: [stored],
+    })
+
+    const next = applyIncomingMessage(sendingPhoto, event.message, viewer)
+
+    expect(next.unsent).toHaveLength(0)
+    expect(next.messages.map((message) => message.id)).toEqual(['server-1'])
+  })
+
+  test('a different photo confirms nothing, however alike the two captions are', () => {
+    const sendingPhoto = beginSend(
+      emptyThread(),
+      draftMessage({
+        id: 'local-1',
+        body: 'Here',
+        author: { id: 'customer-1', name: 'QA', role: 'customer' },
+        sentAt: '2026-08-13T08:00:00.000Z',
+        attachments: [
+          {
+            type: 'image/jpeg',
+            url: '/uploads/chat/mine.jpg',
+            fileName: null,
+            size: null,
+            durationSeconds: null,
+            waveform: null,
+          },
+        ],
+      }),
+    )
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Here',
+      fromCompany: false,
+      messageType: 'media',
+      attachments: [
+        {
+          type: 'image/jpeg',
+          url: '/uploads/chat/theirs.jpg',
+          fileName: null,
+          size: null,
+          durationSeconds: null,
+          waveform: null,
+        },
+      ],
+    })
+
+    expect(applyIncomingMessage(sendingPhoto, event.message, viewer).unsent).toHaveLength(1)
+  })
+
+  /**
+   * One of them is a photo. Matching them on the caption they happen to share
+   * would confirm a message the server has never been told about.
+   */
+  test('a message with attachments never confirms one without them', () => {
+    const sendingText = beginSend(
+      emptyThread(),
+      draftMessage({
+        id: 'local-1',
+        body: 'Look',
+        author: { id: 'customer-1', name: 'QA', role: 'customer' },
+        sentAt: '2026-08-13T08:00:00.000Z',
+      }),
+    )
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Look',
+      fromCompany: false,
+      messageType: 'media',
+      attachments: [
+        {
+          type: 'image/jpeg',
+          url: '/uploads/chat/a.jpg',
+          fileName: null,
+          size: null,
+          durationSeconds: null,
+          waveform: null,
+        },
+      ],
+    })
+
+    expect(applyIncomingMessage(sendingText, event.message, viewer).unsent).toHaveLength(1)
+  })
+
+  /**
+   * Nothing has reached the server yet, so nothing arriving can be the echo of
+   * it — and dropping the bubble here would take the upload's own progress with
+   * it.
+   */
+  test('a message still uploading is confirmed by nothing', () => {
+    const stored = {
+      type: 'image/jpeg',
+      url: 'file:///cache/IMG_0001.jpg',
+      fileName: 'IMG_0001.jpg',
+      size: 2048,
+      durationSeconds: null,
+      waveform: null,
+    }
+    const uploading = beginUpload(
+      emptyThread(),
+      draftMessage({
+        id: 'local-1',
+        body: 'Here',
+        author: { id: 'customer-1', name: 'QA', role: 'customer' },
+        sentAt: '2026-08-13T08:00:00.000Z',
+        attachments: [stored],
+      }),
+    )
+    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Here',
+      fromCompany: false,
+      messageType: 'media',
+      attachments: [stored],
+    })
+
+    expect(applyIncomingMessage(uploading, event.message, viewer).unsent).toHaveLength(1)
+  })
+})
+
+describe('the two waits a send with a file goes through', () => {
+  const author = { id: 'customer-1', name: 'QA', role: 'customer' as const }
+
+  function photoDraft(url: string) {
+    return draftMessage({
+      id: 'local-1',
+      body: 'Here it is',
+      author,
+      sentAt: '2026-08-13T08:00:00.000Z',
+      attachments: [
+        {
+          type: 'image/jpeg',
+          url,
+          fileName: 'IMG_0001.jpg',
+          size: 2048,
+          durationSeconds: null,
+          waveform: null,
+        },
+      ],
+    })
+  }
+
+  test('an upload is its own state, distinct from the send that follows', () => {
+    const uploading = beginUpload(emptyThread(), photoDraft('file:///cache/IMG_0001.jpg'))
+
+    expect(deliveryStates(uploading.unsent).get('local-1')).toBe('uploading')
+  })
+
+  /**
+   * The bubble on screen is the same bubble, holding what the upload answered
+   * with. Two entries would be two bubbles.
+   */
+  test('the send replaces the upload rather than stacking beneath it', () => {
+    const uploading = beginUpload(emptyThread(), photoDraft('file:///cache/IMG_0001.jpg'))
+    const sending = beginSend(uploading, photoDraft('/uploads/chat/9f1c.jpg'))
+
+    expect(sending.unsent).toHaveLength(1)
+    expect(deliveryStates(sending.unsent).get('local-1')).toBe('sending')
+    expect(sending.unsent[0].message.attachments[0].url).toBe('/uploads/chat/9f1c.jpg')
+  })
+
+  test('a message that carries a file is media rather than text', () => {
+    expect(photoDraft('/uploads/chat/9f1c.jpg').messageType).toBe('media')
+  })
+
+  /**
+   * A message carrying three files whose third upload failed has two of them in
+   * the object store already. Dropping what came back would make the retry send
+   * all three again and orphan the first two, every attempt.
+   */
+  test('a failed send keeps whatever did reach the store', () => {
+    const local = photoDraft('file:///cache/IMG_0001.jpg')
+    const uploading = beginUpload(emptyThread(), local)
+
+    const failed = failSend(uploading, 'local-1', {
+      ...local,
+      attachments: [{ ...local.attachments[0], url: '/uploads/chat/9f1c.jpg' }],
+    })
+
+    expect(deliveryStates(failed.unsent).get('local-1')).toBe('failed')
+    expect(findUnsent(failed, 'local-1')?.message.attachments[0].url).toBe(
+      '/uploads/chat/9f1c.jpg',
+    )
+  })
+
+  test('a text send that failed keeps the message it was already holding', () => {
+    const sending = beginSend(
+      emptyThread(),
+      draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: '2026-08-13T08:00:00.000Z' }),
+    )
+
+    const failed = failSend(sending, 'local-1')
+
+    expect(findUnsent(failed, 'local-1')?.message.body).toBe('Hello')
+    expect(deliveryStates(failed.unsent).get('local-1')).toBe('failed')
   })
 })

@@ -228,7 +228,16 @@ export function parseConversations(value: unknown): Conversation[] {
   })
 }
 
-function attachment(value: unknown): MessageAttachment | null {
+/**
+ * One attachment, from a message payload or from the upload endpoint's answer.
+ *
+ * The two shapes differ only in what they leave out: `POST /:id/files` reports
+ * the type, URL, name and size of the object it stored and nothing about
+ * duration or waveform, because it received a file rather than a voice note.
+ * Both read as null here, and `storedAttachment` is what fills them back in
+ * from what the recorder measured.
+ */
+export function parseAttachment(value: unknown): MessageAttachment | null {
   const record = asRecord(value)
   if (!record) return null
   const url = text(record.url)
@@ -290,7 +299,7 @@ export function parseMessage(value: unknown): Message | null {
       return parsed ? [parsed] : []
     }),
     attachments: records(record.attachments).flatMap((item) => {
-      const parsed = attachment(item)
+      const parsed = parseAttachment(item)
       return parsed ? [parsed] : []
     }),
     receiptStatus: oneOf(record.receiptStatus, RECEIPT_STATUSES) ?? ('sent' as const),

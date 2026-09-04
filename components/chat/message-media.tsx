@@ -1,4 +1,4 @@
-import { FileText } from '@/components/icons'
+import { AlertCircle, FileText, RotateCcw } from '@/components/icons'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
@@ -14,6 +14,7 @@ import * as Sharing from 'expo-sharing'
 import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
 import { Text } from '@/components/ui/text'
+import { ensureCachedFile } from '@/lib/attachment-cache'
 import { formatBytes } from '@/lib/attachments'
 import { fitImageSize, mediaCaptionColumnWidth } from '@/lib/image-layout'
 import { cn } from '@/lib/cn'
@@ -96,6 +97,52 @@ function MediaShell({
   )
 }
 
+/**
+ * A photo or a clip that would not load.
+ *
+ * Media that cannot be fetched is the one failure this screen used to keep to
+ * itself: an `<Image>` whose request fails renders nothing, which is a grey
+ * rounded rectangle exactly the shape of a photo that has not arrived yet, and
+ * waiting forever is indistinguishable from being broken. So it says so, and
+ * offers the only thing that helps — asking again, for the connection that has
+ * come back since.
+ *
+ * Sized to the box the media would have taken, so nothing jumps when it fails.
+ */
+function MediaLoadFailure({
+  kind,
+  width,
+  height,
+  onRetry,
+}: {
+  kind: 'image' | 'video'
+  width: number
+  height: number
+  onRetry: () => void
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${kind === 'image' ? 'Photo' : 'Video'} could not be loaded. Tap to try again.`}
+      accessibilityLiveRegion="polite"
+      onPress={onRetry}
+      style={{ width, height }}
+      className="items-center justify-center gap-1.5 rounded-[18px] border border-line/70 bg-line/25 px-4 active:opacity-70"
+    >
+      <AlertCircle color={colors.muted} size={20} />
+      <Text variant="label" className="text-center text-muted">
+        {kind === 'image' ? 'Photo could not load' : 'Video could not load'}
+      </Text>
+      <View className="flex-row items-center gap-1">
+        <RotateCcw color={colors.primary} size={11} />
+        <Text variant="label" className="font-medium text-primary">
+          Try again
+        </Text>
+      </View>
+    </Pressable>
+  )
+}
+
 function CaptionBubble({
   text,
   outgoing,
@@ -141,6 +188,12 @@ function ImageAttachment({
   const maxH = Math.min(Math.round(screenH * 0.48), Math.round(maxW * 1.45))
   const [box, setBox] = useState(() => fitImageSize(0, 0, maxW, maxH))
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [failed, setFailed] = useState(false)
+  /**
+   * Bumped by a retry, and part of the `<Image>` key, which is what makes the
+   * platform fetch again rather than answer from the failure it cached.
+   */
+  const [attempt, setAttempt] = useState(0)
   const trimmed = caption?.trim() ?? ''
   const hasCaption = trimmed.length > 0
   const columnW = mediaCaptionColumnWidth(box.width, maxW, hasCaption)
@@ -155,30 +208,48 @@ function ImageAttachment({
       },
       () => {
         if (cancelled) return
+        // The size is unknown, not the image: a placeholder box is the right
+        // answer, and whether the image itself arrives is `onError`'s to say.
         setBox(fitImageSize(0, 0, maxW, maxH))
       },
     )
     return () => {
       cancelled = true
     }
-  }, [uri, maxW, maxH])
+  }, [uri, maxW, maxH, attempt])
+
+  const retry = useCallback(() => {
+    setFailed(false)
+    setAttempt((n) => n + 1)
+  }, [])
 
   return (
     <View style={{ width: columnW, minWidth: columnW }}>
       <View className={cn(outgoing ? 'items-end' : 'items-start')}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={name ? `View ${name}` : 'View photo'}
-          onPress={() => setPreviewOpen(true)}
-        >
-          <Image
-            source={{ uri }}
-            accessibilityLabel={name || 'Photo'}
-            className="rounded-[18px] bg-line/40"
-            style={{ width: box.width, height: box.height }}
-            resizeMode="cover"
+        {failed ? (
+          <MediaLoadFailure
+            kind="image"
+            width={box.width}
+            height={box.height}
+            onRetry={retry}
           />
-        </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={name ? `View ${name}` : 'View photo'}
+            onPress={() => setPreviewOpen(true)}
+          >
+            <Image
+              key={attempt}
+              source={{ uri }}
+              accessibilityLabel={name || 'Photo'}
+              className="rounded-[18px] bg-line/40"
+              style={{ width: box.width, height: box.height }}
+              resizeMode="cover"
+              onError={() => setFailed(true)}
+            />
+          </Pressable>
+        )}
       </View>
       {hasCaption ? (
         <CaptionBubble text={trimmed} outgoing={outgoing} width={columnW} />
@@ -213,6 +284,7 @@ function VideoAttachment({
   const maxH = Math.min(Math.round(screenH * 0.48), Math.round(maxW * 1.45))
   const trimmed = caption?.trim() ?? ''
   const hasCaption = trimmed.length > 0
+  const [failed, setFailed] = useState(false)
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false
   })
@@ -233,13 +305,28 @@ function VideoAttachment({
       setNatural({ width: track.size.width, height: track.size.height })
     }
     const sub = player.addListener('sourceLoad', ({ availableVideoTracks }) => {
+      setFailed(false)
       const size = availableVideoTracks[0]?.size
       if (size?.width && size.height) {
         setNatural({ width: size.width, height: size.height })
       }
     })
-    return () => sub.remove()
+    // A source that will not load leaves `VideoView` showing a black rectangle
+    // and its controls doing nothing, which reads as a broken player rather than
+    // as a fetch that failed. The player is the only thing that knows.
+    const failure = player.addListener('statusChange', ({ status }) => {
+      if (status === 'error') setFailed(true)
+    })
+    return () => {
+      sub.remove()
+      failure.remove()
+    }
   }, [player])
+
+  const retry = useCallback(() => {
+    setFailed(false)
+    player.replace(uri)
+  }, [player, uri])
 
   const box = fitImageSize(natural.width, natural.height, maxW, maxH)
   const columnW = mediaCaptionColumnWidth(box.width, maxW, hasCaption)
@@ -247,15 +334,24 @@ function VideoAttachment({
   return (
     <View style={{ width: columnW, minWidth: columnW }}>
       <View className={cn(outgoing ? 'items-end' : 'items-start')}>
-        <View className="overflow-hidden rounded-[18px] bg-ink">
-          <VideoView
-            player={player}
-            style={{ width: box.width, height: box.height }}
-            contentFit="contain"
-            nativeControls
-            accessibilityLabel={name || 'Video'}
+        {failed ? (
+          <MediaLoadFailure
+            kind="video"
+            width={box.width}
+            height={box.height}
+            onRetry={retry}
           />
-        </View>
+        ) : (
+          <View className="overflow-hidden rounded-[18px] bg-ink">
+            <VideoView
+              player={player}
+              style={{ width: box.width, height: box.height }}
+              contentFit="contain"
+              nativeControls
+              accessibilityLabel={name || 'Video'}
+            />
+          </View>
+        )}
       </View>
       {hasCaption ? (
         <CaptionBubble text={trimmed} outgoing={outgoing} width={columnW} />
@@ -272,28 +368,57 @@ function DocumentAttachment({
   outgoing: boolean
 }) {
   const size = formatBytes(attachment.size)
+  const [opening, setOpening] = useState(false)
 
+  /**
+   * Hand the document to whatever on this device can read it.
+   *
+   * A document the API is holding is downloaded first. Neither route out of here
+   * takes an `https` URL: `Sharing.shareAsync` wants a file this device holds,
+   * and an Android intent for a remote URL lands in a browser rather than in a
+   * reader. `ensureCachedFile` answers immediately for a document already cached
+   * and for one still local to an outgoing bubble, so the download is paid for
+   * once per file and never for one this device produced.
+   *
+   * The download is the part that can take a moment, so the row says it is
+   * working and refuses a second tap while it is — a person tapping twice on a
+   * slow connection should not start two of these.
+   */
   const open = useCallback(async () => {
+    if (opening) return
+    setOpening(true)
     try {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(attachment.uri)
+      const cached = await ensureCachedFile(attachment.uri, attachment.name)
+      if (!cached.ok) {
+        Alert.alert(
+          'Could not download file',
+          'The file could not be fetched. Check your connection and try again.',
+        )
         return
       }
-      const can = await Linking.canOpenURL(attachment.uri)
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(cached.uri)
+        return
+      }
+      const can = await Linking.canOpenURL(cached.uri)
       if (can) {
-        await Linking.openURL(attachment.uri)
+        await Linking.openURL(cached.uri)
         return
       }
       Alert.alert('Cannot open file', 'No app is available to open this document.')
     } catch {
       Alert.alert('Cannot open file', 'Something went wrong opening this document.')
+    } finally {
+      setOpening(false)
     }
-  }, [attachment.uri])
+  }, [attachment.name, attachment.uri, opening])
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Open ${attachment.name || attachmentKindLabel('document')}`}
+      accessibilityState={{ busy: opening }}
       onPress={() => void open()}
       className="min-w-[180px] flex-row items-center gap-3"
     >
@@ -319,7 +444,7 @@ function DocumentAttachment({
         >
           {attachment.name || 'Document'}
         </Text>
-        {size ? (
+        {opening || size ? (
           <Text
             variant="label"
             className={cn(
@@ -327,7 +452,10 @@ function DocumentAttachment({
               outgoing ? 'text-primary-foreground/70' : 'text-muted',
             )}
           >
-            {size}
+            {/* The size line doubles as the progress line: a document opens by
+                being downloaded, and a row that says nothing while that happens
+                reads as a tap that did not register. */}
+            {opening ? 'Opening…' : size}
           </Text>
         ) : null}
       </View>

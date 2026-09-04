@@ -215,9 +215,28 @@ _Avoid_: Refresh (that is the pull-to-refresh a person asks for), refetch, inval
 (that is the socket's event, not what follows it)
 
 **Attachment**:
-A single file or recording on a Message — image, video, document, or voice note — identified by a local device URI in this client until a server exists. At most one Attachment per Message.
-_Avoid_: Upload, media blob, file message (as a type parallel to Message)
+A file on a Message: a photo, a video, a document, or a Voice note. A message carries `attachments`
+— plural — and a bubble draws every one of them; the *first* is the one the bubble is shaped around,
+and the one a quote strip and a preview line stand in for. Two shapes, in two places, and the
+distinction is the whole of `lib/attachment-view.ts`: `MessageAttachment` is what the API stores — a
+MIME type and a URL naming an object — and `AttachmentView` is what a bubble renders and a picker
+produces, which is a kind, a playable URI and milliseconds.
+_Avoid_: Media (as the name for one), media blob, file message (as a type parallel to
+Message), attachment singular (a message has as many as it has)
+
+**Upload**:
+Putting a file where the API can reach it: `POST /conversations/:id/files`, answered with the object
+it stored. Always before the send that names it — the other order would put a message in front of
+everyone else pointing at a URI only one phone can open — and its own delivery state on the bubble
+(*Uploading…*, then *Sending…*), because on a phone it is the part that takes time. Streamed from
+disk rather than read into memory; see `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`.
+_Avoid_: Attach (as the verb for this), send (when the upload is meant), POST the file
 
 **Voice note**:
-An audio Attachment recorded in the app for a Message, not a file picked from the library.
-_Avoid_: Voice message, audio clip, mic message
+An `audio` Attachment recorded in the composer, not a file picked from the library, and rendered
+as a player with a waveform rather than as a file row. What makes it one is `messageType: 'voice'`,
+which the API accepts only for a message that is one voice note and nothing else — a voice note sent beside a photo is `media`, like anything
+else carrying more than one thing. Its duration and its bar levels were measured by the recorder and
+are carried across the upload by hand: the file endpoint received a file, so it reports a file.
+_Avoid_: Voice message, audio message, audio clip, mic message, voicemail
+
