@@ -40,13 +40,26 @@ Broadcasts are in-inbox announcements (later), not stories.
      see ADR-0005, and do not remove the web client identifier from the mobile configuration. 2FA
      is refused here with the same sentence the password path uses, because the API's two-factor
      hook fires on Google sign-in too.
-4. Realtime (socket.io) + REST (TanStack Query). The Customer's half is real: conversations,
-   sending, unread, and live delivery over a cookie-authenticated socket. Two connections — a
-   global one and one per open conversation — mirroring the web client, with events folded into
-   the same pure functions a fetched page goes through, so a reconnect resync arrives as nothing
-   rather than as a second copy — as does the API's re-broadcast of a message whose receipt has
-   advanced, which is how a tick moves without a refresh.
+4. Realtime (socket.io) + REST (TanStack Query). Every role's *conversations* are real —
+   the list, sending, unread, and live delivery over a cookie-authenticated socket. The Admin's
+   user directory is not; that is its own endpoint and its own ticket. Two connections — a global one
+   and one per open conversation — mirroring the web client, with events folded into the same pure
+   functions a fetched page goes through, so a reconnect resync arrives as nothing rather than as a
+   second copy — as does the API's re-broadcast of a message whose receipt has advanced, which is
+   how a tick moves without a refresh.
    See `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`.
+
+   Staff read the same list a Customer does. `GET /conversations` is scoped by the API's own
+   policy, so an Agent's assigned threads, the unassigned pool, their staff DMs and their groups
+   arrive in one answer and the screens divide it up — the pool is a filter over that list rather
+   than a second request, and an Admin's org-wide set needs no client-side narrowing at all.
+   Starting a staff DM goes through the Staff directory (`GET /conversations/staff`) and the
+   get-or-create beside it. What staff see that a Customer does not is the System notice: an
+   Engage, Takeover or Transfer, rendered as a centred line rather than a bubble.
+
+   Still web-only: engaging, taking over, transferring and closing a thread. The mobile client
+   reads the assignment those actions produce and renders the notices they write, but has no
+   control that performs one.
 5. Media, push, i18n, list virtualization.
    - 5a. Client media UI (local attachments) — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (done)
    - 5b. Push, i18n, list virtualization.

@@ -20,8 +20,15 @@ import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 
+/**
+ * The staff filters, in the order they narrow.
+ *
+ * Short labels because there are four of them and the row does not scroll: "All
+ * Messages" was affordable beside two chips and is not beside three.
+ */
 const CHIPS: { id: InboxChip; label: string }[] = [
-  { id: "all", label: "All Messages" },
+  { id: "all", label: "All" },
+  { id: "mine", label: "Mine" },
   { id: "open", label: "Open" },
   { id: "resolved", label: "Resolved" },
 ];
@@ -127,6 +134,8 @@ type InboxScreenProps = {
   title: string;
   /** Names a Customer's own support threads, which carry no title of their own. */
   organizationNames?: ReadonlyMap<string, string>;
+  /** Who is looking, so the Mine chip knows whose threads to keep. */
+  viewerId?: string;
   /** Set while the first fetch is out and there is nothing to show yet. */
   loading?: boolean;
   /** What went wrong, when the list could not be fetched at all. */
@@ -142,6 +151,7 @@ export function InboxScreen({
   showCompose,
   title,
   organizationNames,
+  viewerId,
   loading = false,
   error = null,
   refreshing: refreshingProp,
@@ -182,13 +192,13 @@ export function InboxScreen({
 
   const visible = useMemo(() => {
     void epoch;
-    return filterConversations(
-      conversations,
+    return filterConversations(conversations, {
       query,
-      showChips ? chip : "all",
+      chip: showChips ? chip : "all",
       organizationNames,
-    );
-  }, [conversations, query, chip, showChips, organizationNames, epoch]);
+      viewerId,
+    });
+  }, [conversations, query, chip, showChips, organizationNames, viewerId, epoch]);
 
   const openConversation = useCallback(
     (conversationId: string) => {
@@ -278,7 +288,7 @@ export function InboxScreen({
       <NewChatModal
         visible={composeOpen}
         onClose={() => setComposeOpen(false)}
-        onSelectChat={(href) => router.push(href)}
+        onOpenConversation={(conversation) => router.push(chatHref(conversation.id))}
       />
     </View>
   );

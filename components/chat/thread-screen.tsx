@@ -20,7 +20,6 @@ import {
   type SendDraft,
 } from '@/lib/conversation-state'
 import { useKeyboardInset } from '@/lib/keyboard-inset'
-import { formatDayLabel, shouldShowDayDivider } from '@/lib/message-day'
 import {
   isImageOrVideo,
   quoteAttachmentText,
@@ -29,6 +28,7 @@ import {
 } from '@/lib/message-attachment'
 import { groupReactions, toggleReaction } from '@/lib/message-react'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
+import { buildThreadRows, type ThreadRow } from '@/lib/thread-rows'
 import {
   anchorFromPayload,
   type OpenMenuPayload,
@@ -65,45 +65,39 @@ type ThreadScreenProps = {
   onRetrySend?: (messageId: string) => void
 }
 
-type Row =
-  | { type: 'day'; id: string; label: string }
-  | { type: 'message'; id: string; message: Message; senderName?: string }
-
 /** What a bubble draws out of a message: its caption and the one attachment shown beside it. */
 function contentOf(message: Message): BubbleContent {
   return { body: message.body, attachment: primaryAttachmentView(message.attachments) }
 }
 
-function keyExtractor(item: Row) {
+function keyExtractor(item: ThreadRow) {
   return item.id
 }
 
 /** How near inverted offset 0 (newest) before MVCP reveals inserted rows. */
 const NEAR_LATEST_PX = 80
 
-function buildRows(messages: Message[], viewerId: string, namesSenders: boolean): Row[] {
-  const rows: Row[] = []
-  for (let i = 0; i < messages.length; i++) {
-    const message = messages[i]!
-    const previous = messages[i - 1]
-    if (shouldShowDayDivider(message.createdAt, previous?.createdAt)) {
-      rows.push({
-        type: 'day',
-        id: `day-${message.id}`,
-        label: formatDayLabel(message.createdAt),
-      })
-    }
-    rows.push({
-      type: 'message',
-      id: message.id,
-      message,
-      senderName:
-        namesSenders && !isOutgoing(message, viewerId)
-          ? messageSenderName(message)
-          : undefined,
-    })
-  }
-  return rows.reverse()
+/**
+ * An Engage, Takeover or Transfer notice.
+ *
+ * Centred and unsided, because it is the thread's own record of what happened
+ * to it rather than something either party said: giving it a bubble would put
+ * an assignment event in somebody's mouth and a tick beside it. Staff only —
+ * the API withholds these from a Customer, and `visibleMessages` drops them
+ * again on the way in.
+ */
+function SystemNotice({ body }: { body: string }) {
+  return (
+    <View className="my-2 items-center px-6">
+      {/* rounded-2xl, not rounded-full: a Transfer notice names two people and
+          wraps, and a stadium around three lines of text is not a pill. */}
+      <View className="max-w-full rounded-2xl bg-line/60 px-3.5 py-1.5">
+        <Text variant="meta" className="text-center text-ink-soft">
+          {body}
+        </Text>
+      </View>
+    </View>
+  )
 }
 
 export function ThreadScreen({
@@ -121,7 +115,7 @@ export function ThreadScreen({
 }: ThreadScreenProps) {
   const keyboardInset = useKeyboardInset()
   const hostRef = useRef<View>(null)
-  const listRef = useRef<FlatList<Row>>(null)
+  const listRef = useRef<FlatList<ThreadRow>>(null)
   const stickToLatestRef = useRef(false)
   const [draft, setDraft] = useState('')
   const [replyTo, setReplyTo] = useState<Message | null>(null)
@@ -142,7 +136,7 @@ export function ThreadScreen({
   const isGroup =
     conversation.type === 'group' || conversation.type === 'community_announcement'
   const rows = useMemo(
-    () => buildRows(messages, viewer.id, isGroup),
+    () => buildThreadRows(messages, { viewerId: viewer.id, namesSenders: isGroup }),
     [messages, viewer.id, isGroup],
   )
 
@@ -295,7 +289,7 @@ export function ThreadScreen({
   }, [])
 
   const renderItem = useCallback(
-    ({ item }: { item: Row }) => {
+    ({ item }: { item: ThreadRow }) => {
       if (item.type === 'day') {
         return (
           <View className="my-2 items-center">
@@ -304,6 +298,9 @@ export function ThreadScreen({
             </Text>
           </View>
         )
+      }
+      if (item.type === 'system') {
+        return <SystemNotice body={item.message.body} />
       }
       const content = contentOf(item.message)
       return (
@@ -341,7 +338,7 @@ export function ThreadScreen({
 
   const host = (
     <View ref={hostRef} collapsable={false} className="flex-1">
-      <FlatList
+      <FlatList<ThreadRow>
         ref={listRef}
         inverted
         className="flex-1"

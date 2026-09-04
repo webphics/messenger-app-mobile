@@ -1,9 +1,5 @@
 import { CONVERSATIONS } from "@/lib/mock-data";
-import {
-  conversationsTabBadge,
-  customerMessagesBadge,
-  unassignedTabBadge,
-} from "@/lib/tab-badges";
+import { inboxTabBadge, unassignedTabBadge } from "@/lib/tab-badges";
 import type { Conversation } from "@/lib/types";
 
 describe("unassignedTabBadge", () => {
@@ -22,17 +18,15 @@ describe("unassignedTabBadge", () => {
   });
 });
 
-describe("conversationsTabBadge", () => {
-  it("sums unread for an Admin over every thread", () => {
+describe("inboxTabBadge, for staff", () => {
+  it("sums unread over every row the API sent", () => {
     const expected = CONVERSATIONS.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
-    expect(conversationsTabBadge("admin", "admin-1", CONVERSATIONS)).toBe(
-      expected > 0 ? expected : undefined,
-    );
+    expect(inboxTabBadge(CONVERSATIONS)).toBe(expected > 0 ? expected : undefined);
   });
 
   it("omits when nothing is unread", () => {
     const zero: Conversation[] = CONVERSATIONS.map((c) => ({ ...c, unreadCount: 0 }));
-    expect(conversationsTabBadge("admin", "admin-1", zero)).toBeUndefined();
+    expect(inboxTabBadge(zero)).toBeUndefined();
   });
 
   it("falls back to the receipt where the API declined to count", () => {
@@ -43,13 +37,11 @@ describe("conversationsTabBadge", () => {
     const unreadRows = uncounted.filter(
       (c) => !c.lastMessageMine && !c.lastMessageRead,
     ).length;
-    expect(conversationsTabBadge("admin", "admin-1", uncounted)).toBe(
-      unreadRows > 0 ? unreadRows : undefined,
-    );
+    expect(inboxTabBadge(uncounted)).toBe(unreadRows > 0 ? unreadRows : undefined);
   });
 });
 
-describe("customerMessagesBadge", () => {
+describe("inboxTabBadge, for a Customer", () => {
   function row(id: string, unreadCount: number | null): Conversation {
     return {
       id,
@@ -76,13 +68,13 @@ describe("customerMessagesBadge", () => {
     ["adds a counted row to an uncounted one", [null, 4], 5],
   ] as const)("%s", (_name, counts, expected) => {
     expect(
-      customerMessagesBadge(counts.map((count, i) => row(`c${i}`, count))),
+      inboxTabBadge(counts.map((count, i) => row(`c${i}`, count))),
     ).toBe(expected);
   });
 
   it("omits an uncounted row the receipt already calls read", () => {
     const read = { ...row("c0", null), lastMessageRead: true } as Conversation;
-    expect(customerMessagesBadge([read])).toBeUndefined();
+    expect(inboxTabBadge([read])).toBeUndefined();
   });
 
   it("counts a Customer's group thread, which no role filter may drop", () => {
@@ -94,6 +86,6 @@ describe("customerMessagesBadge", () => {
       avatarUrl: null,
       members: [],
     } as Conversation;
-    expect(customerMessagesBadge([group])).toBe(3);
+    expect(inboxTabBadge([group])).toBe(3);
   });
 });

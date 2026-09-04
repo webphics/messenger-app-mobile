@@ -16,6 +16,7 @@ import {
   listMyOrganizations,
   markConversationRead,
   type ApiFailure,
+  type ApiResult,
 } from '@/lib/conversation-api'
 import {
   mergeConversation,
@@ -26,29 +27,31 @@ import {
 } from '@/lib/conversation-state'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { createCountedMessages } from '@/lib/realtime-events'
-import type { Conversation } from '@/lib/types'
+import type { Conversation, Organization, UserRole } from '@/lib/types'
 
 /**
- * Everything a Customer's screens read, fetched once and held in one place.
+ * Everything a signed-in person's screens read, fetched once and held in one place.
  *
- * The inbox, the hub's recent-message card, the tab badge and the chat route all
- * need the same two things — the conversations this person is in, and the names
- * of the organizations that title their support threads — so they read one copy
- * rather than each fetching a slice. A Customer has a handful of conversations,
- * so the list is cheap enough to be the unit; when caching arrives it goes behind
- * this seam and no screen changes.
+ * The inbox, the hub's counts and recent-message card, the tab badges and the
+ * chat route all need the same thing — the conversations this person is in — so
+ * they read one copy rather than each fetching a slice. A Customer has a handful
+ * and a staff member a few pages of them, so the list is cheap enough to be the
+ * unit; when caching arrives it goes behind this seam and no screen changes.
  *
  * Shared rather than per-screen because unread is not a per-screen fact: opening
  * a thread clears its badge on the list behind it and on the tab bar above it,
  * and three copies of the list would clear one of the three.
  *
- * Three requests, in two rounds. The memberships and the conversation list are
- * independent and go together; the support thread is got-or-created against the
- * organization the first answer named, which is what makes a Customer's first
- * visit to Messages find a thread waiting rather than an empty screen.
+ * One list, two loads. Staff ask for `GET /conversations` and are done: the API
+ * scopes it by role and membership, so an Agent's assigned threads, the
+ * unassigned pool, their staff DMs and their groups arrive together and the
+ * screens divide them up. A Customer's load is the same call plus two — their
+ * organizations, which title support threads that carry no title of their own,
+ * and the get-or-create that makes a first visit to Messages find a thread
+ * waiting rather than an empty screen.
  */
 
-export type CustomerInbox =
+export type ConversationInbox =
   | { status: 'loading' }
   /** Nothing to show: the list itself could not be fetched. */
   | { status: 'failed'; failure: ApiFailure }
@@ -58,7 +61,7 @@ export type CustomerInbox =
       organizationNames: ReadonlyMap<string, string>
     }
 
-export type CustomerInboxView = CustomerInbox & {
+export type ConversationInboxView = ConversationInbox & {
   /** Pull-to-refresh. Distinct from a first load, which has nothing to show yet. */
   refreshing: boolean
   reload: () => void
@@ -71,12 +74,14 @@ export type CustomerInboxView = CustomerInbox & {
    * server still disagrees.
    */
   markRead: (id: string) => void
+  /** Put a conversation the API just handed over into the list, without refetching it. */
+  addConversation: (conversation: Conversation) => void
 }
 
 const NOBODY: ReadonlyMap<string, string> = new Map()
 
 /** Nobody to fetch for: an empty inbox rather than a pending one, so a screen reading this while signed out is not left on a spinner. */
-const IDLE: CustomerInbox = { status: 'ready', conversations: [], organizationNames: NOBODY }
+const IDLE: ConversationInbox = { status: 'ready', conversations: [], organizationNames: NOBODY }
 
 /**
  * A freshly fetched list, with every read this client made while it was out.
@@ -105,34 +110,39 @@ function applyToList(
   return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }
 
-const CustomerInboxContext = createContext<CustomerInboxView | null>(null)
+const ConversationInboxContext = createContext<ConversationInboxView | null>(null)
 
-export function CustomerInboxProvider({ children }: { children: ReactNode }) {
-  const value = useCustomerInboxState()
+export function ConversationInboxProvider({ children }: { children: ReactNode }) {
+  const value = useConversationInboxState()
   return (
-    <CustomerInboxContext.Provider value={value}>{children}</CustomerInboxContext.Provider>
+    <ConversationInboxContext.Provider value={value}>
+      {children}
+    </ConversationInboxContext.Provider>
   )
 }
 
-export function useCustomerInbox(): CustomerInboxView {
-  const value = useContext(CustomerInboxContext)
+export function useConversationInbox(): ConversationInboxView {
+  const value = useContext(ConversationInboxContext)
   if (!value) {
-    throw new Error('useCustomerInbox must be used inside a CustomerInboxProvider')
+    throw new Error('useConversationInbox must be used inside a ConversationInboxProvider')
   }
   return value
 }
 
-function useCustomerInboxState(): CustomerInboxView {
+/** Nothing to fetch, for the half of a load only a Customer makes. */
+const NO_ORGANIZATIONS: ApiResult<Organization[]> = { ok: true, value: [] }
+
+function useConversationInboxState(): ConversationInboxView {
   const { state } = useAuth()
   /**
    * Who this inbox belongs to, or nobody. Keyed on the id rather than on the
-   * role alone so signing out and back in as a different Customer refetches
-   * instead of showing the first one's threads.
+   * role alone so signing out and back in as somebody else refetches instead of
+   * showing the first person's threads.
    */
-  const customerId =
-    state.status === 'signed-in' && state.user.role === 'customer' ? state.user.id : null
+  const viewerId = state.status === 'signed-in' ? state.user.id : null
+  const role: UserRole | null = state.status === 'signed-in' ? state.user.role : null
 
-  const [inbox, setInbox] = useState<CustomerInbox>(IDLE)
+  const [inbox, setInbox] = useState<ConversationInbox>(IDLE)
   const [refreshing, setRefreshing] = useState(false)
 
   /**
@@ -145,9 +155,9 @@ function useCustomerInboxState(): CustomerInboxView {
    * state to a changed input — it re-renders before anything is committed.
    */
   const [describes, setDescribes] = useState<string | null>(null)
-  if (describes !== customerId) {
-    setDescribes(customerId)
-    setInbox(customerId ? { status: 'loading' } : IDLE)
+  if (describes !== viewerId) {
+    setDescribes(viewerId)
+    setInbox(viewerId ? { status: 'loading' } : IDLE)
     setRefreshing(false)
   }
 
@@ -190,8 +200,12 @@ function useCustomerInboxState(): CustomerInboxView {
     // it. A spinner appearing on its own would read as an error.
     if (mode === 'refresh') setRefreshing(true)
 
+    // Only a Customer's support thread is titled by an organization and
+    // get-or-created against one, so only a Customer pays for the two requests
+    // that need. Staff rows name a peer, a group or a customer of their own.
+    const forCustomer = role === 'customer'
     const [organizations, list] = await Promise.all([
-      listMyOrganizations(),
+      forCustomer ? listMyOrganizations() : NO_ORGANIZATIONS,
       listConversations(),
     ])
 
@@ -212,7 +226,7 @@ function useCustomerInboxState(): CustomerInboxView {
     // shows one. Any others they hold threads in still arrive in the list above;
     // what this decides is only which one is created on a first visit.
     const primary = organizations.ok ? organizations.value[0] : undefined
-    const support = primary ? await ensureSupportConversation(primary.id) : null
+    const support = forCustomer && primary ? await ensureSupportConversation(primary.id) : null
 
     if (generation.current !== mine) return
     loadOut.current = false
@@ -233,7 +247,7 @@ function useCustomerInboxState(): CustomerInboxView {
       ),
     })
     setRefreshing(false)
-  }, [])
+  }, [role])
 
   useEffect(() => {
     // Nothing to cancel on the way out — `fetch` is already out — but bumping
@@ -243,13 +257,13 @@ function useCustomerInboxState(): CustomerInboxView {
     loadOut.current = false
     readWhileLoading.current.clear()
 
-    if (!customerId) return
+    if (!viewerId) return
     void load('first')
 
     return () => {
       generation.current += 1
     }
-  }, [customerId, load])
+  }, [viewerId, load])
 
   const reload = useCallback(() => {
     void load('refresh')
@@ -272,6 +286,22 @@ function useCustomerInboxState(): CustomerInboxView {
     // holds can be older than the thread being opened, and the API is the one
     // that knows which messages the receipt is missing from.
     void markConversationRead(id)
+  }, [])
+
+  /**
+   * A conversation this client has just been handed, folded into the list.
+   *
+   * The get-or-create calls — a staff DM started from the directory, a
+   * Customer's first support thread — answer with a row the list does not have
+   * yet, and refetching the whole list to learn about it would put the largest
+   * request in the app between a tap and the thread it opens.
+   */
+  const addConversation = useCallback((conversation: Conversation) => {
+    setInbox((current) =>
+      current.status === 'ready'
+        ? { ...current, conversations: mergeConversation(current.conversations, conversation) }
+        : current,
+    )
   }, [])
 
   /**
@@ -300,13 +330,13 @@ function useCustomerInboxState(): CustomerInboxView {
     setInbox((current) => {
       if (current.status !== 'ready') return current
 
-      const conversations = applyToList(current.conversations, event, customerId)
+      const conversations = applyToList(current.conversations, event, viewerId)
       return conversations === current.conversations ? current : { ...current, conversations }
     })
   })
 
   return useMemo(
-    () => ({ ...inbox, refreshing, reload, markRead }),
-    [inbox, refreshing, reload, markRead],
+    () => ({ ...inbox, refreshing, reload, markRead, addConversation }),
+    [inbox, refreshing, reload, markRead, addConversation],
   )
 }

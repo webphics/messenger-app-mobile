@@ -85,6 +85,18 @@ export function withoutPages(state: ThreadState): ThreadState {
 }
 
 /**
+ * Whether this message reports something that happened rather than something
+ * someone said: an Engage, a Takeover or a Transfer notice.
+ *
+ * One place, because two things read it and they must not disagree — the rule
+ * below, which withholds these from a Customer, and `buildThreadRows`, which
+ * draws the ones that survive as a centred line rather than as a bubble.
+ */
+export function isSystemMessage(message: Pick<Message, 'messageType'>): boolean {
+  return message.messageType === 'system'
+}
+
+/**
  * Whether a message may be shown to the person looking at it.
  *
  * The rule: a Customer never sees a `system` message in a Support DM. The only
@@ -106,7 +118,7 @@ export function isMessageVisibleTo(
   message: Pick<Message, 'messageType'>,
 ): boolean {
   if (role !== 'customer' || conversationType !== 'support_dm') return true
-  return message.messageType !== 'system'
+  return !isSystemMessage(message)
 }
 
 export function visibleMessages(

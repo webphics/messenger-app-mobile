@@ -22,25 +22,37 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
+import { useConversationInbox } from "@/lib/conversation-inbox";
 import {
   latestInboxThread,
+  listAssignedConversations,
   listUnassignedConversations,
 } from "@/lib/inbox-filter";
-import { getDevUser } from "@/lib/dev-user";
 import { knowledgeListHref } from "@/lib/hub-routes";
-import { CONVERSATIONS } from "@/lib/mock-data";
 import { settleDownEnter } from "@/lib/motion-enter";
-import { getSession } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
+/** Stands in for a count the list has not answered with yet. An em dash, not a zero. */
+const PENDING_COUNT = "—";
+
 export function AgentHub() {
-  const me = getDevUser();
+  const me = getSessionUser();
   const reduceMotion = useReducedMotion();
-  const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
-  const unassignedCount = listUnassignedConversations(CONVERSATIONS).length;
-  const assignedCount = CONVERSATIONS.filter(
-    (conversation) => conversation.assignedAgent?.id === me.id,
-  ).length;
+  const inbox = useConversationInbox();
+  /*
+   * The list this hub counts, once there is one.
+   *
+   * A hub is not where a fetch failure is explained — Messages is — so a load
+   * that has not answered shows no number rather than a zero it would have to
+   * take back: an empty queue and an unfetched one are not the same news to an
+   * Agent, and a `0` that turns into `4` a moment later reads as the first one
+   * having been a lie.
+   */
+  const counted = inbox.status === "ready" && me ? inbox.conversations : null;
+  const recent = counted && me ? latestInboxThread(counted) : undefined;
+  const unassignedCount = counted ? listUnassignedConversations(counted).length : null;
+  const assignedCount = counted && me ? listAssignedConversations(me.id, counted).length : null;
 
   return (
     <HubScroll>
@@ -49,10 +61,10 @@ export function AgentHub() {
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
-            {hubEyebrow(me.role)}
+            {hubEyebrow("agent")}
           </Text>
           <Text variant="display" className="mt-0.5 text-ink">
-            {hubGreeting(me.role, firstName(me.displayName))}
+            {hubGreeting("agent", firstName(me?.name ?? ""))}
           </Text>
         </Animated.View>
 
@@ -73,14 +85,14 @@ export function AgentHub() {
 
           <View className="mt-3 flex-row items-center justify-between gap-3">
             <StatTile
-              value={String(assignedCount)}
+              value={assignedCount === null ? PENDING_COUNT : String(assignedCount)}
               label="Assigned to you"
               onPress={() => router.navigate("/(agent)/conversations" as Href)}
             />
             <StatTile
-              value={String(unassignedCount)}
+              value={unassignedCount === null ? PENDING_COUNT : String(unassignedCount)}
               label="Unassigned pool"
-              alert={unassignedCount > 0}
+              alert={(unassignedCount ?? 0) > 0}
               accessibilityLabel="Unassigned tickets"
               onPress={() => router.navigate("/(agent)/unassigned" as Href)}
             />
@@ -140,11 +152,15 @@ export function AgentHub() {
           icon={Inbox}
           tone="amber"
           title="Unassigned Pool"
-          hint={`${unassignedCount} ${unassignedCount === 1 ? "ticket" : "tickets"} waiting for pickup`}
+          hint={
+            unassignedCount === null
+              ? "Checking the pickup queue…"
+              : `${unassignedCount} ${unassignedCount === 1 ? "ticket" : "tickets"} waiting for pickup`
+          }
           accessibilityLabel="Unassigned pool"
           onPress={() => router.navigate("/(agent)/unassigned" as Href)}
           trailing={
-            unassignedCount > 0 ? (
+            unassignedCount !== null && unassignedCount > 0 ? (
               <Pill label={`${unassignedCount} new`} tone="amber" />
             ) : null
           }

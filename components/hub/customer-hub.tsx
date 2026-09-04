@@ -12,7 +12,7 @@ import { OffersCarousel } from "@/components/hub/offers-carousel";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { useCustomerInbox } from "@/lib/customer-inbox";
+import { useConversationInbox } from "@/lib/conversation-inbox";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { latestInboxThread } from "@/lib/inbox-filter";
@@ -23,14 +23,12 @@ import { getSessionUser } from "@/lib/session";
 export function CustomerHub() {
   const user = getSessionUser();
   const reduceMotion = useReducedMotion();
-  const inbox = useCustomerInbox();
+  const inbox = useConversationInbox();
   // The most recent real thread, or nothing at all while the list is still out
   // or could not be fetched — the hub is not where a fetch failure is explained,
   // Messages is, so a card that cannot be filled is simply absent.
   const recent =
-    inbox.status === "ready" && user
-      ? latestInboxThread("customer", user.id, inbox.conversations)
-      : undefined;
+    inbox.status === "ready" && user ? latestInboxThread(inbox.conversations) : undefined;
 
   return (
     <HubScroll>

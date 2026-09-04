@@ -6,9 +6,16 @@ import {
   parseMessage,
   parseMessages,
   parseOrganizations,
+  parseStaffDirectory,
 } from '@/lib/conversation-parse'
 import type { HttpOutcome } from '@/lib/auth-response'
-import type { Conversation, ConversationType, Message, Organization } from '@/lib/types'
+import type {
+  Conversation,
+  ConversationType,
+  Message,
+  Organization,
+  StaffDirectoryUser,
+} from '@/lib/types'
 
 /**
  * The conversation endpoints, over the one transport this app has.
@@ -95,6 +102,42 @@ export async function listConversations(
 
 export async function getConversation(id: string): Promise<ApiResult<Conversation>> {
   const outcome = await authenticatedRequest(`/conversations/${encodeURIComponent(id)}`)
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * Every other staff member this person could hold a DM with.
+ *
+ * Staff only: a Customer is refused, which is a refusal rather than an empty
+ * directory, because the two would otherwise be indistinguishable on screen.
+ * Each row names the organizations the pair share, which is what
+ * `createStaffDm` binds to and what says whether a DM can exist at all.
+ */
+export async function listStaffDirectory(): Promise<ApiResult<StaffDirectoryUser[]>> {
+  return readOutcome(await authenticatedRequest('/conversations/staff'), parseStaffDirectory)
+}
+
+/**
+ * The staff DM with one person, created if this is the first.
+ *
+ * Get-or-create, like `ensureSupportConversation`: tapping a name in the
+ * directory resumes the thread that already exists rather than starting a
+ * second one beside it.
+ *
+ * `organizationId` is what the pair's DM binds to. It is omitted when the
+ * caller has nothing to say, which is the common case — the API binds silently
+ * when exactly one shared organization exists, and refuses with something worth
+ * reading when there are several. The schema is `.strict()`, so an undefined
+ * value has to be an absent key.
+ */
+export async function createStaffDm(
+  userId: string,
+  organizationId?: string,
+): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest('/conversations/staff', {
+    method: 'POST',
+    body: { userId, ...(organizationId ? { organizationId } : {}) },
+  })
   return readOutcome(outcome, parseConversation)
 }
 

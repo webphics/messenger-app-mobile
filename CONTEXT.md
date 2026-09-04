@@ -18,6 +18,21 @@ The address book a staff member picks from when starting a conversation, backed 
 the end-user role, which is Customer. The two must not be collapsed.
 _Avoid_: Contacts (bare, when the Customer role is meant), directory, people picker
 
+**Staff directory**:
+The list of every other Agent and Admin a staff member may write to, backed by
+`GET /conversations/staff`, and what the New Message sheet shows. Each row names the organizations
+the pair share, because a Staff DM belongs to one of them: one binds silently, several are chosen
+between, and none means the row cannot be written to at all. Distinct from the Contact list, which is
+the `contacts` endpoint and addresses people of any role — a Staff directory holds no Customer.
+_Avoid_: Contacts, team list, people picker, agent list (an Admin is in it too)
+
+**System notice**:
+A `system`-type Message: the thread's own record of an Engage, a Takeover or a Transfer. Rendered as
+a centred line rather than a bubble, because it belongs to the conversation rather than to either
+side of it, and carries no sender, no side and no receipt. Staff see them; a Customer never does —
+the API withholds them from a Customer's payload and the client filters again on the way in.
+_Avoid_: System message (as a bubble), event, activity log entry
+
 **Agent**:
 Support staff role. Sees assigned threads plus the unassigned pool. Cannot delete.
 _Avoid_: Rep, operator

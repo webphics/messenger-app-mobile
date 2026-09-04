@@ -4,6 +4,7 @@ import {
   parseMessage,
   parseMessages,
   parseOrganizations,
+  parseStaffDirectory,
 } from '@/lib/conversation-parse'
 import { isStaffConversation, isStaffMessage } from '@/lib/types'
 
@@ -283,5 +284,50 @@ describe('parseOrganizations', () => {
 
   test('reads a body without rows as no organizations', () => {
     expect(parseOrganizations(null)).toEqual([])
+  })
+})
+
+describe('parseStaffDirectory', () => {
+  function directoryRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'agent-1',
+      name: 'Jonah Reed',
+      role: 'agent',
+      isOnline: true,
+      lastOnlineAt: null,
+      sharedOrganizations: [{ id: 'org-1', name: 'Acme' }],
+      ...overrides,
+    }
+  }
+
+  test('reads a directory row with its shared organizations', () => {
+    expect(parseStaffDirectory([directoryRow()])).toEqual([
+      {
+        id: 'agent-1',
+        name: 'Jonah Reed',
+        role: 'agent',
+        isOnline: true,
+        lastOnlineAt: null,
+        sharedOrganizations: [{ id: 'org-1', name: 'Acme' }],
+      },
+    ])
+  })
+
+  test('a row without the optional field shares nothing rather than sharing unknown', () => {
+    const { sharedOrganizations: _omitted, ...withoutOrganizations } = directoryRow()
+    expect(parseStaffDirectory([withoutOrganizations])[0]?.sharedOrganizations).toBeNull()
+  })
+
+  test.each([
+    ['no id', directoryRow({ id: '' })],
+    ['no name', directoryRow({ name: '' })],
+    ['a role no staff member holds', directoryRow({ role: 'customer' })],
+    ['not a record', 'agent-1'],
+  ])('drops a row with %s', (_case, row) => {
+    expect(parseStaffDirectory([row])).toEqual([])
+  })
+
+  test('answers an empty list for a payload that is not one', () => {
+    expect(parseStaffDirectory({ rows: [] })).toEqual([])
   })
 })

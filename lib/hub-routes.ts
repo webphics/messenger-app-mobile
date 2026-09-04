@@ -28,6 +28,20 @@ export const CUSTOMER_HREF = {
   faq: "/(customer)/(home)/faq" as Href,
 } as const;
 
+/**
+ * Where "Back to Messages" goes, for whoever is reading.
+ *
+ * The three groups spell their inbox differently — a Customer's is `messages`
+ * and staff read `conversations` — so the one screen that offers the way out of
+ * a thread asks here rather than knowing all three.
+ */
+export function messagesHref(role: UserRole): Href {
+  if (role === "customer") return CUSTOMER_HREF.messages;
+  return role === "admin"
+    ? ("/(admin)/conversations" as Href)
+    : ("/(agent)/conversations" as Href);
+}
+
 export function knowledgeListHref(group: "agent" | "admin"): Href {
   return group === "admin"
     ? ("/(admin)/knowledge" as Href)
