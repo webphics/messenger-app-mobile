@@ -108,8 +108,18 @@ Broadcasts are in-inbox announcements (later), not stories.
      that fails is swallowed, because persistence is subordinate to the app working. Split at the
      native boundary: `lib/store-rows` is pure and table-tested, `lib/conversation-store` owns SQLite
      alone and is mocked at `expo-sqlite`.
-   - 6b. Messages, the Outbox, Eviction, wiping the Store on Session end, the splash gate, and real
-     reactions.
+   - 6b. **Attachment files stay within a budget (done)** — the half of Eviction that touches no
+     SQLite, which is why it did not wait for the rest. The downloaded copies of documents are
+     bounded at 250 MB: a download that lands past the budget discards the least recently *read*
+     files until it fits, which is why being read writes a marker beside the file rather than
+     leaning on the modification time the filesystem already keeps. A download still arriving is
+     pinned, and the sweep reads `attachments` and nothing else, so it can never take the picker's
+     copy an Upload is streaming from. A discarded file is downloaded again on the next open —
+     the path a reclaimed cache already took. Split the same way as 6a: `lib/attachment-budget` is
+     pure and table-tested, `lib/attachment-cache` owns the filesystem and is mocked at
+     `expo-file-system`.
+   - 6c. Messages, the Outbox, the Store's own Eviction, wiping the Store on Session end, the splash
+     gate, and real reactions.
 
 ## Session
 
