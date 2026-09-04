@@ -79,11 +79,18 @@ export type EvictionOptions = {
    * A thread that must not be chosen, whatever its activity — the one whose
    * write this plan follows.
    *
-   * It is the thread on screen: memory is still holding its Messages, its
-   * frontier is still moving, and the next state change would write back
-   * everything taken from it. Evicting it would be a write that undoes itself.
-   * It is collected by the next write of some other thread, which is what
-   * navigating away from it does.
+   * It is the thread on screen, and it is spared from both limits rather than
+   * only from the ranking. Memory is still holding its Messages and its frontier
+   * is still moving, so history taken from it now would be history the disk no
+   * longer has and memory is still about to page past — which is the one thing
+   * eviction must never leave behind, a frontier reading back into a gap.
+   * `conversation-store` closes that door from the other side too, by refusing
+   * to patch a thread it has swept; sparing the open one is what keeps the
+   * common case from needing it.
+   *
+   * The cost is one thread's history beyond the limits for as long as it is the
+   * thread being written, and it is collected by the next write of any other
+   * thread — which is what navigating away from it does.
    *
    * Spared from being chosen, not from being counted: it holds its place in the
    * ranking, so sparing it never lets a twenty-first thread keep its history.

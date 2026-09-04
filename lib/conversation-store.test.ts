@@ -83,6 +83,11 @@ jest.mock('expo-sqlite', () => {
       return null
     }
 
+    /** The one read on the write path — see `storedThreads`. Same rows either way. */
+    async getAllAsync(source: string, ...params: unknown[]) {
+      return this.getAllSync(source, ...params)
+    }
+
     getAllSync(source: string, ...params: unknown[]) {
       if (mockFails.read) throw new Error('database disk image is malformed')
       mockStatements.push(source)
@@ -1136,6 +1141,101 @@ describe('eviction', () => {
     expect(
       mockFiles.get(DATABASE_NAME)?.rows.find((row) => row.id === 'conv-020'),
     ).toMatchObject({ has_more: 1, cursor: null })
+  })
+
+  /**
+   * The case that is easy to miss: a shortened thread still has Messages, and
+   * the cursor on its row is further back than the oldest of them.
+   */
+  it('resets the paging of a thread it shortened', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
+    await store.saveMessages('viewer-1', 'conv-1', thread(60))
+    await store.saveThreadPaging('viewer-1', 'conv-1', { hasMore: true, cursor: 'msg-1' })
+
+    await store.saveMessages('viewer-1', 'conv-2', thread(1))
+
+    expect(mockFiles.get(DATABASE_NAME)?.rows.find((row) => row.id === 'conv-1')).toMatchObject({
+      has_more: 1,
+      cursor: null,
+    })
+  })
+
+  /**
+   * A sweep leaves one coherent run on the disk. Memory is still holding what it
+   * held — for a thread scrolled deep, more of it and further back — and
+   * patching that onto what is left is what would put a hole in it.
+   */
+  describe('a thread it took history from', () => {
+    /** Deep enough to be shortened, then swept by a write of the other thread. */
+    async function sweptThread(store: Store): Promise<Message[]> {
+      await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
+      const messages = thread(60)
+      await store.saveMessages('viewer-1', 'conv-1', messages)
+      await store.saveMessages('viewer-1', 'conv-2', thread(1))
+      return messages
+    }
+
+    it('takes no more of it until the thread is Restored', async () => {
+      const store = loadStore()
+      const messages = await sweptThread(store)
+
+      // What a socket event leaves behind in a thread still mounted under the
+      // one on screen.
+      await store.saveMessages('viewer-1', 'conv-1', [...messages, message('msg-61', 61)])
+
+      expect(store.restoreThread('viewer-1', 'conv-1', 100)?.messages).toHaveLength(50)
+    })
+
+    /**
+     * The hole this is really about: a page fetched from further back than
+     * anything that survived would land under the fifty with the evicted history
+     * missing in between, and nothing reading it back could tell.
+     */
+    it('takes no page from below what survived', async () => {
+      const store = loadStore()
+      const messages = await sweptThread(store)
+
+      await store.saveMessages('viewer-1', 'conv-1', [...thread(20, -30), ...messages])
+
+      const held = store.restoreThread('viewer-1', 'conv-1', 100)?.messages ?? []
+      expect(held).toHaveLength(50)
+      expect(ids(held)).not.toContain('msg--30')
+    })
+
+    it('does not write its frontier back over the reset', async () => {
+      const store = loadStore()
+      await sweptThread(store)
+
+      await store.saveThreadPaging('viewer-1', 'conv-1', { hasMore: true, cursor: 'msg-1' })
+
+      expect(mockFiles.get(DATABASE_NAME)?.rows.find((row) => row.id === 'conv-1')).toMatchObject({
+        has_more: 1,
+        cursor: null,
+      })
+    })
+
+    /** A replace rebuilds the thread whole, so it cannot leave a hole in one. */
+    it('accepts a replace, which rebuilds it rather than patching it', async () => {
+      const store = loadStore()
+      const messages = await sweptThread(store)
+
+      await store.saveMessages('viewer-1', 'conv-1', messages.slice(-3), 'replace')
+
+      expect(store.restoreThread('viewer-1', 'conv-1', 100)?.messages).toHaveLength(3)
+    })
+
+    it('takes writes again once it has been Restored', async () => {
+      const store = loadStore()
+      const messages = await sweptThread(store)
+      store.restoreThread('viewer-1', 'conv-1', 100)
+
+      await store.saveMessages('viewer-1', 'conv-1', [...messages, message('msg-61', 61)])
+
+      expect(ids(store.restoreThread('viewer-1', 'conv-1', 100)?.messages ?? [])).toContain(
+        'msg-61',
+      )
+    })
   })
 
   it('does not let a later write of the list carry the old cursor back', async () => {

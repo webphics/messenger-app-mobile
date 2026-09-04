@@ -26,17 +26,14 @@ describe('the retention limits', () => {
     expect(RETAINED_THREADS).toBe(20)
   })
 
+  /**
+   * Fifty because that is `MESSAGE_PAGE_LIMIT`, the page a thread opens on — so
+   * a thread that has been read and not scrolled is kept exactly as it was read,
+   * and only a thread somebody paged back through is ever shortened. Written out
+   * rather than imported, because that constant's module reaches the network.
+   */
   it('keeps fifty Messages in each of them', () => {
     expect(RETAINED_MESSAGES_PER_THREAD).toBe(50)
-  })
-
-  /**
-   * A thread is opened on a page of `MESSAGE_PAGE_LIMIT`, so the depth kept is
-   * the depth a thread arrives at. Anything less would shorten every thread the
-   * moment it was read.
-   */
-  it('keeps at least the page a thread opens on', () => {
-    expect(RETAINED_MESSAGES_PER_THREAD).toBeGreaterThanOrEqual(50)
   })
 })
 
