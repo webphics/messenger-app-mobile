@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
+  BackHandler,
   Pressable,
   ScrollView,
   TextInput,
@@ -30,17 +32,18 @@ import { initials } from '@/lib/display'
 import { useKeyboardInset } from '@/lib/keyboard-inset'
 import { formatDayLabel } from '@/lib/message-day'
 import { colors, screenBottomPad } from '@/lib/tokens'
-import type { ConversationDetails } from '@/lib/use-conversation-details'
+import type {
+  ConversationDetails,
+  LabelsState,
+} from '@/lib/use-conversation-details'
 import { isStaffConversation } from '@/lib/types'
-import type { Conversation, ConversationNote, UserRole } from '@/lib/types'
+import type { Conversation, ConversationNote, Label, UserRole } from '@/lib/types'
 
 type ConversationDetailsScreenProps = {
   conversation: Conversation
   viewerRole: UserRole
   organizationNames?: ReadonlyMap<string, string>
   details: ConversationDetails
-  /** How many attachments and links the loaded history holds, for the Media row. */
-  sharedCount: number
 }
 
 /**
@@ -62,23 +65,62 @@ export function ConversationDetailsScreen({
   viewerRole,
   organizationNames,
   details,
-  sharedCount,
 }: ConversationDetailsScreenProps) {
   const insets = useSafeAreaInsets()
   const keyboardInset = useKeyboardInset()
+  /**
+   * The note being written, held here rather than in `NotesSection`.
+   *
+   * Because leaving is what loses it, and only something above the section can
+   * stand between the draft and the way out. See `confirmLeave`.
+   */
+  const [draft, setDraft] = useState('')
   const title = conversationTitle(conversation, organizationNames)
   const fields = conversationDetailFields(conversation)
   const labels = appliedLabels(conversation)
-  const offerable = offerableLabels(details.all, conversation)
   const showLabels = canLabel(conversation, viewerRole)
   const showNotes = canReadNotes(conversation, viewerRole)
   const members = isStaffConversation(conversation) ? conversation.members : []
   const isGroup =
     conversation.type === 'group' || conversation.type === 'community_announcement'
 
+  /**
+   * Leaving with a note half-written.
+   *
+   * A note is the one thing on this screen that is not saved as it is made: a
+   * label is written the moment it is tapped, and a note sits in a field until
+   * somebody presses Add. Walking out of the screen would take it with no sign
+   * that anything was lost, so it asks first — and the answer is destructive, so
+   * Discard is the one that has to be chosen rather than the one that happens by
+   * default.
+   */
+  const leave = useCallback(() => router.back(), [])
+  const confirmLeave = useCallback(() => {
+    if (draft.trim() === '') {
+      leave()
+      return true
+    }
+    Alert.alert(
+      'Discard this note?',
+      'It has not been added to the conversation yet.',
+      [
+        { text: 'Keep writing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: leave },
+      ],
+    )
+    return true
+  }, [draft, leave])
+
+  // Android's own Back is the other way out, and it loses a draft just as
+  // thoroughly as the header's.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', confirmLeave)
+    return () => sub.remove()
+  }, [confirmLeave])
+
   return (
     <View className="flex-1 bg-bg">
-      <InScreenHeader>
+      <InScreenHeader onBack={confirmLeave}>
         <View className="min-w-0 flex-1 pr-2">
           <Text variant="body" className="font-semibold text-ink" numberOfLines={1}>
             Conversation details
@@ -149,11 +191,13 @@ export function ConversationDetailsScreen({
         {showLabels ? (
           <LabelsSection
             applied={labels}
-            offerable={offerable}
+            labels={details.labels}
+            conversation={conversation}
             busy={details.labelBusy}
             error={details.labelError}
             onAttach={details.attach}
             onDetach={details.detach}
+            onReloadLabels={details.reloadLabels}
           />
         ) : null}
 
@@ -164,12 +208,14 @@ export function ConversationDetailsScreen({
             onAdd={details.addNote}
             adding={details.addingNote}
             error={details.noteError}
+            draft={draft}
+            onChangeDraft={setDraft}
           />
         ) : null}
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Shared in chat, ${sharedCount} items`}
+          accessibilityLabel="Shared in chat"
           onPress={() => router.push(chatMediaHref(conversation.id))}
           className="min-h-11 flex-row items-center gap-3 rounded-2xl border border-line/70 bg-surface px-3 py-3 active:opacity-70"
         >
@@ -180,10 +226,11 @@ export function ConversationDetailsScreen({
             <Text variant="meta" className="font-semibold text-ink">
               Shared in chat
             </Text>
+            {/* No count. What is shared lives a page fetch away, and a number
+                here would either cost that fetch on the way into this screen or
+                report only the page the thread happened to hold. */}
             <Text variant="label" className="mt-0.5 font-normal text-muted">
-              {sharedCount === 0
-                ? 'Photos, videos, voice notes, documents and links'
-                : `${sharedCount} shared so far`}
+              Photos, videos, voice notes, documents and links
             </Text>
           </View>
           <ChevronRight color={colors.muted} size={18} />
@@ -274,23 +321,33 @@ function Section({
  * too — a label is one tap to add and one to take off, and a separate delete
  * affordance beside each would be a second control for a reversible action.
  * The × says so, because a chip that reads as a badge is not obviously a button.
+ *
+ * No confirm on removal, deliberately: the chip reappears under *Add a label*
+ * the moment it comes off, so undoing is the same one tap that did it. A dialog
+ * in front of that would cost more than the mistake it prevents.
  */
 function LabelsSection({
   applied,
-  offerable,
+  labels,
+  conversation,
   busy,
   error,
   onAttach,
   onDetach,
+  onReloadLabels,
 }: {
-  applied: { id: string; name: string; color: Parameters<typeof labelChipColors>[0] }[]
-  offerable: { id: string; name: string; color: Parameters<typeof labelChipColors>[0] }[]
+  applied: Label[]
+  labels: LabelsState
+  conversation: Conversation
   busy: string | null
   error: string | null
   onAttach: (id: string) => void
   onDetach: (id: string) => void
+  onReloadLabels: () => void
 }) {
   const [adding, setAdding] = useState(false)
+  const offerable =
+    labels.status === 'ready' ? offerableLabels(labels.labels, conversation) : []
 
   return (
     <Section
@@ -302,7 +359,7 @@ function LabelsSection({
             accessibilityLabel={adding ? 'Done adding labels' : 'Add a label'}
             accessibilityState={{ expanded: adding }}
             onPress={() => setAdding((open) => !open)}
-            hitSlop={10}
+            hitSlop={12}
             className="flex-row items-center gap-1 active:opacity-60"
           >
             {adding ? (
@@ -318,30 +375,16 @@ function LabelsSection({
       }
     >
       <View className="flex-row flex-wrap gap-1.5">
-        {applied.map((label) => {
-          const chip = labelChipColors(label.color)
-          const working = busy === label.id
-          return (
-            <Pressable
-              key={label.id}
-              accessibilityRole="button"
-              accessibilityLabel={`Remove label ${label.name}`}
-              accessibilityState={{ busy: working, disabled: busy !== null }}
-              disabled={busy !== null}
-              onPress={() => onDetach(label.id)}
-              style={{ backgroundColor: chip.wash }}
-              className={cn(
-                'min-h-8 flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-70',
-                working && 'opacity-60',
-              )}
-            >
-              <Text variant="label" style={{ color: chip.ink }} className="font-semibold">
-                {label.name}
-              </Text>
-              <X color={chip.ink} size={12} />
-            </Pressable>
-          )
-        })}
+        {applied.map((label) => (
+          <LabelChip
+            key={label.id}
+            label={label}
+            action="remove"
+            busy={busy === label.id}
+            disabled={busy !== null}
+            onPress={onDetach}
+          />
+        ))}
         {applied.length === 0 ? (
           <Text variant="meta" className="text-muted">
             No labels attached
@@ -349,40 +392,42 @@ function LabelsSection({
         ) : null}
       </View>
 
+      {/*
+        A list that would not load is not an organization with no labels in it,
+        and the difference is the whole reason to say anything: one of the two is
+        worth asking again for, and an Add control that simply never appears
+        cannot be told apart from the other.
+      */}
+      {labels.status === 'failed' ? (
+        <View className="items-start gap-2" accessibilityLiveRegion="polite">
+          <View className="flex-row items-center gap-1.5">
+            <AlertCircle color={colors.danger} size={14} />
+            <Text variant="meta" className="text-danger">
+              The labels for this organization could not be loaded.
+            </Text>
+          </View>
+          <Button variant="outline" size="sm" onPress={onReloadLabels}>
+            <Text>Try again</Text>
+          </Button>
+        </View>
+      ) : null}
+
       {adding && offerable.length > 0 ? (
         <View className="gap-1.5 border-t border-line/70 pt-3">
           <Text variant="label" className="uppercase tracking-wide text-muted">
             Add a label
           </Text>
           <View className="flex-row flex-wrap gap-1.5">
-            {offerable.map((label) => {
-              const chip = labelChipColors(label.color)
-              const working = busy === label.id
-              return (
-                <Pressable
-                  key={label.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Add label ${label.name}`}
-                  accessibilityState={{ busy: working, disabled: busy !== null }}
-                  disabled={busy !== null}
-                  onPress={() => onAttach(label.id)}
-                  style={{ backgroundColor: chip.wash }}
-                  className={cn(
-                    'min-h-8 flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-70',
-                    working && 'opacity-60',
-                  )}
-                >
-                  <Plus color={chip.ink} size={12} />
-                  <Text
-                    variant="label"
-                    style={{ color: chip.ink }}
-                    className="font-semibold"
-                  >
-                    {label.name}
-                  </Text>
-                </Pressable>
-              )
-            })}
+            {offerable.map((label) => (
+              <LabelChip
+                key={label.id}
+                label={label}
+                action="add"
+                busy={busy === label.id}
+                disabled={busy !== null}
+                onPress={onAttach}
+              />
+            ))}
           </View>
         </View>
       ) : null}
@@ -395,6 +440,56 @@ function LabelsSection({
     </Section>
   )
 }
+
+/**
+ * One label, as a chip that does what its icon says.
+ *
+ * A stadium at chip weight rather than at 44 dp: the visual is the web client's
+ * chip, and a row of them at touch height would read as a row of buttons.
+ * `hitSlop` is what makes the target the size a thumb needs — AGENTS.md, "if
+ * visual <24px, expand hit area". Horizontal slop is smaller than vertical
+ * because chips sit shoulder to shoulder and a wide one would swallow its
+ * neighbour's edge.
+ */
+function LabelChip({
+  label,
+  action,
+  busy,
+  disabled,
+  onPress,
+}: {
+  label: Label
+  action: 'add' | 'remove'
+  busy: boolean
+  disabled: boolean
+  onPress: (id: string) => void
+}) {
+  const chip = labelChipColors(label.color)
+  const removing = action === 'remove'
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${removing ? 'Remove' : 'Add'} label ${label.name}`}
+      accessibilityState={{ busy, disabled }}
+      disabled={disabled}
+      hitSlop={{ top: 10, bottom: 10, left: 3, right: 3 }}
+      onPress={() => onPress(label.id)}
+      style={{ backgroundColor: chip.wash }}
+      className={cn(
+        'min-h-8 flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-70',
+        busy && 'opacity-60',
+      )}
+    >
+      {removing ? null : <Plus color={chip.ink} size={12} />}
+      <Text variant="label" style={{ color: chip.ink }} className="font-semibold">
+        {label.name}
+      </Text>
+      {removing ? <X color={chip.ink} size={12} /> : null}
+    </Pressable>
+  )
+}
+
 
 /**
  * The notes staff have written about this thread.
@@ -410,14 +505,22 @@ function NotesSection({
   onAdd,
   adding,
   error,
+  draft,
+  onChangeDraft,
 }: {
   notes: ConversationDetails['notes']
   onReload: () => void
   onAdd: (text: string) => void
   adding: boolean
   error: string | null
+  /**
+   * Held by the screen rather than here, so that leaving with something typed
+   * can be caught before it is lost. See `confirmLeave`.
+   */
+  draft: string
+  onChangeDraft: (text: string) => void
 }) {
-  const [draft, setDraft] = useState('')
+  const setDraft = onChangeDraft
 
   function submit() {
     const trimmed = draft.trim()

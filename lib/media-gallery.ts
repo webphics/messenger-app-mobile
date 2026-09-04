@@ -123,6 +123,16 @@ export function galleryContents(
     const message = messages[i]!
     if (isSystemMessage(message)) continue
 
+    /**
+     * A message the recorder sent is a voice note whatever its files claim.
+     *
+     * The API names its objects from the multipart part, so a recording can come
+     * back typed `application/octet-stream` and sort itself into Docs on kind
+     * alone. The web client reads `messageType` here for the same reason, and the
+     * two clients must not file one message under different tabs.
+     */
+    const recorded = message.messageType === 'voice'
+
     attachmentViews(message.attachments, baseUrl).forEach((attachment, index) => {
       const item: GalleryItem = {
         id: `${message.id}:${index}`,
@@ -130,8 +140,8 @@ export function galleryContents(
         messageId: message.id,
         sentAt: message.createdAt,
       }
-      if (attachment.kind === 'image' || attachment.kind === 'video') media.push(item)
-      else if (attachment.kind === 'audio') voice.push(item)
+      if (recorded || attachment.kind === 'audio') voice.push(item)
+      else if (attachment.kind === 'image' || attachment.kind === 'video') media.push(item)
       else docs.push(item)
     })
 

@@ -92,6 +92,23 @@ describe('galleryContents', () => {
     })
   })
 
+  test('a voice message is voice whatever its files claim to be', () => {
+    // The recorder's own `messageType`, not the MIME type: the API stores what
+    // the multipart part was called, and a voice note that arrives typed
+    // `application/octet-stream` is still a voice note. The web client reads it
+    // the same way, and the two must not sort the same message differently.
+    const contents = galleryContents(
+      [
+        message('m1', '2026-01-01T00:00:00Z', [
+          attachment({ type: 'application/octet-stream', url: '/files/note.m4a' }),
+        ], { messageType: 'voice' }),
+      ],
+      BASE,
+    )
+    expect(contents.voice).toHaveLength(1)
+    expect(contents.docs).toHaveLength(0)
+  })
+
   test('the MIME type decides which tab an attachment lands under', () => {
     const contents = galleryContents(
       [

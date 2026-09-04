@@ -427,20 +427,20 @@ export async function listNotes(id: string): Promise<ApiResult<ConversationNote[
   return readOutcome(outcome, parseNotes)
 }
 
-/** Write one. `messageId` names the message it is about, where there is one. */
+/**
+ * Write one.
+ *
+ * Text only. The API also takes a `messageId`, which is what the web client's
+ * note-on-a-message affordance sends and what its "Jump to message" reads back —
+ * neither of which this client has, so nothing here would have one to pass.
+ */
 export async function createNote(
   id: string,
-  note: { text: string; messageId?: string },
+  text: string,
 ): Promise<ApiResult<ConversationNote>> {
   const outcome = await authenticatedRequest(
     `/conversations/${encodeURIComponent(id)}/notes`,
-    {
-      method: 'POST',
-      body: {
-        text: note.text,
-        ...(note.messageId ? { messageId: note.messageId } : {}),
-      },
-    },
+    { method: 'POST', body: { text } },
   )
   return readOutcome(outcome, parseNote)
 }
