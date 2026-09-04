@@ -17,6 +17,19 @@ The cost is that one endpoint does not go through `fetch`, so its answer arrives
 shape by hand. That is a dozen lines in one place, against every upload in the app being bounded by
 available memory.
 
+## The deadline measures silence, not duration
+
+Every request through `api-client` is abandoned after a Request deadline, and an upload is not
+exempt: `File#upload` takes the same `AbortSignal` and rejects on it, so an abandoned upload arrives
+as the transport failure every other abandoned request does.
+
+It is the same fifteen seconds, and it means something different here, which is the part worth
+writing down. A deadline on total duration would abandon a fifteen-megabyte video on a slow
+connection for the crime of being large — the exact upload this transport exists to make possible.
+So the uploader's `onProgress` pushes the deadline back on every report of bytes leaving, and only
+silence ends it. `fetch` has no equivalent and needs none: it reports nothing until it has an
+answer, and the answers on those paths are JSON.
+
 Supersedes the "no upload pipeline" half of
 [ADR-0003](./ADR-0003-local-message-attachments.md): the bubble shape it chose is unchanged, and the
 device URI it stored is now what an upload starts from rather than what a message keeps.

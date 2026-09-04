@@ -92,6 +92,17 @@ _Avoid_: Session token, JWT, access token, bearer token
 The double-submit value fetched from the API and sent as `X-CSRF-Token` on every mutation, alongside the `csrf-token` cookie it is paired with. Not bound to a session — one is fetched, cached, and reused until the API rejects it.
 _Avoid_: XSRF token, nonce, anti-forgery token
 
+**Request deadline**:
+The bounded silence every round trip through `lib/api-client` is given before it is abandoned —
+fifteen seconds each, the CSRF pre-flight and the streamed upload included, and a body that stalls
+after its headers arrived counts as silence too. Per round trip rather than per call, so a mutation
+whose pre-flight is also hung is bounded by several of them rather than by one. An abandoned
+request is a transport failure and nothing else: it is the same `{ reached: false }` a dead network
+produces, so it reads as Hydration's Unreachable outcome and is never a Session expiry. It measures
+silence rather than duration, which is why an upload still reporting bytes is never abandoned for
+being large.
+_Avoid_: Timeout (as a state the app has), request expiry, retry window
+
 **Seed account**:
 An account the API's seeder created, offered as a chip on the sign-in screen so a developer can reach
 each Hub without three real accounts. Read from `EXPO_PUBLIC_DEV_SEED_ACCOUNTS` behind `__DEV__`, so it
@@ -153,7 +164,7 @@ Either of the two ways a session stops: signing out, deliberately, and Session e
 _Avoid_: Session exit, teardown, logout (as the name for both)
 
 **Session expiry**:
-The involuntary Session end. The API's sessions are a seven-day sliding window with no refresh token, so a Session cookie simply stops being accepted; an authenticated request answered `401` discards it and returns the person to sign-in with an explanation, never to a screen that has quietly stopped loading. A `403` is not one — that is a verdict on the request, not on the session — and neither is a transport failure, which changes nothing.
+The involuntary Session end. The API's sessions are a seven-day sliding window with no refresh token, so a Session cookie simply stops being accepted; an authenticated request answered `401` discards it and returns the person to sign-in with an explanation, never to a screen that has quietly stopped loading. A `403` is not one — that is a verdict on the request, not on the session — and neither is a transport failure, which changes nothing. A request abandoned on its Request deadline is a transport failure by construction, because silence says nothing about whether the cookie is still good: reading it otherwise would end a session because a train went into a tunnel.
 _Avoid_: Session timeout, token refresh
 
 **Unassigned pool**:
