@@ -550,7 +550,7 @@ export function withIncomingMessage(
     // A message the viewer wrote elsewhere is read by definition; anyone else's
     // is not, whatever the row said a moment ago.
     lastMessageRead: mine,
-    unreadCount: nextUnreadCount(held.unreadCount, mine),
+    unreadCount: nextUnreadCount(held.unreadCount, message, mine),
   }
 
   return sortConversations(next)
@@ -560,10 +560,28 @@ export function withIncomingMessage(
  * Null stays null: it means the API declined to count, not that there is
  * nothing. `isConversationUnread` reads the receipt instead for those rows, and
  * the fields above have just told it the truth.
+ *
+ * A `system` notice is never counted, and that is the one rule here only Staff
+ * ever exercise — the API withholds notices from a Customer's socket. An
+ * Engage, a Takeover or a Transfer is the thread's record of something that
+ * happened rather than something a person has to answer, and the API counts it
+ * that way: `countUnreadMessagesFor` excludes `system` outright. Counting one
+ * here would raise a staff badge that the next list fetch takes straight back
+ * down, which is the one divergence a live count can afford least.
+ *
+ * The count is all a notice is withheld from. Every other field above still
+ * follows it, because the row the API sends beside it follows it too — a notice
+ * is the thread's newest message, and the preview, the order and the receipt
+ * all say so.
  */
-function nextUnreadCount(held: number | null, mine: boolean): number | null {
+function nextUnreadCount(
+  held: number | null,
+  message: Message,
+  mine: boolean,
+): number | null {
   if (held === null) return null
-  return mine ? held : held + 1
+  if (mine || isSystemMessage(message)) return held
+  return held + 1
 }
 
 /**

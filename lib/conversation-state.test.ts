@@ -979,6 +979,90 @@ describe('withIncomingMessage', () => {
       withIncomingMessage(rows, 'conv-1', event.message, 'customer-1')[0].lastMessagePreview,
     ).toHaveLength(140)
   })
+
+  describe('a staff row', () => {
+    const staffRows = [conversation({ id: 'conv-1', unreadCount: 2 })]
+
+    test('counts another agent’s reply', () => {
+      const message = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
+        body: 'Taking this one',
+        sender: { id: 'agent-2', name: 'Rae', role: 'agent' },
+      })
+
+      expect(withIncomingMessage(staffRows, 'conv-1', message, 'agent-1')[0]).toMatchObject({
+        unreadCount: 3,
+        lastMessagePreview: 'Taking this one',
+        lastMessageMine: false,
+        lastMessageRead: false,
+      })
+    })
+
+    test('counts nothing for the staff member’s own reply, sent from elsewhere', () => {
+      const message = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
+        body: 'On it',
+        receiptStatus: 'delivered',
+      })
+
+      expect(withIncomingMessage(staffRows, 'conv-1', message, 'agent-1')[0]).toMatchObject({
+        unreadCount: 2,
+        lastMessageMine: true,
+        lastMessageRead: true,
+        lastMessageReceiptStatus: 'delivered',
+      })
+    })
+
+    test('an Engage notice moves the row without counting, as the API counts it', () => {
+      const notice = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
+        messageType: 'system',
+        body: 'Rae joined the support chat',
+        sender: { id: 'agent-2', name: 'Rae', role: 'agent' },
+      })
+
+      expect(withIncomingMessage(staffRows, 'conv-1', notice, 'agent-1')[0]).toMatchObject({
+        unreadCount: 2,
+        lastMessageAt: '2026-08-13T10:00:00.000Z',
+        lastMessagePreview: 'Rae joined the support chat',
+      })
+    })
+
+    test('the count is all a notice is withheld from', () => {
+      const notice = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
+        messageType: 'system',
+        receiptStatus: 'delivered',
+        sender: { id: 'agent-1', name: 'Jonah Reed', role: 'agent' },
+      })
+
+      // The row the API sends beside the notice derives all three from it, so a
+      // client that froze them would diverge until the next list fetch.
+      expect(withIncomingMessage(staffRows, 'conv-1', notice, 'agent-1')[0]).toMatchObject({
+        lastMessageMine: true,
+        lastMessageReceiptStatus: 'delivered',
+        lastMessageRead: true,
+      })
+    })
+
+    test('an uncounted row is left uncounted, the notice included', () => {
+      const held = [conversation({ id: 'conv-1', unreadCount: null, lastMessageRead: true })]
+      const notice = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
+        messageType: 'system',
+        sender: { id: 'agent-2', name: 'Rae', role: 'agent' },
+      })
+
+      // Null means the API declined to count, so there is no count to withhold
+      // the notice from. What the row reads as then is the receipt's business,
+      // and the `conversation.updated` beside the notice restates it either way.
+      expect(withIncomingMessage(held, 'conv-1', notice, 'agent-1')[0].unreadCount).toBeNull()
+    })
+
+    test('the tab badge does not move for a notice', () => {
+      const notice = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
+        messageType: 'system',
+        sender: { id: 'agent-2', name: 'Rae', role: 'agent' },
+      })
+
+      expect(totalUnread(withIncomingMessage(staffRows, 'conv-1', notice, 'agent-1'))).toBe(2)
+    })
+  })
 })
 
 describe('withoutConversation', () => {
