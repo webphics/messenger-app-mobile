@@ -82,7 +82,15 @@ function ContactItemSeparator() {
   return <View className="h-2.5" />;
 }
 
-function DirectoryNotice({ title, hint }: { title: string; hint: string }) {
+function DirectoryNotice({
+  title,
+  hint,
+  onRetry,
+}: {
+  title: string;
+  hint: string;
+  onRetry?: () => void;
+}) {
   const reduceMotion = useReducedMotion();
   return (
     <Animated.View
@@ -96,7 +104,36 @@ function DirectoryNotice({ title, hint }: { title: string; hint: string }) {
       <Text variant="meta" className="mt-1 text-center text-muted">
         {hint}
       </Text>
+      {onRetry ? (
+        <TactilePressable
+          accessibilityRole="button"
+          accessibilityLabel="Try again"
+          onPress={onRetry}
+          className="mt-4 min-h-11 justify-center rounded-full bg-primary px-5"
+        >
+          <Text variant="label" className="font-semibold text-primary-foreground">
+            Try again
+          </Text>
+        </TactilePressable>
+      ) : null}
     </Animated.View>
+  );
+}
+
+/** One row-shaped placeholder, matching ContactPickerRow's layout so the list doesn't reflow when the directory lands. */
+function DirectoryLoadingRow() {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-3.5"
+    >
+      <View className="size-11 rounded-full bg-muted/15" />
+      <View className="flex-1 gap-2">
+        <View className="h-3.5 w-1/3 rounded-full bg-muted/15" />
+        <View className="h-3 w-1/2 rounded-full bg-muted/10" />
+      </View>
+    </View>
   );
 }
 
@@ -269,7 +306,7 @@ function NewChatSheet({
   /** Whose request was refused, and what the API said about it. */
   const [refusal, setRefusal] = useState<{ id: string; message: string } | null>(null);
 
-  useEffect(() => {
+  const fetchDirectory = useCallback(() => {
     let live = true;
     void listStaffDirectory().then((result) => {
       if (!live) return;
@@ -277,13 +314,21 @@ function NewChatSheet({
         setDirectory({ status: "ready", people: result.value });
         return;
       }
-      const notice = failureNotice(result.failure);
+      const notice = failureNotice(result.failure, "Could not load the staff directory");
       setDirectory({ status: "failed", title: notice.title, hint: notice.hint });
     });
     return () => {
       live = false;
     };
   }, []);
+
+  useEffect(() => fetchDirectory(), [fetchDirectory]);
+
+  /** The retry button's handler — unlike the mount effect, this needs to visibly reset to loading first. */
+  const retryDirectory = useCallback(() => {
+    setDirectory({ status: "loading" });
+    fetchDirectory();
+  }, [fetchDirectory]);
 
   const people = useMemo(
     () => (directory.status === "ready" ? directory.people : NO_STAFF),
@@ -399,14 +444,17 @@ function NewChatSheet({
         renderItem={renderItem}
         ListEmptyComponent={
           directory.status === "loading" ? (
-            <View className="items-center px-4 py-12">
-              <ActivityIndicator color={colors.primary} />
-              <Text variant="meta" className="mt-4 text-muted">
-                Loading directory…
-              </Text>
+            <View accessibilityLabel="Loading directory" className="gap-2.5">
+              <DirectoryLoadingRow />
+              <DirectoryLoadingRow />
+              <DirectoryLoadingRow />
             </View>
           ) : directory.status === "failed" ? (
-            <DirectoryNotice title={directory.title} hint={directory.hint} />
+            <DirectoryNotice
+              title={directory.title}
+              hint={directory.hint}
+              onRetry={retryDirectory}
+            />
           ) : (
             <DirectoryNotice
               title="No matching staff"

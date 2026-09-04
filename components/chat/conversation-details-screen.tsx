@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AlertCircle, ChevronRight, Image as ImageIcon, Plus, X } from '@/components/icons'
@@ -111,12 +111,30 @@ export function ConversationDetailsScreen({
     return true
   }, [draft, leave])
 
-  // Android's own Back is the other way out, and it loses a draft just as
+  // Android's own Back is one other way out, and it loses a draft just as
   // thoroughly as the header's.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', confirmLeave)
     return () => sub.remove()
   }, [confirmLeave])
+
+  // iOS's edge-swipe is a third way out this stack screen allows, and it does
+  // not go through `onBack` or hardware Back at all — only `beforeRemove` sees it.
+  const navigation = useNavigation()
+  useEffect(() => {
+    return navigation.addListener('beforeRemove', (e) => {
+      if (draft.trim() === '') return
+      e.preventDefault()
+      Alert.alert('Discard this note?', 'It has not been added to the conversation yet.', [
+        { text: 'Keep writing', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => navigation.dispatch(e.data.action),
+        },
+      ])
+    })
+  }, [draft, navigation])
 
   return (
     <View className="flex-1 bg-bg">
@@ -522,11 +540,19 @@ function NotesSection({
 }) {
   const setDraft = onChangeDraft
 
+  // A note is cleared only once `adding` resolves without an error — clearing
+  // it at submit time would lose what was typed the moment the request fails,
+  // the same mistake `thread-screen.tsx` avoids for a refused send.
+  const wasAdding = useRef(adding)
+  useEffect(() => {
+    if (wasAdding.current && !adding && !error) setDraft('')
+    wasAdding.current = adding
+  }, [adding, error, setDraft])
+
   function submit() {
     const trimmed = draft.trim()
     if (trimmed === '' || adding) return
     onAdd(trimmed)
-    setDraft('')
   }
 
   return (

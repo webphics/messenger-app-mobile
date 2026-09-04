@@ -14,6 +14,19 @@ describe('failureNotice', () => {
     )
   })
 
+  test('titles a refusal for conversations by default', () => {
+    expect(failureNotice({ kind: 'refused', message: 'x' }).title).toBe(
+      'Could not load conversations',
+    )
+  })
+
+  test('takes a caller-supplied title for a refusal in a different context', () => {
+    expect(
+      failureNotice({ kind: 'refused', message: 'x' }, 'Could not load the staff directory')
+        .title,
+    ).toBe('Could not load the staff directory')
+  })
+
   test('says a session ended rather than showing an empty inbox', () => {
     expect(failureNotice({ kind: 'unauthorised' }).title).toBe('Your session ended')
   })

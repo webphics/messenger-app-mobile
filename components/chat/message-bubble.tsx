@@ -132,7 +132,7 @@ function Delivery({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Not sent. Tap to send again."
+      accessibilityLabel={onRetry ? "Not sent. Tap to send again." : "Not sent."}
       accessibilityLiveRegion="polite"
       onPress={() => onRetry?.(messageId)}
       disabled={!onRetry}

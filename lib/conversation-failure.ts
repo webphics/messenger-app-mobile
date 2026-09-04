@@ -12,7 +12,10 @@ export type FailureNotice = { title: string; hint: string }
  * auth layer is already moving to sign-in around it — so a screen that lingers
  * for a frame does not read as an empty inbox.
  */
-export function failureNotice(failure: ApiFailure): FailureNotice {
+export function failureNotice(
+  failure: ApiFailure,
+  refusedTitle = 'Could not load conversations',
+): FailureNotice {
   switch (failure.kind) {
     case 'unreachable':
       return {
@@ -25,7 +28,7 @@ export function failureNotice(failure: ApiFailure): FailureNotice {
         hint: 'Sign in again to pick up where you left off.',
       }
     case 'refused':
-      return { title: 'Could not load conversations', hint: failure.message }
+      return { title: refusedTitle, hint: failure.message }
     case 'malformed':
       return {
         title: 'Could not read the reply',

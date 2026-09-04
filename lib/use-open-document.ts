@@ -64,5 +64,7 @@ export function useOpenDocument(attachment: AttachmentView): OpenDocument {
     }
   }, [name, opening, uri])
 
-  return { open: () => void open(), opening }
+  const openNow = useCallback(() => void open(), [open])
+
+  return { open: openNow, opening }
 }

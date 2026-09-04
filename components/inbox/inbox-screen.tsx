@@ -1,7 +1,7 @@
 import { useNavigation, useRouter } from "expo-router";
 import { CloudOff, Inbox, MessageCircle, SquarePen } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, View } from "react-native";
+import { FlatList, View } from "react-native";
 
 import { ConversationRow } from "@/components/inbox/conversation-row";
 import { NewChatModal } from "@/components/inbox/new-chat-modal";
@@ -67,14 +67,31 @@ function InboxEmpty({ showChips }: { showChips: boolean }) {
   );
 }
 
-/** The first fetch, with nothing to show yet. */
+/** One row-shaped placeholder, matching ConversationRow's layout so the list doesn't reflow when data lands. */
+function InboxLoadingRow() {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="flex-row items-center gap-3.5 rounded-3xl border border-line/70 bg-surface p-4"
+    >
+      <View className="size-13 rounded-full bg-muted/15" />
+      <View className="flex-1 gap-2">
+        <View className="h-3.5 w-2/5 rounded-full bg-muted/15" />
+        <View className="h-3 w-4/5 rounded-full bg-muted/10" />
+      </View>
+    </View>
+  );
+}
+
+/** The first fetch, with nothing to show yet: row-shaped placeholders, not a bare spinner. */
 function InboxLoading() {
   return (
-    <View className="items-center px-4 py-16">
-      <ActivityIndicator color={colors.primary} />
-      <Text variant="meta" className="mt-4 text-muted">
-        Loading conversations…
-      </Text>
+    <View accessibilityLabel="Loading conversations" className="gap-3 px-4 pt-1">
+      <InboxLoadingRow />
+      <InboxLoadingRow />
+      <InboxLoadingRow />
+      <InboxLoadingRow />
     </View>
   );
 }
