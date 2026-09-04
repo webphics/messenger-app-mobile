@@ -269,6 +269,27 @@ function markThreadWritten(
   writtenMessages.set(key, already)
 }
 
+/**
+ * Threads the Store has taken history from and has not Restored since.
+ *
+ * A sweep leaves the disk holding one coherent run — a thread's newest fifty and
+ * a frontier that reads back to the oldest of them. Memory is still holding
+ * whatever it held, which for a thread somebody scrolled deep is more, and
+ * further back. Patching that memory onto this disk is what would put a hole in
+ * it: a page fetched below what memory holds lands under the fifty with the
+ * evicted history missing in between, and nothing on the way back in could tell.
+ *
+ * So a swept thread stops accepting writes. The cost is that a Message arriving
+ * in it before it is next opened is not persisted, which costs a request on some
+ * later launch. The alternative is a thread that reads from today into last
+ * month with no way to ask for what fell out.
+ *
+ * Cleared by `restoreThread`, which is the moment the two copies are the same
+ * again, and by a `replace`, which rebuilds the thread whole rather than
+ * patching it.
+ */
+const sweptThreads = new Set<string>()
+
 let draining: Promise<void> | null = null
 
 /**
@@ -343,6 +364,10 @@ export function restoreThread(
   if (!database) return null
 
   try {
+    // Reading the thread back is the moment memory and disk are the same run of
+    // history again, so whatever a sweep took from it is no longer a reason to
+    // refuse its writes. See `sweptThreads`.
+    sweptThreads.delete(threadKey(ownerId, conversationId))
     const messages = fromMessageRows(
       database.getAllSync(
         `SELECT * FROM messages WHERE owner_id = ? AND conversation_id = ?
@@ -446,6 +471,7 @@ function discard(): void {
   written.clear()
   writtenMessages.clear()
   frontiers.clear()
+  sweptThreads.clear()
   try {
     connection?.closeSync()
     SQLite.deleteDatabaseSync(DATABASE_NAME)
@@ -579,6 +605,13 @@ async function writeThread(pending: PendingThread): Promise<void> {
 
   const { ownerId, conversationId, messages, paging } = pending
   const key = threadKey(ownerId, conversationId)
+  // A thread a sweep has taken history from takes nothing further until it is
+  // Restored — except a replace, which rebuilds it whole and so cannot leave a
+  // hole in it. See `sweptThreads`.
+  if (sweptThreads.has(key)) {
+    if (!pending.replace) return
+    sweptThreads.delete(key)
+  }
   if (pending.replace) writtenMessages.delete(key)
 
   const already = writtenMessages.get(key) ?? new Map<string, Message>()
@@ -644,14 +677,23 @@ async function writeThread(pending: PendingThread): Promise<void> {
  * the table it is tested against.
  *
  * Conversations are untouched by construction: a plan is a list of threads to
- * take Messages from, and there is no statement here that could reach the
- * `conversations` table for anything but the paging of a thread it just emptied.
+ * take Messages from, and the only statement here that reaches the
+ * `conversations` table writes the paging of a thread this has just taken
+ * Messages from.
  *
- * That paging is reset with the Messages, and it has to be. A cursor is where
- * the next page reads backwards *from*, so one left pointing past history this
- * device no longer holds would make the next scroll ask the API for the page
- * before something already gone — and read straight over everything between,
- * with no way left to ask for it.
+ * That paging is reset for every thread swept — the ones emptied and the ones
+ * shortened alike — and it has to be for both. A cursor is where the next page
+ * reads backwards *from*, so one left pointing past history this device no
+ * longer holds would make the next scroll ask the API for the page before
+ * something already gone, and read straight over everything between with no way
+ * left to ask for it. A shortened thread is the case that is easy to miss: it
+ * still has Messages, and its cursor is further back than the oldest of them.
+ *
+ * What was believed to be on disk is deliberately *not* forgotten. Those rows
+ * were removed on purpose, and a write that put them straight back would be a
+ * write that undoes itself — see `writtenMessages`, which answers "which of
+ * these is not the row already there" and must keep answering no for a Message
+ * this has just discarded.
  *
  * Nothing here throws. A count that will not read, a delete the database
  * refuses: each is swallowed, and the cost is a Store that stays larger than it
@@ -663,9 +705,9 @@ async function evict(
   writtenTo: string,
 ): Promise<void> {
   try {
-    const plan = planEviction(storedThreads(database, ownerId), { spare: writtenTo })
-    const evicted = [...plan.drop, ...plan.shorten]
-    if (evicted.length === 0) return
+    const plan = planEviction(await storedThreads(database, ownerId), { spare: writtenTo })
+    const swept = [...plan.drop, ...plan.shorten]
+    if (swept.length === 0) return
 
     await database.withTransactionAsync(async () => {
       for (const conversationId of plan.drop) {
@@ -691,7 +733,7 @@ async function evict(
 
       // The same statement a thread's own frontier is written with, given the
       // defaults `emptyThread` would hand a conversation nobody has opened.
-      for (const conversationId of evicted) {
+      for (const conversationId of swept) {
         await database.runAsync(
           'UPDATE conversations SET has_more = ?, cursor = ? WHERE owner_id = ? AND id = ?',
           1,
@@ -702,13 +744,12 @@ async function evict(
       }
     })
 
-    for (const conversationId of evicted) {
-      // What was removed on purpose must not be put back by the next write, and
-      // the frontier held in memory is the one a full write of the list would
+    for (const conversationId of swept) {
+      // The frontier held in memory is the one a full write of the list would
       // otherwise carry back over the reset above. Forgetting it *is* the reset:
       // a thread with no frontier held is written with the defaults.
-      writtenMessages.delete(threadKey(ownerId, conversationId))
       frontiers.get(ownerId)?.delete(conversationId)
+      sweptThreads.add(threadKey(ownerId, conversationId))
     }
   } catch {
     // The Store stays over its limits until the next thread is written.
@@ -723,9 +764,17 @@ async function evict(
  * the *conversation's* — the column `toConversationRows` writes — rather than
  * the newest Message held, because the two part company on exactly the threads
  * worth keeping. See `StoredThread`.
+ *
+ * Asynchronous, unlike every other read here. The synchronous ones are the two a
+ * screen makes while it is deciding what to draw, and they are synchronous for
+ * that reason alone — see this module's header. This one is the largest read it
+ * has, it runs on the write path, and nobody is waiting for it.
  */
-function storedThreads(database: SQLite.SQLiteDatabase, ownerId: string): StoredThread[] {
-  const rows = database.getAllSync<{
+async function storedThreads(
+  database: SQLite.SQLiteDatabase,
+  ownerId: string,
+): Promise<StoredThread[]> {
+  const rows = await database.getAllAsync<{
     conversation_id: string
     message_count: number
     activity_at: number | null

@@ -136,8 +136,27 @@ Broadcasts are in-inbox announcements (later), not stories.
      inbox reports the fetch separately from its `status`, which a Restored list makes `ready`
      before anything has been asked of the API. Unreachable is untouched — it is a screen with a
      retry on it, not a route, and it is not folded in with the fetch gate.
-   - 6d. Messages, the Outbox, the Store's own Eviction, wiping the Store on Session end, and real
-     reactions.
+   - 6d. **A thread's Messages survive a restart (done)** — a `messages` table holding one row per
+     confirmed Message, a thread that has been opened before opening on what this device already
+     holds, and a scroll back that reads the disk a page at a time and asks the API only for history
+     the phone does not have. Unsent Messages are deliberately not written; the Outbox is its own
+     ticket.
+   - 6e. **Eviction keeps the database bounded (done)** — the other half of Eviction, and the one
+     that does touch SQLite. Every Conversation row is kept, always: a partial list is a list that
+     lies about which conversations exist, and the list is cheap. Messages are the opposite — kept
+     for the twenty most recently active threads, fifty each, and dropped for the rest, which is
+     deep history on the handful of threads anybody revisits and none on the rest. Recency is the
+     conversation's own `lastMessageAt` rather than the newest Message held, which is why the row
+     carries it as a column; that column is what took the schema to version 3. A thread whose
+     Messages went still appears in the list and fetches when opened, with its paging reset so it
+     cannot restore a cursor pointing past history it no longer has — as does a thread merely
+     shortened, whose cursor is further back than the oldest Message left in it. The sweep runs
+     after the write that grew the table rather than on a timer, so it is bounded by activity and a
+     phone left closed does nothing, and it never chooses the thread that write was for: that is
+     the thread on screen, and taking its Messages would be a write the next state change undoes.
+     Split the same way as 6a and 6b: `lib/store-eviction` is pure and table-tested,
+     `lib/conversation-store` owns the query and the transaction.
+   - 6f. The Outbox, wiping the Store on Session end, and real reactions.
 
 ## Session
 

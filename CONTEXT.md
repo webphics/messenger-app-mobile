@@ -339,9 +339,13 @@ Messages are ranked by **conversation activity** — the row's `lastMessageAt`, 
 this device happens to hold. The two part company on exactly the threads worth keeping: one that has
 been busy all morning while the person read something else holds Messages from yesterday and is the
 next thread they will open. A thread whose Messages went still appears in the list; opening it
-fetches, the same as a thread never opened, and its paging is reset with them so it cannot restore a
-cursor pointing at history it no longer has. An Unsent message is out of reach by construction — the
-Outbox is a table of its own and no sweep names it.
+fetches, the same as a thread never opened. Paging is reset for every thread a sweep touched —
+emptied or merely shortened — so none of them can restore a cursor pointing at history it no longer
+has; the shortened one is the case that is easy to miss, because it still has Messages and its
+cursor is further back than the oldest of them. What a sweep removed stays removed: a swept thread
+takes no further writes until it is Restored, because memory is still holding what was taken and
+patching that onto what is left is what would put a hole in it. An Unsent message is out of reach by
+construction — the Outbox is a table of its own and no sweep names it.
 
 Both sweeps run **after a write** rather than on a timer: a thread's Messages are the only thing that
 makes the database bigger and a download is the only thing that makes the cache bigger, so each is
