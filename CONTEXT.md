@@ -52,6 +52,36 @@ _Avoid_: Dashboard, home feed
 Uppercase eyebrow on the hub greeting block: SUPPORT, AGENT, or ADMIN. Not the header wordmark.
 _Avoid_: Customer Hub, Agent Dashboard, Executive Overview (as UI labels)
 
+**Conversation details**:
+The screen a thread's header opens: who the thread is with, its type and state, the Labels on it,
+the Internal notes about it, and the way into Shared in chat. The mobile counterpart of the web
+client's Conversation Details pane, and gated by the same rules — a Customer's payload carries no
+assignment, no labels and no notes, and the API refuses all three to a Customer who asks, so a
+Customer sees the identity, the type and Shared in chat and nothing else.
+_Avoid_: Info panel, sidebar, profile
+
+**Shared in chat**:
+Every attachment and link a conversation has carried, on one screen, under four tabs: Media, Docs,
+Voice and Links. No endpoint of its own — it reads the same message pages the thread reads, so it is
+exactly as deep as the history that has been loaded, and reaching the end of a tab asks for the page
+before it. Each kind opens the way the thread opens it.
+_Avoid_: Media library, gallery (as the UI label), attachments tab
+
+**Label**:
+A coloured tag an Admin defines for the organization and any staff member puts on a conversation.
+Organization-wide rather than per-thread: the same set is offered everywhere, and which of them a
+thread wears is on the conversation payload. An *archived* label is one an Admin has retired — it
+stays on the threads already carrying it and is offered on none. Creating, renaming and archiving
+one stays on web; this client attaches and detaches.
+_Avoid_: Tag, category, status
+
+**Internal note**:
+A staff-only note about a Support DM, never shown to the Customer and never part of the thread. On
+Support DMs only — the API answers `404` for a note request on any other conversation type — and on
+staff screens only. Distinct from a System notice, which *is* in the thread and which staff read as
+a message.
+_Avoid_: Comment, private message, annotation
+
 ### Session
 
 **Session cookie**:

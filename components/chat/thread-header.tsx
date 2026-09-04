@@ -1,11 +1,11 @@
 import { router } from "expo-router";
 import { View } from "react-native";
 
-import { Image as ImageIcon } from "@/components/icons";
+import { Info } from "@/components/icons";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { chatMediaHref } from "@/lib/chat-route-id";
+import { chatDetailsHref } from "@/lib/chat-route-id";
 import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
 import { initials } from "@/lib/display";
 import { colors } from "@/lib/tokens";
@@ -92,18 +92,22 @@ export function ThreadHeader({ conversation, organizationNames }: ThreadHeaderPr
         </View>
       ) : null}
       {/*
-        The way into this conversation's media. In the header rather than in the
-        composer's attachment sheet, because that sheet is for adding a file and
-        this is for finding one that was already sent — and because a read-only
-        thread has no composer at all, while its media is still worth looking at.
+        The way into everything this thread is besides its messages: who it is
+        with, what state it is in, the labels and notes on it, and everything
+        shared in it. One control rather than several, because they are one
+        screen — the web client's Conversation Details pane, which this mirrors.
+
+        In the header rather than in the composer's attachment sheet: that sheet
+        is for adding a file, and a read-only thread has no composer at all while
+        still having details worth reading.
       */}
       <TactilePressable
         accessibilityRole="button"
-        accessibilityLabel="Media in this conversation"
-        onPress={() => router.push(chatMediaHref(conversation.id))}
+        accessibilityLabel="Conversation details"
+        onPress={() => router.push(chatDetailsHref(conversation.id))}
         className="size-11 shrink-0 items-center justify-center rounded-full"
       >
-        <ImageIcon color={colors.ink} size={20} />
+        <Info color={colors.ink} size={20} />
       </TactilePressable>
     </View>
   );

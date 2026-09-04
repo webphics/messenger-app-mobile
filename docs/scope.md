@@ -79,7 +79,21 @@ Broadcasts are in-inbox announcements (later), not stories.
      same rules mirrored from its `conversations.upload.ts`, and the composer keeps what was staged
      so the refusal is something a person can act on. See
      `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`.
-   - 5c. Push, i18n, list virtualization.
+   - 5c. **What a thread is, beside its messages (done)** — the header opens Conversation details:
+     the identity, the type and state, the Labels staff have put on it, the Internal notes they have
+     written about it, and a row into Shared in chat, which lists every attachment and link the
+     loaded history carries under Media / Docs / Voice / Links. Neither screen has an endpoint of its
+     own: the gallery reads the thread's own pages, and details reads the conversation the shared
+     list already holds plus `GET /conversations/labels` and `GET /conversations/:id/notes`.
+
+     Who sees what is the API's rule, mirrored rather than invented — see `lib/conversation-details`.
+     A Customer's payload carries no assignment, no labels and no notes, so a Customer's details
+     screen is the identity, the type and Shared in chat. Notes are Support DMs only, because the API
+     answers `404` for one anywhere else.
+
+     Still web-only: creating, renaming and archiving a label, and jumping from a gallery item back
+     to the message that carried it.
+   - 5d. Push, i18n, list virtualization.
 
 ## Session
 

@@ -1,6 +1,7 @@
 import { asRecord } from '@/lib/api-envelope'
 import type {
   Conversation,
+  ConversationNote,
   ConversationPerson,
   ConversationStaffPerson,
   ConversationType,
@@ -370,4 +371,45 @@ export function parseStaffDirectory(value: unknown): StaffDirectoryUser[] {
 /** GET /memberships/mine answers with rows rather than a bare array. */
 export function parseOrganizations(value: unknown): Organization[] {
   return organizations(asRecord(value)?.rows)
+}
+
+/** Every label the signed-in staff member may put on a conversation. */
+export function parseLabels(value: unknown): Label[] {
+  return labels(value)
+}
+
+/**
+ * One internal note.
+ *
+ * The author is required, unlike most of what is optional here: a note with
+ * nobody's name on it is not a note anyone can weigh, and dropping the row is
+ * more honest than attributing it to nobody.
+ */
+export function parseNote(value: unknown): ConversationNote | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  const id = text(record.id)
+  const body = text(record.text)
+  const author = asRecord(record.author)
+  const authorId = author ? text(author.id) : null
+  const authorName = author ? text(author.name) : null
+  const createdAt = timestamp(record.createdAt)
+  if (!id || !body || !authorId || !authorName || !createdAt) return null
+
+  return {
+    id,
+    text: body,
+    author: { id: authorId, name: authorName },
+    messageId: nullableText(record.messageId),
+    createdAt,
+  }
+}
+
+/** A page of notes, newest last as the API sends them. Unreadable rows drop. */
+export function parseNotes(value: unknown): ConversationNote[] {
+  return records(value).flatMap((item) => {
+    const parsed = parseNote(item)
+    return parsed ? [parsed] : []
+  })
 }

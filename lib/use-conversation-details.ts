@@ -1,0 +1,238 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import {
+  attachLabel,
+  createNote,
+  detachLabel,
+  listLabels,
+  listNotes,
+  type ApiFailure,
+} from '@/lib/conversation-api'
+import type { Conversation, ConversationNote, Label } from '@/lib/types'
+
+/**
+ * What a thread carries besides its messages: the labels on it, and the notes
+ * staff have written about it.
+ *
+ * Two fetches and three mutations, held together because they are one screen and
+ * share its lifetime. Which of them are *allowed* is not decided here —
+ * `lib/conversation-details` mirrors the API's rules and answers that, and the
+ * caller passes the answer in as `wantsLabels` and `wantsNotes`. A hook that
+ * asked anyway would turn a rule the API states plainly into a 403 on screen.
+ *
+ * A label change answers with the whole conversation, which goes into the shared
+ * list through `onUpdated` — so the chip appears here and the inbox row behind
+ * gains it in the same update, exactly as an Engage does.
+ */
+
+export type NotesState =
+  /** Not a thread that has notes, or not a person who may read them. */
+  | { status: 'unavailable' }
+  | { status: 'loading' }
+  /**
+   * Distinct from an empty list, and deliberately: "No notes yet" is a claim
+   * about the conversation, and making it while the fetch has failed tells an
+   * Agent there is nothing to read on a thread that may have several notes on
+   * it — which is exactly when they most need to know they are not seeing
+   * everything.
+   */
+  | { status: 'failed' }
+  | { status: 'ready'; notes: ConversationNote[] }
+
+export type ConversationDetails = {
+  /**
+   * Every label in the organization, archived ones included. Empty until the
+   * fetch lands, and empty for anyone who may not label. Which of them are worth
+   * *offering* on this thread is `offerableLabels`, which needs the conversation
+   * and so belongs where the conversation is.
+   */
+  all: Label[]
+  /** The label id with a request out for it, so its chip can say it is working. */
+  labelBusy: string | null
+  labelError: string | null
+  attach: (labelId: string) => void
+  detach: (labelId: string) => void
+  notes: NotesState
+  reloadNotes: () => void
+  addNote: (text: string) => void
+  addingNote: boolean
+  noteError: string | null
+}
+
+function refusal(failure: ApiFailure, fallback: string): string {
+  if (failure.kind === 'refused') return failure.message
+  if (failure.kind === 'unreachable') return 'No connection. Try again.'
+  return fallback
+}
+
+export function useConversationDetails({
+  conversationId,
+  wantsLabels,
+  wantsNotes,
+  onUpdated,
+}: {
+  conversationId: string | null
+  wantsLabels: boolean
+  wantsNotes: boolean
+  onUpdated: (conversation: Conversation) => void
+}): ConversationDetails {
+  const [all, setAll] = useState<Label[]>([])
+  const [labelBusy, setLabelBusy] = useState<string | null>(null)
+  const [labelError, setLabelError] = useState<string | null>(null)
+  const [notes, setNotes] = useState<NotesState>({ status: 'unavailable' })
+  const [addingNote, setAddingNote] = useState(false)
+  const [noteError, setNoteError] = useState<string | null>(null)
+
+  /**
+   * Which thread the answers coming back belong to. A screen left before its
+   * notes arrive must not have them appear on the next one.
+   */
+  const onScreen = useRef<string | null>(conversationId)
+
+  /** Held so the callbacks can read it without being rebuilt by every render. */
+  const notify = useRef(onUpdated)
+  useEffect(() => {
+    notify.current = onUpdated
+  }, [onUpdated])
+
+  useEffect(() => {
+    onScreen.current = conversationId
+    setLabelBusy(null)
+    setLabelError(null)
+    setNoteError(null)
+    return () => {
+      onScreen.current = null
+    }
+  }, [conversationId])
+
+  useEffect(() => {
+    if (!wantsLabels) {
+      setAll([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const result = await listLabels()
+      if (cancelled) return
+      // A label list that would not load leaves nothing to offer and says
+      // nothing about it: the chips already on the thread came with the
+      // conversation and are still there, which is the part that matters.
+      setAll(result.ok ? result.value : [])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [wantsLabels])
+
+  const loadNotes = useCallback(
+    (id: string) => {
+      setNotes({ status: 'loading' })
+      void (async () => {
+        const result = await listNotes(id)
+        if (onScreen.current !== id) return
+        setNotes(result.ok ? { status: 'ready', notes: result.value } : { status: 'failed' })
+      })()
+    },
+    [],
+  )
+
+  useEffect(() => {
+    if (!conversationId || !wantsNotes) {
+      setNotes({ status: 'unavailable' })
+      return
+    }
+    loadNotes(conversationId)
+  }, [conversationId, wantsNotes, loadNotes])
+
+  const reloadNotes = useCallback(() => {
+    if (conversationId && wantsNotes) loadNotes(conversationId)
+  }, [conversationId, wantsNotes, loadNotes])
+
+  const changeLabel = useCallback(
+    (labelId: string, change: 'attach' | 'detach') => {
+      const id = conversationId
+      if (!id || labelBusy) return
+
+      setLabelBusy(labelId)
+      setLabelError(null)
+
+      void (async () => {
+        const result =
+          change === 'attach'
+            ? await attachLabel(id, labelId)
+            : await detachLabel(id, labelId)
+
+        if (onScreen.current !== id) return
+        setLabelBusy(null)
+        if (result.ok) {
+          notify.current(result.value)
+          return
+        }
+        setLabelError(
+          refusal(
+            result.failure,
+            change === 'attach' ? 'The label could not be added.' : 'The label could not be removed.',
+          ),
+        )
+      })()
+    },
+    [conversationId, labelBusy],
+  )
+
+  const attach = useCallback(
+    (labelId: string) => changeLabel(labelId, 'attach'),
+    [changeLabel],
+  )
+  const detach = useCallback(
+    (labelId: string) => changeLabel(labelId, 'detach'),
+    [changeLabel],
+  )
+
+  /**
+   * Write a note.
+   *
+   * Appended to what is held rather than refetched: the API answers with the
+   * note it stored, and a second round trip to learn what this client already
+   * has would only make the note appear later than it needs to.
+   */
+  const addNote = useCallback(
+    (text: string) => {
+      const id = conversationId
+      const trimmed = text.trim()
+      if (!id || trimmed === '' || addingNote) return
+
+      setAddingNote(true)
+      setNoteError(null)
+
+      void (async () => {
+        const result = await createNote(id, { text: trimmed })
+        if (onScreen.current !== id) return
+        setAddingNote(false)
+
+        if (!result.ok) {
+          setNoteError(refusal(result.failure, 'The note could not be saved.'))
+          return
+        }
+        setNotes((held) =>
+          held.status === 'ready'
+            ? { status: 'ready', notes: [...held.notes, result.value] }
+            : { status: 'ready', notes: [result.value] },
+        )
+      })()
+    },
+    [addingNote, conversationId],
+  )
+
+  return {
+    all,
+    labelBusy,
+    labelError,
+    attach,
+    detach,
+    notes,
+    reloadNotes,
+    addNote,
+    addingNote,
+    noteError,
+  }
+}
