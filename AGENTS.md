@@ -19,7 +19,12 @@ the half of Eviction that touches no SQLite: the downloaded copies of documents 
 last read rather than last downloaded, which is why a hit writes a marker beside the file. A
 download still arriving is pinned, the sweep reads `attachments` and nothing else, and every
 filesystem failure in it is swallowed. Split the same way: `attachment-budget` is pure and
-table-tested, `attachment-cache` owns the filesystem. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+table-tested, `attachment-cache` owns the filesystem. #42 took the one carve-out ADR-0008 names:
+Engage and Takeover re-read the conversation from the API before they fire, so a thread somebody
+claimed while this phone held an older row leaves the Unassigned pool on the tap that lost the race,
+and the person is told who has it in words rather than shown a bare `403`. The verdict is pure
+(`assignment-precheck`) and judges the thread's state only — who may take a thread over stays the
+API's rule, mirrored once in `composer-access`. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 ## Interactions
 

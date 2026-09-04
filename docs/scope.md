@@ -66,6 +66,13 @@ Broadcasts are in-inbox announcements (later), not stories.
    taken from. See CONTEXT.md's Reassignment entry for why that event is addressed rather than
    broadcast.
 
+   Neither fires against the row on screen. Both re-read the conversation first and check what came
+   back, because the pool is the one surface several staff are competing over the same rows on: a
+   lost race names whoever holds the thread now, the re-read's row replaces the one held so the pool
+   stops offering something that is gone, and a re-read that never arrived asks about the connection
+   instead of inventing a rival. This is the carve-out in ADR-0008; every other read and every send
+   tolerates being Stale.
+
    Still web-only: transferring and closing a thread. The mobile client reads the assignment those
    actions produce and renders the notices they write, but has no control that performs one.
 5. Media, push, i18n, list virtualization.
