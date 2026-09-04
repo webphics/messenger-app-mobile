@@ -6,12 +6,15 @@ import {
   REALTIME_EVENTS,
   REALTIME_NAMESPACE,
 } from '@/lib/realtime-events'
+import { isStaffConversation } from '@/lib/types'
 
 /**
- * The payloads below are copies of what the running API emitted to a Customer's
- * socket — a staff reply into a Support DM, the row update that followed it, and
- * a deletion. Kept verbatim so a change on the API's side shows up here as a
- * failing test rather than as an empty screen.
+ * The payloads below are copies of what the running API emitted — to a
+ * Customer's socket (a staff reply into a Support DM, the row update that
+ * followed it, a deletion) and to an Agent's (the same thread seen from the
+ * staff side, plus the Engage notice only Staff are sent). Kept verbatim so a
+ * change on the API's side shows up here as a failing test rather than as an
+ * empty screen.
  */
 const MESSAGE_CREATED = {
   conversationId: '6f74c64f-445b-40fd-b264-e2adcbd77619',
@@ -39,6 +42,79 @@ const CONVERSATION_UPDATED = {
     lastMessageReceiptStatus: null,
     lastMessageRead: false,
     unreadCount: null,
+  },
+}
+
+/**
+ * What an Agent's socket received for the same conversation: every message
+ * carries a named `sender`, including the Customer's own.
+ */
+const STAFF_MESSAGE_CREATED = {
+  conversationId: '6f74c64f-445b-40fd-b264-e2adcbd77619',
+  message: {
+    id: '94fe7794-f129-4bee-884b-d4db44408aca',
+    body: 'fixture probe',
+    messageType: 'text',
+    createdAt: '2026-09-04T06:41:37.958Z',
+    sender: { id: '0d943b47-fba8-4162-8dc3-cf260544c251', name: 'QA Customer', role: 'customer' },
+    replyTo: null,
+    reactions: [],
+    attachments: [],
+    receiptStatus: 'sent',
+  },
+}
+
+/** The Engage notice, which reaches Staff and no Customer. */
+const SYSTEM_NOTICE_CREATED = {
+  conversationId: '6f74c64f-445b-40fd-b264-e2adcbd77619',
+  message: {
+    id: '9e618aa3-a9f0-4d6d-84f9-82a4d2bbd992',
+    body: 'QA Agent joined the support chat',
+    messageType: 'system',
+    createdAt: '2026-09-04T06:41:42.294Z',
+    sender: { id: '56e168f0-3b5a-49fb-b475-0063c78a2337', name: 'QA Agent', role: 'agent' },
+    replyTo: null,
+    reactions: [],
+    attachments: [],
+    receiptStatus: 'sent',
+  },
+}
+
+/**
+ * The row that followed it on the Agent's socket. Carries the assignment detail
+ * the unassigned pool filters on, and the same `unreadCount: null` a Customer's
+ * row carries — only the list endpoint counts, for either side.
+ */
+const STAFF_CONVERSATION_UPDATED = {
+  conversation: {
+    id: '6f74c64f-445b-40fd-b264-e2adcbd77619',
+    organizationId: 'acb16271-ee14-4a52-8952-68113b7a11bc',
+    type: 'support_dm',
+    status: 'engaged',
+    title: null,
+    description: null,
+    avatarUrl: null,
+    customer: {
+      id: '0d943b47-fba8-4162-8dc3-cf260544c251',
+      name: 'QA Customer',
+      isOnline: false,
+      lastOnlineAt: '2026-09-04T06:19:01.960Z',
+    },
+    assignedAgent: {
+      id: '56e168f0-3b5a-49fb-b475-0063c78a2337',
+      name: 'QA Agent',
+      isOnline: true,
+      lastOnlineAt: null,
+    },
+    otherUser: null,
+    members: [],
+    lastMessageAt: '2026-09-04T06:41:42.234Z',
+    lastMessagePreview: 'QA Agent joined the support chat',
+    lastMessageMine: true,
+    lastMessageReceiptStatus: 'sent',
+    lastMessageRead: true,
+    unreadCount: null,
+    labels: [],
   },
 }
 
@@ -70,6 +146,27 @@ describe('parseMessageCreated', () => {
       reactions: [],
       attachments: [],
       receiptStatus: 'sent',
+    })
+  })
+
+  it('reads what an Agent is sent: a named sender on the Customer’s own message', () => {
+    const event = parseMessageCreated(STAFF_MESSAGE_CREATED)
+
+    expect(event?.conversationId).toBe('6f74c64f-445b-40fd-b264-e2adcbd77619')
+    expect(event?.message).toMatchObject({
+      id: '94fe7794-f129-4bee-884b-d4db44408aca',
+      messageType: 'text',
+      sender: { id: '0d943b47-fba8-4162-8dc3-cf260544c251', name: 'QA Customer', role: 'customer' },
+    })
+  })
+
+  it('reads an Engage notice, which only Staff are sent', () => {
+    const event = parseMessageCreated(SYSTEM_NOTICE_CREATED)
+
+    expect(event?.message).toMatchObject({
+      messageType: 'system',
+      body: 'QA Agent joined the support chat',
+      sender: { id: '56e168f0-3b5a-49fb-b475-0063c78a2337', name: 'QA Agent', role: 'agent' },
     })
   })
 
@@ -124,6 +221,21 @@ describe('parseConversationUpdated', () => {
 
   it('keeps the API’s uncounted unread rather than inventing a zero', () => {
     expect(parseConversationUpdated(CONVERSATION_UPDATED)?.unreadCount).toBeNull()
+  })
+
+  it('reads the staff row, including what the unassigned pool filters on', () => {
+    const row = parseConversationUpdated(STAFF_CONVERSATION_UPDATED)
+
+    expect(row).toMatchObject({
+      id: '6f74c64f-445b-40fd-b264-e2adcbd77619',
+      type: 'support_dm',
+      status: 'engaged',
+      assignedAgent: { id: '56e168f0-3b5a-49fb-b475-0063c78a2337', name: 'QA Agent' },
+      customer: { id: '0d943b47-fba8-4162-8dc3-cf260544c251', name: 'QA Customer' },
+      labels: [],
+      unreadCount: null,
+    })
+    expect(row && isStaffConversation(row)).toBe(true)
   })
 
   const refused: [string, unknown][] = [

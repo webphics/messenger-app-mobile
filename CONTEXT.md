@@ -29,8 +29,11 @@ _Avoid_: Contacts, team list, people picker, agent list (an Admin is in it too)
 **System notice**:
 A `system`-type Message: the thread's own record of an Engage, a Takeover or a Transfer. Rendered as
 a centred line rather than a bubble, because it belongs to the conversation rather than to either
-side of it, and carries no sender, no side and no receipt. Staff see them; a Customer never does —
-the API withholds them from a Customer's payload and the client filters again on the way in.
+side of it, and drawn with no sender, no side and no tick — the payload carries a sender and a
+receipt like any other message, and the notice row shows neither. Never counted as unread, on either
+side: the API's `countUnreadMessagesFor` excludes `system`, and so does this client's live count.
+Staff see them; a Customer never does — the API withholds them from a Customer's payload and the
+client filters again on the way in.
 _Avoid_: System message (as a bubble), event, activity log entry
 
 **Agent**:
