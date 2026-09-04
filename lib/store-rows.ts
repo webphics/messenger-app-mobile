@@ -1,5 +1,9 @@
 import { parseConversation, parseMessage } from '@/lib/conversation-parse'
-import { mergeMessages, sortConversations } from '@/lib/conversation-state'
+import {
+  conversationActivityAt,
+  mergeMessages,
+  sortConversations,
+} from '@/lib/conversation-state'
 import type { Conversation, Message } from '@/lib/types'
 
 /**
@@ -23,7 +27,7 @@ import type { Conversation, Message } from '@/lib/types'
  * rather than migrating it, so a change here costs one cold start's worth of
  * Stale data and never a migration that can go wrong.
  */
-export const STORE_SCHEMA_VERSION = 2
+export const STORE_SCHEMA_VERSION = 3
 
 /**
  * How far back a thread has been read, as the Store holds it.
@@ -45,6 +49,15 @@ export type ConversationRow = {
   /** SQLite has no boolean; 1 unless a page has said otherwise. */
   has_more: number
   cursor: string | null
+  /**
+   * When the conversation was last active, in epoch milliseconds, and 0 for one
+   * nobody has written in.
+   *
+   * A column rather than a field of `payload`, because it is the column
+   * Eviction ranks threads by — see `lib/store-eviction`. The payload says the
+   * same thing in ISO text, which orders a sweep by nothing SQLite can compare.
+   */
+  activity_at: number
 }
 
 /**
@@ -117,6 +130,7 @@ export function toConversationRows(
       payload: JSON.stringify(conversation),
       has_more: thread?.hasMore === false ? 0 : 1,
       cursor: thread?.cursor ?? null,
+      activity_at: conversationActivityAt(conversation),
     }
   })
 }

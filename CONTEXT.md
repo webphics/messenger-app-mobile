@@ -335,6 +335,20 @@ most recently active threads, fifty each, and Attachment files only up to a fixe
 oldest used first. Asking for a page older than what was kept reads SQLite before it reads the API,
 which is the whole of the load this is meant to take off it.
 
+Messages are ranked by **conversation activity** — the row's `lastMessageAt`, not the newest Message
+this device happens to hold. The two part company on exactly the threads worth keeping: one that has
+been busy all morning while the person read something else holds Messages from yesterday and is the
+next thread they will open. A thread whose Messages went still appears in the list; opening it
+fetches, the same as a thread never opened, and its paging is reset with them so it cannot restore a
+cursor pointing at history it no longer has. An Unsent message is out of reach by construction — the
+Outbox is a table of its own and no sweep names it.
+
+Both sweeps run **after a write** rather than on a timer: a thread's Messages are the only thing that
+makes the database bigger and a download is the only thing that makes the cache bigger, so each is
+bounded by activity, and a phone left closed does nothing. A sweep never chooses the thread whose
+write it followed — that is the thread on screen, memory is still holding its Messages, and taking
+them would be a write that undoes itself.
+
 *Used* means last **read**, not last downloaded, so a document opened every week outlives one
 fetched yesterday and never touched. The filesystem records only when a file was modified, so being
 read writes a marker beside it — the `.used` file — and that marker is what the order is made of. A
@@ -346,7 +360,7 @@ An entry being downloaded right now is **pinned**: counted against the budget, n
 meet it. Only the `attachments` directory is ever read, so no device URI an Upload is streaming from
 can be reached at all.
 _Avoid_: Pruning, cleanup, garbage collection, cache invalidation (nothing here is invalidated),
-trimming (the operation is `evictAttachmentFiles`)
+trimming (the operations are `evictAttachmentFiles` and, for the database, `planEviction`)
 
 ### Notifications
 

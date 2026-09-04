@@ -17,6 +17,7 @@ type MockRow = {
   payload: string
   has_more: number
   cursor: string | null
+  activity_at: number
 }
 
 type MockOrganizationRow = { id: string; owner_id: string; name: string }
@@ -85,9 +86,32 @@ jest.mock('expo-sqlite', () => {
     getAllSync(source: string, ...params: unknown[]) {
       if (mockFails.read) throw new Error('database disk image is malformed')
       mockStatements.push(source)
+      if (source.includes('GROUP BY m.conversation_id')) return this.storedThreads(params)
       if (source.includes('FROM messages')) return this.messagePage(source, params)
       const table = source.includes('FROM organizations') ? this.file.organizations : this.file.rows
       return table.filter((row) => row.owner_id === params[0])
+    }
+
+    /**
+     * What a sweep counts: one entry per thread holding Messages, joined to the
+     * activity its conversation row carries. A thread whose row has gone joins
+     * to nothing, which is the null the real `LEFT JOIN` answers with.
+     */
+    private storedThreads(params: unknown[]) {
+      const [ownerId] = params as [string]
+      const counts = new Map<string, number>()
+      for (const row of this.file.messages) {
+        if (row.owner_id !== ownerId) continue
+        counts.set(row.conversation_id, (counts.get(row.conversation_id) ?? 0) + 1)
+      }
+
+      return [...counts].map(([conversation_id, message_count]) => ({
+        conversation_id,
+        message_count,
+        activity_at:
+          this.file.rows.find((row) => row.owner_id === ownerId && row.id === conversation_id)
+            ?.activity_at ?? null,
+      }))
     }
 
     /**
@@ -119,14 +143,15 @@ jest.mock('expo-sqlite', () => {
         this.file.rows = this.file.rows.filter((row) => row.owner_id !== params[0])
       }
       if (source.startsWith('INSERT INTO conversations')) {
-        const [id, owner_id, payload, has_more, cursor] = params as [
+        const [id, owner_id, payload, has_more, cursor, activity_at] = params as [
           string,
           string,
           string,
           number,
           string | null,
+          number,
         ]
-        this.file.rows.push({ id, owner_id, payload, has_more, cursor })
+        this.file.rows.push({ id, owner_id, payload, has_more, cursor, activity_at })
       }
       if (source.startsWith('DELETE FROM organizations WHERE owner_id')) {
         this.file.organizations = this.file.organizations.filter(
@@ -138,13 +163,36 @@ jest.mock('expo-sqlite', () => {
         this.file.organizations.push({ id, owner_id, name })
       }
 
-      if (source.startsWith('DELETE FROM messages') && source.includes('NOT IN')) {
+      if (source.startsWith('DELETE FROM messages') && source.includes('conversation_id NOT IN')) {
         const [owner_id] = params as [string]
         const kept = new Set(
           this.file.rows.filter((row) => row.owner_id === owner_id).map((row) => row.id),
         )
         this.file.messages = this.file.messages.filter(
           (row) => row.owner_id !== owner_id || kept.has(row.conversation_id),
+        )
+      } else if (source.startsWith('DELETE FROM messages') && source.includes('id NOT IN')) {
+        // The shortening: all but a thread's newest `limit`, ordered by
+        // the same two columns the index is on.
+        const [owner_id, conversation_id, , , limit] = params as [
+          string,
+          string,
+          string,
+          string,
+          number,
+        ]
+        const kept = new Set(
+          this.file.messages
+            .filter((row) => row.owner_id === owner_id && row.conversation_id === conversation_id)
+            .sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id))
+            .slice(0, limit)
+            .map((row) => row.id),
+        )
+        this.file.messages = this.file.messages.filter(
+          (row) =>
+            row.owner_id !== owner_id ||
+            row.conversation_id !== conversation_id ||
+            kept.has(row.id),
         )
       } else if (source.startsWith('DELETE FROM messages')) {
         const [owner_id, conversation_id] = params as [string, string]
@@ -271,6 +319,7 @@ function rowFor(ownerId: string, value: Conversation): MockRow {
     payload: JSON.stringify(value),
     has_more: 1,
     cursor: null,
+    activity_at: value.lastMessageAt ? Date.parse(value.lastMessageAt) : 0,
   }
 }
 
@@ -1000,5 +1049,186 @@ describe('wipeStore, with Messages on the disk', () => {
     await store.wipeStore()
 
     expect(store.restoreThread('viewer-1', 'conv-1', 50)).toBeNull()
+  })
+})
+
+/**
+ * The Store bounded, as the disk sees it. What is kept and what goes is decided
+ * by `lib/store-eviction` and tested against a table there; what these are about
+ * is the half a table cannot show — that a sweep runs after a write, that it
+ * reaches the rows it named, and that a Conversation is never one of them.
+ */
+describe('eviction', () => {
+  /** Threads named so their ids sort the opposite way to their activity. */
+  function list(count: number): Conversation[] {
+    return Array.from({ length: count }, (_unused, index) =>
+      conversation(`conv-${String(index).padStart(3, '0')}`, {
+        lastMessageAt: new Date(THREAD_BEGAN + (count - index) * 60_000).toISOString(),
+      }),
+    )
+  }
+
+  /** A person holding a Message in each of `count` threads, newest thread first. */
+  async function held(store: Store, count: number, each = 1): Promise<Conversation[]> {
+    const conversations = list(count)
+    await save(store, 'viewer-1', conversations)
+    for (const one of conversations) await store.saveMessages('viewer-1', one.id, thread(each))
+    return conversations
+  }
+
+  it('keeps the Messages of the twenty most recently active threads', async () => {
+    const store = loadStore()
+
+    await held(store, 21)
+
+    for (const id of list(21).slice(0, 20).map((one) => one.id)) {
+      expect(store.restoreThread('viewer-1', id, 50)?.messages).toHaveLength(1)
+    }
+  })
+
+  it('drops the Messages of the twenty-first', async () => {
+    const store = loadStore()
+
+    await held(store, 21)
+    // The last thread written is spared, so one more write is what collects it.
+    await store.saveMessages('viewer-1', 'conv-000', thread(2))
+
+    expect(store.restoreThread('viewer-1', 'conv-020', 50)).toBeNull()
+  })
+
+  /**
+   * The asymmetry the whole rule is built on: a list that has lost a row is a
+   * list that lies about which conversations exist.
+   */
+  it('leaves every Conversation row where it is', async () => {
+    const store = loadStore()
+
+    await held(store, 30)
+
+    expect(store.restoreStore('viewer-1').conversations).toHaveLength(30)
+  })
+
+  it('keeps a thread that lost its Messages fetchable, like one never opened', async () => {
+    const store = loadStore()
+
+    await held(store, 21)
+    await store.saveMessages('viewer-1', 'conv-000', thread(2))
+
+    expect(store.restoreThread('viewer-1', 'conv-020', 50)).toBeNull()
+    expect(
+      store.restoreStore('viewer-1').conversations.some((one) => one.id === 'conv-020'),
+    ).toBe(true)
+  })
+
+  /**
+   * A cursor is where the next page reads backwards *from*. One left pointing at
+   * history this device no longer holds would make the next scroll ask for the
+   * page before something already gone, and read straight over everything
+   * between it and what is on screen.
+   */
+  it('resets the paging of a thread it emptied', async () => {
+    const store = loadStore()
+
+    await held(store, 21)
+    await store.saveThreadPaging('viewer-1', 'conv-020', { hasMore: false, cursor: 'msg-900' })
+    await store.saveMessages('viewer-1', 'conv-000', thread(2))
+
+    expect(
+      mockFiles.get(DATABASE_NAME)?.rows.find((row) => row.id === 'conv-020'),
+    ).toMatchObject({ has_more: 1, cursor: null })
+  })
+
+  it('does not let a later write of the list carry the old cursor back', async () => {
+    const store = loadStore()
+    const conversations = await held(store, 21)
+    await store.saveThreadPaging('viewer-1', 'conv-020', { hasMore: false, cursor: 'msg-900' })
+    await store.saveMessages('viewer-1', 'conv-000', thread(2))
+
+    await save(store, 'viewer-1', [...conversations])
+
+    expect(
+      mockFiles.get(DATABASE_NAME)?.rows.find((row) => row.id === 'conv-020'),
+    ).toMatchObject({ has_more: 1, cursor: null })
+  })
+
+  it('keeps the fifty newest Messages of a thread paged back further than that', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
+
+    await store.saveMessages('viewer-1', 'conv-1', thread(60))
+    await store.saveMessages('viewer-1', 'conv-2', thread(1))
+
+    const kept = store.restoreThread('viewer-1', 'conv-1', 100)?.messages ?? []
+    expect(kept).toHaveLength(50)
+    expect(ids(kept)).toContain('msg-60')
+    expect(ids(kept)).not.toContain('msg-10')
+  })
+
+  it('never chooses the thread the write it followed was for', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    await store.saveMessages('viewer-1', 'conv-1', thread(60))
+
+    expect(store.restoreThread('viewer-1', 'conv-1', 100)?.messages).toHaveLength(60)
+  })
+
+  it('sweeps after a write and never on its own', async () => {
+    const store = loadStore()
+    await held(store, 21)
+    const before = statementsFor('GROUP BY m.conversation_id')
+
+    store.restoreStore('viewer-1')
+    await save(store, 'viewer-1', list(21))
+
+    expect(statementsFor('GROUP BY m.conversation_id')).toBe(before)
+  })
+
+  /**
+   * The other half of the asymmetry, and what keeps the Outbox out of reach when
+   * it arrives: a sweep removes rows from `messages` and touches nothing else
+   * but the frontier of a thread it just emptied.
+   */
+  it('writes nothing but Messages and the frontier of the thread it emptied', async () => {
+    const store = loadStore()
+    await held(store, 21)
+    mockStatements.length = 0
+
+    await store.saveMessages('viewer-1', 'conv-000', thread(2))
+
+    const swept = mockStatements.slice(
+      mockStatements.findIndex((source) => source.includes('GROUP BY m.conversation_id')),
+    )
+    expect(swept.filter((source) => source.startsWith('DELETE')).length).toBeGreaterThan(0)
+    for (const source of swept) {
+      if (source.startsWith('DELETE')) {
+        expect(source.startsWith('DELETE FROM messages')).toBe(true)
+      }
+      if (source.startsWith('UPDATE')) {
+        expect(source.startsWith('UPDATE conversations SET has_more')).toBe(true)
+      }
+      expect(source).not.toContain('outbox')
+    }
+  })
+
+  it('leaves another person on this phone alone', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-2', [conversation('conv-x')])
+    await store.saveMessages('viewer-2', 'conv-x', thread(3))
+
+    await held(store, 25)
+
+    expect(store.restoreThread('viewer-2', 'conv-x', 50)?.messages).toHaveLength(3)
+  })
+
+  it('leaves the Store alone when a sweep cannot be written', async () => {
+    const store = loadStore()
+    await held(store, 21)
+    mockFails.write = true
+
+    await store.saveMessages('viewer-1', 'conv-000', thread(2))
+    mockFails.write = false
+
+    expect(store.restoreThread('viewer-1', 'conv-020', 50)?.messages).toHaveLength(1)
   })
 })

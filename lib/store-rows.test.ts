@@ -109,6 +109,25 @@ describe('toConversationRows', () => {
     expect(only).toMatchObject({ has_more: 0, cursor: 'msg-40' })
   })
 
+  /**
+   * The one thing a row carries that the payload does not already say: Eviction
+   * ranks threads by it, and reading it out of the JSON on every sweep is what
+   * a column is for.
+   */
+  it('writes the activity Eviction ranks by, as a number', () => {
+    const [only] = toConversationRows('viewer-1', [
+      customerConversation({ lastMessageAt: '2026-08-13T08:00:00.000Z' }),
+    ])
+
+    expect(only.activity_at).toBe(Date.parse('2026-08-13T08:00:00.000Z'))
+  })
+
+  it('writes no activity for a conversation nobody has written in', () => {
+    const [only] = toConversationRows('viewer-1', [customerConversation({ lastMessageAt: null })])
+
+    expect(only.activity_at).toBe(0)
+  })
+
   it('writes no rows for an empty list', () => {
     expect(toConversationRows('viewer-1', [])).toEqual([])
   })
