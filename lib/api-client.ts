@@ -23,6 +23,14 @@ import type { HttpOutcome } from "@/lib/auth-response";
  *
  * Nothing here throws. A request that never got an answer comes back as
  * `{ reached: false }`, which `lib/auth-response` reads as a transport failure.
+ *
+ * A request that is never answered *at all* is one of those. Every round trip
+ * made here runs under a Request deadline and is abandoned when it passes, so a
+ * screen waiting on the API waits for a bounded time and then shows the failure
+ * it already knows how to show. An abandoned request is deliberately the same
+ * fact as a dead network and not a 401: silence says nothing about whether the
+ * Session is still good, and reading it as an expiry would sign someone out for
+ * going into a tunnel. See `REQUEST_DEADLINE_MS`.
  */
 
 /**
@@ -39,6 +47,72 @@ const CSRF_COOKIE = "csrf-token";
 const CSRF_HEADER = "x-csrf-token";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+/**
+ * How long one round trip may go without a word from the server before it is
+ * abandoned.
+ *
+ * Without a deadline nothing here ever gives up: this runtime's `fetch` has no
+ * timeout of its own, so an unanswered request falls through to whatever the
+ * platform's socket layer decides — minutes on Android, longer still on a
+ * connection that is technically open and silent — and a screen waiting on it
+ * waits with it.
+ *
+ * Fifteen seconds is far beyond the sub-second the API answers a healthy
+ * request in, and well short of a person's patience with a screen that is doing
+ * nothing.
+ */
+export const REQUEST_DEADLINE_MS = 15_000;
+
+/** The clock a round trip runs under, as the thing making the request sees it. */
+type Deadline = {
+  signal: AbortSignal;
+  /** Push the deadline back. Bytes moving means this is slow, not hung. */
+  extend: () => void;
+};
+
+/**
+ * Run one round trip under a deadline; anything but an answer is null.
+ *
+ * The deadline measures *silence*, not duration: `extend` pushes it back, so a
+ * transfer still moving bytes is never abandoned for taking a long time. Only
+ * the upload path can say anything about that — `fetch` reports nothing until
+ * it has an answer — so only the upload path extends it.
+ *
+ * A wrapper rather than a clock each caller holds, because the timer has to be
+ * cleared on every way out, including the ones that throw. A caller that forgot
+ * would leave a live abort callback per request for fifteen seconds, which is
+ * invisible right up until it is a phone getting warm — and "remember to call
+ * `clear`" is a rule better kept by the shape of the code than by a comment.
+ */
+async function underDeadline<T>(
+  run: (deadline: Deadline) => Promise<T>,
+): Promise<T | null> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  const arm = () => {
+    timer = setTimeout(() => controller.abort(), REQUEST_DEADLINE_MS);
+  };
+
+  arm();
+
+  try {
+    return await run({
+      signal: controller.signal,
+      extend: () => {
+        if (timer === null) return;
+        clearTimeout(timer);
+        arm();
+      },
+    });
+  } catch {
+    return null;
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  }
+}
 
 let heldSessionCookie: string | null = null;
 
@@ -104,11 +178,12 @@ let csrfInFlight: Promise<CsrfPair | null> | null = null;
  * the API rejects it.
  */
 async function fetchCsrfPair(): Promise<CsrfPair | null> {
-  try {
+  return underDeadline(async ({ signal }) => {
     const response = await fetch(`${API_BASE_URL}${CSRF_PATH}`, {
       method: "GET",
       headers: { Accept: "application/json" },
       credentials: "omit",
+      signal,
     });
     if (!response.ok) return null;
 
@@ -117,9 +192,7 @@ async function fetchCsrfPair(): Promise<CsrfPair | null> {
 
     if (typeof token !== "string" || token === "" || !cookie) return null;
     return { token, cookie };
-  } catch {
-    return null;
-  }
+  });
 }
 
 /** The cached pair, fetching one if there is none. Concurrent mutations share a single fetch. */
@@ -238,7 +311,7 @@ async function sendFile(
   file: UploadFile,
   headers: Record<string, string>,
 ): Promise<Answer | null> {
-  try {
+  return underDeadline(async ({ signal, extend }) => {
     const result = await new File(file.uri).upload(`${API_BASE_URL}${attempt.path}`, {
       httpMethod: uploadMethod(attempt.method),
       uploadType: UploadType.MULTIPART,
@@ -247,16 +320,23 @@ async function sendFile(
       // No Content-Type here: the uploader writes one, and it is the only thing
       // that knows the boundary it generated.
       headers,
+      // The uploader takes the signal and rejects on it, so an abandoned upload
+      // arrives here as any other failure does.
+      signal,
+      // And it reports bytes leaving, which is the one place in this client that
+      // can tell a slow transfer from a dead one. Fifteen megabytes over a bad
+      // connection is a long upload, not a hung one, so every report pushes the
+      // deadline back and only silence ends it.
+      onProgress: extend,
     });
 
     return {
       status: result.status,
+      // Whole and in hand, so unlike `send` there is no body left to stall on.
       body: parseJson(result.body),
       setCookie: headerValue(result.headers, "set-cookie"),
     };
-  } catch {
-    return null;
-  }
+  });
 }
 
 /**
@@ -286,22 +366,31 @@ async function send(attempt: Attempt, csrf: CsrfPair | null): Promise<Answer | n
 
   if (attempt.body !== undefined) headers["Content-Type"] = "application/json";
 
-  try {
+  return underDeadline(async ({ signal }) => {
     const response = await fetch(`${API_BASE_URL}${attempt.path}`, {
       method: attempt.method,
       headers,
       credentials: "omit",
+      signal,
       ...requestBody(attempt),
     });
 
+    const body = await readJsonBody(response);
+
+    // The deadline covers the body too, and a body abandoned half-read has to
+    // come back as a request that never arrived — not as a malformed answer.
+    // `readJsonBody` cannot tell the difference, because it swallows every
+    // reason a body would not parse; the signal can. Without this, one of the
+    // two ways a request can be abandoned would surface as a state of its own,
+    // which is the thing a caller must never have to tell apart.
+    if (signal.aborted) return null;
+
     return {
       status: response.status,
-      body: await readJsonBody(response),
+      body,
       setCookie: response.headers.get("set-cookie"),
     };
-  } catch {
-    return null;
-  }
+  });
 }
 
 /**
@@ -347,6 +436,13 @@ export type ApiRequestOptions = {
  * Send one request to the API and report what came back.
  *
  * `path` is absolute from the API root, e.g. `/auth/login`.
+ *
+ * The deadline is per round trip, not per call: the pre-flight, the request and
+ * the one retry each get their own, so a slow pre-flight cannot spend the
+ * request's chance. The pathological case — every one of them silent — is four
+ * deadlines rather than one, and still bounded, which is the property callers
+ * need. Per call would be the other trade, and it is the worse one: it abandons
+ * a healthy request because the round trip before it was slow.
  */
 export async function apiRequest(
   path: string,

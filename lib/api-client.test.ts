@@ -5,8 +5,10 @@ import {
   findSessionCookie,
   getSessionCookie,
   readCookieValue,
+  REQUEST_DEADLINE_MS,
   setSessionCookie,
 } from "@/lib/api-client";
+import { saysSessionExpired } from "@/lib/auth-response";
 
 type FetchCall = { url: string; init: RequestInit };
 
@@ -18,10 +20,69 @@ const calls: FetchCall[] = [];
  * pre-flight, the request, and a retry — and a once-stub would silently be
  * consumed by the first of them.
  */
-let queue: (Response | Error)[] = [];
+let queue: Queued[] = [];
 
-function enqueue(...responses: (Response | Error)[]): void {
+function enqueue(...responses: Queued[]): void {
   queue.push(...responses);
+}
+
+/**
+ * A request the server never answers, queued like any other response.
+ *
+ * The one thing a mocked `fetch` cannot express by resolving: every other case
+ * here settles, and the whole point of a deadline is what happens when nothing
+ * does.
+ */
+const HANGS = Symbol("hangs");
+
+type Queued = Response | Error | typeof HANGS | ((init: RequestInit) => Response);
+
+/**
+ * Headers that arrive, and a body that then never does.
+ *
+ * The other half of being abandoned, and the one that does not look like it:
+ * the request reached the API and said something, so only the signal separates
+ * a body still on its way from a body this client could not parse.
+ */
+function stalledBody(status: number): (init: RequestInit) => Response {
+  return (init) =>
+    ({
+      status,
+      ok: status >= 200 && status < 300,
+      headers: { get: () => null },
+      json: () => mockHang(init.signal),
+    }) as unknown as Response;
+}
+
+/**
+ * Never answers, and rejects the way a real `fetch` does once its signal is
+ * aborted. A caller that passed no signal waits forever, which is the failure
+ * this is here to catch.
+ */
+function mockHang(signal: AbortSignal | null | undefined): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    const abort = () => {
+      const error = new Error("Aborted");
+      error.name = "AbortError";
+      reject(error);
+    };
+    if (signal?.aborted) abort();
+    else signal?.addEventListener("abort", abort);
+  });
+}
+
+/** Whether a promise has settled, asked without awaiting it. */
+function watch(promise: Promise<unknown>): () => boolean {
+  let done = false;
+  promise.then(
+    () => {
+      done = true;
+    },
+    () => {
+      done = true;
+    },
+  );
+  return () => done;
 }
 
 /** A minimal stand-in for the parts of `Response` this client touches. */
@@ -73,14 +134,21 @@ const SESSION_COOKIE = "better-auth.session_token=abc.def";
 type UploadCall = {
   uri: string;
   url: string;
-  options: { headers: Record<string, string>; [key: string]: unknown };
+  options: {
+    headers: Record<string, string>;
+    signal?: AbortSignal;
+    onProgress?: (data: { bytesSent: number; totalBytes: number }) => void;
+    [key: string]: unknown;
+  };
 };
 
+type QueuedUpload = { status: number; body: string } | Error | typeof HANGS;
+
 const mockUploads: UploadCall[] = [];
-const mockUploadQueue: ({ status: number; body: string } | Error)[] = [];
+const mockUploadQueue: QueuedUpload[] = [];
 const uploads = mockUploads;
 
-function enqueueUpload(...answers: ({ status: number; body: string } | Error)[]): void {
+function enqueueUpload(...answers: QueuedUpload[]): void {
   mockUploadQueue.push(...answers);
 }
 
@@ -99,6 +167,10 @@ jest.mock("expo-file-system", () => ({
       const answer = mockUploadQueue.shift();
       if (!answer) throw new Error("no upload answer was queued");
       if (answer instanceof Error) throw answer;
+      // Recognised by type rather than by identity: the factory is hoisted above
+      // this file and may close over nothing but a `mock`-prefixed binding, so
+      // `HANGS` itself is not in scope here.
+      if (typeof answer === "symbol") return mockHang(options.signal);
       return { status: answer.status, body: answer.body, headers: {} };
     }
   },
@@ -115,6 +187,8 @@ beforeEach(() => {
     calls.push({ url, init });
     const next = queue.shift();
     if (next instanceof Error) throw next;
+    if (next === HANGS) return mockHang(init.signal);
+    if (typeof next === "function") return next(init);
     return next ?? response(200, {});
   }) as unknown as typeof fetch;
 });
@@ -582,5 +656,150 @@ describe("a 403 that a fresh token could not fix", () => {
 
     expect(calls.filter((call) => call.url.endsWith("/conversations"))).toHaveLength(1);
     expect(outcome).toMatchObject({ status: 403 });
+  });
+});
+
+/**
+ * The deadline. A request that never answers has to end somewhere, and where it
+ * ends decides whether a tunnel signs someone out.
+ */
+describe("a request that hangs", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("is abandoned once the deadline passes", async () => {
+    enqueue(HANGS);
+    const pending = apiRequest("/auth/session");
+
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+
+    await expect(pending).resolves.toEqual({ reached: false });
+  });
+
+  test("is still waiting a moment before the deadline", async () => {
+    enqueue(HANGS);
+    const settled = watch(apiRequest("/auth/session"));
+
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS - 1);
+
+    expect(settled()).toBe(false);
+  });
+
+  /**
+   * The point of the whole thing. Being abandoned is the network being gone,
+   * which says nothing about whether the Session is still good — and
+   * `reached: false` is the only shape that cannot be read as a verdict on the
+   * credential.
+   */
+  test("reads exactly as a network error does, and so ends no Session", async () => {
+    setSessionCookie(SESSION_COOKIE);
+
+    enqueue(new TypeError("Network request failed"));
+    const network = await apiRequest("/conversations");
+
+    enqueue(HANGS);
+    const pending = apiRequest("/conversations");
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    const abandoned = await pending;
+
+    expect(abandoned).toEqual(network);
+    expect(saysSessionExpired(abandoned)).toBe(false);
+    expect(getSessionCookie()).toBe(SESSION_COOKIE);
+  });
+
+  /**
+   * The half that does not look like a transport failure and has to be one
+   * anyway: a caller must not be able to tell which way a request was abandoned.
+   */
+  test("a body that stalls after the headers is abandoned as a transport failure", async () => {
+    enqueue(stalledBody(200));
+    const pending = apiRequest("/conversations");
+
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+
+    await expect(pending).resolves.toEqual({ reached: false });
+  });
+
+  test("a body that is merely unparseable still reads as an answer", async () => {
+    enqueue(response(502, undefined));
+    expect(await apiRequest("/conversations")).toEqual({
+      reached: true,
+      status: 502,
+      body: null,
+      sessionCookie: null,
+    });
+  });
+
+  test("the pre-flight is bounded too, so a mutation is not held up by it", async () => {
+    enqueue(HANGS, response(200, {}));
+    const pending = apiRequest("/auth/logout", { method: "POST" });
+
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+
+    expect(await pending).toMatchObject({ reached: true, status: 200 });
+    const sent = calls[calls.length - 1];
+    expect(sent.url).toBe(`${API_BASE_URL}/auth/logout`);
+    expect(headersOf(sent)["x-csrf-token"]).toBeUndefined();
+  });
+
+  test("each request gets its own deadline rather than sharing one clock", async () => {
+    enqueue(response(200, { data: 1 }));
+    expect(await apiRequest("/conversations")).toMatchObject({ reached: true });
+
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS * 2);
+
+    enqueue(response(200, { data: 2 }));
+    expect(await apiRequest("/conversations")).toMatchObject({ reached: true });
+  });
+
+  test("an upload that goes silent is abandoned on the same terms", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload(HANGS);
+
+    const pending = apiRequest("/conversations/c1/files", {
+      method: "POST",
+      file: { uri: "file:///cache/a.jpg", field: "file", type: "image/jpeg" },
+    });
+
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+
+    await expect(pending).resolves.toEqual({ reached: false });
+  });
+
+  /**
+   * Bytes moving is the server still listening. The deadline measures silence,
+   * not duration — otherwise fifteen megabytes over a slow connection would be
+   * abandoned for the crime of being large.
+   */
+  test("an upload still moving is not abandoned, however long it takes", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload(HANGS);
+
+    const settled = watch(
+      apiRequest("/conversations/c1/files", {
+        method: "POST",
+        file: { uri: "file:///cache/big.mp4", field: "file", type: "video/mp4" },
+      }),
+    );
+
+    // Let the pre-flight settle so the upload is actually under way.
+    await jest.advanceTimersByTimeAsync(0);
+    expect(uploads).toHaveLength(1);
+
+    for (let elapsed = 0; elapsed < REQUEST_DEADLINE_MS * 4; elapsed += REQUEST_DEADLINE_MS - 1) {
+      await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS - 1);
+      uploads[0].options.onProgress?.({ bytesSent: elapsed, totalBytes: 15_000_000 });
+    }
+
+    expect(settled()).toBe(false);
+
+    // Then the connection dies mid-file: no more progress, and it gives up.
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    expect(settled()).toBe(true);
   });
 });
