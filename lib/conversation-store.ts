@@ -297,6 +297,38 @@ function markThreadWritten(
  */
 const sweptThreads = new Set<string>()
 
+/**
+ * Everyone the Store has served since the last Wipe, and everyone a Wipe took
+ * it from who has not Restored since.
+ *
+ * The two together are what make a Wipe stick. A Session expiry discards the
+ * credential while the screens still believe they are signed in — they are told
+ * a moment later, and a moment is what this is about — so a socket event landing
+ * in between would queue the Conversation list of the person who has just been
+ * signed out, and the drain would open a fresh database and write it. The
+ * support history would be back on the disk, put there by the thing that was
+ * told to remove it.
+ *
+ * So a Wipe bars the people it took the Store from, and `restoreStore` is what
+ * lets one back in — the same shape as `sweptThreads` above, one person rather
+ * than one thread. Nobody is locked out by it: every screen that writes sits
+ * under the provider that Restores first, so the next person to sign in is
+ * admitted on the way in, and so is the same person signing back in.
+ *
+ * Only a Wipe bars anybody. `discard` does not, because it runs on a database
+ * this build cannot read — a reason to begin the file again, and not a reason to
+ * stop persisting for somebody who is still signed in.
+ */
+const activeOwners = new Set<string>()
+const barredOwners = new Set<string>()
+
+/** Whether this person's Store may be written at all. See `barredOwners`. */
+function mayWrite(ownerId: string): boolean {
+  if (barredOwners.has(ownerId)) return false
+  activeOwners.add(ownerId)
+  return true
+}
+
 let draining: Promise<void> | null = null
 
 /**
@@ -309,6 +341,12 @@ let draining: Promise<void> | null = null
  * is one answer for "this device has nothing to draw", and it is an empty list.
  */
 export function restoreStore(ownerId: string): RestoredStore {
+  // Before the read rather than after it, so the two outcomes that Restore
+  // nothing — no database, and one that would not read — still readmit somebody
+  // a Wipe barred. Restoring nothing is the normal state of a first sign-in.
+  barredOwners.delete(ownerId)
+  activeOwners.add(ownerId)
+
   const database = connect()
   if (!database) return NOTHING_RESTORED
 
@@ -507,6 +545,7 @@ function discard(): void {
  * from a state that has already been superseded.
  */
 export function saveStore(ownerId: string, snapshot: StoreSnapshot): Promise<void> {
+  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
   if (alreadyWritten(ownerId, snapshot)) return draining ?? Promise.resolve()
 
   queued.set(ownerId, snapshot)
@@ -531,6 +570,8 @@ export function saveMessages(
   messages: readonly Message[],
   mode: 'merge' | 'replace' = 'merge',
 ): Promise<void> {
+  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
+
   const key = threadKey(ownerId, conversationId)
   const pending = queuedThreads.get(key)
 
@@ -562,6 +603,8 @@ export function saveThreadPaging(
   conversationId: string,
   paging: ThreadPaging,
 ): Promise<void> {
+  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
+
   const held = frontiers.get(ownerId)?.get(conversationId)
   if (held?.hasMore === paging.hasMore && held.cursor === paging.cursor) {
     return draining ?? Promise.resolve()
@@ -874,6 +917,10 @@ async function write(ownerId: string, snapshot: StoreSnapshot): Promise<void> {
  * removing.
  */
 export async function wipeStore(): Promise<void> {
+  // First, so that anything queueing a write while the drain below is awaited
+  // is refused rather than admitted into the database this is about to remove.
+  for (const ownerId of activeOwners) barredOwners.add(ownerId)
+  activeOwners.clear()
   queued.clear()
   queuedThreads.clear()
   // Nothing is left waiting, but a write already past the queue is still on its

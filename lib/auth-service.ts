@@ -34,6 +34,7 @@ import {
   MAGIC_LINK_UNCONFIGURED_NOTICE,
 } from "@/lib/magic-link-config";
 import { setSessionUser } from "@/lib/session";
+import { wipeStoreAndAttachments } from "@/lib/session-wipe";
 
 /**
  * The I/O the auth state machine cannot do.
@@ -91,12 +92,44 @@ async function applyOutcome(outcome: AuthOutcome, startedAt: number): Promise<vo
   }
 }
 
+/**
+ * Discard the credential, and everything on this device that was only readable
+ * because of it.
+ *
+ * The Store is wiped here rather than at each of the ways a session can end, so
+ * that there is one answer to "what does a Session end leave behind" and it is
+ * "nothing". Every moment that discards the Session cookie arrives here, and
+ * they are not only the two that end a session:
+ *
+ * - signing out;
+ * - a Session expiry, an authenticated request answered `401`;
+ * - a cold start that finds no cookie, which is what covers a sign-out the
+ *   operating system killed halfway — the database on disk is scoped by owner,
+ *   but a device nobody is signed in on should be holding nothing at all;
+ * - a sign-in the API refused, and a two-factor challenge, both by way of
+ *   `applyOutcome`.
+ *
+ * The last of those is not a Session end, and it is wiped anyway. Nothing on
+ * this device belongs to a session that was never established, the person is
+ * standing on the sign-in screen either way, and a refused password is a
+ * perfectly good moment to find out that an earlier wipe had not happened.
+ *
+ * Hydration's Unreachable outcome reaches none of this: `applyOutcome` returns
+ * on a transport failure without discarding anything, so a kept cookie is a kept
+ * Store — the one case where a Restored list is all there is to show.
+ *
+ * The wipe cannot fail this. `wipeStoreAndAttachments` swallows what it can, and
+ * it is caught here as well — the guarantee belongs to the Session end rather
+ * than to the implementation of one of the things it destroys, in the same
+ * spirit as signing out completing when the server cannot be told.
+ */
 async function forgetCredential(): Promise<void> {
   credentialEpoch += 1;
   setSessionCookie(null);
   clearCsrfPair();
   setSessionUser(null);
   await clearSessionCookie();
+  await wipeStoreAndAttachments().catch(() => {});
 }
 
 /**

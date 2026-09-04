@@ -160,7 +160,7 @@ The Hydration outcome where a Session cookie exists but the API could not be rea
 _Avoid_: Offline, error, disconnected
 
 **Session end**:
-Either of the two ways a session stops: signing out, deliberately, and Session expiry. Both discard the Session cookie and everything derived from it — role included — and both land on sign-in, whatever the person was looking at. Hydration's Unreachable outcome is not one: it keeps the cookie.
+Either of the two ways a session stops: signing out, deliberately, and Session expiry. Both discard the Session cookie and everything derived from it — role included — and both land on sign-in, whatever the person was looking at. Both also Wipe: nothing of a person's Conversations outlives their session on this device. Hydration's Unreachable outcome is not one: it keeps the cookie, and so keeps the Store.
 _Avoid_: Session exit, teardown, logout (as the name for both)
 
 **Session expiry**:
@@ -327,6 +327,24 @@ survived a failed request; what the Store adds is surviving a restart, so a mess
 is still there tomorrow, still marked *failed*, still offering to go again. Never sent on its own:
 a message abandoned on Tuesday must not leave on Thursday without somebody tapping it.
 _Avoid_: Queue (nothing drains it), retry queue, pending messages, drafts (a draft was never sent)
+
+**Wipe**:
+Destroying everything this device holds of somebody's Conversations — the database file itself, not
+the rows in it, and the downloaded documents with it. Every moment that discards the Session cookie
+reaches it, and they are not only the two that end a session: signing out, a Session expiry, a cold
+start that finds no cookie, and a sign-in the API refused. The third covers a sign-out the operating
+system killed halfway; the fourth is not a Session end at all and wipes anyway, because nothing on
+the device belongs to a session that was never established. Hydration's Unreachable outcome reaches
+none of it. What a Wipe removes stays removed: it bars the people it took the Store from until they
+Restore again, so a socket event landing in the moment between the credential going and the screens
+being told cannot write the list back. A Wipe cannot fail a Session end — a database the platform
+will not delete is not something the person being signed out can do anything about, so signing out
+completes regardless, as it already does when telling the server fails. Not Eviction, which is about
+size and keeps the database: a Wipe is about entitlement and leaves none of it. Android backup is
+disabled so the file cannot be lifted off the device by a backup tool; it is deliberately not
+encrypted, because `expo-sqlite` has none built in and the threat model that would need it already
+defeats the Session cookie in the keychain.
+_Avoid_: Clear, purge, reset, log out the store, invalidate
 
 **Eviction**:
 Discarding the history the Store is not going to be asked for. Every Conversation row is kept, always

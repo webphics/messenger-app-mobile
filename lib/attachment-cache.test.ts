@@ -3,6 +3,7 @@ import {
   cachedFileName,
   ensureCachedFile,
   evictAttachmentFiles,
+  wipeAttachmentFiles,
 } from '@/lib/attachment-cache'
 import { ATTACHMENT_CACHE_BUDGET_BYTES } from '@/lib/attachment-budget'
 
@@ -510,5 +511,54 @@ describe('evictAttachmentFiles', () => {
 
     expect(mockDeleted).toEqual(['file:///cache/attachments/goes.pdf/'])
     expect(mockDirectories.has('file:///cache/attachments/stuck.pdf/')).toBe(true)
+  })
+})
+
+/**
+ * Everything a Session end has to leave nothing of. What is asserted is the
+ * directory going, not the files inside it: a copy left behind is a document
+ * from somebody else's support thread, readable by whoever holds the phone next.
+ */
+describe('wipeAttachmentFiles', () => {
+  it('discards every downloaded document, whichever thread it came from', () => {
+    seedCached('one.pdf', { bytes: 10, usedAt: 100 })
+    seedCached('two.pdf', { bytes: 10, usedAt: 200 })
+
+    wipeAttachmentFiles()
+
+    expect(mockDeleted).toEqual([ATTACHMENTS])
+    expect(mockDirectories.has(`${ATTACHMENTS}one.pdf/`)).toBe(false)
+    expect(mockFiles.has(`${ATTACHMENTS}two.pdf/doc.pdf`)).toBe(false)
+  })
+
+  it('has nothing to do on a device that never downloaded one', () => {
+    mockDirectories.delete(ATTACHMENTS)
+
+    expect(() => wipeAttachmentFiles()).not.toThrow()
+    expect(mockDeleted).toEqual([])
+  })
+
+  // A Session end that could fail is a Session end that could strand somebody on
+  // a screen they have already been signed out of.
+  it('swallows a directory the platform will not remove', () => {
+    seedCached('stuck.pdf', { bytes: 10, usedAt: 100 })
+    const { Directory } = jest.requireMock('expo-file-system') as {
+      Directory: { prototype: { delete: () => void } }
+    }
+    realDirectoryDelete = Directory.prototype.delete
+    Directory.prototype.delete = function refuse() {
+      throw new Error('EBUSY')
+    }
+
+    expect(() => wipeAttachmentFiles()).not.toThrow()
+  })
+
+  it('leaves a cache the next download can still land in', async () => {
+    seedCached('one.pdf', { bytes: 10, usedAt: 100 })
+    wipeAttachmentFiles()
+
+    const cached = await ensureCachedFile('https://api.example/uploads/new.pdf', 'new.pdf')
+
+    expect(cached).toEqual({ ok: true, uri: `${ATTACHMENTS}new.pdf/new.pdf` })
   })
 })
