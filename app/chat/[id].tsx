@@ -154,9 +154,17 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
    * the button without a refetch, and the pool screen behind loses the row in
    * the same update. Every other staff session learns the same thing from the
    * `conversation.updated` the API broadcasts.
+   *
+   * That is true of the re-read each action makes before it fires as well as of
+   * the action itself, which is how a thread somebody else claimed leaves the
+   * pool on the tap that lost the race.
    */
   const { addConversation } = inbox;
-  const assignment = useConversationAssignment(openedId, addConversation);
+  const assignment = useConversationAssignment(
+    openedId,
+    user?.id ?? null,
+    addConversation,
+  );
 
   /**
    * Opening a thread reads it.
