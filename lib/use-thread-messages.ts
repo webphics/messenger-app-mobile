@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { listMessages, sendMessage, type ApiFailure } from '@/lib/conversation-api'
+import {
+  listMessages,
+  sendMessage,
+  uploadAttachment,
+  type ApiFailure,
+} from '@/lib/conversation-api'
+import { isDeviceUri, sendMessageType } from '@/lib/attachment-upload'
+import {
+  attachmentKindFromType,
+  toAttachmentView,
+  toMessageAttachment,
+} from '@/lib/attachment-view'
 import {
   applyIncomingMessage,
   applyMessagePage,
   applySentMessage,
   beginSend,
+  beginUpload,
   deliveryStates,
   draftMessage,
   emptyThread,
@@ -21,7 +33,7 @@ import {
   type ThreadState,
 } from '@/lib/conversation-state'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
-import type { Conversation, Message, UserRole } from '@/lib/types'
+import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
 
 /**
  * One thread: its history a page at a time, and the messages typed into it.
@@ -44,12 +56,42 @@ export type ThreadMessages = {
   loadingOlder: boolean
   refreshing: boolean
   failure: ApiFailure | null
+  /**
+   * Why the last send did not land, in the API's own words.
+   *
+   * Separate from `failure`, which is about reading the thread and replaces what
+   * is on screen. This one sits beside a bubble that is still there and marked
+   * *Not sent*: the mark says that something went wrong, and this says what — a
+   * file over the limit, a type the server refuses — which is the difference
+   * between retrying and knowing not to.
+   */
+  sendError: string | null
+  dismissSendError: () => void
   loadOlder: () => void
   refresh: () => void
   /** Write a message to the thread. Answers nothing: the outcome arrives as state. */
   send: (draft: SendDraft) => void
   /** Send a failed message again, in place. */
   retrySend: (localId: string) => void
+}
+
+/**
+ * What a failed send says out loud, or null when there is nothing worth saying.
+ *
+ * A refusal speaks in the API's own words, which are the ones worth showing: an
+ * oversized file and an unsupported type both arrive that way. A request that
+ * never landed gets a sentence written here, because "no connection" is
+ * something a person can act on and the transport has nothing to say for itself.
+ *
+ * The other two say nothing. An expired session is already ending the session
+ * around this, and a body this client could not read is a bug rather than
+ * something to explain at a composer — for both, the bubble marked *Not sent*
+ * has already said the useful part.
+ */
+function sendFailureMessage(failure: ApiFailure): string | null {
+  if (failure.kind === 'refused') return failure.message
+  if (failure.kind === 'unreachable') return 'No connection. The message is still here — try again.'
+  return null
 }
 
 export function useThreadMessages(
@@ -62,6 +104,7 @@ export function useThreadMessages(
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [failure, setFailure] = useState<ApiFailure | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   const conversationId = conversation?.id ?? null
   const conversationType = conversation?.type ?? null
@@ -223,6 +266,17 @@ export function useThreadMessages(
   /**
    * Carry one message to the API and record what came back.
    *
+   * Two round trips when the message carries a file, and in this order: the file
+   * goes into the object store, and only then does the message naming it go into
+   * the thread. The other order would put a message in front of everyone else
+   * pointing at a URI only this phone can open.
+   *
+   * The bubble is on screen for both, holding the device URI, so a photo is
+   * visible from the moment it was sent rather than from the moment the server
+   * had it. What the upload answered with is written back onto the message
+   * before the send, which is what makes a retry after a failed *send* re-send
+   * rather than re-upload — nothing is carried up twice.
+   *
    * A reply to a message the server has never seen carries no
    * `replyToMessageId`: the API validates it as a UUID of a real row, and a
    * local id is neither. The reply still sends — losing the quote is a smaller
@@ -231,23 +285,52 @@ export function useThreadMessages(
   const deliver = useCallback(async (id: string, message: Message) => {
     if (delivering.current.has(message.id)) return
     delivering.current.add(message.id)
+    setSendError(null)
 
-    setState((thread) => beginSend(thread, message))
+    let carried = message
+    if (message.attachments.some((attachment) => isDeviceUri(attachment.url))) {
+      setState((thread) => beginUpload(thread, message))
 
-    const quoted = message.replyTo?.id
+      const uploaded = await uploadFiles(id, message.attachments)
+      if (onScreen.current !== id) {
+        delivering.current.delete(message.id)
+        return
+      }
+      if (!uploaded.ok) {
+        delivering.current.delete(message.id)
+        // Marked failed holding whatever did go up, so a retry carries only what
+        // is still local. Discarding them would orphan an object in the store
+        // for every attempt.
+        setState((thread) =>
+          failSend(thread, message.id, { ...message, attachments: uploaded.value }),
+        )
+        setSendError(sendFailureMessage(uploaded.failure))
+        return
+      }
+      carried = { ...message, attachments: uploaded.value }
+    }
+
+    setState((thread) => beginSend(thread, carried))
+
+    const quoted = carried.replyTo?.id
     const sent = await sendMessage(id, {
-      body: message.body,
+      body: carried.body,
+      messageType: sendMessageType(
+        carried.attachments.map((attachment) => attachmentKindFromType(attachment.type)),
+      ),
+      ...(carried.attachments.length > 0 ? { attachments: carried.attachments } : {}),
       ...(quoted && !isLocalId(quoted) ? { replyToMessageId: quoted } : {}),
     })
 
     delivering.current.delete(message.id)
     if (onScreen.current !== id) return
 
-    setState((thread) =>
-      sent.ok
-        ? applySentMessage(thread, message.id, sent.value)
-        : failSend(thread, message.id),
-    )
+    if (sent.ok) {
+      setState((thread) => applySentMessage(thread, message.id, sent.value))
+      return
+    }
+    setState((thread) => failSend(thread, message.id))
+    setSendError(sendFailureMessage(sent.failure))
   }, [])
 
   const send = useCallback(
@@ -256,7 +339,9 @@ export function useThreadMessages(
       // no composer without a conversation and a signed-in person.
       if (!conversationId || !author) return
       const body = draft.body.trim()
-      if (!body) return
+      const attachments = draft.attachments ?? []
+      // The API refuses a message that is neither, and so does the composer.
+      if (!body && attachments.length === 0) return
 
       void deliver(
         conversationId,
@@ -265,6 +350,10 @@ export function useThreadMessages(
           body,
           author,
           replyTo: draft.replyTo,
+          // Device URIs for now. `deliver` uploads them and writes back what the
+          // API stored, so the bubble is drawn from this phone until it can be
+          // drawn from the server.
+          attachments: attachments.map(toMessageAttachment),
         }),
       )
     },
@@ -285,6 +374,8 @@ export function useThreadMessages(
   const messages = useMemo(() => threadMessages(state), [state])
   const delivery = useMemo(() => deliveryStates(state.unsent), [state.unsent])
 
+  const dismissSendError = useCallback(() => setSendError(null), [])
+
   return {
     messages,
     delivery,
@@ -292,9 +383,56 @@ export function useThreadMessages(
     loadingOlder,
     refreshing,
     failure,
+    sendError,
+    dismissSendError,
     loadOlder,
     refresh,
     send,
     retrySend,
   }
+}
+
+/**
+ * Every file a message is still holding locally, put where the API can reach it.
+ *
+ * One at a time rather than all at once: a phone uploading three videos in
+ * parallel on a mobile connection finishes the first later than it would have
+ * alone, and the first one to fail is the answer for the whole message anyway.
+ *
+ * An attachment already carrying a server URL is passed through untouched, which
+ * is what makes this safe to run again — after a send that failed on the second
+ * of its two round trips, and after an upload that failed partway through a
+ * message carrying several.
+ *
+ * `value` is the list either way, which is why it is outside the `ok`. A failure
+ * reports how far it got, and how far it got is worth keeping: the objects
+ * before the one that failed are in the store whatever happens next, and the
+ * only thing that can still use them is the retry.
+ */
+async function uploadFiles(
+  conversationId: string,
+  attachments: MessageAttachment[],
+): Promise<
+  | { ok: true; value: MessageAttachment[] }
+  | { ok: false; failure: ApiFailure; value: MessageAttachment[] }
+> {
+  const uploaded: MessageAttachment[] = []
+
+  for (const [index, attachment] of attachments.entries()) {
+    if (!isDeviceUri(attachment.url)) {
+      uploaded.push(attachment)
+      continue
+    }
+
+    const result = await uploadAttachment(conversationId, toAttachmentView(attachment))
+    if (!result.ok) {
+      // What went up, then the one that did not and everything behind it, in the
+      // order the message holds them — a list of the same length, so the caller
+      // has a message rather than a fragment of one.
+      return { ok: false, failure: result.failure, value: [...uploaded, ...attachments.slice(index)] }
+    }
+    uploaded.push(result.value)
+  }
+
+  return { ok: true, value: uploaded }
 }

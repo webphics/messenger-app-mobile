@@ -12,7 +12,9 @@ import {
   markConversationRead,
   sendMessage,
   takeOverConversation,
+  uploadAttachment,
 } from '@/lib/conversation-api'
+import type { AttachmentView } from '@/lib/types'
 
 /**
  * The two boundaries this file cannot cross under Jest, both reached through
@@ -34,6 +36,46 @@ jest.mock('@/lib/keychain', () => ({
 
 jest.mock('@/lib/legacy-session', () => ({
   purgeMockSession: jest.fn(async () => undefined),
+}))
+
+/**
+ * The native uploader, which is where a file goes instead of through `fetch` —
+ * see `sendFile` in `lib/api-client.ts`. Everything else in this file is real.
+ */
+type UploadCall = {
+  uri: string
+  url: string
+  options: { headers: Record<string, string>; [key: string]: unknown }
+}
+
+const mockUploads: UploadCall[] = []
+const mockUploadQueue: ({ status: number; body: string } | Error)[] = []
+const uploads = mockUploads
+
+function enqueueUpload(...answers: ({ status: number; body: string } | Error)[]): void {
+  mockUploadQueue.push(...answers)
+}
+
+/** The upload endpoint answers `201` with the envelope every other route uses. */
+function uploadEnvelope(data: unknown, status = 201): { status: number; body: string } {
+  return { status, body: JSON.stringify({ statusCode: status, message: 'File uploaded', data }) }
+}
+
+jest.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
+  File: class {
+    uri: string
+    constructor(uri: string) {
+      this.uri = uri
+    }
+    async upload(url: string, options: UploadCall['options']) {
+      mockUploads.push({ uri: this.uri, url, options })
+      const answer = mockUploadQueue.shift()
+      if (!answer) throw new Error('no upload answer was queued')
+      if (answer instanceof Error) throw answer
+      return { status: answer.status, body: answer.body, headers: {} }
+    }
+  },
 }))
 
 type FetchCall = { url: string; init: RequestInit }
@@ -101,6 +143,8 @@ const MESSAGE_ROW = {
 beforeEach(() => {
   calls.length = 0
   queue = []
+  mockUploads.length = 0
+  mockUploadQueue.length = 0
   setSessionCookie('better-auth.session_token=abc.def')
   clearCsrfPair()
   global.fetch = (async (url: string, init: RequestInit) => {
@@ -701,6 +745,257 @@ describe('the refusals the API answers an assignment with', () => {
     expect(await takeOverConversation('conv-1')).toEqual({
       ok: false,
       failure: { kind: 'refused', message: "You don't have permission to do that." },
+    })
+  })
+})
+
+
+describe('uploadAttachment', () => {
+  const PHOTO: AttachmentView = {
+    kind: 'image',
+    uri: 'file:///data/user/0/cache/ImagePicker/9a2f.jpeg',
+    name: 'IMG_0001.jpg',
+    size: 204_800,
+  }
+
+  /** What `POST /:id/files` answers with: the object it stored, and nothing else. */
+  const STORED = {
+    type: 'image/jpeg',
+    url: '/uploads/chat/9f1c-4a2b.jpg',
+    fileName: '9a2f.jpeg',
+    size: 204_800,
+  }
+
+  test('uploads the file to the conversation, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload(uploadEnvelope(STORED))
+
+    const result = await uploadAttachment('conv-1', PHOTO)
+
+    expect(uploads[0]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/files`)
+    expect(uploads[0]?.uri).toBe('file:///data/user/0/cache/ImagePicker/9a2f.jpeg')
+    expect(uploads[0]?.options.headers['x-csrf-token']).toBe('csrf-token-value')
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        type: 'image/jpeg',
+        url: '/uploads/chat/9f1c-4a2b.jpg',
+        fileName: 'IMG_0001.jpg',
+        size: 204_800,
+        durationSeconds: null,
+        waveform: null,
+      },
+    })
+  })
+
+  test('sends it under the field name and the type the API reads', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload(uploadEnvelope(STORED))
+
+    await uploadAttachment('conv-1', PHOTO)
+
+    expect(uploads[0]?.options).toMatchObject({ fieldName: 'file', mimeType: 'image/jpeg' })
+  })
+
+  /**
+   * The API names its objects randomly — an uploaded name is attacker-supplied —
+   * and echoes back whatever the multipart part was called, which for a photo is
+   * the picker's cache filename and means nothing to anyone.
+   */
+  test('keeps the name the person chose rather than the one the picker cached it under', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload(uploadEnvelope(STORED))
+
+    const result = await uploadAttachment('conv-1', { ...PHOTO, name: 'Receipt March.jpg' })
+
+    expect(result).toMatchObject({ ok: true, value: { fileName: 'Receipt March.jpg' } })
+  })
+
+  /**
+   * The endpoint received a file, so it reports a file. Everything a voice note
+   * is beyond its bytes was measured by the recorder, and this is the last thing
+   * holding it before the send.
+   */
+  test('carries the duration and the waveform of a voice note over the round trip', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload(
+      uploadEnvelope({
+        type: 'audio/mp4',
+        url: '/uploads/chat/v.m4a',
+        fileName: 'v.m4a',
+        size: 8_000,
+      }),
+    )
+
+    const result = await uploadAttachment('conv-1', {
+      kind: 'audio',
+      uri: 'file:///cache/v.m4a',
+      name: 'v.m4a',
+      size: 8_000,
+      durationMs: 4_500,
+      peaks: [0.2, 0.8, 0.4],
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({ durationSeconds: 4.5, waveform: [0.2, 0.8, 0.4] }),
+    })
+  })
+
+  test('refuses a type the API does not take, without spending the upload', async () => {
+    const result = await uploadAttachment('conv-1', {
+      kind: 'image',
+      uri: 'file:///logo.svg',
+      name: 'logo.svg',
+      size: 900,
+    })
+
+    expect(uploads).toHaveLength(0)
+    expect(calls).toHaveLength(0)
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: expect.stringContaining('not allowed') },
+    })
+  })
+
+  test('a file the API found too large is a refusal worth reading', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload({
+      status: 413,
+      body: JSON.stringify({ statusCode: 413, message: 'File too large' }),
+    })
+
+    expect(await uploadAttachment('conv-1', PHOTO)).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'File too large' },
+    })
+  })
+
+  test('a type the API refuses after all is its refusal, in its own words', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload({
+      status: 415,
+      body: JSON.stringify({
+        statusCode: 415,
+        code: 'unsupported_file_type',
+        message: 'File type image/heic is not supported.',
+      }),
+    })
+
+    expect(await uploadAttachment('conv-1', PHOTO)).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'File type image/heic is not supported.' },
+    })
+  })
+
+  test('an upload that never reached the API is unreachable, not a refusal', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload(new Error('Network request failed'))
+
+    expect(await uploadAttachment('conv-1', PHOTO)).toEqual({
+      ok: false,
+      failure: { kind: 'unreachable' },
+    })
+  })
+
+  test('a session the API has stopped accepting is unauthorised, and says so once', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload({ status: 401, body: JSON.stringify({ statusCode: 401 }) })
+
+    expect(await uploadAttachment('conv-1', PHOTO)).toEqual({
+      ok: false,
+      failure: { kind: 'unauthorised' },
+    })
+  })
+})
+
+describe('sending a message that carries attachments', () => {
+  const STORED_PHOTO = {
+    type: 'image/jpeg',
+    url: '/uploads/chat/9f1c.jpg',
+    fileName: 'IMG_0001.jpg',
+    size: 204_800,
+    durationSeconds: null,
+    waveform: null,
+  }
+
+  test('names the uploaded objects and the message type', async () => {
+    enqueue(csrfResponse(), envelope({ ...MESSAGE_ROW, id: 'msg-9' }, 201))
+
+    await sendMessage('conv-1', {
+      body: 'Here it is',
+      messageType: 'media',
+      attachments: [STORED_PHOTO],
+    })
+
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
+      body: 'Here it is',
+      messageType: 'media',
+      attachments: [
+        {
+          type: 'image/jpeg',
+          url: '/uploads/chat/9f1c.jpg',
+          fileName: 'IMG_0001.jpg',
+          size: 204_800,
+        },
+      ],
+    })
+  })
+
+  /**
+   * `body` is `min(1)` where present on the send schema, so an attachment with
+   * no caption omits the key rather than sending the empty string the composer
+   * held — the refine below it accepts a message that is attachments alone.
+   */
+  test('omits an empty body rather than sending one the schema refuses', async () => {
+    enqueue(csrfResponse(), envelope({ ...MESSAGE_ROW, id: 'msg-10' }, 201))
+
+    await sendMessage('conv-1', { body: '', messageType: 'media', attachments: [STORED_PHOTO] })
+
+    const sent = JSON.parse(String(calls[1]?.init.body))
+    expect(sent).not.toHaveProperty('body')
+    expect(sent.attachments).toHaveLength(1)
+  })
+
+  /**
+   * The send schema's attachment fields are `.optional()` where a message's are
+   * `.nullable()`, so the null a parsed message carries has to be dropped rather
+   * than echoed back.
+   */
+  test('drops the nulls a parsed attachment carries, which the send schema refuses', async () => {
+    enqueue(csrfResponse(), envelope({ ...MESSAGE_ROW, id: 'msg-11' }, 201))
+
+    await sendMessage('conv-1', {
+      body: '',
+      messageType: 'voice',
+      attachments: [
+        {
+          type: 'audio/mp4',
+          url: '/uploads/chat/v.m4a',
+          fileName: null,
+          size: null,
+          durationSeconds: 4.5,
+          waveform: [0.2, 0.8],
+        },
+      ],
+    })
+
+    expect(JSON.parse(String(calls[1]?.init.body)).attachments[0]).toEqual({
+      type: 'audio/mp4',
+      url: '/uploads/chat/v.m4a',
+      durationSeconds: 4.5,
+      waveform: [0.2, 0.8],
+    })
+  })
+
+  test('a text message still sends no attachments key at all', async () => {
+    enqueue(csrfResponse(), envelope({ ...MESSAGE_ROW, id: 'msg-12' }, 201))
+
+    await sendMessage('conv-1', { body: 'Just words' })
+
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
+      body: 'Just words',
+      messageType: 'text',
     })
   })
 })

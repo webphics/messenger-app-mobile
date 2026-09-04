@@ -70,7 +70,16 @@ Broadcasts are in-inbox announcements (later), not stories.
    actions produce and renders the notices they write, but has no control that performs one.
 5. Media, push, i18n, list virtualization.
    - 5a. Client media UI (local attachments) — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (done)
-   - 5b. Push, i18n, list virtualization.
+   - 5b. **Attachments over the wire (done)** — sending uploads the file to
+     `POST /conversations/:id/files` and then sends the message naming the object it answered with,
+     in that order. A received attachment renders per type and, for a document, downloads into the
+     device cache first, because handing one to another app wants a file rather than a URL. The
+     `attachments` array is plural and every one of them is drawn — this client stages one at a
+     time, the web client does not. A file the API would refuse is refused before the upload, by the
+     same rules mirrored from its `conversations.upload.ts`, and the composer keeps what was staged
+     so the refusal is something a person can act on. See
+     `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`.
+   - 5c. Push, i18n, list virtualization.
 
 ## Session
 

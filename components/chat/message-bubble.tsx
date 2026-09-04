@@ -77,7 +77,18 @@ type MessageBubbleProps = {
   currentUserId: string
   selected?: boolean
   enter?: boolean
-  attachment?: AttachmentView
+  /**
+   * Every attachment on the message, in the order the API sent them.
+   *
+   * Plural because the payload is. This client stages one at a time, so what it
+   * sends carries one — but a message written on web can carry several, and the
+   * bubble has to draw all of them rather than quietly keep the first.
+   *
+   * The first is the one the bubble is *shaped* around: a lone photo or video
+   * makes the bubble borderless and takes the body as its caption. Anything
+   * after it is stacked below, inside whatever chrome the first chose.
+   */
+  attachments?: AttachmentView[]
   onOpenMenu: (payload: OpenMenuPayload) => void
   onReply: (messageId: string) => void
   onToggleReaction: (messageId: string, emoji: string) => void
@@ -106,11 +117,13 @@ function Delivery({
   messageId: string
   onRetry?: (messageId: string) => void
 }) {
-  if (state === 'sending') {
+  if (state === 'uploading' || state === 'sending') {
     return (
       <View className="mt-1 items-end pr-1">
         <Text variant="label" className="text-muted">
-          Sending…
+          {/* Named separately because they are separate waits: the file goes up
+              first, and on a phone that is the part that takes time. */}
+          {state === 'uploading' ? 'Uploading…' : 'Sending…'}
         </Text>
       </View>
     )
@@ -430,6 +443,23 @@ const ReactionBadge = memo(function ReactionBadge({
   )
 })
 
+/** Shared, so a bubble with nothing attached is handed the same array every render. */
+const NO_ATTACHMENTS: AttachmentView[] = []
+
+/**
+ * What a screen reader is told a bubble is.
+ *
+ * The count is named where there is more than one, because "Incoming image" for
+ * a message carrying four of them describes a message that was not sent.
+ */
+function attachmentLabel(attachments: AttachmentView[], outgoing: boolean): string {
+  const direction = outgoing ? 'Outgoing' : 'Incoming'
+  const first = attachments[0]
+  if (!first) return `${direction} message`
+  if (attachments.length === 1) return `${direction} ${first.kind}`
+  return `${direction} message with ${attachments.length} attachments`
+}
+
 export const MessageBubble = memo(function MessageBubble({
   messageId,
   body,
@@ -443,7 +473,7 @@ export const MessageBubble = memo(function MessageBubble({
   currentUserId,
   selected,
   enter,
-  attachment,
+  attachments = NO_ATTACHMENTS,
   onOpenMenu,
   onReply,
   onToggleReaction,
@@ -455,7 +485,12 @@ export const MessageBubble = memo(function MessageBubble({
   const x = useSharedValue(0)
   const tint = useSharedValue(0)
   const swipedHaptic = useSharedValue(false)
-  const borderless = isImageOrVideo(attachment)
+  // The first attachment shapes the bubble; the rest are stacked inside it.
+  const attachment = attachments[0]
+  const trailing = attachments.slice(1)
+  // A lone image or video goes borderless. A second attachment beneath it needs
+  // somewhere to sit, so a message carrying more than one keeps its chrome.
+  const borderless = isImageOrVideo(attachment) && trailing.length === 0
   const hasText = body.trim().length > 0
   const showChromeBubble = !borderless && (hasText || !!attachment)
   const fused =
@@ -595,13 +630,7 @@ export const MessageBubble = memo(function MessageBubble({
     ],
   }))
 
-  const a11yLabel = attachment
-    ? outgoing
-      ? `Outgoing ${attachment.kind}`
-      : `Incoming ${attachment.kind}`
-    : outgoing
-      ? 'Outgoing message'
-      : 'Incoming message'
+  const a11yLabel = attachmentLabel(attachments, outgoing)
 
   return (
     <Animated.View
@@ -723,6 +752,18 @@ export const MessageBubble = memo(function MessageBubble({
                     caption={borderless ? body : undefined}
                   />
                 ) : null}
+                {trailing.map((extra, index) => (
+                  <View
+                    // Nothing in an attachment is a stable identity — two photos
+                    // from one camera roll can share a URI after a re-pick — and
+                    // the list is fixed for the life of the message, so the
+                    // position is the honest key.
+                    key={`${extra.uri}-${index}`}
+                    className="mt-2"
+                  >
+                    <MessageMedia attachment={extra} outgoing={outgoing} />
+                  </View>
+                ))}
                 {!borderless && hasText ? (
                   <Text
                     variant="body"

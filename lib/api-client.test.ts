@@ -63,9 +63,52 @@ function headersOf(call: FetchCall): Record<string, string> {
 
 const SESSION_COOKIE = "better-auth.session_token=abc.def";
 
+/**
+ * What the native uploader was asked to do, and what it will answer with.
+ *
+ * `expo-file-system` is mocked rather than the platform beneath it: a file
+ * upload never reaches `fetch` at all — that is the point of it — so the
+ * queue above cannot stand in for one.
+ */
+type UploadCall = {
+  uri: string;
+  url: string;
+  options: { headers: Record<string, string>; [key: string]: unknown };
+};
+
+const mockUploads: UploadCall[] = [];
+const mockUploadQueue: ({ status: number; body: string } | Error)[] = [];
+const uploads = mockUploads;
+
+function enqueueUpload(...answers: ({ status: number; body: string } | Error)[]): void {
+  mockUploadQueue.push(...answers);
+}
+
+/** `UploadType.MULTIPART`, as the mock below reports it. */
+const MULTIPART = 1;
+
+jest.mock("expo-file-system", () => ({
+  UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
+  File: class {
+    uri: string;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+    async upload(url: string, options: UploadCall["options"]) {
+      mockUploads.push({ uri: this.uri, url, options });
+      const answer = mockUploadQueue.shift();
+      if (!answer) throw new Error("no upload answer was queued");
+      if (answer instanceof Error) throw answer;
+      return { status: answer.status, body: answer.body, headers: {} };
+    }
+  },
+}));
+
 beforeEach(() => {
   calls.length = 0;
   queue = [];
+  mockUploads.length = 0;
+  mockUploadQueue.length = 0;
   setSessionCookie(null);
   clearCsrfPair();
   global.fetch = (async (url: string, init: RequestInit) => {
@@ -253,6 +296,114 @@ describe("apiRequest", () => {
   test("a request that never got an answer is reported, not thrown", async () => {
     enqueue(new TypeError("Network request failed"));
     await expect(apiRequest("/auth/session")).resolves.toEqual({ reached: false });
+  });
+});
+
+describe("a file upload", () => {
+  const FILE = { uri: "file:///cache/a.jpg", field: "file", type: "image/jpeg" };
+
+  test("streams through the native uploader rather than through fetch", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload({ status: 201, body: JSON.stringify({ data: { url: "/uploads/chat/a.jpg" } }) });
+
+    await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
+
+    // One fetch, and it is the CSRF pre-flight. The file did not go that way.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`${API_BASE_URL}/csrf`);
+    expect(uploads).toHaveLength(1);
+    expect(uploads[0].uri).toBe("file:///cache/a.jpg");
+    expect(uploads[0].url).toBe(`${API_BASE_URL}/conversations/c1/files`);
+  });
+
+  test("sends it under the field name and the type the API reads", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
+
+    await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
+
+    expect(uploads[0].options).toMatchObject({
+      httpMethod: "POST",
+      uploadType: MULTIPART,
+      fieldName: "file",
+      mimeType: "image/jpeg",
+    });
+  });
+
+  test("declares no Content-Type, so the uploader can name the boundary", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
+
+    await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
+
+    expect(uploads[0].options.headers).not.toHaveProperty("Content-Type");
+  });
+
+  test("carries the Session cookie and the CSRF pair like any other mutation", async () => {
+    setSessionCookie(SESSION_COOKIE);
+    enqueue(csrfResponse());
+    enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
+
+    await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
+
+    expect(uploads[0].options.headers).toMatchObject({
+      Cookie: `${SESSION_COOKIE}; csrf-token=cookie-value`,
+      "x-csrf-token": "csrf-token-value",
+    });
+  });
+
+  test("an upload the API refused as too large is reported, not thrown", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload({
+      status: 413,
+      body: JSON.stringify({ statusCode: 413, message: "File too large" }),
+    });
+
+    expect(await apiRequest("/conversations/c1/files", { method: "POST", file: FILE })).toEqual({
+      reached: true,
+      status: 413,
+      body: { statusCode: 413, message: "File too large" },
+      sessionCookie: null,
+    });
+  });
+
+  test("an answer that is not JSON reads as no body rather than throwing", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload({ status: 502, body: "<html>Bad Gateway</html>" });
+
+    expect(await apiRequest("/conversations/c1/files", { method: "POST", file: FILE })).toEqual({
+      reached: true,
+      status: 502,
+      body: null,
+      sessionCookie: null,
+    });
+  });
+
+  test("a file that could not be read is a request that never arrived", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload(new Error("File does not exist"));
+
+    await expect(
+      apiRequest("/conversations/c1/files", { method: "POST", file: FILE }),
+    ).resolves.toEqual({ reached: false });
+  });
+
+  /**
+   * The whole reason the upload goes through `apiRequest` at all rather than
+   * being its own path beside it.
+   */
+  test("a CSRF refusal refreshes the pair and uploads again, exactly once", async () => {
+    enqueue(csrfResponse(), csrfResponse("second-token", "second-cookie"));
+    enqueueUpload(
+      { status: 403, body: JSON.stringify({ statusCode: 403, code: "csrf_invalid" }) },
+      { status: 201, body: JSON.stringify({ data: {} }) },
+    );
+
+    const outcome = await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
+
+    expect(uploads).toHaveLength(2);
+    expect(uploads[1].options.headers["x-csrf-token"]).toBe("second-token");
+    expect(outcome).toMatchObject({ reached: true, status: 201 });
   });
 });
 

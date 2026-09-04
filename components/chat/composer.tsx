@@ -62,7 +62,13 @@ export type ComposerReplyPreview = {
 type ComposerProps = {
   value: string
   onChangeText: (text: string) => void
-  onSend: (payload: ComposerSendPayload) => void
+  /**
+   * Where a written message goes. Answers whether it was taken: the composer
+   * clears on `true` and holds everything on `false`, which is what lets a send
+   * be refused without the person losing the file they picked and the caption
+   * they wrote.
+   */
+  onSend: (payload: ComposerSendPayload) => boolean
   replyTo?: ComposerReplyPreview | null
   onCancelReply?: () => void
   /** Overlap the thread already lifted the composer by; see lib/keyboard-inset.ts. */
@@ -383,7 +389,13 @@ export function Composer({
     if (recording) return
     const body = value.trim()
     if (!body && !staged) return
-    onSend({ body, attachment: staged ?? undefined })
+
+    // Cleared only once the message is on its way. A send refused before it
+    // starts — a file over the limit, a type the API will not take — leaves the
+    // draft exactly as it was, so the person can drop the file and keep what
+    // they wrote rather than typing it again.
+    if (!onSend({ body, attachment: staged ?? undefined })) return
+
     onChangeText('')
     setStaged(null)
   }

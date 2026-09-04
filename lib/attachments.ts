@@ -65,16 +65,30 @@ function positiveOrUndefined(n: number | null | undefined): number | undefined {
   return typeof n === 'number' && Number.isFinite(n) && n > 0 ? n : undefined
 }
 
-function toAttachment(asset: ImagePicker.ImagePickerAsset): PickedAttachment {
+/**
+ * One asset the picker handed back, in the shape this app renders and uploads.
+ *
+ * Exported because it is the whole seam between the platform and this app, and
+ * because the units on either side of it disagree in ways that are invisible
+ * until something crosses a wire: see the duration below.
+ */
+export function attachmentFromAsset(
+  asset: ImagePicker.ImagePickerAsset,
+): PickedAttachment {
   const kind = assetKind(asset.type)
   return {
     uri: asset.uri,
     name: asset.fileName ?? fileNameFromUri(asset.uri, `${kind}.jpg`),
     size: asset.fileSize ?? null,
     kind,
+    // `ImagePickerAsset.duration` is already in milliseconds, so it is rounded
+    // rather than converted. Phase 5a multiplied it by a thousand, which nothing
+    // on screen read — a video bubble takes its length from the loaded track —
+    // so the mistake was invisible until #35 started sending it to the server,
+    // where a five-second clip claimed to be an hour and twenty-four minutes.
     durationMs:
       kind === 'video' && asset.duration != null
-        ? Math.round(asset.duration * 1000)
+        ? Math.round(asset.duration)
         : undefined,
     // Videos have no `Image.getSize` equivalent, so the picker's own report is
     // the only aspect ratio available before the player has loaded a track.
@@ -97,7 +111,7 @@ export async function pickFromLibrary(): Promise<AttachmentOutcome> {
   })
   if (result.canceled || result.assets.length === 0) return { status: 'cancelled' }
 
-  return { status: 'picked', attachment: toAttachment(result.assets[0]!) }
+  return { status: 'picked', attachment: attachmentFromAsset(result.assets[0]!) }
 }
 
 /** A freshly captured photo. */
@@ -114,7 +128,7 @@ export async function capturePhoto(): Promise<AttachmentOutcome> {
   })
   if (result.canceled || result.assets.length === 0) return { status: 'cancelled' }
 
-  return { status: 'picked', attachment: toAttachment(result.assets[0]!) }
+  return { status: 'picked', attachment: attachmentFromAsset(result.assets[0]!) }
 }
 
 /** Any document the OS file provider exposes. Needs no runtime permission. */

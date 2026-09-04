@@ -1,3 +1,5 @@
+import { File, UploadType } from "expo-file-system";
+
 import { API_BASE_URL } from "@/lib/api-config";
 import { asRecord, CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import type { HttpOutcome } from "@/lib/auth-response";
@@ -160,12 +162,43 @@ type Attempt = {
   path: string;
   method: string;
   body: unknown;
+  /** A file to upload as multipart. Mutually exclusive with `body`. */
+  file: UploadFile | undefined;
   sessionCookie: string | null;
 };
 
-async function send(attempt: Attempt, csrf: CsrfPair | null): Promise<Answer | null> {
+/**
+ * One file on this device, and what to call it on the way up.
+ *
+ * A descriptor rather than the bytes: the file is streamed from disk by the
+ * native uploader, so nothing here ever holds fifteen megabytes of video.
+ */
+export type UploadFile = {
+  /** `file:` or `content:` — whatever the picker or the recorder produced. */
+  uri: string;
+  /** The multipart form field the API reads. */
+  field: string;
+  /** MIME type, which the API's allowlist is checked against. */
+  type: string;
+};
+
+/**
+ * A body this app can hand `fetch`.
+ *
+ * A file is deliberately absent: it does not travel this way. This runtime's
+ * `fetch` is Expo's, and its `FormData` accepts a string, a `Blob`, or anything
+ * with `bytes()` — every one of which is the file already in memory. React
+ * Native's old `{ uri, name, type }` part, which streamed, is not one of them.
+ * So an upload takes the other path below.
+ */
+function requestBody(attempt: Attempt): { body?: string } {
+  if (attempt.body !== undefined) return { body: JSON.stringify(attempt.body) };
+  return {};
+}
+
+/** The Session cookie and the CSRF pair, however the request is about to travel. */
+function credentialHeaders(attempt: Attempt, csrf: CsrfPair | null): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (attempt.body !== undefined) headers["Content-Type"] = "application/json";
   if (csrf) headers[CSRF_HEADER] = csrf.token;
 
   // Both halves of the double submit travel in one header, beside the Session
@@ -175,12 +208,90 @@ async function send(attempt: Attempt, csrf: CsrfPair | null): Promise<Answer | n
   if (csrf) cookies.push(`${CSRF_COOKIE}=${csrf.cookie}`);
   if (cookies.length > 0) headers.Cookie = cookies.join("; ");
 
+  return headers;
+}
+
+/** A header off a plain record, by a name whose case the platform decides. */
+function headerValue(headers: Record<string, string>, name: string): string | null {
+  const wanted = name.toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === wanted) return value;
+  }
+  return null;
+}
+
+/**
+ * One file, uploaded as multipart, streamed from disk by the platform.
+ *
+ * The native uploader rather than `fetch`, for two reasons. This runtime's
+ * `fetch` would have to hold the whole file — and then the whole multipart body
+ * around it — in memory, which for the fifteen megabytes the API accepts is a
+ * lot to ask of a phone. And it cannot be given a file to stream: Expo's
+ * `FormData` takes bytes, not a URI.
+ *
+ * It is still an `apiRequest`, and that is the point: the Session cookie, the
+ * CSRF pair and the one retry are the same ones every other mutation gets,
+ * because they are built above this and handed in. Only the transport differs.
+ */
+async function sendFile(
+  attempt: Attempt,
+  file: UploadFile,
+  headers: Record<string, string>,
+): Promise<Answer | null> {
+  try {
+    const result = await new File(file.uri).upload(`${API_BASE_URL}${attempt.path}`, {
+      httpMethod: uploadMethod(attempt.method),
+      uploadType: UploadType.MULTIPART,
+      fieldName: file.field,
+      mimeType: file.type,
+      // No Content-Type here: the uploader writes one, and it is the only thing
+      // that knows the boundary it generated.
+      headers,
+    });
+
+    return {
+      status: result.status,
+      body: parseJson(result.body),
+      setCookie: headerValue(result.headers, "set-cookie"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The method, as the uploader takes it.
+ *
+ * It accepts three of the five `apiRequest` does, and an upload is a POST on
+ * every path that reaches here. Narrowed rather than asserted: the two that are
+ * not POST are passed through, and there is nothing useful to do about a `GET`
+ * with a file on it except send the request it obviously meant.
+ */
+function uploadMethod(method: string): "POST" | "PUT" | "PATCH" {
+  return method === "PUT" || method === "PATCH" ? method : "POST";
+}
+
+/** A body the API did not send as JSON reads as null, exactly as `readJsonBody` does. */
+function parseJson(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
+}
+
+async function send(attempt: Attempt, csrf: CsrfPair | null): Promise<Answer | null> {
+  const headers = credentialHeaders(attempt, csrf);
+  if (attempt.file) return sendFile(attempt, attempt.file, headers);
+
+  if (attempt.body !== undefined) headers["Content-Type"] = "application/json";
+
   try {
     const response = await fetch(`${API_BASE_URL}${attempt.path}`, {
       method: attempt.method,
       headers,
       credentials: "omit",
-      ...(attempt.body === undefined ? {} : { body: JSON.stringify(attempt.body) }),
+      ...requestBody(attempt),
     });
 
     return {
@@ -215,6 +326,14 @@ export type ApiRequestOptions = {
   /** Serialised as JSON. Omit for a request with no body. */
   body?: unknown;
   /**
+   * A file on this device, for the one endpoint that takes one.
+   *
+   * Sent as multipart instead of `body` rather than beside it, and streamed from
+   * disk rather than read into memory — see `sendFile`. The request is
+   * authenticated exactly as every other mutation is.
+   */
+  file?: UploadFile;
+  /**
    * Present the given Session cookie instead of the held one.
    *
    * For the single case of signing out, where the credential is deliberately
@@ -238,6 +357,7 @@ export async function apiRequest(
     path,
     method,
     body: options.body,
+    file: options.file,
     sessionCookie: options.cookie ?? heldSessionCookie,
   };
 

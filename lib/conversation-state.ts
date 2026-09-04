@@ -1,4 +1,5 @@
 import type {
+  AttachmentView,
   Conversation,
   ConversationType,
   Message,
@@ -30,11 +31,16 @@ import { isStaffConversation, isStaffMessage } from '@/lib/types'
  * unsent message has no receipt until the API answers with one, and by then it
  * is no longer unsent.
  *
+ * `uploading` is a separate state rather than a longer `sending` because it is a
+ * separate wait: a photo goes up before the message naming it goes out, and on a
+ * phone that is the part that takes time. A message stuck on *Sending…* for
+ * thirty seconds reads as broken; one that says *Uploading…* reads as working.
+ *
  * Deliberately not called *outgoing*: `isOutgoing` already means "sent by the
  * person reading it", which is what a bubble's `outgoing` prop is, and a message
  * can be outgoing in that sense for the rest of its life.
  */
-export type DeliveryState = 'sending' | 'failed'
+export type DeliveryState = 'uploading' | 'sending' | 'failed'
 
 /** A message typed here, from the tap on send until the API confirms it. */
 export type UnsentMessage = {
@@ -48,6 +54,12 @@ export type SendDraft = {
   body: string
   /** The message being answered, or null when this is not a reply. */
   replyTo: Message | null
+  /**
+   * Staged on this device and not yet uploaded — device URIs, in the shape the
+   * picker and the recorder produce. Whatever sends this uploads them first;
+   * see `useThreadMessages`.
+   */
+  attachments?: AttachmentView[]
 }
 
 export type ThreadState = {
@@ -229,31 +241,64 @@ export function applyIncomingMessage(
  * at their own message twice, once delivered and once still marked *sending*,
  * until the round trip caught up. On a slow connection that is not a flicker.
  *
- * Matched on the body rather than on an id, because there is no id to match on:
- * a local id is this device's and the arriving one is the server's, and nothing
- * relates them until the request answers. Only the viewer's own messages are
- * considered, and only against a body that is not empty. Two identical messages
- * in flight at once confirm in the order they were sent, which is the order they
- * were written.
+ * There is no id to match on: a local id is this device's and the arriving one
+ * is the server's, and nothing relates them until the request answers. So the
+ * match is on what the two copies do share, and which of the two that is depends
+ * on what the message is — see `isEchoOf`.
  *
- * Only a send still in flight is confirmed this way. One that has already failed
- * keeps its place and its offer to go again: the person has been told about it,
- * and taking it away on the strength of matching words would leave them with
- * nothing to retry. A send that fails *after* an arrival confirmed it finds
- * nothing left to mark, which is right — the socket has shown that it landed.
+ * Only the viewer's own messages are considered, and only a send still in
+ * flight. One that has already failed keeps its place and its offer to go again:
+ * the person has been told about it, and taking it away on the strength of a
+ * match would leave them with nothing to retry. A send that fails *after* an
+ * arrival confirmed it finds nothing left to mark, which is right — the socket
+ * has shown that it landed.
  */
 function withoutEcho(
   unsent: UnsentMessage[],
   message: Message,
   viewerId: string,
 ): UnsentMessage[] {
-  if (unsent.length === 0 || message.body === '') return unsent
+  if (unsent.length === 0) return unsent
   if (!isOutgoing(message, viewerId)) return unsent
 
-  const echo = unsent.find(
-    (entry) => entry.state === 'sending' && entry.message.body === message.body,
-  )
+  const echo = unsent.find((entry) => isEchoOf(entry, message))
   return echo ? unsent.filter((entry) => entry !== echo) : unsent
+}
+
+/**
+ * Whether this arriving message is the one that unsent entry became.
+ *
+ * A message carrying attachments is matched on their URLs. That is an exact
+ * match rather than a guess: by the time a send is out, the entry holds what the
+ * upload answered with, and the arriving copy names the same stored objects. It
+ * is also the only match available — a photo sent without a caption has an empty
+ * body, which every other uncaptioned photo also has, so matching on the body
+ * would confirm the wrong one.
+ *
+ * A message carrying none is matched on its body, which must not be empty: the
+ * API refuses a message that is neither body nor attachments, so an empty one is
+ * not something this device could have sent. Two identical messages in flight at
+ * once confirm in the order they were sent, which is the order they were written.
+ *
+ * The two are never mixed. An arrival with attachments cannot confirm an entry
+ * without them however well the captions agree, because it is a different
+ * message — one of them is a photo.
+ */
+function isEchoOf(entry: UnsentMessage, message: Message): boolean {
+  // Only a message whose send is actually out. One still uploading has no copy
+  // on the server yet, so nothing arriving can be an echo of it.
+  if (entry.state !== 'sending') return false
+
+  const held = entry.message.attachments
+  const arriving = message.attachments
+  if (held.length > 0 || arriving.length > 0) {
+    return (
+      held.length === arriving.length &&
+      held.every((attachment, index) => attachment.url === arriving[index]?.url)
+    )
+  }
+
+  return message.body !== '' && entry.message.body === message.body
 }
 
 /**
@@ -322,11 +367,37 @@ export function draftMessage(draft: MessageDraft): Message {
  * stacking a second copy of it beneath the first.
  */
 export function beginSend(state: ThreadState, message: Message): ThreadState {
+  return withDelivery(state, message, 'sending')
+}
+
+/**
+ * The upload the send is waiting on.
+ *
+ * A separate entry point rather than an argument to `beginSend`, because the two
+ * are separate moments in one journey and a caller moves between them: an
+ * attachment goes up, then the message naming it goes out, and a retry starts
+ * again from whichever of the two never finished.
+ */
+export function beginUpload(state: ThreadState, message: Message): ThreadState {
+  return withDelivery(state, message, 'uploading')
+}
+
+/**
+ * The message, marked, replacing any earlier mark it carried.
+ *
+ * The replacement is what keeps a retry, and the move from uploading to sending,
+ * from stacking a second copy of the bubble beneath the first.
+ */
+function withDelivery(
+  state: ThreadState,
+  message: Message,
+  delivery: DeliveryState,
+): ThreadState {
   return {
     ...state,
     unsent: [
       ...state.unsent.filter((entry) => entry.message.id !== message.id),
-      { message, state: 'sending' },
+      { message, state: delivery },
     ],
   }
 }
@@ -361,12 +432,24 @@ export function applySentMessage(
  * The message stays where the person put it, marked, rather than vanishing —
  * what they wrote is not the API's to discard, and a thread that quietly loses a
  * bubble is indistinguishable from one that delivered it.
+ *
+ * `message` replaces the one being held, for the one thing a failed send can
+ * still have achieved: a message carrying three files whose third upload failed
+ * has two of them in the object store already, and keeping what came back means
+ * the retry sends the third rather than all three again — which would leave two
+ * orphaned objects behind every attempt.
  */
-export function failSend(state: ThreadState, localId: string): ThreadState {
+export function failSend(
+  state: ThreadState,
+  localId: string,
+  message?: Message,
+): ThreadState {
   return {
     ...state,
     unsent: state.unsent.map((entry) =>
-      entry.message.id === localId ? { ...entry, state: 'failed' } : entry,
+      entry.message.id === localId
+        ? { message: message ?? entry.message, state: 'failed' }
+        : entry,
     ),
   }
 }

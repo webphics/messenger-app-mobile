@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, BackHandler, Dimensions, FlatList, View } from 'react-native'
+import {
+  ActivityIndicator,
+  BackHandler,
+  Dimensions,
+  FlatList,
+  Pressable,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { AlertCircle, X } from '@/components/icons'
 import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
 import { MessageActions } from '@/components/chat/message-actions'
 import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
@@ -9,14 +17,13 @@ import { ThreadHeader } from '@/components/chat/thread-header'
 import { InScreenHeader } from '@/components/in-screen-header'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
-import { primaryAttachmentView, toMessageAttachment } from '@/lib/attachment-view'
+import { attachmentViews, primaryAttachmentView } from '@/lib/attachment-view'
+import { rejectUploadReason } from '@/lib/attachment-upload'
 import { composerAccess, type ComposerAction } from '@/lib/composer-access'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
-  draftMessage,
   isLocalId,
   isOutgoing,
-  LOCAL_ID_PREFIX,
   mergeMessages,
   messageSenderName,
   type DeliveryState,
@@ -58,15 +65,17 @@ type ThreadScreenProps = {
   refreshing?: boolean
   onRefresh?: () => void
   /**
-   * Where a typed message goes.
-   *
-   * Absent on a thread that still has nowhere to send one, where the composer
-   * falls back to echoing locally so it is not a dead control.
+   * Where a typed message goes. Required: every thread this screen opens has a
+   * conversation behind it, and a composer whose send goes nowhere is worse
+   * than no composer at all.
    */
-  onSendMessage?: (draft: SendDraft) => void
+  onSendMessage: (draft: SendDraft) => void
   /** How far each message this device is still carrying has got, by id. */
   delivery?: ReadonlyMap<string, DeliveryState>
   onRetrySend?: (messageId: string) => void
+  /** Why the last send did not land, in the API's own words. See `useThreadMessages`. */
+  sendError?: string | null
+  onDismissSendError?: () => void
   /**
    * Claim this thread, or take it from whoever holds it.
    *
@@ -81,7 +90,13 @@ type ThreadScreenProps = {
   assignError?: string | null
 }
 
-/** What a bubble draws out of a message: its caption and the one attachment shown beside it. */
+/**
+ * What a quote strip or a preview line draws out of a message.
+ *
+ * One attachment, because those have room for one label. A *bubble* draws every
+ * attachment the message carries — see `attachmentViews` — and the two are
+ * deliberately different questions.
+ */
 function contentOf(message: Message): BubbleContent {
   return { body: message.body, attachment: primaryAttachmentView(message.attachments) }
 }
@@ -152,6 +167,46 @@ function ReadOnlyNotice({
 }
 
 /**
+ * Why the last send did not land.
+ *
+ * Directly above the composer rather than as an alert, because the bubble it is
+ * about is still on screen a few rows up, still marked *Not sent*, and still
+ * offering a retry — a modal over all of that would hide the thing it is
+ * explaining. Dismissible, so a refusal a person has read and acted on does not
+ * sit over the composer for the rest of the conversation.
+ */
+function SendErrorNotice({
+  message,
+  onDismiss,
+}: {
+  message: string
+  onDismiss?: () => void
+}) {
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      className="flex-row items-center gap-2 border-t border-line/60 bg-danger/10 px-4 py-2"
+    >
+      <AlertCircle color={colors.danger} size={14} />
+      <Text variant="meta" className="min-w-0 flex-1 text-danger">
+        {message}
+      </Text>
+      {onDismiss ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          hitSlop={10}
+          onPress={onDismiss}
+          className="shrink-0 active:opacity-60"
+        >
+          <X color={colors.danger} size={14} />
+        </Pressable>
+      ) : null}
+    </View>
+  )
+}
+
+/**
  * An Engage, Takeover or Transfer notice.
  *
  * Centred and unsided, because it is the thread's own record of what happened
@@ -186,6 +241,8 @@ export function ThreadScreen({
   onSendMessage,
   delivery,
   onRetrySend,
+  sendError = null,
+  onDismissSendError,
   onAssign,
   assigning = false,
   assignError = null,
@@ -197,6 +254,15 @@ export function ThreadScreen({
   const [draft, setDraft] = useState('')
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const [menu, setMenu] = useState<ReactionAnchor | null>(null)
+  /**
+   * A file this screen refused before it was ever sent.
+   *
+   * Held here rather than by the caller because the caller never heard about it:
+   * nothing was sent. It shares the one notice with `sendError`, which is what a
+   * *sent* message came back with — two sources, one line, because to the person
+   * reading it they are the same sentence about the same message.
+   */
+  const [refusal, setRefusal] = useState<string | null>(null)
 
   /**
    * What this screen did to the thread: a message typed into the composer, and a
@@ -219,6 +285,20 @@ export function ThreadScreen({
    */
   const access = composerAccess(conversation, viewer)
   const readOnly = access.kind === 'read-only'
+
+  /**
+   * Why the last message did not go, whichever of the two reasons it was.
+   *
+   * Rendered above the composer *and* above the read-only line, because a thread
+   * can become read-only between a send and its answer — an Admin takes it while
+   * a message is in flight — and a failure that only ever appeared over a
+   * composer would vanish exactly when it stopped being recoverable.
+   */
+  const notice = refusal ?? sendError
+  const dismissNotice = useCallback(() => {
+    setRefusal(null)
+    onDismissSendError?.()
+  }, [onDismissSendError])
 
   const isGroup =
     conversation.type === 'group' || conversation.type === 'community_announcement'
@@ -341,19 +421,39 @@ export function ThreadScreen({
   /**
    * A message typed here.
    *
-   * Text goes to the API through `onSendMessage`, and the caller owns it from
-   * there — the bubble it puts on screen arrives back in `messages` with a
-   * delivery state, so nothing about a send is held twice.
+   * Everything goes to the API through `onSendMessage`, attachments included:
+   * the caller uploads the file and then sends the message naming it, and the
+   * bubble it put on screen arrives back in `messages` with a delivery state, so
+   * nothing about a send is held twice.
    *
-   * An attachment does not: the API's shape names an uploaded object and Phase
-   * 5a produces a device URI, so a message carrying one has nowhere to go and
-   * stays the local echo it has been since. Same for a thread with no
-   * `onSendMessage` at all — Agent and Admin, still on local data until #32.
+   * A file the API would refuse is refused here instead, before anything is
+   * spent carrying it up a mobile connection — the same rules, mirrored from
+   * `conversations.upload.ts`, and the same reason the web client mirrors them.
+   * The refusal goes to the notice above the composer, beside the file it is
+   * about.
+   *
+   * Answers whether the message was taken, which is what tells the composer
+   * whether to clear: a refused file stays staged beside the caption it had, so
+   * the person can drop it and keep what they wrote.
    */
-  function send(payload: ComposerSendPayload) {
+  function send(payload: ComposerSendPayload): boolean {
     const body = payload.body.trim()
-    if (!body && !payload.attachment) return
+    if (!body && !payload.attachment) return false
 
+    if (payload.attachment) {
+      const reason = rejectUploadReason(payload.attachment)
+      if (reason) {
+        // Into the same line every other send failure lands in, rather than an
+        // alert: the file it is about is staged an inch below, and a modal over
+        // the thing it is explaining is the one place it cannot be read beside.
+        setRefusal(reason)
+        // Refused, so the composer keeps the file and the caption: the person
+        // has been told what is wrong and can act on it.
+        return false
+      }
+    }
+
+    setRefusal(null)
     const quoted = replyTo
     setReplyTo(null)
     // MVCP keeps the prior newest row fixed; after layout, pin offset 0 so the
@@ -361,12 +461,12 @@ export function ThreadScreen({
     // user had scrolled up slightly).
     stickToLatestRef.current = true
 
-    if (onSendMessage && !payload.attachment) {
-      onSendMessage({ body, replyTo: quoted })
-      return
-    }
-
-    setLocal((held) => [...held, localEcho(payload, viewer, quoted)])
+    onSendMessage({
+      body,
+      replyTo: quoted,
+      ...(payload.attachment ? { attachments: [payload.attachment] } : {}),
+    })
+    return true
   }
 
   const onContentSizeChange = useCallback(() => {
@@ -394,7 +494,7 @@ export function ThreadScreen({
         <MessageBubble
           messageId={item.message.id}
           body={content.body}
-          attachment={content.attachment}
+          attachments={attachmentViews(item.message.attachments)}
           outgoing={isOutgoing(item.message, viewer.id)}
           status={item.message.receiptStatus}
           senderName={item.senderName}
@@ -466,6 +566,7 @@ export function ThreadScreen({
             : undefined
         }
       />
+      {notice ? <SendErrorNotice message={notice} onDismiss={dismissNotice} /> : null}
       {access.kind === 'read-only' ? (
         <ReadOnlyNotice
           reason={access.reason}
@@ -517,17 +618,3 @@ export function ThreadScreen({
   )
 }
 
-/** A message this screen shows and does not send. See `send`. */
-function localEcho(
-  payload: ComposerSendPayload,
-  viewer: ThreadViewer,
-  replyTo: Message | null,
-): Message {
-  return draftMessage({
-    id: `${LOCAL_ID_PREFIX}${Date.now()}`,
-    body: payload.body.trim(),
-    author: viewer,
-    replyTo,
-    attachments: payload.attachment ? [toMessageAttachment(payload.attachment)] : [],
-  })
-}
