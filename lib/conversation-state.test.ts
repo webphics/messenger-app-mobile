@@ -24,14 +24,17 @@ import {
   withIncomingMessage,
   withoutConversation,
   withoutPages,
+  withReassignment,
 } from '@/lib/conversation-state'
-import { parseMessageCreated } from '@/lib/realtime-events'
-import type { DeliveryState, ThreadState } from '@/lib/conversation-state'
+import { parseConversationReassigned, parseMessageCreated } from '@/lib/realtime-events'
+import type { DeliveryState, Reassignment, ThreadState } from '@/lib/conversation-state'
+import type { ReassignmentReason } from '@/lib/realtime-events'
 import type {
   Conversation,
   CustomerMessage,
   Message,
   MessageType,
+  StaffConversation,
   StaffMessage,
 } from '@/lib/types'
 
@@ -1061,6 +1064,165 @@ describe('withIncomingMessage', () => {
       })
 
       expect(totalUnread(withIncomingMessage(staffRows, 'conv-1', notice, 'agent-1'))).toBe(2)
+    })
+  })
+})
+
+describe('withReassignment', () => {
+  /**
+   * A staff Support DM row. `labels` is what makes it one — the shape a Customer
+   * receives carries no assignment at all, which is the last case in the table.
+   */
+  function supportRow(overrides: Partial<StaffConversation> = {}): Conversation {
+    return conversation({
+      id: 'conv-1',
+      type: 'support_dm',
+      status: 'engaged',
+      title: null,
+      description: null,
+      avatarUrl: null,
+      customer: { id: 'cust-1', name: 'QA Customer' },
+      assignedAgent: { id: 'agent-1', name: 'QA Agent' },
+      otherUser: null,
+      members: [],
+      labels: [],
+      ...overrides,
+    } as Partial<Conversation>)
+  }
+
+  const ADMIN = { id: 'admin-1', name: 'Admin' }
+
+  function event(overrides: Partial<Reassignment> = {}): Reassignment {
+    return {
+      conversationId: 'conv-1',
+      reason: 'taken_over',
+      assignee: ADMIN,
+      ...overrides,
+    }
+  }
+
+  describe('a thread the viewer still has every right to see', () => {
+    test.each([
+      [
+        'an Admin took it, so the row names the Admin and stays engaged',
+        'taken_over' as ReassignmentReason,
+        ADMIN,
+        { assignedAgent: ADMIN, status: 'engaged' },
+      ],
+      [
+        'the assignee transferred it, so the row names whoever received it',
+        'transferred' as ReassignmentReason,
+        { id: 'agent-2', name: 'Rae' },
+        { assignedAgent: { id: 'agent-2', name: 'Rae' }, status: 'engaged' },
+      ],
+      [
+        'nobody holds it, so it goes back to the pool',
+        'taken_over' as ReassignmentReason,
+        null,
+        { assignedAgent: null, status: 'unassigned' },
+      ],
+    ] as const)('%s', (_name, reason, assignee, expected) => {
+      const next = withReassignment([supportRow()], event({ reason, assignee }))
+
+      expect(next).toHaveLength(1)
+      expect(next[0]).toMatchObject(expected)
+    })
+
+    test('keeps everything the event does not speak for', () => {
+      const held = supportRow({ lastMessagePreview: 'Where is my order?', unreadCount: 4 })
+
+      expect(withReassignment([held], event())[0]).toMatchObject({
+        id: 'conv-1',
+        lastMessagePreview: 'Where is my order?',
+        unreadCount: 4,
+      })
+    })
+
+    test('takes only the assignee’s id and name; presence is the row update’s to carry', () => {
+      const next = withReassignment(
+        [supportRow()],
+        event({ assignee: { id: 'admin-1', name: 'Admin' } }),
+      )
+
+      expect(next[0]).toMatchObject({ assignedAgent: { id: 'admin-1', name: 'Admin' } })
+    })
+
+    test('leaves the rows either side of it alone', () => {
+      const list = [supportRow({ id: 'other' }), supportRow(), supportRow({ id: 'later' })]
+      const next = withReassignment(list, event())
+
+      expect(next.map((row) => row.id)).toEqual(['other', 'conv-1', 'later'])
+      expect(next[0]).toBe(list[0])
+      expect(next[2]).toBe(list[2])
+    })
+
+    test('does not mutate the list it was given', () => {
+      const list = [supportRow()]
+      withReassignment(list, event())
+
+      expect(list[0]).toMatchObject({ assignedAgent: { id: 'agent-1', name: 'QA Agent' } })
+    })
+  })
+
+  describe('a membership that was revoked', () => {
+    test('drops the row, because the thread is in an organization the viewer has left', () => {
+      const next = withReassignment(
+        [supportRow(), supportRow({ id: 'other' })],
+        event({ reason: 'membership_revoked', assignee: null }),
+      )
+
+      expect(next.map((row) => row.id)).toEqual(['other'])
+    })
+
+    test('drops it whoever the API says holds it now', () => {
+      expect(
+        withReassignment([supportRow()], event({ reason: 'membership_revoked', assignee: ADMIN })),
+      ).toEqual([])
+    })
+  })
+
+  describe('an event with nothing to apply', () => {
+    test.each([
+      ['a conversation this client has never held', event({ conversationId: 'unknown' })],
+      [
+        'a revocation for one it has never held',
+        event({ conversationId: 'unknown', reason: 'membership_revoked', assignee: null }),
+      ],
+    ] as const)('answers the same list for %s', (_name, reassignment) => {
+      const list = [supportRow()]
+      expect(withReassignment(list, reassignment)).toBe(list)
+    })
+
+    test('answers the same list for a Customer’s row, which carries no assignment', () => {
+      // A Customer is never sent this event; the guard is here because the list
+      // this walks holds every shape the API sends.
+      const list = [conversation({ id: 'conv-1', type: 'support_dm' })]
+      expect(withReassignment(list, event())).toBe(list)
+    })
+  })
+
+  test('applies the payload the running API sent, end to end', () => {
+    const parsed = parseConversationReassigned({
+      conversationId: 'conv-1',
+      reason: 'taken_over',
+      currentAssignee: { id: 'admin-1', name: 'Admin', role: 'admin' },
+      engagedStaffCount: 2,
+      engagedStaff: [
+        { id: 'admin-1', name: 'Admin', role: 'admin' },
+        { id: 'agent-1', name: 'QA Agent', role: 'agent' },
+      ],
+    })
+
+    expect(parsed).not.toBeNull()
+    const next = withReassignment([supportRow()], {
+      conversationId: parsed!.conversationId,
+      reason: parsed!.reason,
+      assignee: parsed!.currentAssignee,
+    })
+
+    expect(next[0]).toMatchObject({
+      status: 'engaged',
+      assignedAgent: { id: 'admin-1', name: 'Admin' },
     })
   })
 })

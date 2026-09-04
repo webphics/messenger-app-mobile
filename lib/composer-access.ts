@@ -17,19 +17,34 @@ import type { Conversation, UserRole } from '@/lib/types'
  * fails it — the person has already written the thing by the time the app admits
  * it was never going to be sent.
  *
- * The reasons name web where the action lives. Engaging, taking over and
- * transferring are not on this client, so "engage it first" without saying where
- * would be an instruction with nowhere to carry it out.
+ * A read-only thread sometimes comes with a way out of it, and this is what
+ * says so: an unassigned Support DM can be engaged by any staff member, and one
+ * somebody else holds can be taken over by an Admin. The rule that decides which
+ * is the API's, mirrored for the same reason as the rest of this file — the API
+ * answers an Agent's Takeover `403` whatever the thread's state, because
+ * `assertCanTakeOver` begins with `assertAdmin`, so an Agent is told who is
+ * handling the thread and offered nothing. A button that always fails is worse
+ * than no button.
  */
+
+/** What a staff member may do about a thread they cannot write in yet. */
+export type ComposerAction = {
+  kind: 'engage' | 'takeover'
+  /** The words on the button. The web client's, so the two products agree. */
+  label: string
+}
 
 export type ComposerAccess =
   | { kind: 'open' }
-  | { kind: 'read-only'; reason: string }
+  | { kind: 'read-only'; reason: string; action?: ComposerAction }
 
 const OPEN: ComposerAccess = { kind: 'open' }
 
-function readOnly(reason: string): ComposerAccess {
-  return { kind: 'read-only', reason }
+const ENGAGE: ComposerAction = { kind: 'engage', label: 'Engage chat' }
+const TAKE_OVER: ComposerAction = { kind: 'takeover', label: 'Take over' }
+
+function readOnly(reason: string, action?: ComposerAction): ComposerAccess {
+  return action ? { kind: 'read-only', reason, action } : { kind: 'read-only', reason }
 }
 
 export type ComposerViewer = { id: string; role: UserRole }
@@ -66,13 +81,16 @@ export function composerAccess(
   }
 
   if (conversation.status === 'unassigned') {
-    return readOnly('Engage this conversation on web to reply.')
+    // Every staff role may engage: the API asks only that the actor is staff and
+    // that the thread is in one of their organizations, which is the same test
+    // that put it in this list.
+    return readOnly('Engage this conversation to reply.', ENGAGE)
   }
 
   if (conversation.status === 'engaged') {
     if (conversation.assignedAgent?.id === viewer.id) return OPEN
     if (viewer.role === 'admin') {
-      return readOnly('Take over this conversation on web to reply.')
+      return readOnly('Take over this conversation to reply.', TAKE_OVER)
     }
     const holder = conversation.assignedAgent?.name
     return readOnly(

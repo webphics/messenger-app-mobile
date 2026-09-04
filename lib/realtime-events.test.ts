@@ -1,6 +1,7 @@
 import {
   createCountedMessages,
   parseConversationDeleted,
+  parseConversationReassigned,
   parseConversationUpdated,
   parseMessageCreated,
   REALTIME_EVENTS,
@@ -118,6 +119,26 @@ const STAFF_CONVERSATION_UPDATED = {
   },
 }
 
+/**
+ * What the Agent's socket received the moment the Admin took the thread from
+ * them, verbatim. Nothing else received it: the API emits this to the previous
+ * assignee's user room alone.
+ */
+const CONVERSATION_REASSIGNED = {
+  conversationId: '6f74c64f-445b-40fd-b264-e2adcbd77619',
+  reason: 'taken_over',
+  currentAssignee: {
+    id: 'ab05cfc4-5ee5-40fb-93af-564a773257e5',
+    name: 'Admin',
+    role: 'admin',
+  },
+  engagedStaffCount: 2,
+  engagedStaff: [
+    { id: 'ab05cfc4-5ee5-40fb-93af-564a773257e5', name: 'Admin', role: 'admin' },
+    { id: '56e168f0-3b5a-49fb-b475-0063c78a2337', name: 'QA Agent', role: 'agent' },
+  ],
+}
+
 describe('the namespace and event names', () => {
   it('are the API’s own', () => {
     expect(REALTIME_NAMESPACE).toBe('/realtime')
@@ -125,6 +146,7 @@ describe('the namespace and event names', () => {
       messageCreated: 'message.created',
       conversationUpdated: 'conversation.updated',
       conversationDeleted: 'conversation.deleted',
+      conversationReassigned: 'conversation.reassigned',
       conversationJoin: 'conversation.join',
       conversationLeave: 'conversation.leave',
     })
@@ -265,6 +287,63 @@ describe('parseConversationDeleted', () => {
 
   it.each(refused)('answers null for %s', (_case, payload) => {
     expect(parseConversationDeleted(payload)).toBeNull()
+  })
+})
+
+describe('parseConversationReassigned', () => {
+  test('reads what the running API sent the Agent whose thread was taken', () => {
+    expect(parseConversationReassigned(CONVERSATION_REASSIGNED)).toEqual({
+      conversationId: '6f74c64f-445b-40fd-b264-e2adcbd77619',
+      reason: 'taken_over',
+      currentAssignee: {
+        id: 'ab05cfc4-5ee5-40fb-93af-564a773257e5',
+        name: 'Admin',
+        role: 'admin',
+        sharedOrganizations: null,
+      },
+    })
+  })
+
+  test.each(['taken_over', 'transferred', 'membership_revoked'])(
+    'reads %s, which is one of the three the API can send',
+    (reason) => {
+      expect(parseConversationReassigned({ ...CONVERSATION_REASSIGNED, reason })?.reason).toBe(
+        reason,
+      )
+    },
+  )
+
+  test('a revocation names nobody, because the thread went back to the pool', () => {
+    expect(
+      parseConversationReassigned({
+        conversationId: 'conv-1',
+        reason: 'membership_revoked',
+        currentAssignee: null,
+        engagedStaffCount: 0,
+        engagedStaff: [],
+      }),
+    ).toEqual({ conversationId: 'conv-1', reason: 'membership_revoked', currentAssignee: null })
+  })
+
+  test.each([
+    ['no payload at all', null],
+    ['a payload that is not an object', 'conversation.reassigned'],
+    ['no conversation', { reason: 'taken_over', currentAssignee: null }],
+    ['an empty conversation id', { conversationId: '', reason: 'taken_over' }],
+    ['no reason', { conversationId: 'conv-1', currentAssignee: null }],
+    ['a reason this client does not know', { conversationId: 'conv-1', reason: 'reopened' }],
+  ])('answers null for %s', (_case, payload) => {
+    expect(parseConversationReassigned(payload)).toBeNull()
+  })
+
+  test('an unreadable assignee reads as nobody rather than failing the event', () => {
+    expect(
+      parseConversationReassigned({
+        conversationId: 'conv-1',
+        reason: 'taken_over',
+        currentAssignee: { name: 'Admin' },
+      }),
+    ).toEqual({ conversationId: 'conv-1', reason: 'taken_over', currentAssignee: null })
   })
 })
 

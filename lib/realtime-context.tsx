@@ -13,9 +13,11 @@ import { useAuth } from '@/lib/auth-context'
 import { connectRealtime } from '@/lib/realtime'
 import {
   parseConversationDeleted,
+  parseConversationReassigned,
   parseConversationUpdated,
   parseMessageCreated,
   REALTIME_EVENTS,
+  type ConversationReassigned,
 } from '@/lib/realtime-events'
 import type { Conversation, Message } from '@/lib/types'
 
@@ -46,6 +48,13 @@ export type RealtimeEvent =
   | { kind: 'message'; conversationId: string; message: Message }
   | { kind: 'conversation'; conversation: Conversation }
   | { kind: 'deleted'; conversationId: string }
+  /**
+   * A conversation taken out of the recipient's hands — an Admin's Takeover, an
+   * assignee's Transfer, or a membership of theirs that was revoked. Addressed
+   * to the person who lost it and to nobody else; see
+   * `parseConversationReassigned`.
+   */
+  | { kind: 'reassigned'; reassignment: ConversationReassigned }
   /**
    * The connection came back after dropping. Whatever was emitted while it was
    * down was emitted to nobody, so what is held is unverifiable and has to be
@@ -184,6 +193,11 @@ function useRealtimeConnection(): RealtimeValue {
     socket.on(REALTIME_EVENTS.conversationDeleted, (payload: unknown) => {
       const conversationId = parseConversationDeleted(payload)
       if (conversationId) emit({ kind: 'deleted', conversationId })
+    })
+
+    socket.on(REALTIME_EVENTS.conversationReassigned, (payload: unknown) => {
+      const reassignment = parseConversationReassigned(payload)
+      if (reassignment) emit({ kind: 'reassigned', reassignment })
     })
 
     return () => {

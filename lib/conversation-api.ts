@@ -241,3 +241,40 @@ export async function markConversationRead(id: string): Promise<ApiResult<Conver
 export async function listMyOrganizations(): Promise<ApiResult<Organization[]>> {
   return readOutcome(await authenticatedRequest('/memberships/mine'), parseOrganizations)
 }
+
+/**
+ * Claim an unassigned Support DM. The API's `engage` action.
+ *
+ * Answers with the conversation as it now stands — engaged, with the caller as
+ * its assignee — which is what a list folds in so the composer opens without a
+ * refetch. Staff only, and only inside the caller's own organizations; a thread
+ * somebody reached first is refused with `already_engaged` rather than silently
+ * reassigned, and that refusal is worth showing, because the person is about to
+ * write in a thread that is no longer theirs.
+ */
+export async function engageConversation(id: string): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/engage`,
+    { method: 'POST' },
+  )
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * Take a Support DM away from whoever holds it. The API's `takeover` action.
+ *
+ * Admin only — `assertCanTakeOver` in the API's `conversations.policy.ts` begins
+ * with `assertAdmin`, and an Agent asking for this is answered `403` whatever
+ * the thread's state. So nothing offers it to an Agent; see
+ * `lib/composer-access.ts`, which is where that rule is written down.
+ *
+ * The dispossessed assignee is told separately and directly, over
+ * `conversation.reassigned` — see `lib/realtime-events.ts`.
+ */
+export async function takeOverConversation(id: string): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/takeover`,
+    { method: 'POST' },
+  )
+  return readOutcome(outcome, parseConversation)
+}

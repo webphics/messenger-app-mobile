@@ -24,6 +24,7 @@ import {
   withConversationRead,
   withIncomingMessage,
   withoutConversation,
+  withReassignment,
 } from '@/lib/conversation-state'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { createCountedMessages } from '@/lib/realtime-events'
@@ -106,6 +107,13 @@ function applyToList(
 ): Conversation[] {
   if (event.kind === 'deleted') return withoutConversation(conversations, event.conversationId)
   if (event.kind === 'conversation') return mergeConversation(conversations, event.conversation)
+  if (event.kind === 'reassigned') {
+    return withReassignment(conversations, {
+      conversationId: event.reassignment.conversationId,
+      reason: event.reassignment.reason,
+      assignee: event.reassignment.currentAssignee,
+    })
+  }
   if (!viewerId) return conversations
   return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }
@@ -316,6 +324,11 @@ function useConversationInboxState(): ConversationInboxView {
    * A message for a conversation this client has never held changes nothing —
    * the `conversation.updated` the API sends beside it carries the whole row and
    * adds it.
+   *
+   * A reassignment is the one event addressed to a single person: the API sends
+   * it only to the assignee who has just lost the thread. So it moves this
+   * viewer's own row, and every *other* staff session learns the same thing from
+   * the `conversation.updated` that follows.
    */
   useRealtimeEvents((event: RealtimeEvent) => {
     if (event.kind === 'resync') {

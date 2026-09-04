@@ -76,24 +76,32 @@ describe('composerAccess, on a Support DM', () => {
     })
   })
 
-  test('an Admin is sent to Takeover rather than refused silently', () => {
+  test('an Admin is offered the Takeover the API would accept from them', () => {
     expect(composerAccess(staffRow(), ADMIN)).toEqual({
       kind: 'read-only',
-      reason: 'Take over this conversation on web to reply.',
+      reason: 'Take over this conversation to reply.',
+      action: { kind: 'takeover', label: 'Take over' },
     })
   })
 
-  test.each([
-    ['unassigned', 'Engage this conversation on web to reply.'],
-    ['closed', 'This conversation is closed.'],
-  ] as const)('a %s thread is read-only for staff', (status: SupportStatus, reason) => {
-    expect(composerAccess(staffRow({ status, assignedAgent: null }), ME)).toEqual({
+  test('an Agent is offered no Takeover, because the API answers theirs 403', () => {
+    expect(composerAccess(staffRow(), ME)).not.toHaveProperty('action')
+  })
+
+  test.each([ME, ADMIN])('either staff role may engage an unassigned thread', (viewer) => {
+    expect(composerAccess(staffRow({ status: 'unassigned', assignedAgent: null }), viewer)).toEqual(
+      {
+        kind: 'read-only',
+        reason: 'Engage this conversation to reply.',
+        action: { kind: 'engage', label: 'Engage chat' },
+      },
+    )
+  })
+
+  test.each([ME, ADMIN])('a closed thread offers neither role a way in', (viewer) => {
+    expect(composerAccess(staffRow({ status: 'closed', assignedAgent: null }), viewer)).toEqual({
       kind: 'read-only',
-      reason,
-    })
-    expect(composerAccess(staffRow({ status, assignedAgent: null }), ADMIN)).toEqual({
-      kind: 'read-only',
-      reason,
+      reason: 'This conversation is closed.',
     })
   })
 
