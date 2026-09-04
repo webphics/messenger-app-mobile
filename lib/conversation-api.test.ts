@@ -1,11 +1,13 @@
 import { API_BASE_URL } from '@/lib/api-config'
 import { clearCsrfPair, setSessionCookie } from '@/lib/api-client'
 import {
+  createStaffDm,
   ensureSupportConversation,
   getConversation,
   listConversations,
   listMessages,
   listMyOrganizations,
+  listStaffDirectory,
   markConversationRead,
   sendMessage,
 } from '@/lib/conversation-api'
@@ -467,6 +469,111 @@ describe('markConversationRead', () => {
     expect(await markConversationRead('missing')).toEqual({
       ok: false,
       failure: { kind: 'refused', message: 'Conversation not found' },
+    })
+  })
+})
+
+describe('listStaffDirectory', () => {
+  const DIRECTORY_ROW = {
+    id: 'agent-1',
+    name: 'Jonah Reed',
+    role: 'agent',
+    isOnline: true,
+    lastOnlineAt: null,
+    sharedOrganizations: [{ id: 'org-1', name: 'Talo' }],
+  }
+
+  test('reads the directory', async () => {
+    enqueue(envelope([DIRECTORY_ROW]))
+
+    const result = await listStaffDirectory()
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/conversations/staff`)
+    expect(calls[0]?.init.method ?? 'GET').toBe('GET')
+    expect(result).toEqual({
+      ok: true,
+      value: [expect.objectContaining({ id: 'agent-1', role: 'agent' })],
+    })
+  })
+
+  test('an empty directory is an answer, not a failure', async () => {
+    enqueue(envelope([]))
+
+    expect(await listStaffDirectory()).toEqual({ ok: true, value: [] })
+  })
+
+  test('a 403 for a Customer is a refusal worth repeating', async () => {
+    enqueue(response(403, { statusCode: 403, message: 'Staff only.' }))
+
+    expect(await listStaffDirectory()).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Staff only.' },
+    })
+  })
+
+  test('reports a body that is not an envelope as malformed', async () => {
+    enqueue(response(200, [DIRECTORY_ROW]))
+
+    expect(await listStaffDirectory()).toEqual({ ok: false, failure: { kind: 'malformed' } })
+  })
+})
+
+describe('createStaffDm', () => {
+  const STAFF_DM_ROW = {
+    ...SUPPORT_ROW,
+    id: 'conv-dm',
+    type: 'staff_dm',
+    status: null,
+    title: null,
+    description: null,
+    avatarUrl: null,
+    customer: null,
+    assignedAgent: null,
+    otherUser: { id: 'agent-2', name: 'Priya Raman', role: 'agent' },
+    members: [],
+    labels: [],
+  }
+
+  test('posts the person, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope(STAFF_DM_ROW))
+
+    const result = await createStaffDm('agent-2')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/staff`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(calls[1]?.init.body).toBe(JSON.stringify({ userId: 'agent-2' }))
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'conv-dm' }) })
+  })
+
+  test('names the organization when one was picked, and omits the key otherwise', async () => {
+    enqueue(csrfResponse(), envelope(STAFF_DM_ROW))
+
+    await createStaffDm('agent-2', 'org-1')
+
+    expect(calls[1]?.init.body).toBe(
+      JSON.stringify({ userId: 'agent-2', organizationId: 'org-1' }),
+    )
+  })
+
+  test('repeats the refusal when the pair shares no organization', async () => {
+    enqueue(
+      csrfResponse(),
+      response(422, {
+        statusCode: 422,
+        message: 'You and this person do not share an organization.',
+      }),
+    )
+
+    expect(await createStaffDm('agent-2')).toEqual({
+      ok: false,
+      failure: {
+        kind: 'refused',
+        message: 'You and this person do not share an organization.',
+      },
     })
   })
 })

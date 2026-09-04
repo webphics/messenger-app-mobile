@@ -26,4 +26,13 @@ describe('hubGreeting', () => {
   test('formats admin greeting copy', () => {
     expect(hubGreeting('admin', 'Alex')).toBe('Welcome back, Alex 👋')
   })
+
+  test.each([
+    ['customer', 'How can we help? 👋'],
+    ['agent', 'Ready when you are 👋'],
+    ['admin', 'Welcome back 👋'],
+  ] as const)('greets a %s with no name to use, without the punctuation around it', (role, copy) => {
+    expect(hubGreeting(role, '')).toBe(copy)
+    expect(hubGreeting(role, '   ')).toBe(copy)
+  })
 })

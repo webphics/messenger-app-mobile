@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import type { Conversation } from "@/lib/types";
 import { useEffect } from "react";
 import { View, type LayoutChangeEvent } from "react-native";
 import Animated, {
@@ -12,15 +13,10 @@ import { Tabs } from "expo-router";
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { useCustomerInbox } from "@/lib/customer-inbox";
-import { getDevUser } from "@/lib/dev-user";
-import { CONVERSATIONS } from "@/lib/mock-data";
+import { useConversationInbox } from "@/lib/conversation-inbox";
 import { motion } from "@/lib/motion";
-import {
-  conversationsTabBadge,
-  customerMessagesBadge,
-  unassignedTabBadge,
-} from "@/lib/tab-badges";
+import { getSessionUser } from "@/lib/session";
+import { inboxTabBadge, unassignedTabBadge } from "@/lib/tab-badges";
 import { colors } from "@/lib/tokens";
 
 type FloatingTabBarProps = Parameters<
@@ -33,26 +29,27 @@ const CAPSULE_PAD = 6;
 /**
  * The count on a tab, where there is one to show.
  *
- * A Customer's is the real unread total the API sends with their conversation
- * list, and it clears as soon as a thread is opened because the list it is
- * counted from is the one `CustomerInboxProvider` holds for every screen.
+ * Every count is real and every one clears as soon as the thread behind it is
+ * opened, because they are all read off the single list
+ * `ConversationInboxProvider` holds for every screen — a Customer's unread
+ * total, an Agent's and an Admin's, and the size of the unassigned pool beside
+ * them.
  *
- * The staff tabs still read the mock list, which is what their screens read
- * until #32.
+ * Nothing while the first fetch is out: an empty list is not yet a fact, and a
+ * badge that appears a moment later is better than one that says zero and then
+ * disagrees with the screen it sits under.
  */
 function badgeForRoute(
   name: string,
-  /** A Customer's unread total, already summed. Undefined for every other role. */
-  customerUnread: number | undefined,
+  conversations: Conversation[] | null,
 ): number | undefined {
-  const user = getDevUser();
-  if (user.role === "customer") {
-    return name === "messages" ? customerUnread : undefined;
+  const user = getSessionUser();
+  if (!conversations || !user) return undefined;
+
+  if (name === "unassigned") {
+    return user.role === "customer" ? undefined : unassignedTabBadge(conversations);
   }
-  if (name === "unassigned") return unassignedTabBadge(CONVERSATIONS);
-  if (name === "conversations" || name === "messages") {
-    return conversationsTabBadge(user.role, user.id, CONVERSATIONS);
-  }
+  if (name === "conversations" || name === "messages") return inboxTabBadge(conversations);
   return undefined;
 }
 
@@ -69,9 +66,8 @@ export function FloatingTabBar({
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const tabCount = state.routes.length;
-  const inbox = useCustomerInbox();
-  const customerUnread =
-    inbox.status === "ready" ? customerMessagesBadge(inbox.conversations) : undefined;
+  const inbox = useConversationInbox();
+  const conversations = inbox.status === "ready" ? inbox.conversations : null;
 
   const tabWidth = useSharedValue(0);
   const activeIndex = useSharedValue(state.index);
@@ -119,7 +115,7 @@ export function FloatingTabBar({
           const { options } = descriptors[route.key];
           const color = focused ? colors.primary : colors.muted;
           const label = options.title ?? route.name;
-          const badge = badgeForRoute(route.name, customerUnread);
+          const badge = badgeForRoute(route.name, conversations);
 
           const onPress = () => {
             const event = navigation.emit({

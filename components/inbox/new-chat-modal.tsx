@@ -1,7 +1,6 @@
-import type { Href } from "expo-router";
 import { MessageSquare, X } from "@/components/icons";
-import { memo, useCallback, useMemo, useState } from "react";
-import { FlatList, Modal, View } from "react-native";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, Modal, View } from "react-native";
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -12,25 +11,47 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PresenceDot } from "@/components/ui/presence-dot";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { chatHref } from "@/lib/chat-route-id";
+import { createStaffDm, listStaffDirectory } from "@/lib/conversation-api";
+import { useConversationInbox } from "@/lib/conversation-inbox";
+import { failureNotice } from "@/lib/conversation-failure";
 import { initials } from "@/lib/display";
-import { getDevUserId } from "@/lib/dev-user";
-import { CONVERSATIONS, PEOPLE } from "@/lib/mock-data";
 import { listItemEnter, settleEnter } from "@/lib/motion-enter";
+import {
+  filterStaff,
+  presenceLabel,
+  staffDmIntent,
+  type StaffDmIntent,
+} from "@/lib/staff-directory";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
-import type { Person } from "@/lib/types";
+import type { Conversation, StaffDirectoryUser } from "@/lib/types";
 import Animated, { useReducedMotion } from "react-native-reanimated";
+
+/**
+ * Starting a conversation with another staff member.
+ *
+ * The directory is real (`GET /conversations/staff`) and so is what a tap does:
+ * `POST /conversations/staff` is get-or-create, so picking someone this person
+ * already writes to resumes that thread rather than starting a second one
+ * beside it. The row that comes back joins the shared list directly — refetching
+ * the whole inbox to learn about a conversation the API has just handed over
+ * would put the largest request in the app between the tap and the thread.
+ *
+ * A staff DM belongs to an organization the two share. One is bound silently,
+ * several are offered as a second tap on the row itself, and none disables the
+ * row with the reason on it — see `staffDmIntent`.
+ */
 
 type NewChatModalProps = {
   visible: boolean;
   onClose: () => void;
-  onSelectChat: (href: Href) => void;
+  /** Where the conversation the API answered with should be opened. */
+  onOpenConversation: (conversation: Conversation) => void;
 };
 
 export function NewChatModal({
   visible,
   onClose,
-  onSelectChat,
+  onOpenConversation,
 }: NewChatModalProps) {
   return (
     <Modal
@@ -47,13 +68,13 @@ export function NewChatModal({
         the safe area like every other screen.
       */}
       <SafeAreaProvider>
-        <NewChatSheet onClose={onClose} onSelectChat={onSelectChat} />
+        <NewChatSheet onClose={onClose} onOpenConversation={onOpenConversation} />
       </SafeAreaProvider>
     </Modal>
   );
 }
 
-function keyExtractor(item: Person) {
+function keyExtractor(item: StaffDirectoryUser) {
   return item.id;
 }
 
@@ -61,35 +82,69 @@ function ContactItemSeparator() {
   return <View className="h-2.5" />;
 }
 
-function EmptyContacts() {
+function DirectoryNotice({ title, hint }: { title: string; hint: string }) {
   const reduceMotion = useReducedMotion();
   return (
     <Animated.View
       entering={settleEnter(!!reduceMotion)}
+      accessibilityLiveRegion="polite"
       className="items-center px-4 py-12"
     >
       <Text variant="title" className="text-ink">
-        No matching contacts
+        {title}
       </Text>
       <Text variant="meta" className="mt-1 text-center text-muted">
-        Try searching for a different name or role.
+        {hint}
       </Text>
     </Animated.View>
   );
 }
 
 type ContactPickerRowProps = {
-  person: Person;
-  onSelect: (person: Person) => void;
+  person: StaffDirectoryUser;
+  onSelect: (person: StaffDirectoryUser) => void;
+  onPickOrganization: (person: StaffDirectoryUser, organizationId: string) => void;
+  /** Set while this row's request is out, so a second tap cannot start a second one. */
+  busy: boolean;
+  /** Whether this row is showing the organizations to choose between. */
+  expanded: boolean;
+  /** What the API said when this row's request was refused. */
+  refusal: string | null;
   index?: number;
 };
+
+/**
+ * What the row's accessible name promises, which is what its tap does.
+ *
+ * Three different actions wear the same row: starting a conversation, opening
+ * the organizations to choose between, and nothing at all. A single "Chat with
+ * …" would be a promise the second and third do not keep.
+ */
+function rowLabel(person: StaffDirectoryUser, intent: StaffDmIntent): string {
+  if (intent.kind === "impossible") {
+    return `${person.name}, unavailable: you share no organization`;
+  }
+  if (intent.kind === "choose") return `Chat with ${person.name}, choose an organization`;
+  return `Chat with ${person.name}`;
+}
 
 const ContactPickerRow = memo(function ContactPickerRow({
   person,
   onSelect,
+  onPickOrganization,
+  busy,
+  expanded,
+  refusal,
   index = 0,
 }: ContactPickerRowProps) {
   const reduceMotion = useReducedMotion();
+  const intent = staffDmIntent(person);
+  const disabled = intent.kind === "impossible" || busy;
+  const subtitle =
+    intent.kind === "impossible"
+      ? "You share no organization"
+      : presenceLabel(person);
+
   const handlePress = useCallback(() => {
     onSelect(person);
   }, [onSelect, person]);
@@ -98,15 +153,21 @@ const ContactPickerRow = memo(function ContactPickerRow({
     <Animated.View entering={listItemEnter(!!reduceMotion, index)}>
       <TactilePressable
         accessibilityRole="button"
-        accessibilityLabel={`Chat with ${person.displayName}`}
+        accessibilityLabel={rowLabel(person, intent)}
+        accessibilityState={
+          intent.kind === "choose" ? { disabled, expanded } : { disabled }
+        }
+        disabled={disabled}
         onPress={handlePress}
-        className="flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-3.5 shadow-md shadow-black/8"
+        className={`flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-3.5 shadow-md shadow-black/8 ${
+          disabled ? "opacity-60" : ""
+        }`}
       >
         <View className="relative">
-          <Avatar alt={person.displayName} className="size-11">
+          <Avatar alt={person.name} className="size-11">
             <AvatarFallback className="bg-primary-soft">
               <Text variant="meta" className="font-bold text-primary">
-                {initials(person.displayName)}
+                {initials(person.name)}
               </Text>
             </AvatarFallback>
           </Avatar>
@@ -117,82 +178,172 @@ const ContactPickerRow = memo(function ContactPickerRow({
 
         <View className="min-w-0 flex-1">
           <Text variant="title" className="text-ink" numberOfLines={1}>
-            {person.displayName}
+            {person.name}
           </Text>
-          <Text variant="label" className="mt-0.5 font-normal text-muted">
-            {person.lastActiveLabel ?? (person.isOnline ? "Active now" : "Offline")}
-          </Text>
+          {subtitle ? (
+            <Text
+              variant="label"
+              className="mt-0.5 font-normal text-muted"
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
         </View>
 
-        <View
-          className={`rounded-full px-2.5 py-0.5 ${
-            person.role === "admin"
-              ? "bg-primary-soft"
-              : person.role === "agent"
-                ? "bg-success/15"
-                : "bg-line/80"
-          }`}
-        >
-          <Text
-            variant="label"
-            className={`font-bold uppercase tracking-wider ${
-              person.role === "admin"
-                ? "text-primary"
-                : person.role === "agent"
-                  ? "text-success"
-                  : "text-muted"
+        {busy ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <View
+            className={`rounded-full px-2.5 py-0.5 ${
+              person.role === "admin" ? "bg-primary-soft" : "bg-success/15"
             }`}
           >
-            {person.role}
+            <Text
+              variant="label"
+              className={`font-bold uppercase tracking-wider ${
+                person.role === "admin" ? "text-primary" : "text-success"
+              }`}
+            >
+              {person.role}
+            </Text>
+          </View>
+        )}
+      </TactilePressable>
+
+      {refusal ? (
+        <View
+          accessibilityLiveRegion="polite"
+          className="mt-1.5 rounded-2xl border border-danger/30 bg-danger/10 px-3.5 py-2.5"
+        >
+          <Text variant="meta" className="text-ink-soft">
+            {refusal}
           </Text>
         </View>
-      </TactilePressable>
+      ) : null}
+
+      {expanded && intent.kind === "choose" ? (
+        <View accessibilityLiveRegion="polite">
+        <View className="mt-1.5 gap-1.5 pl-6">
+          <Text variant="label" className="text-muted">
+            Which organization?
+          </Text>
+          {intent.organizations.map((organization) => (
+            <TactilePressable
+              key={organization.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Start in ${organization.name}`}
+              onPress={() => onPickOrganization(person, organization.id)}
+              className="min-h-11 justify-center rounded-2xl border border-line/70 bg-surface px-3.5"
+            >
+              <Text variant="label" className="text-ink">
+                {organization.name}
+              </Text>
+            </TactilePressable>
+          ))}
+          </View>
+        </View>
+      ) : null}
     </Animated.View>
   );
 });
 
+/** Shared, so a sheet that has nothing to list hands the same array every render. */
+const NO_STAFF: StaffDirectoryUser[] = [];
+
+type Directory =
+  | { status: "loading" }
+  | { status: "failed"; title: string; hint: string }
+  | { status: "ready"; people: StaffDirectoryUser[] };
+
 function NewChatSheet({
   onClose,
-  onSelectChat,
+  onOpenConversation,
 }: Omit<NewChatModalProps, "visible">) {
   const insets = useSafeAreaInsets();
-  const myId = getDevUserId();
+  const { addConversation } = useConversationInbox();
   const [query, setQuery] = useState("");
+  const [directory, setDirectory] = useState<Directory>({ status: "loading" });
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  /** Whose request was refused, and what the API said about it. */
+  const [refusal, setRefusal] = useState<{ id: string; message: string } | null>(null);
 
-  const filteredPeople = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return PEOPLE.filter((p) => {
-      if (p.id === myId) return false;
-      if (!q) return true;
-      return (
-        p.displayName.toLowerCase().includes(q) ||
-        p.role.toLowerCase().includes(q)
-      );
+  useEffect(() => {
+    let live = true;
+    void listStaffDirectory().then((result) => {
+      if (!live) return;
+      if (result.ok) {
+        setDirectory({ status: "ready", people: result.value });
+        return;
+      }
+      const notice = failureNotice(result.failure);
+      setDirectory({ status: "failed", title: notice.title, hint: notice.hint });
     });
-  }, [myId, query]);
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const people = useMemo(
+    () => (directory.status === "ready" ? directory.people : NO_STAFF),
+    [directory],
+  );
+  const filtered = useMemo(() => filterStaff(people, query), [people, query]);
+
+  const start = useCallback(
+    async (person: StaffDirectoryUser, organizationId?: string) => {
+      setBusyId(person.id);
+      setRefusal(null);
+      const result = await createStaffDm(person.id, organizationId);
+      setBusyId(null);
+
+      if (!result.ok) {
+        setRefusal({ id: person.id, message: failureNotice(result.failure).hint });
+        return;
+      }
+
+      addConversation(result.value);
+      onClose();
+      onOpenConversation(result.value);
+    },
+    [addConversation, onClose, onOpenConversation],
+  );
 
   const handleSelect = useCallback(
-    (person: Person) => {
-      // Find if a 1-on-1 conversation exists with this person
-      const existing = CONVERSATIONS.find(
-        (conversation) =>
-          conversation.type !== "group" &&
-          (conversation.customer?.id === person.id ||
-            conversation.otherUser?.id === person.id),
-      );
-      const targetId =
-        existing?.id ?? (person.role === "customer" ? "conv-unassigned" : "conv-assigned");
-      onClose();
-      onSelectChat(chatHref(targetId));
+    (person: StaffDirectoryUser) => {
+      const intent = staffDmIntent(person);
+      if (intent.kind === "impossible") return;
+      if (intent.kind === "choose") {
+        setExpandedId((current) => (current === person.id ? null : person.id));
+        return;
+      }
+      void start(person, intent.organizationId);
     },
-    [onClose, onSelectChat],
+    [start],
+  );
+
+  const handlePickOrganization = useCallback(
+    (person: StaffDirectoryUser, organizationId: string) => {
+      setExpandedId(null);
+      void start(person, organizationId);
+    },
+    [start],
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: Person; index: number }) => (
-      <ContactPickerRow person={item} onSelect={handleSelect} index={index} />
+    ({ item, index }: { item: StaffDirectoryUser; index: number }) => (
+      <ContactPickerRow
+        person={item}
+        onSelect={handleSelect}
+        onPickOrganization={handlePickOrganization}
+        busy={busyId === item.id}
+        expanded={expandedId === item.id}
+        refusal={refusal?.id === item.id ? refusal.message : null}
+        index={index}
+      />
     ),
-    [handleSelect],
+    [busyId, expandedId, handlePickOrganization, handleSelect, refusal],
   );
 
   return (
@@ -226,15 +377,14 @@ function NewChatSheet({
         <SearchFieldWithClear
           value={query}
           onChangeText={setQuery}
-          placeholder="Search people by name or role…"
-          accessibilityLabel="Search people"
+          placeholder="Search staff by name or role…"
+          accessibilityLabel="Search staff"
         />
       </View>
 
-      {/* Contacts List */}
       <FlatList
         className="flex-1 bg-bg"
-        data={filteredPeople}
+        data={filtered}
         keyExtractor={keyExtractor}
         initialNumToRender={10}
         maxToRenderPerBatch={8}
@@ -248,7 +398,25 @@ function NewChatSheet({
         ItemSeparatorComponent={ContactItemSeparator}
         renderItem={renderItem}
         ListEmptyComponent={
-          <EmptyContacts />
+          directory.status === "loading" ? (
+            <View className="items-center px-4 py-12">
+              <ActivityIndicator color={colors.primary} />
+              <Text variant="meta" className="mt-4 text-muted">
+                Loading directory…
+              </Text>
+            </View>
+          ) : directory.status === "failed" ? (
+            <DirectoryNotice title={directory.title} hint={directory.hint} />
+          ) : (
+            <DirectoryNotice
+              title="No matching staff"
+              hint={
+                people.length === 0
+                  ? "There is nobody else on the team to write to yet."
+                  : "Try searching for a different name or role."
+              }
+            />
+          )
         }
       />
     </View>

@@ -1,12 +1,7 @@
-import { useMemo } from "react";
-
 import { InboxScreen } from "@/components/inbox/inbox-screen";
+import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
-import { useCustomerInbox } from "@/lib/customer-inbox";
-import { getDevUserId } from "@/lib/dev-user";
-import { listInboxConversations } from "@/lib/inbox-filter";
-import { CONVERSATIONS } from "@/lib/mock-data";
-import { getSession } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 
 type RoleConversationsScreenProps = {
   /** Agents read the shared queue but do not start threads from it. */
@@ -16,26 +11,24 @@ type RoleConversationsScreenProps = {
 /**
  * The signed-in person's own inbox.
  *
- * Split by role rather than by screen, because the two halves are at different
- * stages of the same migration: a Customer's conversations are real as of #28,
- * and an Agent's and an Admin's follow in #32. The staff branch is the screen
- * exactly as it was; when it moves, this component loses the branch rather than
- * gaining a third.
+ * One list for all three roles, because there is one list: the API scopes
+ * `GET /conversations` by who is asking, so an Agent receives their assigned
+ * threads, the unassigned pool, their staff DMs and their groups, an Admin
+ * receives the org-wide set their policy grants, and a Customer receives their
+ * own — and none of them needs a client-side filter to say so.
+ *
+ * What still differs by role is the chrome. Only staff get the chips: Mine is
+ * the assigned list an Agent works from, and Open/Resolved filter on a status
+ * only a staff payload carries — closing a thread is a staff action, and a
+ * Customer's row has no `status` field at all, so those two would offer a
+ * filter that could only answer with everything or with nothing.
  */
 export function RoleConversationsScreen({
   showCompose = true,
 }: RoleConversationsScreenProps) {
-  const role = getSession().role;
-
-  return role === "customer" ? (
-    <CustomerConversationsScreen />
-  ) : (
-    <StaffConversationsScreen showCompose={showCompose} />
-  );
-}
-
-function CustomerConversationsScreen() {
-  const inbox = useCustomerInbox();
+  const user = getSessionUser();
+  const inbox = useConversationInbox();
+  const isStaff = user !== null && user.role !== "customer";
 
   return (
     <InboxScreen
@@ -47,33 +40,9 @@ function CustomerConversationsScreen() {
       error={inbox.status === "failed" ? failureNotice(inbox.failure) : null}
       refreshing={inbox.refreshing}
       onRefresh={inbox.reload}
-      /*
-       * No Open/Resolved chips: a Customer's payload carries no status to filter
-       * on — closing a thread is a staff action and the field is staff-facing —
-       * so the chips would offer a filter that could only ever answer with
-       * everything or with nothing.
-       */
-      showChips={false}
-      showCompose={false}
-      title="Messages"
-    />
-  );
-}
-
-function StaffConversationsScreen({ showCompose }: { showCompose: boolean }) {
-  const role = getSession().role;
-  const selfId = getDevUserId();
-
-  const conversations = useMemo(
-    () => listInboxConversations(role, selfId, CONVERSATIONS),
-    [role, selfId],
-  );
-
-  return (
-    <InboxScreen
-      conversations={conversations}
-      showChips
-      showCompose={showCompose}
+      showChips={isStaff}
+      showCompose={isStaff && showCompose}
+      viewerId={user?.id}
       title="Messages"
     />
   );

@@ -13,6 +13,7 @@ import type {
   MessageType,
   Organization,
   ReceiptStatus,
+  StaffDirectoryUser,
   SupportStatus,
   UserRole,
 } from '@/lib/types'
@@ -308,12 +309,56 @@ export function parseMessages(value: unknown): Message[] {
   })
 }
 
-/** GET /memberships/mine answers with rows rather than a bare array. */
-export function parseOrganizations(value: unknown): Organization[] {
-  const record = asRecord(value)
-  return records(record?.rows).flatMap((item) => {
+/** The two roles the staff directory answers with. A Customer is never in it. */
+const STAFF_ROLES: readonly StaffDirectoryUser['role'][] = ['admin', 'agent']
+
+function organizations(value: unknown): Organization[] {
+  return records(value).flatMap((item) => {
     const id = text(item.id)
     const name = text(item.name)
     return id && name ? [{ id, name }] : []
   })
+}
+
+/**
+ * One row of the staff directory.
+ *
+ * `sharedOrganizations` is optional on the API's schema — the directory fills it
+ * on every row, but the same person shape is reused by payloads that do not — so
+ * an absent field reads as null, "the API did not say", and never as an empty
+ * list, which is what a staff member sharing no organization with the viewer
+ * looks like. A screen that disables a row on the second must not disable it on
+ * the first.
+ */
+export function parseStaffDirectoryUser(value: unknown): StaffDirectoryUser | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  const id = text(record.id)
+  const name = text(record.name)
+  const role = oneOf(record.role, STAFF_ROLES)
+  if (!id || !name || !role) return null
+
+  return {
+    id,
+    name,
+    role,
+    ...(typeof record.isOnline === 'boolean' ? { isOnline: record.isOnline } : {}),
+    ...('lastOnlineAt' in record ? { lastOnlineAt: timestamp(record.lastOnlineAt) } : {}),
+    sharedOrganizations: Array.isArray(record.sharedOrganizations)
+      ? organizations(record.sharedOrganizations)
+      : null,
+  }
+}
+
+export function parseStaffDirectory(value: unknown): StaffDirectoryUser[] {
+  return records(value).flatMap((item) => {
+    const user = parseStaffDirectoryUser(item)
+    return user ? [user] : []
+  })
+}
+
+/** GET /memberships/mine answers with rows rather than a bare array. */
+export function parseOrganizations(value: unknown): Organization[] {
+  return organizations(asRecord(value)?.rows)
 }

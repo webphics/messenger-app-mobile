@@ -3,6 +3,7 @@ import {
   dynamicRouteId,
   knowledgeHref,
   knowledgeListHref,
+  messagesHref,
   ROLE_HREF,
   SIGN_IN_HREF,
 } from '@/lib/hub-routes'
@@ -45,5 +46,15 @@ describe('hub-routes', () => {
     expect(dynamicRouteId('[id]', '/(admin)/(home)/chart/open-threads', 'chart')).toBe(
       'open-threads',
     )
+  })
+})
+
+describe('messagesHref', () => {
+  test.each([
+    ['customer', '/(customer)/messages'],
+    ['agent', '/(agent)/conversations'],
+    ['admin', '/(admin)/conversations'],
+  ] as const)('%s reads their inbox at %s', (role, href) => {
+    expect(messagesHref(role)).toBe(href)
   })
 })

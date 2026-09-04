@@ -31,7 +31,7 @@ import { Uniwind } from "uniwind";
 
 import { SessionEndRedirect } from "@/components/auth/session-end";
 import { AuthProvider } from "@/lib/auth-context";
-import { CustomerInboxProvider } from "@/lib/customer-inbox";
+import { ConversationInboxProvider } from "@/lib/conversation-inbox";
 import { RealtimeProvider } from "@/lib/realtime-context";
 import { colors } from "@/lib/tokens";
 
@@ -101,10 +101,11 @@ export default function RootLayout() {
             listens to it, and inside the auth provider, because a connection
             needs a session to authenticate its handshake with. */}
         <RealtimeProvider>
-          {/* Inside the auth provider and outside the navigator: a Customer's
-            conversations are fetched once for every screen that reads them, and
-            the chat route sits beside the tab groups rather than inside one. */}
-          <CustomerInboxProvider>
+          {/* Inside the auth provider and outside the navigator: the signed-in
+            person's conversations are fetched once for every screen that reads
+            them, and the chat route sits beside the tab groups rather than
+            inside one. */}
+          <ConversationInboxProvider>
             <Stack
               screenOptions={{
                 headerShown: false,
@@ -138,7 +139,7 @@ export default function RootLayout() {
                 }}
               />
             </Stack>
-          </CustomerInboxProvider>
+          </ConversationInboxProvider>
         </RealtimeProvider>
       </AuthProvider>
     </GestureHandlerRootView>

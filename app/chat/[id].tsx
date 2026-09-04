@@ -14,12 +14,10 @@ import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
+import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
 import { findOffersConversation, isOutgoing } from "@/lib/conversation-state";
-import { useCustomerInbox } from "@/lib/customer-inbox";
-import { getDevUser } from "@/lib/dev-user";
-import { CUSTOMER_HREF, ROLE_HREF } from "@/lib/hub-routes";
-import { CONVERSATIONS, MESSAGES } from "@/lib/mock-data";
+import { messagesHref, ROLE_HREF } from "@/lib/hub-routes";
 import { canViewConversation } from "@/lib/rbac";
 import {
   useConversationRoom,
@@ -28,7 +26,7 @@ import {
 } from "@/lib/realtime-context";
 import { getSession, getSessionUser } from "@/lib/session";
 import { useThreadMessages } from "@/lib/use-thread-messages";
-import type { Conversation, Message } from "@/lib/types";
+import type { Conversation, UserRole } from "@/lib/types";
 
 /**
  * The route id the Offers carousel and the hub still push.
@@ -58,10 +56,13 @@ function useRouteId(): string | undefined {
 }
 
 /**
- * One conversation, in whichever half of the migration its role is standing.
+ * One conversation, for whoever is reading it.
  *
- * A Customer's thread is real as of #28; an Agent's and an Admin's are still the
- * local ones until #32. Both branches end at the same `ThreadScreen`.
+ * Every role's thread is the same real thread now: the rows come from the one
+ * list `ConversationInboxProvider` holds, the history and the sends go through
+ * `useThreadMessages`, and what differs between a Customer and an Agent is what
+ * the API put in the payload — a `sender` on every staff message, and the
+ * assignment notices a Customer never receives.
  */
 export default function ChatScreen() {
   const id = useRouteId();
@@ -69,11 +70,7 @@ export default function ChatScreen() {
 
   if (!id) return <Redirect href={ROLE_HREF[role]} />;
 
-  return role === "customer" ? (
-    <CustomerChatScreen routeId={id} />
-  ) : (
-    <StaffChatScreen routeId={id} />
-  );
+  return <ConversationScreen routeId={id} role={role} />;
 }
 
 /**
@@ -84,7 +81,15 @@ export default function ChatScreen() {
  * without their doing anything. The header went with the thread, so without a
  * control here the screen is a dead end with nothing on it.
  */
-function ChatNotice({ title, hint }: { title: string; hint: string }) {
+function ChatNotice({
+  title,
+  hint,
+  home,
+}: {
+  title: string;
+  hint: string;
+  home: UserRole;
+}) {
   return (
     <View
       accessibilityLiveRegion="polite"
@@ -99,7 +104,7 @@ function ChatNotice({ title, hint }: { title: string; hint: string }) {
       <Button
         variant="outline"
         className="mt-4"
-        onPress={() => router.replace(CUSTOMER_HREF.messages)}
+        onPress={() => router.replace(messagesHref(home))}
       >
         <Text>Back to Messages</Text>
       </Button>
@@ -107,8 +112,16 @@ function ChatNotice({ title, hint }: { title: string; hint: string }) {
   );
 }
 
-function CustomerChatScreen({ routeId }: { routeId: string }) {
-  const inbox = useCustomerInbox();
+/**
+ * The thread itself, once a role is known.
+ *
+ * Written once for all three, because the differences that used to justify two
+ * components are in the payload rather than in the screen: the role decides
+ * which shape the API sends and which messages it withholds, and everything
+ * from there — paging, sending, reading — is the same code.
+ */
+function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole }) {
+  const inbox = useConversationInbox();
   const user = getSessionUser();
 
   const conversation = useMemo<Conversation | null>(() => {
@@ -120,19 +133,14 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
   const allowed =
     conversation !== null &&
     user !== null &&
-    canViewConversation("customer", user.id, conversation);
+    canViewConversation(role, user.id, conversation);
 
   const author = useMemo(
-    () =>
-      user ? ({ id: user.id, name: user.name, role: "customer" } as const) : null,
+    () => (user ? { id: user.id, name: user.name, role: user.role } : null),
     [user],
   );
 
-  const thread = useThreadMessages(
-    allowed ? conversation : null,
-    "customer",
-    author,
-  );
+  const thread = useThreadMessages(allowed ? conversation : null, role, author);
 
   /**
    * Opening a thread reads it.
@@ -173,7 +181,7 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
   if (inbox.status === "loading") return <AppLoadingScreen />;
   if (inbox.status === "failed") {
     const notice = failureNotice(inbox.failure);
-    return <ChatNotice title={notice.title} hint={notice.hint} />;
+    return <ChatNotice title={notice.title} hint={notice.hint} home={role} />;
   }
   if (!conversation || !user) {
     return (
@@ -184,16 +192,17 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
             ? "Offers announcements will appear here once the group is set up."
             : "It may have been removed, or it is not yours to open."
         }
+        home={role}
       />
     );
   }
-  if (!allowed) return <Redirect href={ROLE_HREF.customer} />;
+  if (!allowed) return <Redirect href={ROLE_HREF[role]} />;
 
   return (
     <ThreadScreen
       conversation={conversation}
       messages={thread.messages}
-      viewer={{ id: user.id, name: user.name, role: "customer" }}
+      viewer={{ id: user.id, name: user.name, role: user.role }}
       organizationNames={inbox.organizationNames}
       onLoadOlder={thread.loadOlder}
       loadingOlder={thread.loadingOlder}
@@ -202,27 +211,6 @@ function CustomerChatScreen({ routeId }: { routeId: string }) {
       onSendMessage={thread.send}
       delivery={thread.delivery}
       onRetrySend={thread.retrySend}
-    />
-  );
-}
-
-/** Agent and Admin, still on local data until #32. */
-function StaffChatScreen({ routeId }: { routeId: string }) {
-  const me = getDevUser();
-  // Not memoised: a handful of rows in a module constant, and the React compiler
-  // cannot preserve a memo whose value it does not control.
-  const conversation = CONVERSATIONS.find((row) => row.id === routeId);
-  const messages: Message[] = conversation ? (MESSAGES[conversation.id] ?? []) : [];
-
-  if (!conversation || !canViewConversation(me.role, me.id, conversation)) {
-    return <Redirect href={ROLE_HREF[me.role]} />;
-  }
-
-  return (
-    <ThreadScreen
-      conversation={conversation}
-      messages={messages}
-      viewer={{ id: me.id, name: me.displayName, role: me.role }}
     />
   );
 }

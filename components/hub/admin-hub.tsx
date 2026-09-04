@@ -13,18 +13,30 @@ import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { Text } from "@/components/ui/text";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
+import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread } from "@/lib/inbox-filter";
-import { getDevUser } from "@/lib/dev-user";
 import { knowledgeListHref } from "@/lib/hub-routes";
-import { CONVERSATIONS, PEOPLE } from "@/lib/mock-data";
+import { PEOPLE } from "@/lib/mock-data";
 import { settleDownEnter } from "@/lib/motion-enter";
-import { getSession } from "@/lib/session";
+import { getSessionUser } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
+/** Stands in for a count the list has not answered with yet. An em dash, not a zero. */
+const PENDING_COUNT = "—";
+
 export function AdminHub() {
-  const me = getDevUser();
+  const me = getSessionUser();
   const reduceMotion = useReducedMotion();
-  const recent = latestInboxThread(getSession().role, me.id, CONVERSATIONS);
+  const inbox = useConversationInbox();
+  /*
+   * Real, and org-wide: an Admin's `GET /conversations` is already the broad set
+   * their policy grants, so the count is the length of what arrived — and until
+   * it arrives there is no count, rather than a zero to be taken back.
+   */
+  const counted = inbox.status === "ready" ? inbox.conversations : null;
+  const recent = counted && me ? latestInboxThread(counted) : undefined;
+  // Still the mock directory: user management is its own endpoint and its own
+  // ticket, and this tile links to the screen that reads it.
   const onlineCount = PEOPLE.filter((p) => p.isOnline).length;
   const totalUsers = PEOPLE.length;
 
@@ -35,10 +47,10 @@ export function AdminHub() {
 
         <Animated.View entering={settleDownEnter(!!reduceMotion)}>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
-            {hubEyebrow(me.role)}
+            {hubEyebrow("admin")}
           </Text>
           <Text variant="display" className="mt-0.5 text-ink">
-            {hubGreeting(me.role, firstName(me.displayName))}
+            {hubGreeting("admin", firstName(me?.name ?? ""))}
           </Text>
         </Animated.View>
 
@@ -66,7 +78,7 @@ export function AdminHub() {
               onPress={() => router.navigate("/(admin)/users" as Href)}
             />
             <StatTile
-              value={String(CONVERSATIONS.length)}
+              value={counted === null ? PENDING_COUNT : String(counted.length)}
               label="Conversations"
               accessibilityLabel="Conversations"
               onPress={() => router.navigate("/(admin)/conversations" as Href)}

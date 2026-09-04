@@ -225,6 +225,25 @@ export type AttachmentView = {
   peaks?: number[]
 }
 
+/**
+ * A staff member as `GET /conversations/staff` lists them.
+ *
+ * Not a `ConversationStaffPerson`: it carries the organizations the viewer and
+ * this person share, which is what a staff DM binds to and what decides whether
+ * one can exist at all. Null where the API did not say — a row that names no
+ * shared organization is a row no DM can be started with, and the two must not
+ * read the same.
+ */
+export type StaffDirectoryUser = {
+  id: string
+  name: string
+  /** A directory of staff: the API sends no Customer here. */
+  role: 'admin' | 'agent'
+  isOnline?: boolean
+  lastOnlineAt?: string | null
+  sharedOrganizations: Organization[] | null
+}
+
 export type InternalNote = {
   id: string
   conversationId: string
