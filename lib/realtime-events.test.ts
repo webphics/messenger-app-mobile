@@ -295,12 +295,9 @@ describe('parseConversationReassigned', () => {
     expect(parseConversationReassigned(CONVERSATION_REASSIGNED)).toEqual({
       conversationId: '6f74c64f-445b-40fd-b264-e2adcbd77619',
       reason: 'taken_over',
-      currentAssignee: {
-        id: 'ab05cfc4-5ee5-40fb-93af-564a773257e5',
-        name: 'Admin',
-        role: 'admin',
-        sharedOrganizations: null,
-      },
+      // The assignee's role and the engaged-staff roll call are dropped: a
+      // conversation row names an assignee, and nothing here asks who came before.
+      assignee: { id: 'ab05cfc4-5ee5-40fb-93af-564a773257e5', name: 'Admin' },
     })
   })
 
@@ -322,7 +319,7 @@ describe('parseConversationReassigned', () => {
         engagedStaffCount: 0,
         engagedStaff: [],
       }),
-    ).toEqual({ conversationId: 'conv-1', reason: 'membership_revoked', currentAssignee: null })
+    ).toEqual({ conversationId: 'conv-1', reason: 'membership_revoked', assignee: null })
   })
 
   test.each([
@@ -343,7 +340,7 @@ describe('parseConversationReassigned', () => {
         reason: 'taken_over',
         currentAssignee: { name: 'Admin' },
       }),
-    ).toEqual({ conversationId: 'conv-1', reason: 'taken_over', currentAssignee: null })
+    ).toEqual({ conversationId: 'conv-1', reason: 'taken_over', assignee: null })
   })
 })
 

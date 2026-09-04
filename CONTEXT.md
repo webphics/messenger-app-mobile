@@ -135,8 +135,23 @@ An Agent or Admin claiming a conversation from the Unassigned pool, becoming its
 _Avoid_: Claim, pick up, assign to self (assignment is what results, not the action's name)
 
 **Takeover**:
-An Agent or Admin taking assignment of a conversation away from its current assignee. Distinct from Transfer (Phase 4b): a Takeover is unilateral and names no destination other than the actor; a Transfer hands off to a chosen agent.
+An Admin taking assignment of a conversation away from its current assignee. Admin only, unlike an
+Engage: the API's `assertCanTakeOver` begins with `assertAdmin` and answers an Agent `403` whatever
+the thread's state, so an Agent reading a conversation somebody else holds is told who has it and
+offered nothing. Distinct from Transfer (Phase 4b): a Takeover is unilateral and names no destination
+other than the actor; a Transfer hands off to a chosen agent.
 _Avoid_: Reassign, steal, force-assign
+
+**Reassignment**:
+Being told that a conversation is no longer yours — `conversation.reassigned`, the one event the API
+addresses rather than broadcasts: it goes to the *previous* assignee's own room and to nobody else.
+Three reasons, and the third is why it exists. A Takeover or a Transfer leaves the person able to see
+the thread — an Agent reads every Support DM in their organizations whoever holds it — so the row
+stays and only its assignment moves. A revoked membership does not: they are out of the organization,
+the thread goes back to the pool, and the `conversation.updated` that follows every other
+reassignment is emitted to rooms they have already been removed from. Everyone *else* learns of an
+assignment from that update, never from this.
+_Avoid_: Unassign, kicked out, access lost (that is the web client's screen, not the event)
 
 **Offers**:
 In-app promo carousel plus the shared group chat `id: 'offers'`. `"Sponsored"` is a section label only.

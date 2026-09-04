@@ -35,18 +35,19 @@ export function failureNotice(failure: ApiFailure): FailureNotice {
 }
 
 /**
- * One sentence for an Engage or a Takeover that did not happen.
+ * One sentence for an Engage or a Takeover that did not happen, or nothing.
  *
  * Shorter than `failureNotice`'s pair because it has less room and less to say:
  * it sits under the reason the composer is closed, beside the button that just
  * failed, and the person is still looking at the thread. A refusal is repeated
  * verbatim — the one that matters is `already_engaged`, "This chat is already
  * engaged.", which is exactly the news: somebody reached it first.
+ *
+ * An expired session is the one failure with nothing to say here. The auth layer
+ * is already on its way to sign-in, and a sentence about engaging would arrive on
+ * a screen that is leaving.
  */
-export function assignmentRefusal(
-  action: 'engage' | 'takeover',
-  failure: ApiFailure,
-): string {
+export function assignmentRefusal(failure: ApiFailure): string | null {
   switch (failure.kind) {
     case 'unreachable':
       return 'Could not reach the server. Check your connection and try again.'
@@ -55,11 +56,6 @@ export function assignmentRefusal(
     case 'malformed':
       return 'The server answered with something this app did not understand.'
     case 'unauthorised':
-      // Not shown — `useConversationAssignment` drops this one, because the auth
-      // layer is already sending the person to sign in. Answered anyway so the
-      // switch stays total and a fifth failure would fail to compile here.
-      return action === 'engage'
-        ? 'Could not engage this conversation.'
-        : 'Could not take over this conversation.'
+      return null
   }
 }

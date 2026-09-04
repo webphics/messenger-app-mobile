@@ -107,13 +107,7 @@ function applyToList(
 ): Conversation[] {
   if (event.kind === 'deleted') return withoutConversation(conversations, event.conversationId)
   if (event.kind === 'conversation') return mergeConversation(conversations, event.conversation)
-  if (event.kind === 'reassigned') {
-    return withReassignment(conversations, {
-      conversationId: event.reassignment.conversationId,
-      reason: event.reassignment.reason,
-      assignee: event.reassignment.currentAssignee,
-    })
-  }
+  if (event.kind === 'reassigned') return withReassignment(conversations, event.reassignment)
   if (!viewerId) return conversations
   return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }

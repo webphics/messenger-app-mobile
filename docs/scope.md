@@ -57,9 +57,17 @@ Broadcasts are in-inbox announcements (later), not stories.
    get-or-create beside it. What staff see that a Customer does not is the System notice: an
    Engage, Takeover or Transfer, rendered as a centred line rather than a bubble.
 
-   Still web-only: engaging, taking over, transferring and closing a thread. The mobile client
-   reads the assignment those actions produce and renders the notices they write, but has no
-   control that performs one.
+   Engaging and taking over are here. Both sit where the composer would be, because that is where
+   the sentence saying why this person cannot write already sat: an unassigned thread offers every
+   staff member the Engage, and one somebody else holds offers an Admin the Takeover and offers an
+   Agent nothing — the API refuses an Agent's Takeover `403` whatever the thread's state. The row
+   the action answers with goes into the shared list, so the composer replaces the button and the
+   pool loses the row without a refetch, and `conversation.reassigned` tells whoever the thread was
+   taken from. See CONTEXT.md's Reassignment entry for why that event is addressed rather than
+   broadcast.
+
+   Still web-only: transferring and closing a thread. The mobile client reads the assignment those
+   actions produce and renders the notices they write, but has no control that performs one.
 5. Media, push, i18n, list virtualization.
    - 5a. Client media UI (local attachments) — image/video/document pick + in-app voice notes; `Message.attachment` with local URI; in-bubble render; no server upload. (done)
    - 5b. Push, i18n, list virtualization.
