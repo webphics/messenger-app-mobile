@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Linking,
@@ -147,8 +148,18 @@ export function MediaGalleryScreen({
       />
 
       {loading && messages.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator accessibilityLabel="Loading media…" />
+        <View
+          accessibilityLabel="Loading media"
+          className="flex-row flex-wrap"
+          style={{ gap: TILE_GAP, padding: GRID_PAD }}
+        >
+          {Array.from({ length: GALLERY_COLUMNS * 4 }, (_, index) => (
+            <View
+              key={index}
+              className="rounded-md bg-muted/15"
+              style={{ width: tile, height: tile }}
+            />
+          ))}
         </View>
       ) : (
         <FlatList<GalleryRow>
@@ -397,7 +408,11 @@ function LinkRow({ link }: { link: GalleryLink }) {
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={`Open ${link.url}`}
-      onPress={() => void Linking.openURL(link.url).catch(() => {})}
+      onPress={() =>
+        void Linking.openURL(link.url).catch(() =>
+          Alert.alert('Cannot open link', 'No app is available to open this link.'),
+        )
+      }
       className="mb-2 min-h-11 flex-row items-start gap-3 rounded-2xl border border-line/70 bg-surface px-3 py-2.5 active:opacity-70"
     >
       <View className="mt-0.5 size-8 items-center justify-center rounded-xl bg-primary-soft">

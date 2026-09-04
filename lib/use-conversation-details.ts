@@ -74,9 +74,16 @@ export type ConversationDetails = {
   noteError: string | null
 }
 
-function refusal(failure: ApiFailure, fallback: string): string {
+/**
+ * An expired session says nothing here, the same convention
+ * `conversation-failure.ts`'s `assignmentRefusal` follows: the auth layer is
+ * already moving to sign-in, and a label/note-specific sentence would arrive
+ * on a screen that is leaving.
+ */
+function refusal(failure: ApiFailure, fallback: string): string | null {
   if (failure.kind === 'refused') return failure.message
   if (failure.kind === 'unreachable') return 'No connection. Try again.'
+  if (failure.kind === 'unauthorised') return null
   return fallback
 }
 
