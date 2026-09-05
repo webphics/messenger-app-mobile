@@ -9,14 +9,7 @@ import {
   MESSAGE_PAGE_LIMIT,
   type ApiFailure,
 } from '@/lib/conversation-api'
-import {
-  restoreOlderMessages,
-  restoreOutbox,
-  restoreThread,
-  saveMessages,
-  saveOutbox,
-  saveThreadPaging,
-} from '@/lib/conversation-store'
+import { restoreOlderMessages, restoreThread, saveThread } from '@/lib/conversation-store'
 import { missingStagedFiles } from '@/lib/staged-file'
 import { isDeviceUri, missingFilesMessage, sendMessageType } from '@/lib/attachment-upload'
 import {
@@ -40,9 +33,7 @@ import {
   mergeMessages,
   refuseSend,
   LOCAL_ID_PREFIX,
-  threadContinues,
   threadMessages,
-  visibleMessages,
   type DeliveryState,
   type MessageAuthor,
   type SendDraft,
@@ -59,9 +50,11 @@ import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/t
  * The decisions this makes are all in `lib/conversation-state`, which is where
  * they are tested: what a page does to the thread already held, how far back the
  * next one asks from, when there is nothing further back to ask for, and what
- * becomes of a message between the tap on send and the API's answer. What is
- * left here is the part that cannot be pure — when to ask, and how to ignore an
- * answer that arrived for a thread nobody is looking at any more.
+ * becomes of a message between the tap on send and the API's answer. What that
+ * state costs to keep is `lib/conversation-store`'s, which is handed the thread
+ * whole and works out for itself which of its tables that moved. What is left
+ * here is the part that is neither — when to ask, and how to ignore an answer
+ * that arrived for a thread nobody is looking at any more.
  *
  * ## The thread opens on what this device already knows
  *
@@ -162,14 +155,9 @@ function sendFailureMessage(failure: ApiFailure): string | null {
  * rendered, which would put one empty thread in front of the person before the
  * thing this exists to avoid.
  *
- * Filtered on the way in, exactly as a page from the API is. The Store holds
- * what was already visible — nothing withheld was ever written — but the rule
- * that decides what a viewer may see is not one to hold in a single place and
- * hope, and a database is the one input to this app that an older build of it
- * wrote. See `isMessageVisibleTo`.
- *
- * The frontier comes back with the Messages, which is what makes the scroll back
- * pick up where it stopped instead of reading the thread again from the top.
+ * A thread nobody is signed in to, or none open, is an empty one. Everything
+ * else — the Messages, the frontier they were read to, the Outbox, and the
+ * filtering the rows get on the way out — is `lib/conversation-store`'s.
  */
 function restoredThread(
   ownerId: string | null,
@@ -177,21 +165,7 @@ function restoredThread(
   viewer: ThreadViewer | null,
 ): ThreadState {
   if (!ownerId || !conversationId || !viewer) return emptyThread()
-
-  // Read whether or not there is any history to draw it into. A thread whose
-  // first message never got away has nothing else on this device, and it is the
-  // one this feature is most obviously for.
-  const unsent = restoreOutbox(ownerId, conversationId)
-  const held = restoreThread(ownerId, conversationId, MESSAGE_PAGE_LIMIT)
-  if (!held) return { ...emptyThread(), unsent }
-
-  return {
-    ...emptyThread(),
-    messages: visibleMessages(viewer.role, viewer.conversationType, held.messages),
-    unsent,
-    hasMore: held.paging.hasMore,
-    cursor: held.paging.cursor,
-  }
+  return restoreThread(ownerId, conversationId, viewer, MESSAGE_PAGE_LIMIT)
 }
 
 export function useThreadMessages(
@@ -671,75 +645,28 @@ export function useThreadMessages(
   )
 
   /**
-   * Every confirmed Message this thread reaches, written through to the Store.
+   * Every state this thread reaches, written through to the Store.
    *
    * Observed here rather than written at each transition, the way the shared
    * Conversation list does it: a fetched page, a page read back off the disk, a
-   * socket event and a send that has just been confirmed all end up in this one
-   * piece of state, so watching it persists all four — and the fifth, added by
-   * somebody who would have had no idea there was a writer to call.
+   * socket event, a send that has just been confirmed, a reaction and a send
+   * that failed all end up in this one piece of state, so watching it persists
+   * all six — and the seventh, added by somebody who would have had no idea
+   * there was a writer to call.
    *
-   * Confirmed only. `state.unsent` is not here and must not be: a Message this
-   * device is still carrying is its own word about something the server may
-   * never have heard, and the Outbox is its own ticket.
+   * One effect over the whole state rather than one per table. What of it has
+   * moved, whether these Messages are more of the thread or a different run of
+   * it, and which of the three writes that means are all
+   * `lib/conversation-store`'s to work out — it is the side that knows what is
+   * on the disk, and it was keeping that record either way.
    *
-   * `replace` is for the one case where the Messages are not more of the thread
-   * but a different run of it — a newest page that turned out not to continue
-   * what was held, because enough was said while this phone was away. What was
-   * dropped from the screen has to leave the disk with it; see `applyNewestPage`.
-   */
-  const persisted = useRef<{ id: string; messages: Message[] } | null>(null)
-  useEffect(() => {
-    if (!ownerId || !conversationId) return
-
-    const last = persisted.current
-    const replaced =
-      last?.id === conversationId && !threadContinues(last.messages, state.messages)
-    persisted.current = { id: conversationId, messages: state.messages }
-    void saveMessages(ownerId, conversationId, state.messages, replaced ? 'replace' : 'merge')
-  }, [conversationId, ownerId, state.messages])
-
-  /**
-   * And how far back it has been read.
-   *
-   * On the conversation's own row rather than beside the Messages, because there
-   * is exactly one of these per thread — see `lib/store-rows`. It is what makes
-   * a restart continue the scroll rather than start it again, and what stops a
-   * thread with nothing before it from asking after one.
+   * Nothing read back here is ever sent. `restoredThread` is the only reader of
+   * the Outbox, and all it does is draw.
    */
   useEffect(() => {
     if (!ownerId || !conversationId) return
-    void saveThreadPaging(ownerId, conversationId, {
-      hasMore: state.hasMore,
-      cursor: state.cursor,
-    })
-  }, [conversationId, ownerId, state.cursor, state.hasMore])
-
-  /**
-   * And everything it did not manage to send, written through to the Outbox.
-   *
-   * Observed the same way the confirmed Messages are, and for the same reason: a
-   * send that failed, a retry that failed again, an upload that stopped partway
-   * and a message the API finally confirmed all end up in this one piece of
-   * state, so watching it persists all of them.
-   *
-   * Every Unsent Message, not only the failed ones. A message still in flight is
-   * exactly the one worth having on disk — if this process dies with the request
-   * out, nobody knows whether it landed, and the row is what lets it come back
-   * to be sent again rather than disappearing with the process that was carrying
-   * it. It comes back *failed* either way; see `OutboxRow` in `lib/store-rows`.
-   *
-   * Nothing reads this back and sends it. `restoredThread` is the only reader,
-   * and all it does is draw.
-   */
-  useEffect(() => {
-    if (!ownerId || !conversationId) return
-    void saveOutbox(
-      ownerId,
-      conversationId,
-      state.unsent.map((entry) => entry.message),
-    )
-  }, [conversationId, ownerId, state.unsent])
+    void saveThread(ownerId, conversationId, state)
+  }, [conversationId, ownerId, state])
 
   const messages = useMemo(() => threadMessages(state), [state])
   const delivery = useMemo(() => deliveryStates(state.unsent), [state.unsent])
