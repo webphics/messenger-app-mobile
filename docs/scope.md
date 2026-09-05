@@ -100,7 +100,28 @@ Broadcasts are in-inbox announcements (later), not stories.
 
      Still web-only: creating, renaming and archiving a label, and jumping from a gallery item back
      to the message that carried it.
-   - 5d. Push, i18n, list virtualization.
+   - 5d. **Push and resume** — the only way a closed app learns anything, since the Realtime
+     connection lives just as long as the foreground. `POST /push/devices` and its own dispatcher
+     against Expo's service, because the API's existing `POST /push/subscriptions` takes a browser's
+     VAPID subscription and an `ExponentPushToken` satisfies none of it. Pushed: a Message in any
+     conversation the person is a recipient of — which already reaches the Unassigned pool, because
+     an unassigned Support DM resolves its recipients to the whole staff pool — except a group or
+     announcement, which stops at its members rather than reaching every Admin. Plus three things
+     that happen *to* somebody rather than being said to them: a Transfer into their queue, an
+     Engage or Takeover of the thread they were holding, and being added to a group. Suppressed on
+     the thread it is about; an In-app banner instead when the app is open elsewhere; Mute is the
+     granularity, per person per conversation, and per-event opt-out waits for a server-side one.
+     Coming back to the foreground refetches through the existing Resync path.
+
+     Needs the API: a `pushTo` on `handleConversationEngaged`, which writes a row and pushes
+     nothing, and a notification kind for `group.member_added`, which today is heard only by the
+     activity log. Android only until there is an iOS build profile. See
+     `docs/adr/ADR-0009-mobile-push-is-a-second-transport.md`.
+
+     Undecided, and for the spec: when the Android 13+ permission is asked for, and how a tap routes
+     into its thread from a cold start, which has Hydration, Restore and the Launch gate in front of
+     it.
+   - 5e. i18n, list virtualization.
 6. The Store — one in-memory copy of everything the screens read, written through to SQLite on the
    device and read back at the next cold start, so a launch draws the last thing this phone knew
    instead of a spinner and the fetch underneath it confirms rather than reveals. See
