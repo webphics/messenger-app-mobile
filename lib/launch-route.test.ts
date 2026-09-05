@@ -1,6 +1,6 @@
 import type { AuthState } from "@/lib/auth-machine";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
-import { launchDestination, type LaunchHold } from "@/lib/launch-route";
+import { launchDestination } from "@/lib/launch-route";
 import type { ConversationFetch, SessionUser, UserRole } from "@/lib/types";
 
 const AGENT: SessionUser = {
@@ -23,9 +23,13 @@ const stale = (role: UserRole): AuthState => ({
   stale: true,
 });
 
-const EVERY_FETCH: ConversationFetch[] = ["outstanding", "answered", "failed"];
-const SETTLED: ConversationFetch[] = ["answered", "failed"];
-const EVERY_HOLD: LaunchHold[] = ["within", "expired"];
+const EVERY_FETCH: ConversationFetch[] = [
+  "outstanding",
+  "answered",
+  "failed",
+  "abandoned",
+];
+const SETTLED: ConversationFetch[] = ["answered", "failed", "abandoned"];
 
 /**
  * The mistake this module exists to prevent, in its newer form.
@@ -39,7 +43,7 @@ describe("a Stale session", () => {
   test("goes to the Hub for the role this device last heard", () => {
     const roles: UserRole[] = ["customer", "agent", "admin"];
     for (const role of roles) {
-      expect(launchDestination(stale(role), "answered", "within")).toEqual({
+      expect(launchDestination(stale(role), "answered")).toEqual({
         kind: "navigate",
         href: ROLE_HREF[role],
       });
@@ -50,23 +54,21 @@ describe("a Stale session", () => {
     // The fetch failed because the same network that made the session Stale is
     // still down. There are Restored rows behind this, so the Hub is the honest
     // screen; waiting for an answer that is not coming is not.
-    expect(launchDestination(stale("agent"), "failed", "within")).toEqual({
+    expect(launchDestination(stale("agent"), "failed")).toEqual({
       kind: "navigate",
       href: ROLE_HREF.agent,
     });
   });
 
   test("waits for the list like any other session, rather than arriving empty", () => {
-    expect(launchDestination(stale("agent"), "outstanding", "within")).toEqual({
-      kind: "wait",
-    });
+    expect(launchDestination(stale("agent"), "outstanding")).toEqual({ kind: "wait" });
   });
 
   test("is never the Unreachable screen", () => {
     for (const fetch of EVERY_FETCH) {
-      expect(
-        launchDestination(stale("customer"), fetch, "within"),
-      ).not.toEqual({ kind: "unreachable" });
+      expect(launchDestination(stale("customer"), fetch)).not.toEqual({
+        kind: "unreachable",
+      });
     }
   });
 });
@@ -75,7 +77,7 @@ describe("the three Hydration outcomes", () => {
   test("signed in goes to the Hub for the role the server gave", () => {
     const roles: UserRole[] = ["customer", "agent", "admin"];
     for (const role of roles) {
-      expect(launchDestination(signedIn(role), "answered", "within")).toEqual({
+      expect(launchDestination(signedIn(role), "answered")).toEqual({
         kind: "navigate",
         href: ROLE_HREF[role],
       });
@@ -84,11 +86,7 @@ describe("the three Hydration outcomes", () => {
 
   test("signed out goes to sign-in", () => {
     expect(
-      launchDestination(
-        { status: "signed-out", notice: null },
-        "answered",
-        "within",
-      ),
+      launchDestination({ status: "signed-out", notice: null }, "answered"),
     ).toEqual({ kind: "navigate", href: SIGN_IN_HREF });
   });
 
@@ -97,7 +95,6 @@ describe("the three Hydration outcomes", () => {
       launchDestination(
         { status: "signed-out", notice: "Wrong password." },
         "answered",
-        "within",
       ),
     ).toEqual({ kind: "navigate", href: SIGN_IN_HREF });
   });
@@ -105,28 +102,20 @@ describe("the three Hydration outcomes", () => {
   // The whole reason this ticket exists on its own: an API that did not answer
   // must not be read as a session that ended.
   test("unreachable stays on the launch screen rather than routing anywhere", () => {
-    expect(
-      launchDestination({ status: "unreachable" }, "answered", "within"),
-    ).toEqual({
+    expect(launchDestination({ status: "unreachable" }, "answered")).toEqual({
       kind: "unreachable",
     });
     expect(
-      launchDestination({ status: "unreachable" }, "answered", "within"),
+      launchDestination({ status: "unreachable" }, "answered"),
     ).not.toEqual(
-      launchDestination(
-        { status: "signed-out", notice: null },
-        "answered",
-        "within",
-      ),
+      launchDestination({ status: "signed-out", notice: null }, "answered"),
     );
   });
 });
 
 describe("states that are not an outcome yet", () => {
   test("hydration still running holds the launch animation", () => {
-    expect(
-      launchDestination({ status: "hydrating" }, "answered", "within"),
-    ).toEqual({
+    expect(launchDestination({ status: "hydrating" }, "answered")).toEqual({
       kind: "wait",
     });
   });
@@ -134,9 +123,7 @@ describe("states that are not an outcome yet", () => {
   // Only ever reachable from the sign-in screen, which is where a submit comes
   // from — so if the launch screen is somehow still up, that is where to send it.
   test("a sign-in in flight routes to sign-in", () => {
-    expect(
-      launchDestination({ status: "submitting" }, "answered", "within"),
-    ).toEqual({
+    expect(launchDestination({ status: "submitting" }, "answered")).toEqual({
       kind: "navigate",
       href: SIGN_IN_HREF,
     });
@@ -153,7 +140,7 @@ describe("the first Conversation fetch", () => {
   test("answered and signed in leaves for the Hub", () => {
     const roles: UserRole[] = ["customer", "agent", "admin"];
     for (const role of roles) {
-      expect(launchDestination(signedIn(role), "answered", "within")).toEqual({
+      expect(launchDestination(signedIn(role), "answered")).toEqual({
         kind: "navigate",
         href: ROLE_HREF[role],
       });
@@ -163,7 +150,7 @@ describe("the first Conversation fetch", () => {
   test("still outstanding holds the animation, in every role", () => {
     const roles: UserRole[] = ["customer", "agent", "admin"];
     for (const role of roles) {
-      expect(launchDestination(signedIn(role), "outstanding", "within")).toEqual({
+      expect(launchDestination(signedIn(role), "outstanding")).toEqual({
         kind: "wait",
       });
     }
@@ -173,10 +160,10 @@ describe("the first Conversation fetch", () => {
   // draw either way, and holding an animation open on a bad network is the
   // failure this gate exists to prevent — so a failure releases it too.
   test("a fetch that failed releases it exactly as one that answered", () => {
-    expect(launchDestination(signedIn("agent"), "failed", "within")).toEqual(
-      launchDestination(signedIn("agent"), "answered", "within"),
+    expect(launchDestination(signedIn("agent"), "failed")).toEqual(
+      launchDestination(signedIn("agent"), "answered"),
     );
-    expect(launchDestination(signedIn("agent"), "failed", "within")).toEqual({
+    expect(launchDestination(signedIn("agent"), "failed")).toEqual({
       kind: "navigate",
       href: ROLE_HREF.agent,
     });
@@ -186,15 +173,9 @@ describe("the first Conversation fetch", () => {
   // reason to hold either of them.
   test("nothing waits on a fetch that was never made", () => {
     expect(
-      launchDestination(
-        { status: "signed-out", notice: null },
-        "outstanding",
-        "within",
-      ),
+      launchDestination({ status: "signed-out", notice: null }, "outstanding"),
     ).toEqual({ kind: "navigate", href: SIGN_IN_HREF });
-    expect(
-      launchDestination({ status: "submitting" }, "outstanding", "within"),
-    ).toEqual({
+    expect(launchDestination({ status: "submitting" }, "outstanding")).toEqual({
       kind: "navigate",
       href: SIGN_IN_HREF,
     });
@@ -205,9 +186,9 @@ describe("the first Conversation fetch", () => {
   // back into the launch animation and take away the one control on it.
   test("unreachable is still unreachable whatever the fetch has done", () => {
     for (const fetch of EVERY_FETCH) {
-      expect(
-        launchDestination({ status: "unreachable" }, fetch, "within"),
-      ).toEqual({ kind: "unreachable" });
+      expect(launchDestination({ status: "unreachable" }, fetch)).toEqual({
+        kind: "unreachable",
+      });
     }
   });
 
@@ -215,25 +196,23 @@ describe("the first Conversation fetch", () => {
   // answer is the same whichever it is.
   test("hydration still running holds it whatever the fetch has done", () => {
     for (const fetch of EVERY_FETCH) {
-      expect(
-        launchDestination({ status: "hydrating" }, fetch, "within"),
-      ).toEqual({ kind: "wait" });
+      expect(launchDestination({ status: "hydrating" }, fetch)).toEqual({
+        kind: "wait",
+      });
     }
   });
 
   test("both halves have to be true, in either order", () => {
     // Hydration first, fetch second.
-    expect(
-      launchDestination({ status: "hydrating" }, "answered", "within"),
-    ).toEqual({
+    expect(launchDestination({ status: "hydrating" }, "answered")).toEqual({
       kind: "wait",
     });
     // Fetch first, Hydration second.
-    expect(
-      launchDestination(signedIn("admin"), "outstanding", "within"),
-    ).toEqual({ kind: "wait" });
+    expect(launchDestination(signedIn("admin"), "outstanding")).toEqual({
+      kind: "wait",
+    });
     for (const fetch of SETTLED) {
-      expect(launchDestination(signedIn("admin"), fetch, "within")).toEqual({
+      expect(launchDestination(signedIn("admin"), fetch)).toEqual({
         kind: "navigate",
         href: ROLE_HREF.admin,
       });
@@ -242,77 +221,73 @@ describe("the first Conversation fetch", () => {
 });
 
 /**
- * The third input, and the only one that is not about what happened — it is
- * about how long this has gone on. See #52, and the module comment for why a
- * per-request deadline underneath does not add up to one.
+ * The Launch deadline, as the gate sees it: not a clock here, just a fourth
+ * thing the fetch can say. See #52 — the clock is `lib/launch-deadline`, armed
+ * by the inbox where the load it bounds actually lives.
  */
-describe("the bound on the hold", () => {
-  // The row the ticket is about: the fetch is still out, has been for the whole
-  // budget, and there is no longer any point waiting for it. With the Store
-  // there are Restored rows behind the Hub, so handing over draws them.
-  test("a fetch still outstanding at the bound hands over anyway", () => {
+describe("a fetch the Launch deadline gave up on", () => {
+  // The row the ticket is about. There are Restored rows behind the Hub, and
+  // the load that was abandoned lands in them if it ever answers.
+  test("hands a signed-in person over rather than holding them", () => {
     const roles: UserRole[] = ["customer", "agent", "admin"];
     for (const role of roles) {
-      expect(launchDestination(signedIn(role), "outstanding", "expired")).toEqual(
-        { kind: "navigate", href: ROLE_HREF[role] },
-      );
+      expect(launchDestination(signedIn(role), "abandoned")).toEqual({
+        kind: "navigate",
+        href: ROLE_HREF[role],
+      });
     }
   });
 
-  test("a Stale session reaches its Hub at the bound as well", () => {
-    expect(
-      launchDestination(stale("customer"), "outstanding", "expired"),
-    ).toEqual({ kind: "navigate", href: ROLE_HREF.customer });
+  test("reads exactly as answered and as failed do", () => {
+    expect(launchDestination(signedIn("agent"), "abandoned")).toEqual(
+      launchDestination(signedIn("agent"), "answered"),
+    );
+    expect(launchDestination(signedIn("agent"), "abandoned")).toEqual(
+      launchDestination(signedIn("agent"), "failed"),
+    );
   });
 
-  // The bound only ever ends a wait early. Everything that had already decided
-  // decides the same thing.
-  test("nothing that had already settled is changed by it", () => {
-    const states: AuthState[] = [
-      { status: "signed-out", notice: null },
-      { status: "submitting" },
-      signedIn("customer"),
-      signedIn("agent"),
-      signedIn("admin"),
-    ];
-    for (const state of states) {
-      for (const fetch of SETTLED) {
-        expect(launchDestination(state, fetch, "expired")).toEqual(
-          launchDestination(state, fetch, "within"),
-        );
-      }
-    }
+  test("a Stale session reaches its Hub on it too", () => {
+    expect(launchDestination(stale("customer"), "abandoned")).toEqual({
+      kind: "navigate",
+      href: ROLE_HREF.customer,
+    });
   });
 
-  // A launch that cannot reach the API still ends on the retry button.
-  test("unreachable is still unreachable at the bound", () => {
-    for (const fetch of EVERY_FETCH) {
-      expect(launchDestination({ status: "unreachable" }, fetch, "expired")).toEqual(
-        { kind: "unreachable" },
-      );
-    }
+  // Unreachable is a screen with a retry on it, not a route: there is no
+  // session behind it and so no Hub the deadline could hand over to.
+  test("unreachable is still unreachable", () => {
+    expect(launchDestination({ status: "unreachable" }, "abandoned")).toEqual({
+      kind: "unreachable",
+    });
   });
 
   // Nowhere to send anyone: which Hub is what Hydration was going to say.
-  test("hydration still running is still a wait at the bound", () => {
-    for (const fetch of EVERY_FETCH) {
-      expect(launchDestination({ status: "hydrating" }, fetch, "expired")).toEqual(
-        { kind: "wait" },
-      );
-    }
+  test("hydration still running is still a wait", () => {
+    expect(launchDestination({ status: "hydrating" }, "abandoned")).toEqual({
+      kind: "wait",
+    });
   });
 
-  // The whole point, stated as the invariant: past the bound the gate never
-  // holds a person who has somewhere to be.
-  test("no signed-in state waits once the bound is reached", () => {
-    for (const fetch of EVERY_FETCH) {
-      expect(
-        launchDestination(signedIn("agent"), fetch, "expired").kind,
-      ).not.toBe("wait");
-      expect(launchDestination(stale("agent"), fetch, "expired").kind).not.toBe(
-        "wait",
-      );
-    }
+  test("signed out still goes to sign-in", () => {
+    expect(
+      launchDestination({ status: "signed-out", notice: null }, "abandoned"),
+    ).toEqual({ kind: "navigate", href: SIGN_IN_HREF });
+    expect(launchDestination({ status: "submitting" }, "abandoned")).toEqual({
+      kind: "navigate",
+      href: SIGN_IN_HREF,
+    });
+  });
+
+  // The whole point, as the invariant: past the deadline the gate never holds
+  // somebody who has a Hub to be in.
+  test("no signed-in state waits on it", () => {
+    expect(launchDestination(signedIn("agent"), "abandoned").kind).not.toBe(
+      "wait",
+    );
+    expect(launchDestination(stale("agent"), "abandoned").kind).not.toBe(
+      "wait",
+    );
   });
 });
 
@@ -330,12 +305,10 @@ test("every auth state lands on a destination, and none is mutated", () => {
 
   for (const state of states) {
     for (const fetch of EVERY_FETCH) {
-      for (const hold of EVERY_HOLD) {
-        const before = JSON.stringify(state);
-        const destination = launchDestination(state, fetch, hold);
-        expect(["wait", "navigate", "unreachable"]).toContain(destination.kind);
-        expect(JSON.stringify(state)).toBe(before);
-      }
+      const before = JSON.stringify(state);
+      const destination = launchDestination(state, fetch);
+      expect(["wait", "navigate", "unreachable"]).toContain(destination.kind);
+      expect(JSON.stringify(state)).toBe(before);
     }
   }
 });

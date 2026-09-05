@@ -29,6 +29,7 @@ import {
 } from '@/lib/conversation-state'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { createCountedMessages } from '@/lib/realtime-events'
+import { createLaunchDeadline, type LaunchDeadline } from '@/lib/launch-deadline'
 import type { Conversation, ConversationFetch, Organization, UserRole } from '@/lib/types'
 
 /**
@@ -239,9 +240,37 @@ function useConversationInboxState(): ConversationInboxView {
   const counted = useRef<ReturnType<typeof createCountedMessages>>(undefined)
   counted.current ??= createCountedMessages()
 
+  /**
+   * The Launch gate's bound. Armed here rather than in the launch screen
+   * because this is where the load it bounds is started — and because a Resync
+   * restarting the load is the thing it has to survive, which is only visible
+   * from in here. See `lib/launch-deadline` and #52.
+   */
+  const deadline = useRef<LaunchDeadline>(undefined)
+  deadline.current ??= createLaunchDeadline()
+
   const load = useCallback(async (mode: 'first' | 'refresh' | 'resync') => {
     const mine = ++generation.current
     loadOut.current = true
+    // Every load, and the first one wins: `arm` does nothing while a deadline
+    // is already running, which is exactly what a Resync's call has to do. The
+    // generation guard below strands the load this one is replacing, and if
+    // that strand also restarted the clock the launch would have no bound —
+    // only each hop of it would.
+    deadline.current?.arm(() => {
+      // The gate is told to stop waiting; the load is not cancelled and may
+      // still answer, which is why this is not terminal.
+      setConversationFetch('abandoned')
+      // The rule the first-load failure below already settles: Restored rows
+      // are what this phone knows and are kept, and a list with nothing in it
+      // says so rather than rendering as *no conversations found*. Unreachable
+      // because that is what it is — silence, and nothing about the session.
+      setInbox((current) =>
+        current.status === 'ready' && current.conversations.length > 0
+          ? current
+          : { status: 'failed', failure: { kind: 'unreachable' } },
+      )
+    })
     // A resync is not something anyone asked for, so it shows nothing while it
     // runs: the list on screen stays exactly as it is until the answer replaces
     // it. A spinner appearing on its own would read as an error.
@@ -261,10 +290,12 @@ function useConversationInboxState(): ConversationInboxView {
     if (!list.ok) {
       loadOut.current = false
       readWhileLoading.current.clear()
-      // Settled, which is all the Launch animation asked. Recorded for every
-      // mode rather than the first load alone: a resync bumps the generation and
-      // strands the load it interrupted, so the gate has to be released by
-      // whichever one actually comes back.
+      // Settled, which is all the Launch animation asked, so the gate is
+      // released and its clock stops. Recorded for every mode rather than the
+      // first load alone: a resync bumps the generation and strands the load it
+      // interrupted, so the gate has to be released by whichever one actually
+      // comes back.
+      deadline.current?.settle()
       setConversationFetch('failed')
       // A resync that failed leaves what is on screen alone. Nobody asked for
       // it, the rows are still the last thing the API said, and replacing them
@@ -301,6 +332,7 @@ function useConversationInboxState(): ConversationInboxView {
 
     if (generation.current !== mine) return
     loadOut.current = false
+    deadline.current?.settle()
     setConversationFetch('answered')
 
     const merged =
@@ -334,12 +366,17 @@ function useConversationInboxState(): ConversationInboxView {
     generation.current += 1
     loadOut.current = false
     readWhileLoading.current.clear()
+    // Somebody else, or nobody: a different launch, and it gets a clock of its
+    // own rather than inheriting one that has already run.
+    deadline.current?.reset()
 
     if (!viewerId) return
     void load('first')
 
     return () => {
       generation.current += 1
+      // Nothing left to hand over to.
+      deadline.current?.reset()
     }
   }, [viewerId, load])
 

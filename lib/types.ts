@@ -162,10 +162,20 @@ export type Conversation = StaffConversation | CustomerConversation
  * the failure the gate exists to prevent. The two are kept apart rather than
  * collapsed to a boolean so the gate's table can say which is which.
  *
+ * `abandoned` is the third settled outcome: the Launch deadline passed with a
+ * load still out. See #52 — a Resync restarts the load underneath the gate, so
+ * a socket that flaps bounds every round trip and never the launch. It is not
+ * terminal: the load it gave up on may still answer, and is free to overwrite
+ * it when it does.
+ *
  * Produced by `lib/conversation-inbox` and read by `lib/launch-route`; here
  * rather than in either, so neither has to import the other.
  */
-export type ConversationFetch = 'outstanding' | 'answered' | 'failed'
+export type ConversationFetch =
+  | 'outstanding'
+  | 'answered'
+  | 'failed'
+  | 'abandoned'
 
 /**
  * Which shape a conversation arrived in.
