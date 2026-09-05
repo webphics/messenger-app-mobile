@@ -127,8 +127,19 @@ Broadcasts are in-inbox announcements (later), not stories.
      second trigger fires for somebody the first never reached, never as a second ask. Somebody who
      has said no is offered a route into system settings from Settings, not another prompt.
 
-     Undecided, and for the spec: how a tap routes into its thread from a cold start, which has
-     Hydration, Restore and the Launch gate in front of it.
+     A tap opens the thread it is about, and the cold start is the whole of the problem — Hydration,
+     Restore and the Launch gate are all in front of it. It is not a second route: `launchDestination`
+     already answers where a launch lands as a pure function of Hydration and the Conversation fetch,
+     so the conversation a notification asked for arrives as a third input, and the one signed-in row
+     that has a Hub behind it answers `chatHref(id)` instead of the role's Hub. Every other row is
+     unchanged, and the wait is the one already there: a thread Restores from the Store, but the Hub
+     underneath it has to exist for Back to mean anything.
+
+     A tap while the app is running does not go near any of that — the listener navigates. A tap
+     with no session goes to sign-in and the intent is dropped, because a Session end wiped the Store
+     the thread would have drawn from; a tap that lands on Unreachable keeps it, because that cookie
+     is still good. A conversation this device does not know needs nothing special: the thread
+     fetches what it cannot Restore, and says so when it cannot.
    - 5e. i18n, list virtualization.
 6. The Store — one in-memory copy of everything the screens read, written through to SQLite on the
    device and read back at the next cold start, so a launch draws the last thing this phone knew
