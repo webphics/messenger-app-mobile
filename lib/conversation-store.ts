@@ -20,7 +20,14 @@ import {
   type RestoredStore,
   type ThreadPaging,
 } from '@/lib/store-rows'
-import type { UnsentMessage } from '@/lib/conversation-state'
+import {
+  emptyThread,
+  threadContinues,
+  visibleMessages,
+  type ThreadState,
+  type ThreadViewer,
+  type UnsentMessage,
+} from '@/lib/conversation-state'
 import type { Conversation, Message } from '@/lib/types'
 
 /**
@@ -51,23 +58,27 @@ import type { Conversation, Message } from '@/lib/types'
  * on the render path, and nobody is waiting for them — so they are queued,
  * coalesced to the newest state per person, and run one transaction at a time.
  *
- * ## Three things are written, and they are written by different people
+ * ## Two things are written, and they are written by different people
  *
- * The Conversation list is one unit and is replaced whole. A thread's Messages
- * are per thread and are added to, because a Message that has been confirmed
- * does not leave the thread it is in — what changes is its receipts, and an
- * upsert by id says exactly that. So the two have separate queues, separate
- * transactions and separate coalescing, and the only thing they share is the
- * `conversations` row that carries a thread's paging: written whole by the list
- * and one column at a time by the thread, which is why the paging is also held
- * in memory here. See `frontiers`.
+ * The Conversation list, by whoever holds the list; and a thread, by whoever
+ * holds that thread. Two callers, two calls: `saveStore` and `saveThread`,
+ * against `restoreStore` and `restoreThread`. Neither caller is told what a
+ * table is.
  *
- * The Outbox is the third, and it is per thread like the Messages but is neither
- * of the other two: a row there is this device's word rather than the server's,
- * and it leaves when the message it stands for is confirmed. Its own queue and
- * its own transaction, and untouched by every rule the Messages have — a sweep
- * never names it, and a thread a sweep has taken history from still writes it.
- * See `saveOutbox`.
+ * Underneath, a thread is three of them. Its Messages are added to, because a
+ * Message that has been confirmed does not leave the thread it is in — what
+ * changes is its receipts, and an upsert by id says exactly that. Its frontier
+ * is a column pair on the `conversations` row, which is the one thing the list
+ * and the thread share: written whole by the list and one column at a time by
+ * the thread, which is why the paging is also held in memory here — see
+ * `frontiers`. Its Outbox is neither, because a row there is this device's word
+ * rather than the server's and it leaves when the message it stands for is
+ * confirmed; it is untouched by every rule the Messages have, a sweep never
+ * names it, and a thread a sweep has taken history from still writes it. See
+ * `queueOutbox`.
+ *
+ * Each of the three keeps its own queue, transaction and coalescing, and each is
+ * skipped when the state handed to `saveThread` did not move it.
  */
 
 const DATABASE_NAME = 'enki-store.db'
@@ -289,6 +300,21 @@ function fromThreadKey(key: string): { ownerId: string; conversationId: string }
  */
 const writtenMessages = new Map<string, Map<string, Message>>()
 
+/**
+ * The last state of each thread this was handed, by thread.
+ *
+ * Not a claim about the disk — `writtenMessages` is that. This answers one
+ * question and only one: whether the Messages arriving now are more of the run
+ * of history that arrived last time, or a different run of it with something
+ * nobody fetched in between. See `saveThread`, which is the only reader.
+ *
+ * Per thread rather than one slot, which is what the screen used to keep: a
+ * person who opens one thread, then another, then the first again is asking the
+ * same question about the first thread both times, and the answer does not
+ * depend on where they went in between.
+ */
+const lastThreads = new Map<string, ThreadState>()
+
 function markThreadWritten(
   ownerId: string,
   conversationId: string,
@@ -433,30 +459,71 @@ export function restoreStore(ownerId: string): RestoredStore {
 }
 
 /**
- * A thread as this device last knew it: its newest Messages, and its frontier.
+ * What one read of the `messages` table found: the page, and the frontier.
  *
  * `paging` is what the API had already said about how far back this thread
  * goes, so a restart picks the scroll back up where it stopped instead of
  * reading the whole thread again from the top. A row that has never recorded one
  * — every row written before this existed — falls back to the oldest Message
  * actually held, which is the same place by another route.
- *
- * Null when there is nothing here: no database, nothing stored for this thread,
- * or a read that failed. All three mean the same to a caller, which is that this
- * thread has to be fetched before it can be drawn.
  */
-export type RestoredThread = { messages: Message[]; paging: ThreadPaging }
+type RestoredThread = { messages: Message[]; paging: ThreadPaging }
 
 /**
- * The newest Messages this device holds for a thread, and how far back it read.
+ * A thread as this device last knew it, ready to draw.
+ *
+ * One call for everything a thread opens on, because to the screen it is one
+ * question: the Messages, the frontier they were read to, and the ones that were
+ * typed here and never got away. Three tables and one answer — a screen deciding
+ * what to draw has no use for them apart, and asking separately only invites
+ * drawing one without the others.
  *
  * Synchronous and bounded, for the same reason `restoreStore` is: the screen
  * reads this while it is deciding what to draw, and a thread that has been
  * scrolled back through for an hour must cost the same to open as one that has
  * not. `limit` is a page, not a thread — what is below it stays on disk and is
  * read by `restoreOlderMessages` when somebody scrolls into it.
+ *
+ * Filtered on the way out, exactly as a page from the API is. The Store holds
+ * what was already visible — nothing withheld was ever written — but the rule
+ * that decides what a viewer may see is not one to hold in a single place and
+ * hope, and a database is the one input to this app that an older build of it
+ * wrote. Here rather than at the screen because this is the boundary the
+ * untrusted rows cross. See `isMessageVisibleTo`.
+ *
+ * A thread this device holds nothing for comes back empty rather than absent:
+ * an empty thread is what the screen would have made of a null anyway, and the
+ * Outbox is read whether or not there is history to draw it into — a thread
+ * whose first message never got away has nothing else on this device, and it is
+ * the one this feature is most obviously for.
  */
 export function restoreThread(
+  ownerId: string,
+  conversationId: string,
+  viewer: ThreadViewer,
+  limit: number,
+): ThreadState {
+  const unsent = restoreOutbox(ownerId, conversationId)
+  const held = restoreMessages(ownerId, conversationId, limit)
+  if (!held) return { ...emptyThread(), unsent }
+
+  return {
+    ...emptyThread(),
+    messages: visibleMessages(viewer.role, viewer.conversationType, held.messages),
+    unsent,
+    hasMore: held.paging.hasMore,
+    cursor: held.paging.cursor,
+  }
+}
+
+/**
+ * The newest Messages this device holds for a thread, and how far back it read.
+ *
+ * Null when there is nothing here: no database, nothing stored for this thread,
+ * or a read that failed. All three mean the same to `restoreThread`, which is
+ * that this thread has to be fetched before it can be drawn.
+ */
+function restoreMessages(
   ownerId: string,
   conversationId: string,
   limit: number,
@@ -578,9 +645,9 @@ export function restoreOlderMessages(
  * while it is deciding what to draw.
  *
  * Empty when there is nothing here: no database, nothing stored for this thread,
- * or a read that failed. All three mean the same to a caller.
+ * or a read that failed. All three mean the same to `restoreThread`.
  */
-export function restoreOutbox(ownerId: string, conversationId: string): UnsentMessage[] {
+function restoreOutbox(ownerId: string, conversationId: string): UnsentMessage[] {
   const database = connect()
   if (!database) return []
 
@@ -638,6 +705,7 @@ function markOutboxWritten(
 function discard(): void {
   written.clear()
   writtenMessages.clear()
+  lastThreads.clear()
   writtenOutbox.clear()
   frontiers.clear()
   sweptThreads.clear()
@@ -678,24 +746,93 @@ export function saveStore(ownerId: string, snapshot: StoreSnapshot): Promise<voi
 }
 
 /**
- * Write a thread's confirmed Messages through, when the queue gets to it.
+ * Write a thread through, when the queue gets to it.
  *
- * `replace` says these Messages are the thread rather than more of it — see
- * `PendingThread`. Everything else is an upsert by id, because a Message that
- * has been confirmed does not leave the thread it is in: what changes is its
- * receipts and its reactions, and replacing the row by id is exactly that.
+ * The mirror of `restoreThread`, and one call for the same reason: a thread's
+ * confirmed Messages, its frontier and its Outbox are three tables but one
+ * state, and the screen holding that state has no business splitting it up. A
+ * fetched page, a page read back off the disk, a socket event, a send that was
+ * just confirmed, a reaction and a send that failed all end up in this one
+ * value, so handing it over persists all six — and the seventh, added by
+ * somebody who would have had no idea there were three writers to call.
  *
- * Same queue as the list, so the two cannot interleave inside one thread's
- * transaction, and same fire-and-forget: the promise exists for tests.
+ * Nothing that did not change is written. Each half is compared by identity
+ * against the state handed over last time, which is what the reducers in
+ * `lib/conversation-state` leave behind: a thread whose Messages changed queues
+ * no Outbox write, and a thread that only failed a send queues no Messages. The
+ * frontier has a guard of its own — see `queueThreadPaging`.
+ *
+ * Fire and forget: the promise is returned so a test can wait for the queue to
+ * drain, and callers ignore it. Nothing on screen is waiting for a write.
+ *
+ * ## Whether this is more of the thread, or a different run of it
+ *
+ * The one decision here rather than at the caller. Messages are an upsert by id
+ * — a Message that has been confirmed does not leave the thread it is in; what
+ * changes is its receipts and its reactions — except when the newest page turns
+ * out not to continue what was held, because enough was said while this phone
+ * was away. Then what left the screen has to leave the disk with it, or the next
+ * scroll back reads straight into a fragment with unfetched history in the
+ * middle of it.
+ *
+ * `threadContinues` answers that, against `lastThreads`. It used to be answered
+ * by the screen, which had to keep its own copy of what it last wrote to do it —
+ * a shadow of a record this module already keeps. A thread handed over for the
+ * first time is more of nothing, and merges.
  */
-export function saveMessages(
+export function saveThread(
   ownerId: string,
   conversationId: string,
-  messages: readonly Message[],
-  mode: 'merge' | 'replace' = 'merge',
+  thread: ThreadState,
 ): Promise<void> {
   if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
 
+  const key = threadKey(ownerId, conversationId)
+  const last = lastThreads.get(key)
+  lastThreads.set(key, thread)
+
+  if (last?.messages !== thread.messages) {
+    const continues = last === undefined || threadContinues(last.messages, thread.messages)
+    queueMessages(ownerId, conversationId, thread.messages, continues ? 'merge' : 'replace')
+  }
+
+  if (last?.unsent !== thread.unsent) {
+    queueOutbox(
+      ownerId,
+      conversationId,
+      thread.unsent.map((entry) => entry.message),
+    )
+  }
+
+  queueThreadPaging(ownerId, conversationId, {
+    hasMore: thread.hasMore,
+    cursor: thread.cursor,
+  })
+
+  // After all three, never between them. `drain` runs as far as its first await
+  // the moment it is called, which would take the Messages out of the queue
+  // before the frontier that moved with them had been put in — and one state
+  // change would cost two transactions instead of the one it is.
+  draining ??= drain()
+  return draining
+}
+
+/**
+ * Write a thread's confirmed Messages through, when the queue gets to it.
+ *
+ * `replace` says these Messages are the thread rather than more of it — see
+ * `PendingThread` and `saveThread`, which decides which of the two this is.
+ * Everything else is an upsert by id.
+ *
+ * Same queue as the list, so the two cannot interleave inside one thread's
+ * transaction.
+ */
+function queueMessages(
+  ownerId: string,
+  conversationId: string,
+  messages: readonly Message[],
+  mode: 'merge' | 'replace',
+): void {
   const key = threadKey(ownerId, conversationId)
   const pending = queuedThreads.get(key)
 
@@ -708,9 +845,6 @@ export function saveMessages(
     replace: mode === 'replace' || pending?.replace === true,
     paging: pending?.paging ?? null,
   })
-
-  draining ??= drain()
-  return draining
 }
 
 /**
@@ -722,17 +856,13 @@ export function saveMessages(
  * every row this person has. Held in memory as well, so the next full write of
  * the list carries it instead of flattening it. See `frontiers`.
  */
-export function saveThreadPaging(
+function queueThreadPaging(
   ownerId: string,
   conversationId: string,
   paging: ThreadPaging,
-): Promise<void> {
-  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
-
+): void {
   const held = frontiers.get(ownerId)?.get(conversationId)
-  if (held?.hasMore === paging.hasMore && held.cursor === paging.cursor) {
-    return draining ?? Promise.resolve()
-  }
+  if (held?.hasMore === paging.hasMore && held.cursor === paging.cursor) return
   holdPaging(ownerId, new Map([[conversationId, paging]]))
 
   const key = threadKey(ownerId, conversationId)
@@ -744,9 +874,6 @@ export function saveThreadPaging(
     replace: pending?.replace === true,
     paging,
   })
-
-  draining ??= drain()
-  return draining
 }
 
 /**
@@ -761,26 +888,20 @@ export function saveThreadPaging(
  * the process dying with the request out: the row is what makes that message
  * come back at all, and it comes back failed either way. See `OutboxRow`.
  *
- * Same queue as the list and the Messages, and same fire-and-forget: the promise
- * exists for tests. A thread a sweep has taken history from writes this
- * regardless — `sweptThreads` is about a hole in *history*, and the Outbox has
- * none to put one in.
+ * Same queue as the list and the Messages. A thread a sweep has taken history
+ * from writes this regardless — `sweptThreads` is about a hole in *history*, and
+ * the Outbox has none to put one in.
  */
-export function saveOutbox(
+function queueOutbox(
   ownerId: string,
   conversationId: string,
   messages: readonly Message[],
-): Promise<void> {
-  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
-
+): void {
   queuedOutbox.set(threadKey(ownerId, conversationId), {
     ownerId,
     conversationId,
     messages,
   })
-
-  draining ??= drain()
-  return draining
 }
 
 async function drain(): Promise<void> {
