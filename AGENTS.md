@@ -62,10 +62,10 @@ Conversation fetch settled and leaned on the Request deadline to guarantee it wo
 guarantee is per round trip — a socket flapping inside the launch window abandons the load in
 flight and starts another with a deadline of its own, so the total hold had no bound. The gate now
 takes the hold as a third input and hands a signed-in person over past it, to the Restored rows the
-Store already holds. Two Request deadlines, derived rather than restated: that is what one
-interrupted strand costs, so a single resync is still waited for exactly as before and only a
-flapping socket is cut off. The clock sits beside the two-second minimum rather than in one of its
-own. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`. What a cold start with no network knows: `docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`. What never leaves the phone: `docs/adr/ADR-0011-the-store-does-not-leave-the-phone-in-a-backup.md`.
+Store already holds. Ten seconds, and deliberately shorter than a Request deadline — sizing the
+bound to fit a strand of abandoned loads only moves the number up, and the question is what somebody
+is asked to watch rather than what the network is allowed to take. The clock sits beside the
+two-second minimum rather than in one of its own, and a Try again re-arms it. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`. What a cold start with no network knows: `docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`. What never leaves the phone: `docs/adr/ADR-0011-the-store-does-not-leave-the-phone-in-a-backup.md`.
 
 ## Interactions
 

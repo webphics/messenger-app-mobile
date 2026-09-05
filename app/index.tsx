@@ -4,7 +4,6 @@ import { View } from "react-native";
 
 import { UnreachableScreen } from "@/components/auth/unreachable-screen";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
-import { REQUEST_DEADLINE_MS } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { launchDestination, type LaunchHold } from "@/lib/launch-route";
@@ -20,13 +19,21 @@ const MINIMUM_DISPLAY_MS = 2000;
  * The other end of the same hold: how long the launch animation may stay up
  * waiting for the Conversation list, however many times that list is asked for.
  *
- * Two Request deadlines, because that is what one interrupted strand costs — a
- * load abandoned when the socket reconnected, and its replacement running out a
- * deadline of its own. One interruption fits inside the bound and is waited for
- * exactly as it always was; a socket flapping over and over does not, which is
- * the whole of #52. Derived rather than restated so the two cannot drift.
+ * A number about the person rather than about the network, and deliberately
+ * shorter than `lib/api-client`'s Request deadline. Tying it to that deadline
+ * is what #52 is a bug report about — one round trip is bounded, and a socket
+ * flapping inside the launch window keeps starting fresh ones, so the sum never
+ * was. Sizing the bound to fit a strand of them only moves the number up;
+ * nothing makes ten seconds of a looping animation with no control on it worth
+ * watching, and with the Store there is a Hub with Restored rows behind it the
+ * whole time.
+ *
+ * The cost is that a genuinely slow first load is cut off here rather than
+ * waited out. That is the trade the Store pays for: being cut off means the
+ * rows this phone already holds, and the list still lands in them when it
+ * arrives.
  */
-const LAUNCH_BOUND_MS = REQUEST_DEADLINE_MS * 2;
+const LAUNCH_BOUND_MS = 10_000;
 
 export default function Index() {
   const { state, retry } = useAuth();
@@ -52,7 +59,7 @@ export default function Index() {
    */
   const [attempt, setAttempt] = useState(0);
   /**
-   * Whether Try again has been pressed.
+   * Whether Try again has ever been pressed.
    *
    * Unreachable is the only place the launch animation is torn down while
    * Hydration can still come back round, and `retry` puts the state back to
@@ -61,10 +68,10 @@ export default function Index() {
    * pressed a button on replaced by an animation that says nothing about
    * whether the press worked.
    *
-   * Taken from the press rather than derived from the state, because the press
-   * is the fact — `hydrating` cannot tell the two runs apart on its own, and
-   * asking a render or an effect to remember which one this is puts a cascade
-   * where an event handler will do.
+   * Counted from the press rather than derived from the auth state, because
+   * the press is the fact — `hydrating` cannot tell the two runs apart on its
+   * own, and asking a render or an effect to remember which one this is puts a
+   * cascade where an event handler will do.
    */
   const retryStarted = attempt > 0;
   const navigatedRef = useRef(false);
@@ -86,6 +93,9 @@ export default function Index() {
   // The far end is #52. It is armed here beside the minimum rather than in a
   // clock of its own, because they are the two ends of one stretch of time; two
   // timers each deciding when the launch is over is what that would become.
+  //
+  // Note which one this does *not* depend on: the fetch. That is the bug — a
+  // bound re-armed by anything happening underneath it is not a bound.
   //
   // Re-armed on a Try again, which is why the attempt is a dependency: a retry
   // is another go at the same launch and gets the same bound, rather than

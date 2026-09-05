@@ -247,10 +247,12 @@ What has to be true before the Launch animation ends: it has played its two seco
 Conversation fetch has **settled**. Settled means answered **or** failed — with the Store there is
 something to draw either way, and an animation held open on a bad network is the failure the gate
 exists to prevent. Both halves count in either order. Hydration's Unreachable outcome is not part of
-it: that is a screen with a retry on it rather than a Hub to hand over. The wait has a **bound** — two
-Request deadlines from the animation appearing, over the launch as a whole rather than over any one
-request, because a socket that flaps inside the window keeps starting fresh ones — and reaching it
-hands over the Restored rows. A Try again re-arms it. The decision is `lib/launch-route`.
+it: that is a screen with a retry on it rather than a Hub to hand over. The wait has a **bound** — ten
+seconds from the animation appearing, over the launch as a whole rather than over any one request,
+because a socket that flaps inside the window keeps starting fresh ones — and reaching it hands over
+the Restored rows. It is shorter than a Request deadline on purpose: it is a limit on what somebody
+is asked to watch, not on what the network is allowed to take. A Try again re-arms it. The decision
+is `lib/launch-route`.
 _Avoid_: Splash gate, minimum display (that is only the animation's own half), loading gate, budget,
 timeout (that is the Request deadline, which bounds a round trip rather than the launch)
 
