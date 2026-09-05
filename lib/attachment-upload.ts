@@ -111,6 +111,37 @@ export function rejectUploadReason(attachment: AttachmentView): string | null {
 }
 
 /**
+ * Why a message cannot be sent again, naming the staged files that have gone.
+ *
+ * Beside the other two refusals rather than beside the check that finds them:
+ * this is the same kind of sentence `rejectUploadReason` writes — an attachment
+ * the API is not going to receive, said in words somebody can act on — and it is
+ * pure, where the check has to read a disk. Which files have gone is
+ * `missingStagedFiles` in `lib/staged-file`, and why any of them can go is
+ * explained there.
+ *
+ * Named where every missing file has a name, because "a file is missing" on a
+ * message carrying three of them is not something a person can act on, and what
+ * they can do about it — attach it again — needs to know which. Where any of
+ * them is nameless the sentence names none of them: a list missing one of its
+ * subjects reads as a complete list, and somebody acting on it would replace the
+ * wrong file.
+ */
+export function missingFilesMessage(missing: readonly Pick<AttachmentView, 'name'>[]): string {
+  const names = missing.map((attachment) => attachment.name.trim()).filter(Boolean)
+  const one = missing.length === 1
+
+  const subject =
+    names.length === missing.length
+      ? `${names.map((name) => `“${name}”`).join(', ')} ${one ? 'is' : 'are'}`
+      : one
+        ? 'The file on this message is'
+        : 'The files on this message are'
+
+  return `${subject} no longer on this device. Attach ${one ? 'it' : 'them'} again to send this message.`
+}
+
+/**
  * Whether this URL still points at the device that produced it.
  *
  * What separates an attachment that has to be uploaded from one that already

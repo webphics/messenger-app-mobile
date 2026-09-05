@@ -8,6 +8,7 @@ import {
   draftMessage,
   emptyThread,
   failSend,
+  refuseSend,
   findOffersConversation,
   findUnsent,
   isLocalId,
@@ -693,6 +694,42 @@ describe('failSend', () => {
   test('a message nobody is holding changes nothing', () => {
     const before = beginSend(emptyThread(), echo)
     expect(failSend(before, 'local-9')).toEqual(before)
+  })
+})
+
+describe('refuseSend', () => {
+  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
+  const echo = draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: 'x' })
+
+  /**
+   * The case `failSend` cannot answer: a first send stopped on its way out — a
+   * staged file that is no longer on the phone — has put nothing in the thread
+   * yet, so there is nothing there for a mark to find.
+   */
+  test('a send stopped before it began still gets its bubble, marked', () => {
+    const state = refuseSend(emptyThread(), echo)
+
+    expect(state.unsent).toEqual([{ message: echo, state: 'failed' }])
+    expect(threadMessages(state).map((m) => m.id)).toEqual(['local-1'])
+  })
+
+  test('a retry stopped the same way marks the bubble already there', () => {
+    const state = refuseSend(beginSend(emptyThread(), echo), echo)
+
+    expect(state.unsent).toEqual([{ message: echo, state: 'failed' }])
+  })
+
+  test('leaves the other messages on their way out alone', () => {
+    const other = draftMessage({ id: 'local-2', body: 'And', author, sentAt: 'y' })
+
+    const state = refuseSend(beginSend(emptyThread(), other), echo)
+
+    expect(deliveryStates(state.unsent)).toEqual(
+      new Map([
+        ['local-2', 'sending'],
+        ['local-1', 'failed'],
+      ]),
+    )
   })
 })
 

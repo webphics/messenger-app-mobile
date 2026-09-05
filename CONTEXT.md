@@ -325,7 +325,13 @@ _Avoid_: Out of date, dirty, invalid, expired (that is what a Session does)
 Unsent messages that have outlived the process that typed them. An Unsent message has always
 survived a failed request; what the Store adds is surviving a restart, so a message typed on a train
 is still there tomorrow, still marked *failed*, still offering to go again. Never sent on its own:
-a message abandoned on Tuesday must not leave on Thursday without somebody tapping it.
+a message abandoned on Tuesday must not leave on Thursday without somebody tapping it. Every Unsent
+message is written whatever its Delivery state and every one comes back *failed*: a send that was in
+flight when the process died did not survive the thing that was sending it, nobody knows whether it
+landed, and *failed* is the state that offers to go again. A staged Attachment comes back with the
+message carrying it — but the picker's copy of the file lives in the system cache, which the system
+reclaims, so a retry reads the file before it sends and names the one that has gone rather than
+failing on it.
 _Avoid_: Queue (nothing drains it), retry queue, pending messages, drafts (a draft was never sent)
 
 **Wipe**:

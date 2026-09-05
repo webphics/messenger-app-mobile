@@ -3,6 +3,7 @@ import {
   conversationActivityAt,
   mergeMessages,
   sortConversations,
+  type UnsentMessage,
 } from '@/lib/conversation-state'
 import type { Conversation, Message } from '@/lib/types'
 
@@ -27,7 +28,7 @@ import type { Conversation, Message } from '@/lib/types'
  * rather than migrating it, so a change here costs one cold start's worth of
  * Stale data and never a migration that can go wrong.
  */
-export const STORE_SCHEMA_VERSION = 3
+export const STORE_SCHEMA_VERSION = 4
 
 /**
  * How far back a thread has been read, as the Store holds it.
@@ -210,11 +211,11 @@ export function messageOrder(createdAt: string): number {
 /**
  * A thread's confirmed Messages as rows.
  *
- * Confirmed only. What is still on its way to the API — the Outbox — is
- * deliberately not here: an unsent Message is this device's word about something
- * the server may never have heard, and writing it beside history that the server
- * did confirm would make the two indistinguishable on the way back in. It is its
- * own table and its own ticket.
+ * Confirmed only. What is still on its way to the API is deliberately not here:
+ * an unsent Message is this device's word about something the server may never
+ * have heard, and writing it beside history that the server did confirm would
+ * make the two indistinguishable on the way back in. It has its own table — see
+ * `toOutboxRows`.
  *
  * Owned by a person and keyed by conversation, the way the conversation rows
  * are, and for the same reason: the next person to sign in on this phone reads
@@ -298,4 +299,86 @@ export function fromOrganizationRows(rows: readonly unknown[]): ReadonlyMap<stri
   }
 
   return names
+}
+
+/**
+ * One row of the `outbox` table: a Message typed here that the API has not
+ * confirmed.
+ *
+ * Its own table rather than a flag on `messages`, because the two are different
+ * claims. A `messages` row is the server's word about something it holds; an
+ * outbox row is this device's word about something the server may never have
+ * heard. Written beside each other they would be indistinguishable on the way
+ * back in, and a thread would draw a message nobody else can see as history.
+ *
+ * There is no state column. `UnsentMessage` carries three — uploading, sending,
+ * failed — and only one of them survives a process: a send still in flight when
+ * the app died did not survive the thing that was sending it, and nobody knows
+ * whether it landed. So a row on disk means *failed*, whatever it meant when it
+ * was written, and `fromOutboxRows` says so. That is also why writing one is not
+ * conditional on the state: a message killed mid-send has to come back, and the
+ * only honest thing to come back as is failed.
+ */
+export type OutboxRow = {
+  /** Local; see `LOCAL_ID_PREFIX` in `lib/conversation-state`. */
+  id: string
+  conversation_id: string
+  owner_id: string
+  /** When it was typed, as the column that orders it. See `MessageRow`. */
+  created_at: number
+  /** The Message as this device holds it, serialised. Read back through `parseMessage`. */
+  payload: string
+}
+
+/**
+ * A thread's Unsent Messages as rows.
+ *
+ * Every one of them, whatever its Delivery state — see `OutboxRow`. Owned and
+ * keyed the way the Messages are: the next person to sign in on this phone reads
+ * back nothing rather than somebody else's half-sent message.
+ */
+export function toOutboxRows(
+  ownerId: string,
+  conversationId: string,
+  messages: readonly Message[],
+): OutboxRow[] {
+  return messages.map((message) => ({
+    id: message.id,
+    conversation_id: conversationId,
+    owner_id: ownerId,
+    created_at: messageOrder(message.createdAt),
+    payload: JSON.stringify(message),
+  }))
+}
+
+/**
+ * Rows back into the Unsent Messages of a thread, oldest first.
+ *
+ * Every one comes back *failed*, which is the whole of the state mapping — see
+ * `OutboxRow`. Sorted through `mergeMessages` like a page of history, so the
+ * order a restored Message is drawn in is decided by the same function that
+ * orders the thread it is drawn into.
+ *
+ * An unreadable row is dropped rather than thrown over, the same rule the
+ * Messages follow. What it costs is one message a person will not see again,
+ * which is worse here than it is for history — but a thread that will not open
+ * at all costs them every message in it.
+ */
+export function fromOutboxRows(rows: readonly unknown[]): UnsentMessage[] {
+  const messages: Message[] = []
+
+  for (const row of rows) {
+    const payload = (row as Partial<OutboxRow> | null)?.payload
+    if (typeof payload !== 'string') continue
+
+    try {
+      const message = parseMessage(JSON.parse(payload))
+      if (message) messages.push(message)
+    } catch {
+      // Not JSON at all: a truncated write, or a row from a schema this build
+      // has no idea about. Either way there is nothing here to send again.
+    }
+  }
+
+  return mergeMessages([], messages).map((message) => ({ message, state: 'failed' }))
 }

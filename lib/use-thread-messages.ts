@@ -9,11 +9,14 @@ import {
 } from '@/lib/conversation-api'
 import {
   restoreOlderMessages,
+  restoreOutbox,
   restoreThread,
   saveMessages,
+  saveOutbox,
   saveThreadPaging,
 } from '@/lib/conversation-store'
-import { isDeviceUri, sendMessageType } from '@/lib/attachment-upload'
+import { missingStagedFiles } from '@/lib/staged-file'
+import { isDeviceUri, missingFilesMessage, sendMessageType } from '@/lib/attachment-upload'
 import {
   attachmentKindFromType,
   toAttachmentView,
@@ -32,6 +35,7 @@ import {
   failSend,
   findUnsent,
   isLocalId,
+  refuseSend,
   LOCAL_ID_PREFIX,
   threadContinues,
   threadMessages,
@@ -64,8 +68,15 @@ import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/t
  *
  * Scrolling back reads this device before it reads the API: a page already held
  * comes off the disk, and only history that was never fetched costs a request.
- * What is on the way out — Messages typed here and not yet confirmed — is
- * deliberately not part of any of this; the Outbox is its own ticket.
+ *
+ * ## And on what it failed to send
+ *
+ * A message that did not get away is Restored with the thread, in its place,
+ * marked *failed*, offering to go again. Nothing here sends one: the Outbox is
+ * read on the way in and written on every change, and the only thing that
+ * carries a message to the API is a tap. A support message somebody typed and
+ * abandoned on Tuesday must not leave on Thursday because a phone was unlocked
+ * — that is the whole difference between this and a send queue.
  */
 
 export type ThreadMessages = {
@@ -148,12 +159,17 @@ function restoredThread(
 ): ThreadState {
   if (!ownerId || !conversationId || !viewer) return emptyThread()
 
+  // Read whether or not there is any history to draw it into. A thread whose
+  // first message never got away has nothing else on this device, and it is the
+  // one this feature is most obviously for.
+  const unsent = restoreOutbox(ownerId, conversationId)
   const held = restoreThread(ownerId, conversationId, MESSAGE_PAGE_LIMIT)
-  if (!held) return emptyThread()
+  if (!held) return { ...emptyThread(), unsent }
 
   return {
     ...emptyThread(),
     messages: visibleMessages(viewer.role, viewer.conversationType, held.messages),
+    unsent,
     hasMore: held.paging.hasMore,
     cursor: held.paging.cursor,
   }
@@ -444,6 +460,24 @@ export function useThreadMessages(
 
     let carried = message
     if (message.attachments.some((attachment) => isDeviceUri(attachment.url))) {
+      // Before the upload rather than during it, because of what a Restored
+      // message can be pointing at: the Outbox brings a staged Attachment back
+      // whole, but the picker's copy of the file lives in the system cache and
+      // the system reclaims that. Retrying into a file that has gone would fail
+      // on a read and tell the person only that their message did not send. See
+      // `lib/staged-file`.
+      const missing = missingStagedFiles(message.attachments)
+      if (missing.length > 0) {
+        delivering.current.delete(message.id)
+        // `refuseSend` rather than `failSend`, because this is the one failure
+        // that can happen before the message is in the thread: a first send
+        // reaches here having put nothing on screen yet, and a mark that only
+        // marks would lose the bubble along with what the person wrote.
+        setState((thread) => refuseSend(thread, message))
+        setSendError(missingFilesMessage(missing.map((one) => toAttachmentView(one))))
+        return
+      }
+
       setState((thread) => beginUpload(thread, message))
 
       const uploaded = await uploadFiles(id, message.attachments)
@@ -570,6 +604,32 @@ export function useThreadMessages(
       cursor: state.cursor,
     })
   }, [conversationId, ownerId, state.cursor, state.hasMore])
+
+  /**
+   * And everything it did not manage to send, written through to the Outbox.
+   *
+   * Observed the same way the confirmed Messages are, and for the same reason: a
+   * send that failed, a retry that failed again, an upload that stopped partway
+   * and a message the API finally confirmed all end up in this one piece of
+   * state, so watching it persists all of them.
+   *
+   * Every Unsent Message, not only the failed ones. A message still in flight is
+   * exactly the one worth having on disk — if this process dies with the request
+   * out, nobody knows whether it landed, and the row is what lets it come back
+   * to be sent again rather than disappearing with the process that was carrying
+   * it. It comes back *failed* either way; see `OutboxRow` in `lib/store-rows`.
+   *
+   * Nothing reads this back and sends it. `restoredThread` is the only reader,
+   * and all it does is draw.
+   */
+  useEffect(() => {
+    if (!ownerId || !conversationId) return
+    void saveOutbox(
+      ownerId,
+      conversationId,
+      state.unsent.map((entry) => entry.message),
+    )
+  }, [conversationId, ownerId, state.unsent])
 
   const messages = useMemo(() => threadMessages(state), [state])
   const delivery = useMemo(() => deliveryStates(state.unsent), [state.unsent])

@@ -2,6 +2,7 @@ import {
   fileExtension,
   isDeviceUri,
   MAX_UPLOAD_BYTES,
+  missingFilesMessage,
   rejectUploadReason,
   sendMessageType,
   UNSUPPORTED_TYPE_MESSAGE,
@@ -138,5 +139,48 @@ describe('sendMessageType', () => {
     expect(sendMessageType(['image'])).toBe('media')
     expect(sendMessageType(['document'])).toBe('media')
     expect(sendMessageType(['audio', 'image'])).toBe('media')
+  })
+})
+
+/** Only the name matters to the sentence; the rest is what a picker happens to report. */
+function named(name: string): Pick<AttachmentView, 'name'> {
+  return { name }
+}
+
+describe('missingFilesMessage', () => {
+  it('names the one file that has gone', () => {
+    expect(missingFilesMessage([named('holiday.jpg')])).toBe(
+      '“holiday.jpg” is no longer on this device. Attach it again to send this message.',
+    )
+  })
+
+  it('names every file that has gone', () => {
+    const message = missingFilesMessage([
+      named('one.jpg'),
+      named('two.jpg'),
+    ])
+
+    expect(message).toBe(
+      '“one.jpg”, “two.jpg” are no longer on this device. Attach them again to send this message.',
+    )
+  })
+
+  it('describes a file the picker gave no name to', () => {
+    expect(missingFilesMessage([named('')])).toBe(
+      'The file on this message is no longer on this device. Attach it again to send this message.',
+    )
+  })
+
+  /**
+   * A list missing one of its subjects reads as a complete list, and somebody
+   * acting on it would replace the wrong file. So one nameless file makes the
+   * whole sentence describe rather than name.
+   */
+  it('names none of them when one of them has no name', () => {
+    expect(
+      missingFilesMessage([named('one.jpg'), named('  ')]),
+    ).toBe(
+      'The files on this message are no longer on this device. Attach them again to send this message.',
+    )
   })
 })

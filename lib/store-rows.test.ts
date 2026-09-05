@@ -2,12 +2,15 @@ import {
   fromConversationRows,
   fromMessageRows,
   fromOrganizationRows,
+  fromOutboxRows,
   messageOrder,
   toConversationRows,
   toMessageRows,
   toOrganizationRows,
+  toOutboxRows,
   type ConversationRow,
   type MessageRow,
+  type OutboxRow,
   type ThreadPaging,
 } from '@/lib/store-rows'
 import { isStaffConversation, isStaffMessage } from '@/lib/types'
@@ -489,5 +492,157 @@ describe('the paging a thread is written with', () => {
     const restored = fromConversationRows(toConversationRows('viewer-1', [customerConversation()]))
 
     expect(restored.paging.get('conv-1')).toEqual({ hasMore: true, cursor: undefined })
+  })
+})
+
+/** An Outbox row as SQLite would hand it back, with what a test is not about filled in. */
+function outboxRow(overrides: Record<string, unknown> = {}): unknown {
+  return {
+    id: 'local-1',
+    conversation_id: 'conv-1',
+    owner_id: 'viewer-1',
+    created_at: Date.parse('2026-08-13T08:00:00.000Z'),
+    payload: JSON.stringify(customerMessage('local-1', '2026-08-13T08:00:00.000Z')),
+    ...overrides,
+  }
+}
+
+describe('toOutboxRows', () => {
+  it('writes one row per Unsent Message, under the viewer and the thread it belongs to', () => {
+    const rows = toOutboxRows('viewer-1', 'conv-1', [
+      customerMessage('local-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('local-2', '2026-08-13T08:01:00.000Z'),
+    ])
+
+    expect(rows.map((row) => [row.id, row.conversation_id, row.owner_id])).toEqual([
+      ['local-1', 'conv-1', 'viewer-1'],
+      ['local-2', 'conv-1', 'viewer-1'],
+    ])
+  })
+
+  it('carries the timestamp as the column that orders it', () => {
+    const [row] = toOutboxRows('viewer-1', 'conv-1', [
+      customerMessage('local-1', '2026-08-13T08:00:00.000Z'),
+    ])
+
+    expect(row.created_at).toBe(Date.parse('2026-08-13T08:00:00.000Z'))
+  })
+
+  it('writes no rows for a thread with nothing on its way out', () => {
+    expect(toOutboxRows('viewer-1', 'conv-1', [])).toEqual([])
+  })
+})
+
+describe('fromOutboxRows', () => {
+  it('reads nothing back out of nothing', () => {
+    expect(fromOutboxRows([])).toEqual([])
+  })
+
+  it('gives back the Messages that were written', () => {
+    const written = [
+      customerMessage('local-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('local-2', '2026-08-13T08:01:00.000Z'),
+    ]
+
+    expect(fromOutboxRows(toOutboxRows('viewer-1', 'conv-1', written))).toEqual([
+      { message: written[0], state: 'failed' },
+      { message: written[1], state: 'failed' },
+    ])
+  })
+
+  /**
+   * The whole of the state mapping. A send still in flight when the process died
+   * did not survive the thing that was sending it, and nobody knows whether it
+   * landed — so a row means *failed* whatever it meant when it was written.
+   */
+  it('reads every row back as failed, because a row carries no state to read', () => {
+    const rows = toOutboxRows('viewer-1', 'conv-1', [
+      customerMessage('local-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('local-2', '2026-08-13T08:01:00.000Z'),
+    ])
+
+    expect(fromOutboxRows(rows).map((entry) => entry.state)).toEqual(['failed', 'failed'])
+  })
+
+  it('keeps a staff Message a staff Message', () => {
+    const written = staffMessage('local-1', '2026-08-13T08:00:00.000Z')
+
+    const [restored] = fromOutboxRows(toOutboxRows('viewer-1', 'conv-1', [written]))
+
+    expect(isStaffMessage(restored.message)).toBe(true)
+    expect(restored.message).toEqual(written)
+  })
+
+  /**
+   * A staged Attachment restores with the message that carries it, device URI
+   * and all: what the retry has to send is the same file the person picked, and
+   * an attachment dropped on the way to disk would retry into a message that has
+   * quietly lost its photo. Whether the URI still resolves is a question for the
+   * retry — see `missingStagedFiles` in `lib/staged-file`.
+   */
+  it('keeps a staged Attachment, device URI and all', () => {
+    const written = customerMessage('local-1', '2026-08-13T08:00:00.000Z', {
+      body: '',
+      messageType: 'media',
+      attachments: [
+        {
+          type: 'image/jpeg',
+          url: 'file:///var/mobile/Containers/Data/tmp/photo.jpg',
+          fileName: 'photo.jpg',
+          size: 2048,
+          durationSeconds: null,
+          waveform: null,
+        },
+      ],
+    })
+
+    expect(fromOutboxRows(toOutboxRows('viewer-1', 'conv-1', [written]))).toEqual([
+      { message: written, state: 'failed' },
+    ])
+  })
+
+  it('keeps the reply a Message was answering', () => {
+    const written = customerMessage('local-1', '2026-08-13T08:00:00.000Z', {
+      replyTo: { id: 'msg-0', preview: 'Where is it?' },
+    })
+
+    expect(fromOutboxRows(toOutboxRows('viewer-1', 'conv-1', [written]))[0].message).toEqual(
+      written,
+    )
+  })
+
+  it('reads a thread back oldest first, whatever order the rows came out in', () => {
+    const rows = toOutboxRows('viewer-1', 'conv-1', [
+      customerMessage('local-3', '2026-08-13T08:02:00.000Z'),
+      customerMessage('local-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('local-2', '2026-08-13T08:01:00.000Z'),
+    ])
+
+    expect(fromOutboxRows(rows).map((entry) => entry.message.id)).toEqual([
+      'local-1',
+      'local-2',
+      'local-3',
+    ])
+  })
+
+  it('drops a row it cannot read rather than the thread it is in', () => {
+    const rows = [
+      outboxRow({ id: 'local-1' }),
+      outboxRow({ id: 'local-2', payload: '{"id":' }),
+      outboxRow({
+        id: 'local-3',
+        payload: JSON.stringify(customerMessage('local-3', '2026-08-13T08:02:00.000Z')),
+      }),
+    ]
+
+    expect(fromOutboxRows(rows).map((entry) => entry.message.id)).toEqual(['local-1', 'local-3'])
+  })
+
+  it('drops a row whose payload is not a Message', () => {
+    expect(fromOutboxRows([outboxRow({ payload: JSON.stringify({ id: 'local-1' }) })])).toEqual([])
+  })
+
+  it('drops a row with no payload at all', () => {
+    expect(fromOutboxRows([{ id: 'local-1' } as Partial<OutboxRow>, null])).toEqual([])
   })
 })
