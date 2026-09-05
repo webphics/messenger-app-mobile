@@ -112,6 +112,14 @@ The iOS IPA will not install via TestFlight or the App Store. Sideload it with A
 
 `pnpm build:apk` still builds an APK locally on Windows (needs JDK 17 + Android SDK) and is the escape hatch when the EAS quota runs out.
 
+### Native configuration
+
+`app.json` and `plugins/` are the native project; `android/` and `ios/` are generated from them and
+gitignored. A change to either only reaches a phone through a build — `pnpm build:apk --prebuild`, or
+a fresh development client — so nothing in `plugins/` takes effect on a running Metro. That includes
+the backup rules keeping the Store out of a device backup (ADR-0011): the exclusion is real in the
+build, not in the bundle.
+
 ### Costs
 
 Android costs ~1 GitHub minute per run plus one of the **15 free EAS Android builds/month** — no overage charges, the quota just resets on the 1st. iOS is the expensive one: `macos-latest` bills at **10×** on a private repo. A run measures ~13 minutes, so ~130 billable minutes — roughly 15 iOS builds against the 2,000 free monthly minutes.

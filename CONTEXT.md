@@ -388,10 +388,11 @@ Restore again, so a socket event landing in the moment between the credential go
 being told cannot write the list back. A Wipe cannot fail a Session end — a database the platform
 will not delete is not something the person being signed out can do anything about, so signing out
 completes regardless, as it already does when telling the server fails. Not Eviction, which is about
-size and keeps the database: a Wipe is about entitlement and leaves none of it. Android backup is
-disabled so the file cannot be lifted off the device by a backup tool; it is deliberately not
-encrypted, because `expo-sqlite` has none built in and the threat model that would need it already
-defeats the Session cookie in the keychain.
+size and keeps the database: a Wipe is about entitlement and leaves none of it. The database is
+excluded from both platforms' device backups so it cannot be lifted off the phone by a backup tool,
+while the rest of the app is still backed up; it is deliberately not encrypted, because
+`expo-sqlite` has none built in and the threat model that would need it already defeats the Session
+cookie in the keychain. See ADR-0011.
 _Avoid_: Clear, purge, reset, log out the store, invalidate
 
 **Eviction**:

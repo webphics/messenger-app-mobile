@@ -16,7 +16,6 @@
       "supportsTablet": true
     },
     "android": {
-      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#FFA034",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
@@ -81,6 +80,7 @@
           "recordAudioAndroid": true
         }
       ],
+      "./plugins/with-store-excluded-from-backup",
       "expo-secure-store",
       "expo-sqlite"
     ],
