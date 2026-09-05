@@ -1,4 +1,4 @@
-import { isOutgoing, isSystemMessage, messageSenderName } from '@/lib/conversation-state'
+import { isOutgoing, isSystemMessage, messageSenderName } from '@/lib/thread-state'
 import { formatDayLabel, shouldShowDayDivider } from '@/lib/message-day'
 import type { Message } from '@/lib/types'
 

@@ -41,7 +41,7 @@ import {
   type OpenMenuPayload,
 } from '@/lib/overlay-frame'
 import { colors } from '@/lib/tokens'
-import type { DeliveryState } from '@/lib/conversation-state'
+import type { DeliveryState } from '@/lib/thread-state'
 import type {
   AttachmentKind,
   AttachmentView,

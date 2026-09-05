@@ -279,7 +279,7 @@ function replyTo(value: unknown): MessageReplyTo | null {
  * An unrecognised messageType reads as text, the only fallback that still shows
  * the person what was written. It is not how the system-message rule is
  * enforced: the API withholds those before they are sent, and
- * `lib/conversation-state` filters on the type it did recognise.
+ * `lib/thread-state` filters on the type it did recognise.
  */
 export function parseMessage(value: unknown): Message | null {
   const record = asRecord(value)

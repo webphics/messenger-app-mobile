@@ -26,7 +26,7 @@ import {
   withIncomingMessage,
   withoutConversation,
   withReassignment,
-} from '@/lib/conversation-state'
+} from '@/lib/conversation-list'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { createCountedMessages } from '@/lib/realtime-events'
 import { createLaunchDeadline, type LaunchDeadline } from '@/lib/launch-deadline'
@@ -422,7 +422,7 @@ function useConversationInboxState(): ConversationInboxView {
   /**
    * What the socket says, on the list.
    *
-   * Every case is one call into `lib/conversation-state`, where what it means is
+   * Every case is one call into `lib/conversation-list`, where what it means is
    * decided and tested. A message moves the row and its count; a row the API
    * re-sends replaces the one held, count included, since the API answers
    * `unreadCount: null` everywhere but the list endpoint; a deleted conversation

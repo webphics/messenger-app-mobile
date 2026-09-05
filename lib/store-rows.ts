@@ -1,10 +1,6 @@
 import { parseConversation, parseMessage } from '@/lib/conversation-parse'
-import {
-  conversationActivityAt,
-  mergeMessages,
-  sortConversations,
-  type UnsentMessage,
-} from '@/lib/conversation-state'
+import { mergeMessages, type UnsentMessage } from '@/lib/thread-state'
+import { conversationActivityAt, sortConversations } from '@/lib/conversation-list'
 import type { Conversation, Message } from '@/lib/types'
 
 /**
@@ -320,7 +316,7 @@ export function fromOrganizationRows(rows: readonly unknown[]): ReadonlyMap<stri
  * only honest thing to come back as is failed.
  */
 export type OutboxRow = {
-  /** Local; see `LOCAL_ID_PREFIX` in `lib/conversation-state`. */
+  /** Local; see `LOCAL_ID_PREFIX` in `lib/thread-state`. */
   id: string
   conversation_id: string
   owner_id: string
@@ -359,7 +355,7 @@ export function toOutboxRows(
  * of the rest of it. The mark is what lets the thread tell these apart from a
  * send that failed while somebody watched, and so resolve one the API turns out
  * to hold rather than draw it beside its own confirmed copy; see
- * `UnsentMessage` in `lib/conversation-state`.
+ * `UnsentMessage` in `lib/thread-state`.
  *
  * Sorted through `mergeMessages` like a page of history, so the order a restored
  * Message is drawn in is decided by the same function that orders the thread it

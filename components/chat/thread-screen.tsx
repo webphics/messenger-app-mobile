@@ -28,7 +28,7 @@ import {
   messageSenderName,
   type DeliveryState,
   type SendDraft,
-} from '@/lib/conversation-state'
+} from '@/lib/thread-state'
 import { useKeyboardInset } from '@/lib/keyboard-inset'
 import {
   isImageOrVideo,

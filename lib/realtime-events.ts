@@ -4,7 +4,7 @@ import {
   parseMessage,
   parseStaffDirectoryUser,
 } from '@/lib/conversation-parse'
-import type { Reassignment, ReassignmentReason } from '@/lib/conversation-state'
+import type { Reassignment, ReassignmentReason } from '@/lib/conversation-list'
 import type { Conversation, Message } from '@/lib/types'
 
 /**

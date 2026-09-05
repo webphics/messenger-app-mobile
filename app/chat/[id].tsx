@@ -16,7 +16,8 @@ import { Text } from "@/components/ui/text";
 import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
-import { findOffersConversation, isOutgoing } from "@/lib/conversation-state";
+import { findOffersConversation } from "@/lib/conversation-list";
+import { isOutgoing } from "@/lib/thread-state";
 import { messagesHref, ROLE_HREF } from "@/lib/hub-routes";
 import { canViewConversation } from "@/lib/rbac";
 import {

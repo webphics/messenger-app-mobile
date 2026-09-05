@@ -3,7 +3,7 @@ import {
   type ThreadState,
   type ThreadViewer,
   type UnsentMessage,
-} from '@/lib/conversation-state'
+} from '@/lib/thread-state'
 import { messageOrder, STORE_SCHEMA_VERSION } from '@/lib/store-rows'
 import type { Conversation, CustomerMessage, Message } from '@/lib/types'
 
@@ -861,7 +861,7 @@ const VIEWER: ThreadViewer = { id: 'viewer-1', role: 'agent', conversationType: 
  * about.
  *
  * The two halves it is not given keep their identity between calls, the way the
- * reducers in `lib/conversation-state` leave them: a test about the Outbox must
+ * reducers in `lib/thread-state` leave them: a test about the Outbox must
  * not also be writing Messages, and a state that did not move is exactly how
  * `saveThread` is told so.
  */

@@ -1,4 +1,4 @@
-import { totalUnread } from "@/lib/conversation-state";
+import { totalUnread } from "@/lib/conversation-list";
 import { listUnassignedConversations } from "@/lib/inbox-filter";
 import type { Conversation } from "@/lib/types";
 

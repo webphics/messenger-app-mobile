@@ -554,7 +554,7 @@ describe('fromOutboxRows', () => {
    * The mark that tells a Restored entry from a send that failed while somebody
    * watched. Nothing on screen shows it — both say *Not sent* — and what reads
    * it is the rule that resolves one the API turns out to hold; see
-   * `UnsentMessage` in `lib/conversation-state`.
+   * `UnsentMessage` in `lib/thread-state`.
    */
   it('marks every row Restored, because a row is all this device has been told', () => {
     const rows = toOutboxRows('viewer-1', 'conv-1', [

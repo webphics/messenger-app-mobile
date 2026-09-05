@@ -10,7 +10,7 @@ import { Text } from "@/components/ui/text";
 import {
   isConversationUnread,
   isOffersConversation,
-} from "@/lib/conversation-state";
+} from "@/lib/conversation-list";
 import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
 import { formatRelativeTime, initials } from "@/lib/display";
 import { listItemEnter, popEnter } from "@/lib/motion-enter";

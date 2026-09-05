@@ -11,7 +11,7 @@ import {
 import { getSessionCookie } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
 import { connectRealtime } from '@/lib/realtime'
-import type { Reassignment } from '@/lib/conversation-state'
+import type { Reassignment } from '@/lib/conversation-list'
 import {
   parseConversationDeleted,
   parseConversationReassigned,

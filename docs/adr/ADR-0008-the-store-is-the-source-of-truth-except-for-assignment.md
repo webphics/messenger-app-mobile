@@ -6,7 +6,8 @@ to SQLite and read back at the next cold start. Nothing renders from a request's
 
 The Store is held in memory and persisted, rather than being SQLite itself. The reducers this needs
 already exist and are already tested: `mergeConversation`, `withIncomingMessage`, `applyMessagePage`
-and the rest of `lib/conversation-state.ts` are pure functions with table tests beside them.
+and the rest of `lib/thread-state.ts` and `lib/conversation-list.ts` — one module when this was
+written — are pure functions with table tests beside them.
 Expressing that logic as SQL instead would discard all of it and replace it with queries this repo's
 standards forbid us from integration-testing — there are no component or integration tests here, only
 pure-function unit tests and manual verification on a device. So SQLite gets the job it is good at

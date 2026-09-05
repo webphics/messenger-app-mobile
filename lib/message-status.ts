@@ -7,7 +7,7 @@ import type { ReceiptStatus } from '@/lib/types'
  * acknowledged is at least `sent`, and a message this device is still holding
  * has no receipt at all — it says so as a `DeliveryState` instead, which is
  * what a bubble shows in place of a receipt the server has not issued. See
- * `lib/conversation-state`.
+ * `lib/thread-state`.
  */
 export function messageStatusLabel(status: ReceiptStatus): string {
   switch (status) {

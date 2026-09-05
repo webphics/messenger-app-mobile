@@ -347,7 +347,8 @@ _Avoid_: Voice message, audio message, audio clip, mic message, voicemail
 **Store**:
 The one in-memory copy of everything the screens read — the Conversation list, the Messages of the
 threads that have been opened, the Outbox — kept on disk so a cold start has something to draw before
-the API answers. Reducers are the pure functions in `lib/conversation-state.ts`, unchanged: what is
+the API answers. Reducers are the pure functions in `lib/thread-state.ts` and `lib/conversation-list.ts`,
+unchanged: what is
 new is that every state they produce is written through to SQLite, and that a boot reads one back.
 Screens read the Store and never the network, and a socket event, a fetched page and a typed message
 all reach them the same way — through it. See

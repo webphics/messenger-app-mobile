@@ -245,7 +245,7 @@ export async function sendMessage(
  * The answer is the conversation, but it arrives with `unreadCount: null` like
  * every row from outside the list endpoint, so there is nothing in it worth
  * merging: what a caller wants from this is the effect, and `ok` is how it
- * learns the effect happened. `lib/conversation-state`'s `withConversationRead`
+ * learns the effect happened. `lib/conversation-list`'s `withConversationRead`
  * is what says so on screen, ahead of this and independently of it.
  */
 export async function markConversationRead(id: string): Promise<ApiResult<Conversation>> {

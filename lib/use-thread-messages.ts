@@ -39,7 +39,7 @@ import {
   type SendDraft,
   type ThreadState,
   type ThreadViewer,
-} from '@/lib/conversation-state'
+} from '@/lib/thread-state'
 import { toggleReaction } from '@/lib/message-react'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
@@ -47,7 +47,7 @@ import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/t
 /**
  * One thread: its history a page at a time, and the messages typed into it.
  *
- * The decisions this makes are all in `lib/conversation-state`, which is where
+ * The decisions this makes are all in `lib/thread-state`, which is where
  * they are tested: what a page does to the thread already held, how far back the
  * next one asks from, when there is nothing further back to ask for, and what
  * becomes of a message between the tap on send and the API's answer. What that

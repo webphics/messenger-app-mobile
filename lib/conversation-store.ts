@@ -27,7 +27,7 @@ import {
   type ThreadState,
   type ThreadViewer,
   type UnsentMessage,
-} from '@/lib/conversation-state'
+} from '@/lib/thread-state'
 import type { Conversation, Message } from '@/lib/types'
 
 /**
@@ -275,7 +275,7 @@ const queuedThreads = new Map<string, PendingThread>()
  * The Map key for one thread: an owner and a conversation, joined.
  *
  * Both halves are ids — a UUID from the API, or a `local-` id from
- * `lib/conversation-state` — and neither can contain a `|`, so the join is
+ * `lib/thread-state` — and neither can contain a `|`, so the join is
  * unambiguous. In memory only: no key here is ever written to disk.
  */
 function threadKey(ownerId: string, conversationId: string): string {
@@ -758,7 +758,7 @@ export function saveStore(ownerId: string, snapshot: StoreSnapshot): Promise<voi
  *
  * Nothing that did not change is written. Each half is compared by identity
  * against the state handed over last time, which is what the reducers in
- * `lib/conversation-state` leave behind: a thread whose Messages changed queues
+ * `lib/thread-state` leave behind: a thread whose Messages changed queues
  * no Outbox write, and a thread that only failed a send queues no Messages. The
  * frontier has a guard of its own — see `queueThreadPaging`.
  *
@@ -928,7 +928,7 @@ async function drain(): Promise<void> {
  * One thread's state change, one transaction.
  *
  * Only the Messages that are not already the rows on disk are written — by
- * object identity, which is what the merge in `lib/conversation-state` leaves
+ * object identity, which is what the merge in `lib/thread-state` leaves
  * behind. See `writtenMessages`. A replace forgets all of that first, because
  * the rows it is about to remove are exactly the ones that belief is about.
  */
