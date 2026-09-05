@@ -36,6 +36,7 @@ import type {
   Reassignment,
   ReassignmentReason,
   ThreadState,
+  UnsentMessage,
 } from '@/lib/conversation-state'
 import type {
   Conversation,
@@ -175,7 +176,7 @@ describe('mergeMessages', () => {
 })
 
 describe('applyMessagePage', () => {
-  const viewer = { role: 'customer', conversationType: 'support_dm' } as const
+  const viewer = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
 
   test('the first page fills an empty thread and points the cursor at its oldest message', () => {
     const page = [
@@ -254,6 +255,7 @@ describe('applyMessagePage', () => {
   test('an Agent keeps the system notice a Customer would not see', () => {
     const page = [customerMessage('a', '2026-08-13T08:00:00.000Z', { messageType: 'system' })]
     const state = applyMessagePage(emptyThread(), page, {
+      id: 'agent-1',
       role: 'agent',
       conversationType: 'support_dm',
     })
@@ -587,7 +589,7 @@ describe('beginSend', () => {
     const held = applyMessagePage(
       emptyThread(),
       [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
-      { role: 'customer', conversationType: 'support_dm' },
+      { id: 'customer-1', role: 'customer', conversationType: 'support_dm' },
     )
     const state = beginSend(held, draft('local-1', '2026-08-13T08:01:00.000Z'))
 
@@ -620,7 +622,7 @@ describe('applySentMessage', () => {
     const held = applyMessagePage(
       emptyThread(),
       [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
-      { role: 'customer', conversationType: 'support_dm' },
+      { id: 'customer-1', role: 'customer', conversationType: 'support_dm' },
     )
     const state = applySentMessage(beginSend(held, echo), 'local-1', stored)
 
@@ -628,7 +630,7 @@ describe('applySentMessage', () => {
   })
 
   test('a refresh that already brought the stored message does not show it twice', () => {
-    const viewer = { role: 'customer', conversationType: 'support_dm' } as const
+    const viewer = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
     const raced = applyMessagePage(beginSend(emptyThread(), echo), [stored], viewer)
     const state = applySentMessage(raced, 'local-1', stored)
 
@@ -789,7 +791,7 @@ describe('threadMessages', () => {
         customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
         customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
       ],
-      { role: 'customer', conversationType: 'support_dm' },
+      { id: 'customer-1', role: 'customer', conversationType: 'support_dm' },
     )
     const state = beginSend(
       held,
@@ -803,7 +805,7 @@ describe('threadMessages', () => {
     const held = applyMessagePage(
       emptyThread(),
       [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
-      { role: 'customer', conversationType: 'support_dm' },
+      { id: 'customer-1', role: 'customer', conversationType: 'support_dm' },
     )
 
     expect(threadMessages(held)).toEqual(held.messages)
@@ -823,6 +825,7 @@ describe('withoutPages', () => {
     const echo = draftMessage({ id: 'local-1', body: 'Hi', author, sentAt: 'x' })
     const held = beginSend(
       applyMessagePage(emptyThread(), [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')], {
+        id: 'customer-1',
         role: 'customer',
         conversationType: 'support_dm',
       }),
@@ -1577,6 +1580,301 @@ describe('applyIncomingMessage and the echo of a message sent from here', () => 
   })
 })
 
+/**
+ * The other half of the echo rule: a Message that did not get away, Restored
+ * from the Outbox into a session that has told this person nothing about it, and
+ * a fetch that turns out to be carrying the copy the API kept all along.
+ *
+ * What separates it from a send that failed while somebody watched is a property
+ * of the entry — `restored` — rather than a reading of the bubble, which is why
+ * the two tables below can be tables at all.
+ */
+describe('a Restored Outbox entry the API turns out to hold', () => {
+  const viewer = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
+  const author = { id: 'customer-1', name: 'QA', role: 'customer' as const }
+
+  function typed(id: string, body: string, sentAt: string): Message {
+    return draftMessage({ id, body, author, sentAt })
+  }
+
+  /** A thread as it comes back off the disk: history, and what never got away. */
+  function restoredThread(unsent: UnsentMessage[], messages: Message[] = []): ThreadState {
+    return { ...emptyThread(), messages, unsent }
+  }
+
+  function restoredEntry(body: string, sentAt = '2026-08-13T08:00:00.000Z'): UnsentMessage {
+    return { message: typed('local-1', body, sentAt), state: 'failed', restored: true }
+  }
+
+  /** The API's copy of it, under the id the server gave it. */
+  function confirmed(body: string, createdAt: string): CustomerMessage {
+    return customerMessage('server-1', createdAt, { body, fromCompany: false })
+  }
+
+  test('is resolved by the page carrying it, so the thread draws it once', () => {
+    const next = applyNewestPage(
+      restoredThread([restoredEntry('Any update?')]),
+      [confirmed('Any update?', '2026-08-13T08:00:01.000Z')],
+      viewer,
+    )
+
+    expect(next.unsent).toEqual([])
+    expect(threadMessages(next).map((message) => message.id)).toEqual(['server-1'])
+  })
+
+  test('is resolved by the socket arrival too, whichever gets here first', () => {
+    const next = applyIncomingMessage(
+      restoredThread([restoredEntry('Any update?')]),
+      confirmed('Any update?', '2026-08-13T08:00:01.000Z'),
+      viewer,
+    )
+
+    expect(next.unsent).toEqual([])
+  })
+
+  /**
+   * The rule `withoutEcho` already documented, unweakened. A send that failed in
+   * front of the person is a bubble they were told about, and taking it away on
+   * the strength of a match would leave them nothing to retry. One still
+   * uploading has no copy on the server for anything to be an echo of, and one
+   * still in flight has an answer of its own coming.
+   */
+  test.each([
+    ['a send still in flight', 'sending' as const],
+    ['a send still uploading', 'uploading' as const],
+    ['a send that failed in this session', 'failed' as const],
+  ])('leaves %s where the person can see it', (_name, delivery) => {
+    const held = restoredThread([
+      { message: typed('local-1', 'Any update?', '2026-08-13T08:00:00.000Z'), state: delivery },
+    ])
+
+    const next = applyNewestPage(
+      held,
+      [confirmed('Any update?', '2026-08-13T08:00:01.000Z')],
+      viewer,
+    )
+
+    expect(next.unsent.map((one) => one.message.id)).toEqual(['local-1'])
+  })
+
+  /**
+   * A Restored entry somebody has tapped *Retry* on is an ordinary send of this
+   * session from that moment: they watched it go, and they were told when it did
+   * not arrive.
+   */
+  test('a Restored entry retried and failed again keeps its place', () => {
+    const entry = restoredEntry('Any update?')
+    const retried = failSend(beginSend(restoredThread([entry]), entry.message), 'local-1')
+
+    expect(retried.unsent[0].restored).toBeUndefined()
+    expect(
+      applyNewestPage(retried, [confirmed('Any update?', '2026-08-13T08:00:01.000Z')], viewer)
+        .unsent,
+    ).toHaveLength(1)
+  })
+
+  /** Everything the socket path already refuses to match on, refused here too. */
+  test.each([
+    [
+      'a message from somebody else',
+      customerMessage('server-1', '2026-08-13T08:00:01.000Z', {
+        body: 'Any update?',
+        fromCompany: true,
+      }),
+    ],
+    [
+      'a message that says something else',
+      customerMessage('server-1', '2026-08-13T08:00:01.000Z', {
+        body: 'Something else',
+        fromCompany: false,
+      }),
+    ],
+    [
+      'a system notice, which nobody typed',
+      customerMessage('server-1', '2026-08-13T08:00:01.000Z', {
+        body: 'Any update?',
+        fromCompany: false,
+        messageType: 'system',
+      }),
+    ],
+  ])('is not resolved by %s', (_name, message) => {
+    const next = applyNewestPage(restoredThread([restoredEntry('Any update?')]), [message], viewer)
+
+    expect(next.unsent).toHaveLength(1)
+  })
+
+  /**
+   * The one thing a page could otherwise be wrong about: history that reads the
+   * same, which is somebody saying *Thanks* twice a fortnight apart. The copy of
+   * an Outbox entry is a Message this device has never held — that is why the
+   * entry is still there — so a Message it is holding already is not it.
+   */
+  test('is not resolved by history this device is already holding', () => {
+    const fortnightAgo = customerMessage('server-9', '2026-07-30T09:00:00.000Z', {
+      body: 'Thanks',
+      fromCompany: false,
+    })
+    const held = restoredThread([restoredEntry('Thanks')], [fortnightAgo])
+
+    const next = applyMessagePage(held, [fortnightAgo], viewer)
+
+    expect(next.unsent).toHaveLength(1)
+  })
+
+  test('is resolved by a copy this device has never held', () => {
+    const held = restoredThread(
+      [restoredEntry('Thanks')],
+      [customerMessage('server-9', '2026-08-13T07:59:00.000Z', { fromCompany: false })],
+    )
+
+    const next = applyNewestPage(
+      held,
+      [
+        customerMessage('server-9', '2026-08-13T07:59:00.000Z', { fromCompany: false }),
+        confirmed('Thanks', '2026-08-13T08:00:01.000Z'),
+      ],
+      viewer,
+    )
+
+    expect(next.unsent).toEqual([])
+  })
+
+  /**
+   * The copy the API kept can be older than Messages this device went on to
+   * receive before the process died — the send is what stopped, not the socket.
+   * A rule that compared times would refuse this one for good.
+   */
+  test('is resolved by a copy older than the newest Message the thread holds', () => {
+    const held = restoredThread(
+      [restoredEntry('Thanks', '2026-08-13T08:00:00.000Z')],
+      [customerMessage('server-9', '2026-08-13T08:05:00.000Z', { fromCompany: true })],
+    )
+
+    const next = applyMessagePage(
+      held,
+      [confirmed('Thanks', '2026-08-13T08:00:01.000Z')],
+      viewer,
+    )
+
+    expect(next.unsent).toEqual([])
+  })
+
+  /**
+   * Both copies are new to this device, so both are candidates. The Message that
+   * did not get away was the last one this person wrote, so the later of the two
+   * is the one it is likelier to be — and the earlier stays on screen as the
+   * history it is.
+   */
+  test('takes the later of two copies that read the same', () => {
+    const earlier = customerMessage('server-8', '2026-08-12T09:00:00.000Z', {
+      body: 'Thanks',
+      fromCompany: false,
+    })
+    const next = applyNewestPage(
+      restoredThread([restoredEntry('Thanks')]),
+      [earlier, confirmed('Thanks', '2026-08-13T08:00:01.000Z')],
+      viewer,
+    )
+
+    expect(next.unsent).toEqual([])
+    expect(next.messages.map((message) => message.id)).toEqual(['server-8', 'server-1'])
+  })
+
+  /**
+   * A page is read for this after the visibility rule has run, not before. An
+   * entry resolved by a Message the viewer may not see would be a bubble taken
+   * away with nothing drawn in its place.
+   */
+  test('is not resolved by a copy this viewer is not shown', () => {
+    const notice = customerMessage('server-1', '2026-08-13T08:00:01.000Z', {
+      body: 'Any update?',
+      fromCompany: false,
+      messageType: 'system',
+    })
+
+    const next = applyNewestPage(restoredThread([restoredEntry('Any update?')]), [notice], viewer)
+
+    expect(next.unsent).toHaveLength(1)
+    expect(next.messages).toEqual([])
+  })
+
+  test('one arriving copy resolves one entry, not both that say the same', () => {
+    const both = restoredThread([
+      restoredEntry('Thanks', '2026-08-13T08:00:00.000Z'),
+      {
+        message: typed('local-2', 'Thanks', '2026-08-13T08:00:01.000Z'),
+        state: 'failed',
+        restored: true,
+      },
+    ])
+
+    const next = applyNewestPage(both, [confirmed('Thanks', '2026-08-13T08:00:02.000Z')], viewer)
+
+    expect(next.unsent.map((entry) => entry.message.id)).toEqual(['local-2'])
+  })
+
+  /**
+   * A staged Attachment is a device URI and the API's copy names a stored
+   * object, so the two attachment lists cannot agree and the match fails safe.
+   * The bubble that is kept is one somebody can send again; the one this would
+   * have dropped is gone.
+   */
+  test('is kept when its photo is still the one the picker staged', () => {
+    const staged = {
+      type: 'image/jpeg',
+      url: 'file:///tmp/IMG_0001.jpg',
+      fileName: 'IMG_0001.jpg',
+      size: 2048,
+      durationSeconds: null,
+      waveform: null,
+    }
+    const held = restoredThread([
+      {
+        message: draftMessage({
+          id: 'local-1',
+          body: '',
+          author,
+          sentAt: '2026-08-13T08:00:00.000Z',
+          attachments: [staged],
+        }),
+        state: 'failed',
+        restored: true,
+      },
+    ])
+
+    const next = applyNewestPage(
+      held,
+      [
+        customerMessage('server-1', '2026-08-13T08:00:01.000Z', {
+          body: '',
+          fromCompany: false,
+          messageType: 'media',
+          attachments: [{ ...staged, url: '/uploads/chat/9f1c.jpg' }],
+        }),
+      ],
+      viewer,
+    )
+
+    expect(next.unsent).toHaveLength(1)
+  })
+
+  test('a page that starts the thread over still resolves what it confirms', () => {
+    const held = restoredThread(
+      [restoredEntry('Any update?')],
+      [customerMessage('server-0', '2026-07-01T08:00:00.000Z', { fromCompany: false })],
+    )
+
+    const next = applyNewestPage(
+      held,
+      [confirmed('Any update?', '2026-08-13T08:00:01.000Z')],
+      viewer,
+    )
+
+    expect(next.messages.map((message) => message.id)).toEqual(['server-1'])
+    expect(next.unsent).toEqual([])
+  })
+})
+
 describe('the two waits a send with a file goes through', () => {
   const author = { id: 'customer-1', name: 'QA', role: 'customer' as const }
 
@@ -1698,7 +1996,7 @@ describe('threadContinues', () => {
 })
 
 describe('applyNewestPage', () => {
-  const viewer = { role: 'customer', conversationType: 'support_dm' } as const
+  const viewer = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
 
   function restored(): ThreadState {
     return {

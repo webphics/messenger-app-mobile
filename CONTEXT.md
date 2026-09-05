@@ -384,7 +384,15 @@ flight when the process died did not survive the thing that was sending it, nobo
 landed, and *failed* is the state that offers to go again. A staged Attachment comes back with the
 message carrying it — but the picker's copy of the file lives in the system cache, which the system
 reclaims, so a retry reads the file before it sends and names the one that has gone rather than
-failing on it.
+failing on it. A Restored message the API turns out to have received all along is resolved by the
+copy that comes back rather than drawn beside it — the same words twice, one confirmed and one
+offering to post a third. That is the one thing being Restored changes about an Unsent message: a
+send that failed while somebody watched keeps its place, because they were told and the bubble is
+what they were told with, and a Restored one has told this session nothing. The match is only ever
+made against the person's own messages, and on a fetched page only against ones this device has
+never held — the copy of an Unsent message is one of those by construction, and history that reads
+the same is not — because a bubble kept is a message somebody can send again and a bubble dropped
+is a message that is gone.
 _Avoid_: Queue (nothing drains it), retry queue, pending messages, drafts (a draft was never sent)
 
 **Wipe**:

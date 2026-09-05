@@ -47,6 +47,29 @@ export type UnsentMessage = {
   /** Carries a local id. The one the API assigns replaces it rather than joining it. */
   message: Message
   state: DeliveryState
+  /**
+   * Read back from the Outbox, rather than failed in front of the person reading
+   * it.
+   *
+   * The two look identical on screen — both say *Not sent*, both offer to go
+   * again — and they are not the same claim. A send that failed in this session
+   * failed while somebody watched: they were told, and the bubble is the record
+   * of it. A Restored one comes back *failed* because a send in flight when the
+   * process died did not survive the thing that was sending it, and nobody knows
+   * whether it landed. This session has told them nothing about it.
+   *
+   * That is the difference `withoutEcho` needed and could not read. A Restored
+   * entry the API turns out to hold is resolved by the copy that arrives; a
+   * session failure keeps its place and its offer to go again. It is a property
+   * of the entry rather than a reading of one, so the rule is one a table can be
+   * written for.
+   *
+   * Set on the way out of `fromOutboxRows` and nowhere else, and it lasts only
+   * until somebody acts on the entry: a retry goes through `beginSend`, which
+   * replaces the entry whole, and what comes back is an ordinary send of this
+   * session — watched, and so kept, if it fails again.
+   */
+  restored?: boolean
 }
 
 /** What the composer hands whatever is going to send it. */
@@ -148,7 +171,11 @@ export function visibleMessages(
  * because the same fields travel together into everything that folds a message
  * into a thread, and a page and a socket event must not answer them differently.
  */
-export type ThreadViewer = { role: UserRole; conversationType: ConversationType }
+export type ThreadViewer = {
+  id: string
+  role: UserRole
+  conversationType: ConversationType
+}
 
 function byCreatedAt(a: Message, b: Message): number {
   const difference = Date.parse(a.createdAt) - Date.parse(b.createdAt)
@@ -176,7 +203,7 @@ export function mergeMessages(existing: Message[], incoming: Message[]): Message
 /**
  * One page of history, applied to what is already on screen.
  *
- * Two things here are deliberate and neither is obvious.
+ * Three things here are deliberate and none is obvious.
  *
  * The cursor advances from the *raw* page, not from the messages that survived
  * the visibility filter. Advancing it from the visible ones would stall on a
@@ -189,18 +216,30 @@ export function mergeMessages(existing: Message[], incoming: Message[]): Message
  * that history has run out. The cost of being wrong the other way is one extra
  * request that answers with nothing; the cost of guessing from the length is a
  * thread that silently refuses to scroll further back.
+ *
+ * The third thing is newer: a page can be carrying the copy the API kept of a
+ * Restored Outbox entry, and drawing both would put the same words on screen
+ * twice, one confirmed and one marked *Not sent* beside a *Retry* that would
+ * post a third. So the entry goes when the page confirms it — see
+ * `withoutRestoredEchoes`, which is the only thing here that touches `unsent`
+ * and touches nothing a send of this session put there.
+ *
+ * It is asked about the *visible* page rather than the raw one, which is the one
+ * place the two differ from the cursor's reading of them: an entry resolved by a
+ * Message that is then withheld would be a bubble taken away and nothing drawn
+ * in its place.
  */
 export function applyMessagePage(
   state: ThreadState,
   page: Message[],
   viewer: ThreadViewer,
 ): ThreadState {
+  const visible = visibleMessages(viewer.role, viewer.conversationType, page)
+
   return {
     ...state,
-    messages: mergeMessages(
-      state.messages,
-      visibleMessages(viewer.role, viewer.conversationType, page),
-    ),
+    messages: mergeMessages(state.messages, visible),
+    unsent: withoutRestoredEchoes(state.unsent, state.messages, visible, viewer.id),
     hasMore: page.length > 0,
     cursor: page[0]?.id ?? state.cursor,
   }
@@ -228,6 +267,14 @@ export function applyMessagePage(
  * thread that reads straight from today into last month with a hole in between
  * and no way to ask for it. That is `withoutPages`, which is what every fetch of
  * the newest page did before there was anything to Restore.
+ *
+ * Either way the page may be carrying the copy the API kept of a Restored
+ * Outbox entry, and either way that entry goes rather than sitting beside its
+ * own confirmed self; see `withoutRestoredEchoes`. The two branches ask it the
+ * same question despite one of them having just dropped the Messages it reads:
+ * what it reads them for is which of this page the device had seen before, and
+ * a page that does not continue the thread shares nothing with it by
+ * definition — which is how it got down that branch.
  */
 export function applyNewestPage(
   state: ThreadState,
@@ -238,12 +285,12 @@ export function applyNewestPage(
     return applyMessagePage(withoutPages(state), page, viewer)
   }
 
+  const visible = visibleMessages(viewer.role, viewer.conversationType, page)
+
   return {
     ...state,
-    messages: mergeMessages(
-      state.messages,
-      visibleMessages(viewer.role, viewer.conversationType, page),
-    ),
+    messages: mergeMessages(state.messages, visible),
+    unsent: withoutRestoredEchoes(state.unsent, state.messages, visible, viewer.id),
   }
 }
 
@@ -287,7 +334,7 @@ export function threadContinues(held: readonly Message[], page: readonly Message
 export function applyIncomingMessage(
   state: ThreadState,
   message: Message,
-  viewer: ThreadViewer & { id: string },
+  viewer: ThreadViewer,
 ): ThreadState {
   if (!isMessageVisibleTo(viewer.role, viewer.conversationType, message)) return state
 
@@ -311,14 +358,15 @@ export function applyIncomingMessage(
  * There is no id to match on: a local id is this device's and the arriving one
  * is the server's, and nothing relates them until the request answers. So the
  * match is on what the two copies do share, and which of the two that is depends
- * on what the message is — see `isEchoOf`.
+ * on what the message is — see `isSameMessage`.
  *
- * Only the viewer's own messages are considered, and only a send still in
- * flight. One that has already failed keeps its place and its offer to go again:
- * the person has been told about it, and taking it away on the strength of a
- * match would leave them with nothing to retry. A send that fails *after* an
- * arrival confirmed it finds nothing left to mark, which is right — the socket
- * has shown that it landed.
+ * Only the viewer's own messages are considered, and only an entry with nobody
+ * watching it — a send still in flight, or one Restored from the Outbox into a
+ * session that has said nothing about it. A send that failed in front of the
+ * person keeps its place and its offer to go again: they were told about it, and
+ * taking it away on the strength of a match would leave them with nothing to
+ * retry. A send that fails *after* an arrival confirmed it finds nothing left to
+ * mark, which is right — the socket has shown that it landed.
  */
 function withoutEcho(
   unsent: UnsentMessage[],
@@ -333,7 +381,99 @@ function withoutEcho(
 }
 
 /**
+ * The Restored entries a page turns out to be the confirmation of, dropped.
+ *
+ * The page path's half of `withoutEcho`, and deliberately the smaller half. A
+ * page is many messages rather than one, and matching a send of this session
+ * against all of them would risk taking away a bubble the person is watching on
+ * the strength of an older message that happens to read the same. So this
+ * considers Restored entries only: the ones no request of this session is
+ * coming for, because the one that would have answered them died with the
+ * process that was sending it.
+ *
+ * Two things narrow it further, both because a bubble kept is a message somebody
+ * can send again and a bubble dropped is a message that is gone.
+ *
+ * Only the viewer's own messages, as on the socket path.
+ *
+ * And only Messages this device has never held. The copy of an Outbox entry is
+ * one of those by construction: the entry exists precisely because nothing ever
+ * came back for it, so no page had brought the copy here and no row on disk is
+ * about it. What that rules out is the thing this would otherwise be wrong
+ * about — history that reads the same, which is somebody saying *Thanks* twice
+ * a fortnight apart, and which the device is holding already if it is drawing
+ * it. Deliberately not a comparison of times: the entry's own timestamp is this
+ * phone's clock and the arriving copy's is the server's, and a rule that reads
+ * both stops working on a phone whose clock is wrong.
+ *
+ * Where more than one candidate says the same thing, the newest wins. The
+ * Message that did not get away was the last one this person wrote, so among
+ * copies that read alike it is the latest that is likeliest to be it.
+ *
+ * A page message confirms one entry at most: two Restored copies of the same
+ * words are two messages, and one arriving copy is evidence of one of them.
+ */
+function withoutRestoredEchoes(
+  unsent: UnsentMessage[],
+  held: readonly Message[],
+  page: readonly Message[],
+  viewerId: string,
+): UnsentMessage[] {
+  if (page.length === 0) return unsent
+  if (!unsent.some((entry) => entry.restored === true)) return unsent
+
+  const seen = new Set(held.map((message) => message.id))
+  const candidates = page.filter(
+    (message) => !seen.has(message.id) && isOutgoing(message, viewerId),
+  )
+  if (candidates.length === 0) return unsent
+
+  const taken = new Set<Message>()
+  const confirmed = new Set<UnsentMessage>()
+  for (const entry of unsent) {
+    if (entry.restored !== true) continue
+    const match = newestMatch(candidates, taken, entry)
+    if (!match) continue
+    taken.add(match)
+    confirmed.add(entry)
+  }
+
+  if (confirmed.size === 0) return unsent
+  return unsent.filter((entry) => !confirmed.has(entry))
+}
+
+/** The last unclaimed candidate that reads as this entry's own message. */
+function newestMatch(
+  candidates: readonly Message[],
+  taken: ReadonlySet<Message>,
+  entry: UnsentMessage,
+): Message | undefined {
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const message = candidates[index]
+    if (!taken.has(message) && isSameMessage(entry, message)) return message
+  }
+  return undefined
+}
+
+/**
  * Whether this arriving message is the one that unsent entry became.
+ *
+ * Two questions, and only the second is about the message. The first is about
+ * the entry: whether anything arriving may resolve it at all. A send still in
+ * flight may be — that is what this function was written for. One Restored from
+ * the Outbox may be, because the session has told the person nothing and there
+ * is no other answer coming for it. A send that failed while they watched may
+ * not, and neither may one still uploading, which has no copy on the server for
+ * anything to be an echo of.
+ */
+function isEchoOf(entry: UnsentMessage, message: Message): boolean {
+  if (entry.state !== 'sending' && entry.restored !== true) return false
+  return isSameMessage(entry, message)
+}
+
+/**
+ * Whether these two are the same message: one copy this device is holding, one
+ * the server has handed over.
  *
  * A message carrying attachments is matched on their URLs. That is an exact
  * match rather than a guess: by the time a send is out, the entry holds what the
@@ -351,10 +491,9 @@ function withoutEcho(
  * without them however well the captions agree, because it is a different
  * message — one of them is a photo.
  */
-function isEchoOf(entry: UnsentMessage, message: Message): boolean {
-  // Only a message whose send is actually out. One still uploading has no copy
-  // on the server yet, so nothing arriving can be an echo of it.
-  if (entry.state !== 'sending') return false
+function isSameMessage(entry: UnsentMessage, message: Message): boolean {
+  // Nobody typed a system notice, so no entry is ever the one it confirms.
+  if (isSystemMessage(message)) return false
 
   const held = entry.message.attachments
   const arriving = message.attachments
@@ -453,7 +592,11 @@ export function beginUpload(state: ThreadState, message: Message): ThreadState {
  * The message, marked, replacing any earlier mark it carried.
  *
  * The replacement is what keeps a retry, and the move from uploading to sending,
- * from stacking a second copy of the bubble beneath the first.
+ * from stacking a second copy of the bubble beneath the first. It is also what
+ * ends a Restored entry's Restored-ness: the entry written here is a new one and
+ * carries no `restored`, so a Restored message somebody has tapped *Retry* on is
+ * from that moment an ordinary send of this session — watched, and kept if it
+ * fails.
  */
 function withDelivery(
   state: ThreadState,
