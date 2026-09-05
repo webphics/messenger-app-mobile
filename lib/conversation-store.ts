@@ -9,15 +9,18 @@ import {
   fromConversationRows,
   fromMessageRows,
   fromOrganizationRows,
+  fromOutboxRows,
   messageOrder,
   toConversationRows,
   toMessageRows,
   toOrganizationRows,
+  toOutboxRows,
   NOTHING_RESTORED,
   STORE_SCHEMA_VERSION,
   type RestoredStore,
   type ThreadPaging,
 } from '@/lib/store-rows'
+import type { UnsentMessage } from '@/lib/conversation-state'
 import type { Conversation, Message } from '@/lib/types'
 
 /**
@@ -48,7 +51,7 @@ import type { Conversation, Message } from '@/lib/types'
  * on the render path, and nobody is waiting for them — so they are queued,
  * coalesced to the newest state per person, and run one transaction at a time.
  *
- * ## Two things are written, and they are written by different people
+ * ## Three things are written, and they are written by different people
  *
  * The Conversation list is one unit and is replaced whole. A thread's Messages
  * are per thread and are added to, because a Message that has been confirmed
@@ -58,6 +61,13 @@ import type { Conversation, Message } from '@/lib/types'
  * `conversations` row that carries a thread's paging: written whole by the list
  * and one column at a time by the thread, which is why the paging is also held
  * in memory here. See `frontiers`.
+ *
+ * The Outbox is the third, and it is per thread like the Messages but is neither
+ * of the other two: a row there is this device's word rather than the server's,
+ * and it leaves when the message it stands for is confirmed. Its own queue and
+ * its own transaction, and untouched by every rule the Messages have — a sweep
+ * never names it, and a thread a sweep has taken history from still writes it.
+ * See `saveOutbox`.
  */
 
 const DATABASE_NAME = 'enki-store.db'
@@ -94,6 +104,14 @@ const SCHEMA = `
   );
   CREATE INDEX messages_by_thread
     ON messages (owner_id, conversation_id, created_at DESC, id DESC);
+  CREATE TABLE outbox (
+    id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    PRIMARY KEY (owner_id, conversation_id, id)
+  );
   PRAGMA user_version = ${STORE_SCHEMA_VERSION};
 `
 
@@ -253,6 +271,12 @@ function threadKey(ownerId: string, conversationId: string): string {
   return `${ownerId}|${conversationId}`
 }
 
+/** The two halves back. The delimiter is written and read in one place, here. */
+function fromThreadKey(key: string): { ownerId: string; conversationId: string } {
+  const at = key.indexOf('|')
+  return { ownerId: key.slice(0, at), conversationId: key.slice(at + 1) }
+}
+
 /**
  * The Messages last known to be on disk for a thread, by identity.
  *
@@ -275,6 +299,38 @@ function markThreadWritten(
   for (const message of messages) already.set(message.id, message)
   writtenMessages.set(key, already)
 }
+
+/**
+ * One thread's pending Outbox write: the Unsent Messages it is holding, whole.
+ *
+ * Whole rather than a delta, because the Outbox is small — what somebody typed
+ * and has not got away — and because the interesting change is a removal. A
+ * message that was confirmed, or one the person gave up on, leaves the list, and
+ * a delta of "here is what is unsent" cannot say that.
+ */
+type PendingOutbox = {
+  ownerId: string
+  conversationId: string
+  messages: readonly Message[]
+}
+
+/** The newest Outbox state each thread is waiting to have written. */
+const queuedOutbox = new Map<string, PendingOutbox>()
+
+/**
+ * The Unsent Messages last known to be on disk for a thread, by identity.
+ *
+ * The same trick `writtenMessages` uses, and for the same reason: a state change
+ * anywhere in a thread hands this the whole Outbox again, and almost none of it
+ * has moved. What is here answers the two questions a write needs — which of
+ * these is not already the row on disk, and which row on disk is no longer one
+ * of these — so a message failing in a thread holding two others costs one
+ * insert rather than three.
+ *
+ * Seeded by `restoreOutbox`, so a thread opening on what this device holds does
+ * not write its own Restored Outbox straight back.
+ */
+const writtenOutbox = new Map<string, Map<string, Message>>()
 
 /**
  * Threads the Store has taken history from and has not Restored since.
@@ -506,6 +562,73 @@ export function restoreOlderMessages(
 }
 
 /**
+ * The Outbox of one thread: what was typed here and never confirmed.
+ *
+ * Every entry comes back *failed*, and none of them is sent by reading them —
+ * that is the whole difference between an Outbox and a send queue. A message
+ * abandoned on Tuesday must not leave on Thursday because a phone was unlocked;
+ * it comes back where it was written, marked, offering to go again, and it goes
+ * when somebody taps it.
+ *
+ * Synchronous and unbounded, unlike `restoreThread`. Unbounded because there is
+ * no page here to take: the Outbox is what one person failed to send in one
+ * thread, a thread with more than a handful in it is a thread with a problem,
+ * and dropping the oldest would be dropping the message they have been carrying
+ * longest. Synchronous for the same reason the thread is — the screen reads this
+ * while it is deciding what to draw.
+ *
+ * Empty when there is nothing here: no database, nothing stored for this thread,
+ * or a read that failed. All three mean the same to a caller.
+ */
+export function restoreOutbox(ownerId: string, conversationId: string): UnsentMessage[] {
+  const database = connect()
+  if (!database) return []
+
+  try {
+    const unsent = fromOutboxRows(
+      database.getAllSync(
+        `SELECT * FROM outbox WHERE owner_id = ? AND conversation_id = ?
+         ORDER BY created_at ASC, id ASC`,
+        ownerId,
+        conversationId,
+      ),
+    )
+    // What was just read is what is on disk. Without this, opening a thread
+    // would write its whole Restored Outbox straight back. See `writtenOutbox`.
+    markOutboxWritten(
+      ownerId,
+      conversationId,
+      unsent.map((entry) => entry.message),
+    )
+    return unsent
+  } catch {
+    // Same rule as `restoreStore`: a database that cannot be read is discarded
+    // rather than asked again for the life of the install.
+    discard()
+    return []
+  }
+}
+
+/**
+ * Record what this thread's Outbox is believed to hold.
+ *
+ * A replacement rather than an addition, unlike `markThreadWritten`: the Outbox
+ * is read and written whole, so what is not in the list handed over is not on
+ * disk either. A belief that only grew would answer "already written" for a
+ * message that has since been confirmed and removed.
+ */
+function markOutboxWritten(
+  ownerId: string,
+  conversationId: string,
+  messages: readonly Message[],
+): void {
+  writtenOutbox.set(
+    threadKey(ownerId, conversationId),
+    new Map(messages.map((message) => [message.id, message])),
+  )
+}
+
+/**
  * Close the connection and remove the file. The next use opens a fresh one.
  *
  * What was believed to be on disk is forgotten with it — the new database has
@@ -515,6 +638,7 @@ export function restoreOlderMessages(
 function discard(): void {
   written.clear()
   writtenMessages.clear()
+  writtenOutbox.clear()
   frontiers.clear()
   sweptThreads.clear()
   try {
@@ -625,9 +749,43 @@ export function saveThreadPaging(
   return draining
 }
 
+/**
+ * Write a thread's Unsent Messages through, when the queue gets to it.
+ *
+ * The list is the unit: what is handed over is the Outbox, and a row on disk
+ * that is not in it is a message that has left — confirmed by the API, or
+ * dropped. So this is the one write here that removes rows nobody asked it to.
+ *
+ * Every Unsent Message, whatever its Delivery state. A send in flight is written
+ * exactly like one that has already failed, because the case this exists for is
+ * the process dying with the request out: the row is what makes that message
+ * come back at all, and it comes back failed either way. See `OutboxRow`.
+ *
+ * Same queue as the list and the Messages, and same fire-and-forget: the promise
+ * exists for tests. A thread a sweep has taken history from writes this
+ * regardless — `sweptThreads` is about a hole in *history*, and the Outbox has
+ * none to put one in.
+ */
+export function saveOutbox(
+  ownerId: string,
+  conversationId: string,
+  messages: readonly Message[],
+): Promise<void> {
+  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
+
+  queuedOutbox.set(threadKey(ownerId, conversationId), {
+    ownerId,
+    conversationId,
+    messages,
+  })
+
+  draining ??= drain()
+  return draining
+}
+
 async function drain(): Promise<void> {
   try {
-    while (queued.size > 0 || queuedThreads.size > 0) {
+    while (queued.size > 0 || queuedThreads.size > 0 || queuedOutbox.size > 0) {
       const lists = [...queued]
       queued.clear()
       for (const [ownerId, pending] of lists) await write(ownerId, pending)
@@ -635,6 +793,10 @@ async function drain(): Promise<void> {
       const threads = [...queuedThreads.values()]
       queuedThreads.clear()
       for (const pending of threads) await writeThread(pending)
+
+      const outboxes = [...queuedOutbox.values()]
+      queuedOutbox.clear()
+      for (const pending of outboxes) await writeOutbox(pending)
     }
   } finally {
     draining = null
@@ -716,6 +878,70 @@ async function writeThread(pending: PendingThread): Promise<void> {
   // the one thing that makes it bigger, so this is where the growth is. A write
   // that only moved a frontier moved no rows.
   if (rows.length > 0) await evict(database, ownerId, conversationId)
+}
+
+/**
+ * One thread's Outbox, one transaction.
+ *
+ * Two statements, and the removal is the one that matters: a message the API
+ * confirmed has left the Outbox in memory, and a row left behind for it would
+ * restore a message the person watched succeed. So what is on disk and no longer
+ * in the list handed over is deleted by id, and what is in the list and not
+ * already the row there is written.
+ *
+ * No eviction follows, unlike a thread's Messages. The Outbox is bounded by what
+ * one person managed to type without a connection, and every row in it is
+ * something they wrote and nothing else holds — there is no copy on a server to
+ * fetch it back from, which is exactly what a sweep assumes.
+ */
+async function writeOutbox(pending: PendingOutbox): Promise<void> {
+  const database = connect()
+  if (!database) return
+
+  const { ownerId, conversationId, messages } = pending
+  const key = threadKey(ownerId, conversationId)
+  const already = writtenOutbox.get(key)
+
+  const rows = toOutboxRows(
+    ownerId,
+    conversationId,
+    messages.filter((message) => already?.get(message.id) !== message),
+  )
+  const kept = new Set(messages.map((message) => message.id))
+  const gone = [...(already?.keys() ?? [])].filter((id) => !kept.has(id))
+  // Nothing to say. A thread that has just been Restored reaches this on its
+  // first state change, and every state change in a thread with a settled
+  // Outbox reaches it after that.
+  if (rows.length === 0 && gone.length === 0) return
+
+  try {
+    await database.withTransactionAsync(async () => {
+      for (const id of gone) {
+        await database.runAsync(
+          'DELETE FROM outbox WHERE owner_id = ? AND conversation_id = ? AND id = ?',
+          ownerId,
+          conversationId,
+          id,
+        )
+      }
+
+      for (const row of rows) {
+        await database.runAsync(
+          'INSERT OR REPLACE INTO outbox (id, conversation_id, owner_id, created_at, payload) VALUES (?, ?, ?, ?, ?)',
+          row.id,
+          row.conversation_id,
+          row.owner_id,
+          row.created_at,
+          row.payload,
+        )
+      }
+    })
+
+    markOutboxWritten(ownerId, conversationId, messages)
+  } catch {
+    // Swallowed, like every other write here. Nothing is recorded, so the next
+    // state change writes these Messages again.
+  }
 }
 
 /**
@@ -900,11 +1126,37 @@ async function write(ownerId: string, snapshot: StoreSnapshot): Promise<void> {
         ownerId,
         ownerId,
       )
+
+      // And its Outbox, for the same reason and one more. A message waiting to
+      // be sent into a conversation this person can no longer open is one the
+      // retry it offers could only fail at, so restoring it would put a bubble
+      // and a *Try again* in front of somebody with nowhere to send it.
+      await database.runAsync(
+        'DELETE FROM outbox WHERE owner_id = ? AND conversation_id NOT IN (SELECT id FROM conversations WHERE owner_id = ?)',
+        ownerId,
+        ownerId,
+      )
     })
     markWritten(ownerId, snapshot)
+    forgetOutboxOf(ownerId, new Set(rows.map((row) => row.id)))
   } catch {
     // Swallowed. The Store in memory is still right; the next Restore is poorer.
     // Nothing is recorded as written, so the next state change writes again.
+  }
+}
+
+/**
+ * Forget what the Outbox of a departed conversation held.
+ *
+ * The rows have just gone with the conversation, and a belief that outlived them
+ * would answer "already written" for a message this device no longer has — so a
+ * conversation that came back would come back without the message that was
+ * waiting in it.
+ */
+function forgetOutboxOf(ownerId: string, kept: ReadonlySet<string>): void {
+  for (const key of writtenOutbox.keys()) {
+    const held = fromThreadKey(key)
+    if (held.ownerId === ownerId && !kept.has(held.conversationId)) writtenOutbox.delete(key)
   }
 }
 
@@ -923,6 +1175,7 @@ export async function wipeStore(): Promise<void> {
   activeOwners.clear()
   queued.clear()
   queuedThreads.clear()
+  queuedOutbox.clear()
   // Nothing is left waiting, but a write already past the queue is still on its
   // way to the file this is about to remove.
   await draining?.catch(() => {})

@@ -139,8 +139,7 @@ Broadcasts are in-inbox announcements (later), not stories.
    - 6d. **A thread's Messages survive a restart (done)** — a `messages` table holding one row per
      confirmed Message, a thread that has been opened before opening on what this device already
      holds, and a scroll back that reads the disk a page at a time and asks the API only for history
-     the phone does not have. Unsent Messages are deliberately not written; the Outbox is its own
-     ticket.
+     the phone does not have. Unsent Messages were deliberately not written here; the Outbox is 6f.
    - 6e. **Eviction keeps the database bounded (done)** — the other half of Eviction, and the one
      that does touch SQLite. Every Conversation row is kept, always: a partial list is a list that
      lies about which conversations exist, and the list is cheap. Messages are the opposite — kept
@@ -156,7 +155,18 @@ Broadcasts are in-inbox announcements (later), not stories.
      the thread on screen, and taking its Messages would be a write the next state change undoes.
      Split the same way as 6a and 6b: `lib/store-eviction` is pure and table-tested,
      `lib/conversation-store` owns the query and the transaction.
-   - 6f. The Outbox, wiping the Store on Session end, and real reactions.
+   - 6f. **The Outbox survives a restart (done)** — an `outbox` table holding one row per Unsent
+     Message, restored into its thread on the next cold start, still marked *failed*, still offering
+     to go again. It never sends itself: a support message somebody typed and abandoned on Tuesday
+     must not leave on Thursday without a tap, which is the whole difference between this and a send
+     queue. Every Unsent Message is written whatever its Delivery state and every one comes back
+     *failed* — a send in flight when the process died did not survive the thing that was sending it
+     and nobody knows whether it landed, so there is no state column to get wrong. A row whose
+     Conversation has left the list goes with it, in the same statement its Messages do. A staged
+     Attachment restores with its message, URI and all, but the picker's copy lives in the system
+     cache and the system reclaims that — so a retry reads the file first and says which one has
+     gone rather than failing on it (`lib/staged-file`). The table took the schema to version 4.
+   - 6g. Real reactions.
 
 ## Session
 

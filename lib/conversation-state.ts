@@ -470,6 +470,21 @@ function withDelivery(
 }
 
 /**
+ * A send this device refused to make, marked before it was ever carried.
+ *
+ * `failSend` marks a message the thread is already holding, which every failure
+ * arriving from the API is: the send began, so `beginSend` or `beginUpload` put
+ * it there. This is the one failure decided on the way *out* — a staged file
+ * that is no longer on the phone, found before the first upload — and on a first
+ * send there is nothing in the thread yet for a mark to find. Without this the
+ * message would never appear at all, which is precisely the vanishing bubble
+ * `failSend` exists to prevent.
+ */
+export function refuseSend(state: ThreadState, message: Message): ThreadState {
+  return withDelivery(state, message, 'failed')
+}
+
+/**
  * The API's answer to a send, folded into the thread.
  *
  * The echo is dropped in the same step the real message is merged, so the bubble

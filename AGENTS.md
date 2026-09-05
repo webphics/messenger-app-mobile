@@ -51,7 +51,13 @@ on this device and a shared phone hands the next person nothing. Hydration's Unr
 deliberately does not, because a kept cookie is a kept Store. What a Wipe removes stays removed: the
 Store bars the people it was taken from until they Restore, so the moment between the credential
 going and the screens being told cannot write the list back. Android backup is disabled; the database
-is deliberately not encrypted. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
+is deliberately not encrypted. #47 gave the Store its third table: the Outbox, so a message that did
+not get away is still there tomorrow. Every Unsent Message is written whatever its Delivery state and
+every one comes back *failed* — a send in flight when the process died did not survive the thing that
+was sending it — and nothing ever sends one without a tap, which is the whole difference between this
+and a send queue. A row whose Conversation has left the list goes with it; a staged Attachment comes
+back with its message, and because the picker's copy lives in the system cache a retry reads the file
+first and names the one that has gone (`staged-file`) rather than sending into nothing. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`.
 
 ## Interactions
 

@@ -30,11 +30,15 @@ type MockMessageRow = {
   payload: string
 }
 
+/** Same columns as a Message row; a different table, and a different claim. */
+type MockOutboxRow = MockMessageRow
+
 type MockFile = {
   userVersion: number
   rows: MockRow[]
   organizations: MockOrganizationRow[]
   messages: MockMessageRow[]
+  outbox: MockOutboxRow[]
 }
 
 const mockFiles = new Map<string, MockFile>()
@@ -64,6 +68,7 @@ jest.mock('expo-sqlite', () => {
       if (source.includes('CREATE TABLE conversations')) this.file.rows = []
       if (source.includes('CREATE TABLE organizations')) this.file.organizations = []
       if (source.includes('CREATE TABLE messages')) this.file.messages = []
+      if (source.includes('CREATE TABLE outbox')) this.file.outbox = []
       const stamped = /PRAGMA user_version = (\d+)/.exec(source)
       if (stamped) this.file.userVersion = Number(stamped[1])
     }
@@ -92,6 +97,7 @@ jest.mock('expo-sqlite', () => {
       if (mockFails.read) throw new Error('database disk image is malformed')
       mockStatements.push(source)
       if (source.includes('GROUP BY m.conversation_id')) return this.storedThreads(params)
+      if (source.includes('FROM outbox')) return this.outboxRows(params)
       if (source.includes('FROM messages')) return this.messagePage(source, params)
       const table = source.includes('FROM organizations') ? this.file.organizations : this.file.rows
       return table.filter((row) => row.owner_id === params[0])
@@ -138,6 +144,14 @@ jest.mock('expo-sqlite', () => {
       return held
         .filter((row) => row.created_at < at || (row.created_at === at && row.id < id))
         .slice(0, limit)
+    }
+
+    /** One thread's Outbox, oldest first — the order the real query asks for. */
+    private outboxRows(params: unknown[]) {
+      const [ownerId, conversationId] = params as [string, string]
+      return this.file.outbox
+        .filter((row) => row.owner_id === ownerId && row.conversation_id === conversationId)
+        .sort((a, b) => a.created_at - b.created_at || a.id.localeCompare(b.id))
     }
 
     async runAsync(source: string, ...params: unknown[]) {
@@ -221,6 +235,39 @@ jest.mock('expo-sqlite', () => {
         )
         this.file.messages.push({ id, conversation_id, owner_id, created_at, payload })
       }
+      if (source.startsWith('DELETE FROM outbox') && source.includes('conversation_id NOT IN')) {
+        const [owner_id] = params as [string]
+        const kept = new Set(
+          this.file.rows.filter((row) => row.owner_id === owner_id).map((row) => row.id),
+        )
+        this.file.outbox = this.file.outbox.filter(
+          (row) => row.owner_id !== owner_id || kept.has(row.conversation_id),
+        )
+      } else if (source.startsWith('DELETE FROM outbox')) {
+        const [owner_id, conversation_id, id] = params as [string, string, string]
+        this.file.outbox = this.file.outbox.filter(
+          (row) =>
+            row.owner_id !== owner_id ||
+            row.conversation_id !== conversation_id ||
+            row.id !== id,
+        )
+      }
+      if (source.startsWith('INSERT OR REPLACE INTO outbox')) {
+        const [id, conversation_id, owner_id, created_at, payload] = params as [
+          string,
+          string,
+          string,
+          number,
+          string,
+        ]
+        this.file.outbox = this.file.outbox.filter(
+          (row) =>
+            row.owner_id !== owner_id ||
+            row.conversation_id !== conversation_id ||
+            row.id !== id,
+        )
+        this.file.outbox.push({ id, conversation_id, owner_id, created_at, payload })
+      }
       if (source.startsWith('UPDATE conversations SET has_more')) {
         const [has_more, cursor, owner_id, id] = params as [number, string | null, string, string]
         const row = this.file.rows.find((each) => each.owner_id === owner_id && each.id === id)
@@ -239,12 +286,14 @@ jest.mock('expo-sqlite', () => {
       const conversations = this.file.rows.map((row) => ({ ...row }))
       const organizations = [...this.file.organizations]
       const messages = [...this.file.messages]
+      const outbox = [...this.file.outbox]
       try {
         await task()
       } catch (error) {
         this.file.rows = conversations
         this.file.organizations = organizations
         this.file.messages = messages
+        this.file.outbox = outbox
         throw error
       }
     }
@@ -254,7 +303,13 @@ jest.mock('expo-sqlite', () => {
     openDatabaseSync(name: string) {
       if (mockFails.open) throw new Error('unable to open database file')
       if (!mockFiles.has(name)) {
-        mockFiles.set(name, { userVersion: 0, rows: [], organizations: [], messages: [] })
+        mockFiles.set(name, {
+          userVersion: 0,
+          rows: [],
+          organizations: [],
+          messages: [],
+          outbox: [],
+        })
       }
       return new MockDatabase(name)
     },
@@ -301,8 +356,9 @@ function seed(
   rows: MockRow[] = [],
   organizations: MockOrganizationRow[] = [],
   messages: MockMessageRow[] = [],
+  outbox: MockOutboxRow[] = [],
 ) {
-  mockFiles.set(DATABASE_NAME, { userVersion, rows, organizations, messages })
+  mockFiles.set(DATABASE_NAME, { userVersion, rows, organizations, messages, outbox })
 }
 
 const NO_NAMES: ReadonlyMap<string, string> = new Map()
@@ -1424,5 +1480,292 @@ describe('eviction', () => {
     mockFails.write = false
 
     expect(store.restoreThread('viewer-1', 'conv-020', 50)?.messages).toHaveLength(1)
+  })
+})
+
+/** A Message typed on this device: a local id, and nothing the server has said. */
+function unsent(id: string, minute: number, overrides: Partial<CustomerMessage> = {}): Message {
+  return message(`local-${id}`, minute, { fromCompany: false, ...overrides })
+}
+
+function outboxIds(store: Store, ownerId: string, conversationId: string): string[] {
+  return store.restoreOutbox(ownerId, conversationId).map((entry) => entry.message.id)
+}
+
+describe('restoreOutbox', () => {
+  it('has nothing for a thread this device has never held', () => {
+    const store = loadStore()
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1')).toEqual([])
+  })
+
+  it('gives back what was never sent, oldest first', async () => {
+    const store = loadStore()
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('b', 2), unsent('a', 1)])
+
+    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a', 'local-b'])
+  })
+
+  /**
+   * The whole of the state mapping, and the reason the Outbox has no state
+   * column: nobody knows whether a send that was in flight when the process died
+   * landed, and *failed* is the only honest answer — it is the one that offers
+   * to go again.
+   */
+  it('gives every Message back as failed, whatever it was doing when it was written', async () => {
+    const store = loadStore()
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1), unsent('b', 2)])
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1').map((entry) => entry.state)).toEqual([
+      'failed',
+      'failed',
+    ])
+  })
+
+  it('keeps a staged Attachment, device URI and all', async () => {
+    const store = loadStore()
+    const staged = unsent('a', 1, {
+      messageType: 'media',
+      attachments: [
+        {
+          type: 'image/jpeg',
+          url: 'file:///var/mobile/tmp/photo.jpg',
+          fileName: 'photo.jpg',
+          size: 2048,
+          durationSeconds: null,
+          waveform: null,
+        },
+      ],
+    })
+
+    await store.saveOutbox('viewer-1', 'conv-1', [staged])
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1')[0].message).toEqual(staged)
+  })
+
+  it('holds one viewer apart from another', async () => {
+    const store = loadStore()
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    expect(store.restoreOutbox('viewer-2', 'conv-1')).toEqual([])
+  })
+
+  it('holds one thread apart from another', async () => {
+    const store = loadStore()
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    expect(store.restoreOutbox('viewer-1', 'conv-2')).toEqual([])
+  })
+
+  it('gives back nothing rather than throwing when the read fails', () => {
+    const store = loadStore()
+    mockFails.read = true
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1')).toEqual([])
+  })
+
+  it('discards a database it could not read, so the next write still lands', async () => {
+    const store = loadStore()
+    mockFails.read = true
+    store.restoreOutbox('viewer-1', 'conv-1')
+    mockFails.read = false
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a'])
+  })
+})
+
+describe('saveOutbox', () => {
+  /**
+   * The list is the unit. A message the API confirmed has left the Outbox in
+   * memory, and a row left behind for it would restore a message the person
+   * watched succeed.
+   */
+  it('removes a Message that has left the Outbox', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1), unsent('b', 2)])
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('b', 2)])
+
+    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-b'])
+  })
+
+  it('empties the Outbox when the last Message in it is confirmed', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    await store.saveOutbox('viewer-1', 'conv-1', [])
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1')).toEqual([])
+  })
+
+  /**
+   * A failed send can still have achieved something: what an upload answered
+   * with is written back onto the message it is holding, so the row has to move
+   * with it or a retry would carry those files up a second time.
+   */
+  it('replaces a Message the send wrote back over', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1, { body: 'edited' })])
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1')[0].message.body).toBe('edited')
+  })
+
+  it('leaves another thread alone', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    await store.saveOutbox('viewer-1', 'conv-2', [])
+
+    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a'])
+  })
+
+  it('writes nothing at all when a Restored Outbox has not changed', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+    const restored = store.restoreOutbox('viewer-1', 'conv-1')
+    mockCounts.transactions = 0
+
+    await store.saveOutbox(
+      'viewer-1',
+      'conv-1',
+      restored.map((entry) => entry.message),
+    )
+
+    expect(mockCounts.transactions).toBe(0)
+  })
+
+  it('writes nothing for a thread whose Outbox is and always was empty', async () => {
+    const store = loadStore()
+    mockCounts.transactions = 0
+
+    await store.saveOutbox('viewer-1', 'conv-1', [])
+
+    expect(mockCounts.transactions).toBe(0)
+  })
+
+  it('says nothing when the write fails', async () => {
+    const store = loadStore()
+    mockFails.write = true
+
+    await expect(store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])).resolves.toBeUndefined()
+    mockFails.write = false
+    expect(store.restoreOutbox('viewer-1', 'conv-1')).toEqual([])
+  })
+
+  it('writes again after a write that failed', async () => {
+    const store = loadStore()
+    mockFails.write = true
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+    mockFails.write = false
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a'])
+  })
+
+  /**
+   * A sweep is about a hole in *history* — memory holding more of it than the
+   * disk does. The Outbox has none to put one in, and a message somebody is
+   * still waiting to send is the last thing to stop recording.
+   */
+  it('writes a thread a sweep has taken history from', async () => {
+    const store = loadStore()
+    // Twenty-one threads holding Messages, so the least recently active loses
+    // its history to the sweep that follows the last write.
+    const swept = Array.from({ length: 21 }, (_unused, index) =>
+      conversation(`conv-${String(index).padStart(3, '0')}`, {
+        lastMessageAt: new Date(THREAD_BEGAN + (21 - index) * 60_000).toISOString(),
+      }),
+    )
+    await save(store, 'viewer-1', swept)
+    for (const one of swept) await store.saveMessages('viewer-1', one.id, thread(1))
+    // One more write, so the sweep it triggers spares the busiest thread rather
+    // than the least active one — which is the one about to be tested.
+    await store.saveMessages('viewer-1', 'conv-000', thread(1, 2))
+    expect(store.restoreThread('viewer-1', 'conv-020', 50)).toBeNull()
+
+    await store.saveOutbox('viewer-1', 'conv-020', [unsent('a', 1)])
+
+    expect(outboxIds(store, 'viewer-1', 'conv-020')).toEqual(['local-a'])
+  })
+})
+
+describe('an Outbox row whose Conversation is gone', () => {
+  const list = [conversation('conv-1'), conversation('conv-2')]
+
+  it('is discarded rather than restored into nothing', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', list)
+    await store.saveOutbox('viewer-1', 'conv-2', [unsent('a', 1)])
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(store.restoreOutbox('viewer-1', 'conv-2')).toEqual([])
+  })
+
+  it('leaves the Outbox of a thread still in the list alone', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', list)
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a'])
+  })
+
+  it('leaves another person on this phone alone', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-2', 'conv-2', [unsent('a', 1)])
+
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    expect(outboxIds(store, 'viewer-2', 'conv-2')).toEqual(['local-a'])
+  })
+
+  /**
+   * The belief goes with the rows. Kept, it would answer "already written" for a
+   * message this device no longer has, and a conversation that came back would
+   * come back without it.
+   */
+  it('is written again if its Conversation comes back', async () => {
+    const store = loadStore()
+    await save(store, 'viewer-1', list)
+    const carried = [unsent('a', 1)]
+    await store.saveOutbox('viewer-1', 'conv-2', carried)
+    await save(store, 'viewer-1', [conversation('conv-1')])
+
+    await save(store, 'viewer-1', list)
+    await store.saveOutbox('viewer-1', 'conv-2', carried)
+
+    expect(outboxIds(store, 'viewer-1', 'conv-2')).toEqual(['local-a'])
+  })
+})
+
+describe('wipeStore, with an Outbox on the disk', () => {
+  it('leaves none of it behind', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+
+    await store.wipeStore()
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1')).toEqual([])
+  })
+
+  it('refuses a write queued after it by somebody it just wiped', async () => {
+    const store = loadStore()
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('a', 1)])
+    await store.wipeStore()
+
+    await store.saveOutbox('viewer-1', 'conv-1', [unsent('b', 2)])
+
+    expect(store.restoreOutbox('viewer-1', 'conv-1')).toEqual([])
   })
 })
