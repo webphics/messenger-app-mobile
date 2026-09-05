@@ -118,9 +118,17 @@ Broadcasts are in-inbox announcements (later), not stories.
      activity log. Android only until there is an iOS build profile. See
      `docs/adr/ADR-0009-mobile-push-is-a-second-transport.md`.
 
-     Undecided, and for the spec: when the Android 13+ permission is asked for, and how a tap routes
-     into its thread from a cold start, which has Hydration, Restore and the Launch gate in front of
-     it.
+     The permission is asked for in two places: after a first sign-in, and when a Message first
+     arrives for somebody who has not been asked. The second is the one that earns it — a person
+     watching a reply land is being asked a question they can answer from what is in front of them —
+     and the first is there so the common case does not wait for it. Both are guarded on the
+     permission still being undetermined, because they have to be: Android 13+ and iOS each show the
+     system dialog once, and a request after a denial is refused without drawing anything. So the
+     second trigger fires for somebody the first never reached, never as a second ask. Somebody who
+     has said no is offered a route into system settings from Settings, not another prompt.
+
+     Undecided, and for the spec: how a tap routes into its thread from a cold start, which has
+     Hydration, Restore and the Launch gate in front of it.
    - 5e. i18n, list virtualization.
 6. The Store — one in-memory copy of everything the screens read, written through to SQLite on the
    device and read back at the next cold start, so a launch draws the last thing this phone knew
