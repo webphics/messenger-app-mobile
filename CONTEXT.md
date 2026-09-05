@@ -244,17 +244,23 @@ _Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface
 
 **Launch gate**:
 What has to be true before the Launch animation ends: it has played its two seconds, *and* the first
-Conversation fetch has **settled**. Settled means answered **or** failed — with the Store there is
-something to draw either way, and an animation held open on a bad network is the failure the gate
-exists to prevent. Both halves count in either order. Hydration's Unreachable outcome is not part of
-it: that is a screen with a retry on it rather than a Hub to hand over. The wait has a **bound** — ten
-seconds from the animation appearing, over the launch as a whole rather than over any one request,
-because a socket that flaps inside the window keeps starting fresh ones — and reaching it hands over
-the Restored rows. It is shorter than a Request deadline on purpose: it is a limit on what somebody
-is asked to watch, not on what the network is allowed to take. A Try again re-arms it. The decision
-is `lib/launch-route`.
-_Avoid_: Splash gate, minimum display (that is only the animation's own half), loading gate, budget,
-timeout (that is the Request deadline, which bounds a round trip rather than the launch)
+Conversation fetch has **settled**. Settled means answered, failed, **or** abandoned on the Launch
+deadline — with the Store there is something to draw whichever it is, and an animation held open on
+a bad network is the failure the gate exists to prevent. Both halves count in either order. Hydration's Unreachable outcome is not part of
+it: that is a screen with a retry on it rather than a Hub to hand over. What bounds the wait is the
+**Launch deadline**. The decision is `lib/launch-route`.
+_Avoid_: Splash gate, minimum display (that is only the animation's own half), loading gate
+
+**Launch deadline**:
+The bound on the Launch gate's wait: ten seconds from the first Conversation load starting, after
+which the fetch is **abandoned** and the gate hands over whatever this device already holds. One
+clock per launch — a Resync abandons the load in flight and starts another, and restarting the clock
+with it would bound every round trip and never the launch. Armed in `lib/conversation-inbox` beside
+the load it bounds, never in the launch screen; the clock is `lib/launch-deadline`. Shorter than a
+Request deadline on purpose: it limits what somebody is asked to watch rather than what the network
+is allowed to take. A *Try again* that succeeds starts a launch, so it gets one too.
+_Avoid_: Request deadline (that is the same word about a round trip, and this one is not built from
+it), launch timeout, splash timeout
 
 **Tab capsule**:
 The floating rounded nav bar at the bottom of every role. Icon-only — destination names live in the accessible name, not on screen.
