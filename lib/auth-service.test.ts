@@ -6,6 +6,7 @@ import {
 } from "@/lib/api-client";
 import {
   authenticatedRequest,
+  confirmSession,
   hydrateAuth,
   onSessionExpired,
   requestMagicLink,
@@ -16,9 +17,12 @@ import {
 } from "@/lib/auth-service";
 import { releaseGoogleSession, requestGoogleIdToken } from "@/lib/google-session";
 import {
+  clearKeptPerson,
   clearRetiredCredential,
   clearSessionCookie,
+  readKeptPerson,
   readSessionCookie,
+  writeKeptPerson,
   writeSessionCookie,
 } from "@/lib/keychain";
 import { purgeMockSession } from "@/lib/legacy-session";
@@ -72,6 +76,9 @@ jest.mock("@/lib/keychain", () => ({
   writeSessionCookie: jest.fn(async () => true),
   clearSessionCookie: jest.fn(async () => true),
   clearRetiredCredential: jest.fn(async () => undefined),
+  readKeptPerson: jest.fn(async () => null),
+  writeKeptPerson: jest.fn(async () => undefined),
+  clearKeptPerson: jest.fn(async () => undefined),
 }));
 
 const request = apiRequest as jest.MockedFunction<typeof apiRequest>;
@@ -85,6 +92,9 @@ const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCo
 const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
 const clearCookie = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
 const wipe = wipeStoreAndAttachments as jest.MockedFunction<typeof wipeStoreAndAttachments>;
+const readPerson = readKeptPerson as jest.MockedFunction<typeof readKeptPerson>;
+const writePerson = writeKeptPerson as jest.MockedFunction<typeof writeKeptPerson>;
+const clearPerson = clearKeptPerson as jest.MockedFunction<typeof clearKeptPerson>;
 
 const ID_TOKEN = "eyJhbGciOiJSUzI1NiJ9.google-minted.signature";
 
@@ -117,6 +127,9 @@ beforeEach(() => {
   writeCookie.mockResolvedValue(true);
   clearCookie.mockResolvedValue(true);
   wipe.mockResolvedValue(undefined);
+  readPerson.mockResolvedValue(null);
+  writePerson.mockResolvedValue(undefined);
+  clearPerson.mockResolvedValue(undefined);
 });
 
 describe("hydrateAuth", () => {
@@ -129,9 +142,20 @@ describe("hydrateAuth", () => {
 
   test("no stored cookie means nothing to check", async () => {
     readCookie.mockResolvedValueOnce(null);
-    await expect(hydrateAuth()).resolves.toBeNull();
+    await expect(hydrateAuth()).resolves.toEqual({ outcome: null, kept: null });
     expect(request).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
+  });
+
+  test("a person kept with no cookie is leftovers, and is swept up rather than carried", async () => {
+    readCookie.mockResolvedValueOnce(null);
+    readPerson.mockResolvedValueOnce(PARSED_USER);
+
+    // Nobody signs in off a name. The cookie is the credential; this is who it
+    // said the credential belonged to.
+    await expect(hydrateAuth()).resolves.toEqual({ outcome: null, kept: null });
+    expect(clearPerson).toHaveBeenCalled();
+    expect(getSessionUser()).toBeNull();
   });
 
   test("a live cookie signs its owner in and is held for later requests", async () => {
@@ -139,13 +163,14 @@ describe("hydrateAuth", () => {
     request.mockResolvedValueOnce(ok(USER));
 
     await expect(hydrateAuth()).resolves.toEqual({
-      kind: "signed-in",
-      cookie: STORED,
-      user: PARSED_USER,
+      outcome: { kind: "signed-in", cookie: STORED, user: PARSED_USER },
+      kept: null,
     });
     expect(request).toHaveBeenCalledWith("/auth/session");
     expect(getSessionCookie()).toBe(STORED);
     expect(getSessionUser()).toEqual(PARSED_USER);
+    // Beside the cookie, so the next cold start has somebody to answer with.
+    expect(writePerson).toHaveBeenCalledWith(PARSED_USER);
   });
 
   test("the credential is held before the request, so it is the one presented", async () => {
@@ -167,9 +192,26 @@ describe("hydrateAuth", () => {
       sessionCookie: null,
     });
 
-    await expect(hydrateAuth()).resolves.toMatchObject({ kind: "unauthorised" });
+    await expect(hydrateAuth()).resolves.toMatchObject({
+      outcome: { kind: "unauthorised" },
+    });
     expect(clearCookie).toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
+    expect(getSessionUser()).toBeNull();
+  });
+
+  test("a rejected cookie takes the kept person with it — an expiry is not a dead network", async () => {
+    readCookie.mockResolvedValueOnce("better-auth.session_token=stale");
+    readPerson.mockResolvedValueOnce(PARSED_USER);
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: { message: "Unauthorized" },
+      sessionCookie: null,
+    });
+
+    await hydrateAuth();
+    expect(clearPerson).toHaveBeenCalled();
     expect(getSessionUser()).toBeNull();
   });
 
@@ -177,9 +219,107 @@ describe("hydrateAuth", () => {
     readCookie.mockResolvedValueOnce(STORED);
     request.mockResolvedValueOnce({ reached: false });
 
-    await expect(hydrateAuth()).resolves.toEqual({ kind: "transport-failure" });
+    await expect(hydrateAuth()).resolves.toEqual({
+      outcome: { kind: "transport-failure" },
+      kept: null,
+    });
     expect(clearCookie).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBe(STORED);
+  });
+
+  test("an unreachable API with a kept person hands that person back, and holds them", async () => {
+    readCookie.mockResolvedValueOnce(STORED);
+    readPerson.mockResolvedValueOnce(PARSED_USER);
+    request.mockResolvedValueOnce({ reached: false });
+
+    await expect(hydrateAuth()).resolves.toEqual({
+      outcome: { kind: "transport-failure" },
+      kept: PARSED_USER,
+    });
+    // The mirror `getSession()` reads, so a screen drawn off a Stale session
+    // names the same person the state machine put in it.
+    expect(getSessionUser()).toEqual(PARSED_USER);
+    expect(clearCookie).not.toHaveBeenCalled();
+    expect(clearPerson).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBe(STORED);
+  });
+
+  test("a server error keeps the kept person too — the cookie is kept either way", async () => {
+    readCookie.mockResolvedValueOnce(STORED);
+    readPerson.mockResolvedValueOnce(PARSED_USER);
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 503,
+      body: { message: "Service unavailable" },
+      sessionCookie: null,
+    });
+
+    await expect(hydrateAuth()).resolves.toMatchObject({ kept: PARSED_USER });
+    expect(clearPerson).not.toHaveBeenCalled();
+    expect(getSessionUser()).toEqual(PARSED_USER);
+  });
+});
+
+describe("confirmSession", () => {
+  test("asks the session endpoint with the cookie already held", async () => {
+    setSessionCookie(STORED);
+    request.mockResolvedValueOnce(ok(USER));
+
+    await expect(confirmSession()).resolves.toEqual({
+      kind: "signed-in",
+      cookie: STORED,
+      user: PARSED_USER,
+    });
+    expect(request).toHaveBeenCalledWith("/auth/session", {});
+  });
+
+  test("a confirmed session replaces what the device was holding", async () => {
+    setSessionCookie(STORED);
+    setSessionUser({ ...PARSED_USER, role: "customer" });
+    request.mockResolvedValueOnce(ok(USER));
+
+    await confirmSession();
+    // The role is the server's, even when this device had been drawing another
+    // one for the last few seconds.
+    expect(getSessionUser()).toEqual(PARSED_USER);
+    expect(writePerson).toHaveBeenCalledWith(PARSED_USER);
+  });
+
+  test("a 401 is an ordinary Session expiry, announced once", async () => {
+    setSessionCookie(STORED);
+    const listener = jest.fn();
+    const stop = onSessionExpired(listener);
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: { message: "Unauthorized" },
+      sessionCookie: null,
+    });
+
+    // Nothing to report back: by the time this returns, the session has already
+    // ended around it.
+    await expect(confirmSession()).resolves.toBeNull();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(clearCookie).toHaveBeenCalled();
+    expect(clearPerson).toHaveBeenCalled();
+    expect(wipe).toHaveBeenCalled();
+    stop();
+  });
+
+  test("a dead network leaves the Stale session exactly as it was", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    request.mockResolvedValueOnce({ reached: false });
+
+    await expect(confirmSession()).resolves.toEqual({ kind: "transport-failure" });
+    expect(clearCookie).not.toHaveBeenCalled();
+    expect(clearPerson).not.toHaveBeenCalled();
+    expect(getSessionUser()).toEqual(PARSED_USER);
+  });
+
+  test("nothing to confirm without a held cookie", async () => {
+    await expect(confirmSession()).resolves.toBeNull();
+    expect(request).not.toHaveBeenCalled();
   });
 });
 

@@ -161,15 +161,46 @@ sides, so only the origin ever changes.
 _Avoid_: Deep link URL, callback URL, redirect URI
 
 **Hydration**:
-Reading the stored Session cookie at cold start and exchanging it for the signed-in Customer, Agent, or Admin. Ends in one of three states: signed in, signed out, or unreachable.
+Reading the stored Session cookie at cold start and exchanging it for the signed-in Customer, Agent,
+or Admin. Ends in one of three states: signed in, signed out, or unreachable — and the first of
+those has two flavours, because a cookie the API could not answer for still signs in the Kept person
+beside it, as a Stale session.
 _Avoid_: Bootstrapping, session restore, rehydrate
 
+**Kept person**:
+The signed-in person stored on this device beside the Session cookie — an id, a name, an email and a
+role, in the same keystore, written on every established session and destroyed by every moment that
+discards the cookie. It is not a credential: no cookie is no session however well this device
+remembers who was here, and a `401` takes it along with everything else. What it is for is the one
+question a cookie alone cannot answer with no network — who this is — which is what the Restore needs
+before it can draw a Conversation list. See
+`docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`.
+_Avoid_: Cached user, stored identity, offline user, profile
+
 **Unreachable**:
-The Hydration outcome where a Session cookie exists but the API could not be reached. Distinct from signed out: the cookie is kept and the person is not sent to sign-in.
+The Hydration outcome where a Session cookie exists, *nobody is kept beside it*, and the API could
+not be reached. Distinct from signed out: the cookie is kept and the person is not sent to sign-in.
+Since the Kept person it is the narrower case it always described — a device holding a credential and
+no idea whose — which in practice is a session established by a build that had no Kept person, or one
+whose keystore refused the write.
 _Avoid_: Offline, error, disconnected
 
+**Stale session**:
+A session Hydration could not confirm: the Kept person, signed in, drawn from this device rather than
+from the API. Everything on screen is what this phone last knew, which is what every Restored screen
+shows anyway, so it looks exactly like a confirmed one — the failures speak instead, and they read as
+the network, because a write against a Stale session fails the way a write against any dead network
+does. Confirmed by an *authenticated* refetch at the three moments this app can see the server answer —
+entering the state, returning to the foreground, and the socket connecting — which is why a cookie
+that expired meanwhile is an ordinary Session expiry rather than a silent sign-out. Not a status of its own: every screen asking whether somebody is signed in is told yes.
+_Avoid_: Offline session, cached session, unverified session, half signed in
+
 **Session end**:
-Either of the two ways a session stops: signing out, deliberately, and Session expiry. Both discard the Session cookie and everything derived from it — role included — and both land on sign-in, whatever the person was looking at. Both also Wipe: nothing of a person's Conversations outlives their session on this device. Hydration's Unreachable outcome is not one: it keeps the cookie, and so keeps the Store.
+Either of the two ways a session stops: signing out, deliberately, and Session expiry. Both discard
+the Session cookie and everything derived from it — role included, and the Kept person with it — and
+both land on sign-in, whatever the person was looking at. Both also Wipe: nothing of a person's
+Conversations outlives their session on this device. Hydration's Unreachable outcome is not one, and
+neither is a Stale session: both keep the cookie, and so keep the Kept person and the Store.
 _Avoid_: Session exit, teardown, logout (as the name for both)
 
 **Session expiry**:
@@ -323,7 +354,9 @@ _Avoid_: Hydration (that is auth's, and the collision is the reason this word ex
 load from cache, warm start
 
 **Stale**:
-Restored data that the current session has not yet confirmed. Every cold start and every return to
+Restored data that the current session has not yet confirmed. A Stale session is the same word about
+the session itself — who this is, rather than what they were looking at — and the two arrive
+together on a cold start with no network. Every cold start and every return to
 the foreground refetches, so staleness is measured in the seconds before that answer lands — but it
 is real, and it is the price of drawing something immediately. Reads tolerate it and sends tolerate
 it; Engage and Takeover do not, and re-read the conversation from the API before they fire, because

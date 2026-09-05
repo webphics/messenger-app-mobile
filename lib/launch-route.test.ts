@@ -13,10 +13,60 @@ const AGENT: SessionUser = {
 const signedIn = (role: UserRole): AuthState => ({
   status: "signed-in",
   user: { ...AGENT, role },
+  stale: false,
+});
+
+/** The same person on a launch that could not reach the API. See #50. */
+const stale = (role: UserRole): AuthState => ({
+  status: "signed-in",
+  user: { ...AGENT, role },
+  stale: true,
 });
 
 const EVERY_FETCH: ConversationFetch[] = ["outstanding", "answered", "failed"];
 const SETTLED: ConversationFetch[] = ["answered", "failed"];
+
+/**
+ * The mistake this module exists to prevent, in its newer form.
+ *
+ * Unreachable is not a route, and a Stale session is not Unreachable: it has a
+ * person, so it has a Hub, and sending it to the launch screen's retry button
+ * would put a *Try again* in front of Conversations this device is already
+ * holding — which is the whole of #50.
+ */
+describe("a Stale session", () => {
+  test("goes to the Hub for the role this device last heard", () => {
+    const roles: UserRole[] = ["customer", "agent", "admin"];
+    for (const role of roles) {
+      expect(launchDestination(stale(role), "answered")).toEqual({
+        kind: "navigate",
+        href: ROLE_HREF[role],
+      });
+    }
+  });
+
+  test("a list that could not be fetched still hands over — that is the airplane-mode launch", () => {
+    // The fetch failed because the same network that made the session Stale is
+    // still down. There are Restored rows behind this, so the Hub is the honest
+    // screen; waiting for an answer that is not coming is not.
+    expect(launchDestination(stale("agent"), "failed")).toEqual({
+      kind: "navigate",
+      href: ROLE_HREF.agent,
+    });
+  });
+
+  test("waits for the list like any other session, rather than arriving empty", () => {
+    expect(launchDestination(stale("agent"), "outstanding")).toEqual({ kind: "wait" });
+  });
+
+  test("is never the Unreachable screen", () => {
+    for (const fetch of EVERY_FETCH) {
+      expect(launchDestination(stale("customer"), fetch)).not.toEqual({
+        kind: "unreachable",
+      });
+    }
+  });
+});
 
 describe("the three Hydration outcomes", () => {
   test("signed in goes to the Hub for the role the server gave", () => {

@@ -141,7 +141,7 @@ export function useConversationRoom(conversationId: string | null): void {
 }
 
 function useRealtimeConnection(): RealtimeValue {
-  const { state } = useAuth()
+  const { state, confirmStaleSession } = useAuth()
   /**
    * Whose connection this is, or nobody's. Keyed on the id so signing out and
    * back in as someone else opens a new one rather than keeping the first
@@ -177,6 +177,11 @@ function useRealtimeConnection(): RealtimeValue {
     socket.on('connect', () => {
       if (connectedBefore) emit({ kind: 'resync' })
       connectedBefore = true
+      // A socket that connected is the server answering, which is the one thing
+      // a Stale session is waiting for — and the only moment of it this app can
+      // see while it is open and in the foreground. A no-op for a session that
+      // was confirmed at launch, which is nearly all of them.
+      confirmStaleSession()
     })
 
     socket.on(REALTIME_EVENTS.messageCreated, (payload: unknown) => {
@@ -204,7 +209,7 @@ function useRealtimeConnection(): RealtimeValue {
       socket.removeAllListeners()
       socket.disconnect()
     }
-  }, [emit, userId])
+  }, [confirmStaleSession, emit, userId])
 
   return useMemo(
     () => ({

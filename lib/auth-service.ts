@@ -22,9 +22,12 @@ import {
   requestGoogleIdToken,
 } from "@/lib/google-session";
 import {
+  clearKeptPerson,
   clearRetiredCredential,
   clearSessionCookie,
+  readKeptPerson,
   readSessionCookie,
+  writeKeptPerson,
   writeSessionCookie,
 } from "@/lib/keychain";
 import { purgeMockSession } from "@/lib/legacy-session";
@@ -35,6 +38,7 @@ import {
 } from "@/lib/magic-link-config";
 import { setSessionUser } from "@/lib/session";
 import { wipeStoreAndAttachments } from "@/lib/session-wipe";
+import type { SessionUser } from "@/lib/types";
 
 /**
  * The I/O the auth state machine cannot do.
@@ -66,11 +70,22 @@ let credentialEpoch = 0;
 /**
  * Bring the keychain and the held credential in line with what just happened.
  *
- * A transport failure or an unreadable answer deliberately changes nothing: the
- * stored cookie may well still be good, and throwing it away because the train
- * went into a tunnel would sign the person out for the wrong reason.
+ * A transport failure or an unreadable answer deliberately changes nothing about
+ * the credential: the stored cookie may well still be good, and throwing it away
+ * because the train went into a tunnel would sign the person out for the wrong
+ * reason.
+ *
+ * `kept` is the Kept person, and only Hydration passes one — it is who this
+ * device says the cookie belongs to, and it answers exactly the outcomes that
+ * leave the cookie alone. This is the only exhaustive list of those outcomes in
+ * the app outside the state machine's own, which is why the mirror is set here
+ * rather than at the call site guessing which branch it landed in.
  */
-async function applyOutcome(outcome: AuthOutcome, startedAt: number): Promise<void> {
+async function applyOutcome(
+  outcome: AuthOutcome,
+  startedAt: number,
+  kept: SessionUser | null = null,
+): Promise<void> {
   if (startedAt !== credentialEpoch) return;
 
   switch (outcome.kind) {
@@ -78,16 +93,25 @@ async function applyOutcome(outcome: AuthOutcome, startedAt: number): Promise<vo
       setSessionCookie(outcome.cookie);
       setSessionUser(outcome.user);
       await writeSessionCookie(outcome.cookie);
+      // Beside the cookie, in the same write: from here a cold start that cannot
+      // reach the API still knows who this is. Written on every established
+      // session, including the one that just confirmed a Stale one, so a role
+      // changed on the web is what the *next* cold start restores.
+      await writeKeptPerson(outcome.user);
       return;
     // Neither establishes a session, so neither may leave a credential behind.
     case "unauthorised":
     case "two-factor":
       await forgetCredential();
       return;
-    // None of these say the credential is bad, so none of them may erase it.
+    // None of these say the credential is bad, so none of them may erase it —
+    // and with a Kept person to hand, none of them leaves the screens with
+    // nobody to draw either. The state machine reaches the same verdict from the
+    // same three cases; this is what makes `getSession()` agree with it.
     case "transport-failure":
     case "server-error":
     case "malformed":
+      if (kept) setSessionUser(kept);
       return;
   }
 }
@@ -129,15 +153,35 @@ async function forgetCredential(): Promise<void> {
   clearCsrfPair();
   setSessionUser(null);
   await clearSessionCookie();
+  // With the cookie, always. A person kept beside a credential that has gone
+  // would sign the next cold start in as them off a cookie that no longer
+  // exists — or, worse on a shared device, hand their name to whoever picks the
+  // phone up next.
+  await clearKeptPerson();
   await wipeStoreAndAttachments().catch(() => {});
 }
 
 /**
+ * What a Hydration found: what the API said, and who this device already thought
+ * it was.
+ *
+ * Both, because the second only means anything in the light of the first. See
+ * `afterHydration` in `lib/auth-machine`, which is where they are read together.
+ */
+export type HydrationResult = {
+  outcome: AuthOutcome | null;
+  kept: SessionUser | null;
+};
+
+/**
  * Cold start: read the stored Session cookie and find out who it belongs to.
  *
- * Returns null when there was no cookie to check — a first run, or after a sign-out.
+ * `outcome: null` means there was no cookie to check — a first run, or after a
+ * sign-out. `kept` is the person stored beside that cookie, which is what lets a
+ * launch with no network answer "this is who you were, and none of it is
+ * confirmed" instead of answering nothing at all.
  */
-export async function hydrateAuth(): Promise<AuthOutcome | null> {
+export async function hydrateAuth(): Promise<HydrationResult> {
   // Captured before the first await, so a sign-out arriving at any point during
   // hydration — including while the keychain read is outstanding — invalidates it.
   const startedAt = credentialEpoch;
@@ -147,21 +191,54 @@ export async function hydrateAuth(): Promise<AuthOutcome | null> {
   // sign-in.
   void purgeMockSession();
   void clearRetiredCredential();
-  const cookie = await readSessionCookie();
+  // Together, because they are one credential in two keys and the launch screen
+  // is waiting on both.
+  const [cookie, kept] = await Promise.all([readSessionCookie(), readKeptPerson()]);
 
   // A sign-out that overtook the keychain read wins outright — holding the cookie
   // it just deleted would attach a credential to every later request.
-  if (startedAt !== credentialEpoch) return null;
+  if (startedAt !== credentialEpoch) return { outcome: null, kept: null };
 
   if (!cookie) {
     await forgetCredential();
-    return null;
+    // Deliberately not carried: a Kept person with no cookie is not half a
+    // session, it is leftovers, and `forgetCredential` has just removed them.
+    return { outcome: null, kept: null };
   }
 
   // Held before the request so `apiRequest` attaches it, same as every later call.
   setSessionCookie(cookie);
 
   const outcome = interpretSession(await apiRequest(SESSION_PATH), cookie);
+  await applyOutcome(outcome, startedAt, kept);
+  return { outcome, kept };
+}
+
+/**
+ * Ask the API who the held cookie belongs to, with a session already on screen.
+ *
+ * The same request Hydration makes and a different job: nothing is waiting on
+ * this, so there is no launch screen to hold up and nothing to navigate. It
+ * replaces a Stale session with a confirmed one where it stands.
+ *
+ * Through `authenticatedRequest` rather than `apiRequest`, which is the whole
+ * difference that matters: a cookie that expired while the phone had no signal
+ * is an ordinary Session expiry here — the credential goes, the Store goes with
+ * it, and the person is told — instead of the silent sign-out a second Hydration
+ * would produce. A refusal is not this function's to report; by the time it
+ * returns, the expiry has already been announced.
+ *
+ * Answers null when there is nothing to confirm against, which is a session that
+ * ended while the request was being made.
+ */
+export async function confirmSession(): Promise<AuthOutcome | null> {
+  const cookie = getSessionCookie();
+  if (!cookie) return null;
+
+  const startedAt = credentialEpoch;
+  const outcome = interpretSession(await authenticatedRequest(SESSION_PATH), cookie);
+  if (startedAt !== credentialEpoch) return null;
+
   await applyOutcome(outcome, startedAt);
   return outcome;
 }

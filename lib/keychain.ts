@@ -1,7 +1,10 @@
 import * as SecureStore from "expo-secure-store";
 
+import { parseKeptPerson, serialiseKeptPerson } from "@/lib/kept-person";
+import type { SessionUser } from "@/lib/types";
+
 /**
- * The Session cookie's only home on the device.
+ * The Session cookie's only home on the device, and the signed-in person's.
  *
  * Every operation degrades rather than throws. `expo-secure-store` is a native
  * module: in Expo Go on some platforms, on web, and on a device whose keystore
@@ -13,6 +16,16 @@ import * as SecureStore from "expo-secure-store";
 
 /** Namespaced so it cannot collide with anything a later feature stores. */
 export const SESSION_COOKIE_KEY = "enki.session_cookie";
+
+/**
+ * The Kept person: who the cookie above belongs to, as this device last heard it.
+ *
+ * Beside the cookie rather than in the Store, because it is part of the
+ * credential rather than part of what the credential can read: it lives and dies
+ * with the cookie, in the same keystore, and `forgetCredential` takes both. See
+ * `docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`.
+ */
+export const KEPT_PERSON_KEY = "enki.session_user";
 
 /**
  * The key the previous slice of Phase 3a stored its credential under.
@@ -66,5 +79,46 @@ export async function clearRetiredCredential(): Promise<void> {
     await SecureStore.deleteItemAsync(RETIRED_CREDENTIAL_KEY);
   } catch {
     // See above: nothing here is recoverable and nothing downstream reads it.
+  }
+}
+
+/** The Kept person, or null when nobody is kept and when the keystore cannot say. */
+export async function readKeptPerson(): Promise<SessionUser | null> {
+  try {
+    const stored = await SecureStore.getItemAsync(KEPT_PERSON_KEY);
+    return parseKeptPerson(typeof stored === "string" ? stored : null);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Put the signed-in person down beside their cookie.
+ *
+ * No boolean, unlike the cookie: a write that would not land costs the next cold
+ * start its Stale session and nothing more — Hydration falls back to Unreachable,
+ * which is exactly where it was before there was a Kept person to read.
+ */
+export async function writeKeptPerson(user: SessionUser): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(KEPT_PERSON_KEY, serialiseKeptPerson(user));
+  } catch {
+    // See above: nothing downstream can act on this failing.
+  }
+}
+
+/**
+ * Remove the Kept person.
+ *
+ * Silent for the same reason `clearSessionCookie` is not: that one is the
+ * credential, and this one cannot authenticate anything on its own. A delete the
+ * keystore refuses leaves a name and an email behind, which the next Hydration
+ * will only ever read alongside a cookie it has just been handed.
+ */
+export async function clearKeptPerson(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(KEPT_PERSON_KEY);
+  } catch {
+    // See above.
   }
 }

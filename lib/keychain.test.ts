@@ -1,12 +1,17 @@
 import * as SecureStore from "expo-secure-store";
 
 import {
+  clearKeptPerson,
   clearRetiredCredential,
   clearSessionCookie,
+  KEPT_PERSON_KEY,
+  readKeptPerson,
   readSessionCookie,
   SESSION_COOKIE_KEY,
+  writeKeptPerson,
   writeSessionCookie,
 } from "@/lib/keychain";
+import type { SessionUser } from "@/lib/types";
 
 jest.mock("expo-secure-store", () => ({
   getItemAsync: jest.fn(),
@@ -17,6 +22,13 @@ jest.mock("expo-secure-store", () => ({
 const store = SecureStore as jest.Mocked<typeof SecureStore>;
 
 const COOKIE = "better-auth.session_token=abc.def";
+
+const AGENT: SessionUser = {
+  id: "56e168f0-3b5a-49fb-b475-0063c78a2337",
+  name: "QA Agent",
+  email: "qa-agent@talo.test",
+  role: "agent",
+};
 
 /** What a missing native module actually throws, verbatim enough to be recognisable. */
 const NATIVE_MODULE_FAILURE = new Error(
@@ -102,6 +114,57 @@ describe("clearRetiredCredential", () => {
   });
 });
 
+describe("the Kept person", () => {
+  test("is stored under its own key, as the four fields", async () => {
+    store.setItemAsync.mockResolvedValueOnce(undefined);
+    await writeKeptPerson(AGENT);
+
+    const [key, value] = store.setItemAsync.mock.calls[0];
+    expect(key).toBe(KEPT_PERSON_KEY);
+    expect(JSON.parse(value)).toEqual(AGENT);
+  });
+
+  test("reads back as the person who was written", async () => {
+    store.getItemAsync.mockResolvedValueOnce(JSON.stringify(AGENT));
+    await expect(readKeptPerson()).resolves.toEqual(AGENT);
+    expect(store.getItemAsync).toHaveBeenCalledWith(KEPT_PERSON_KEY);
+  });
+
+  test("an empty keystore keeps nobody", async () => {
+    store.getItemAsync.mockResolvedValueOnce(null);
+    await expect(readKeptPerson()).resolves.toBeNull();
+  });
+
+  // The fallback is Unreachable, which is where a build with no Kept person at
+  // all already lands — never a session signed in as half a person.
+  test("a value this build cannot read keeps nobody", async () => {
+    store.getItemAsync.mockResolvedValueOnce("{ not json");
+    await expect(readKeptPerson()).resolves.toBeNull();
+  });
+
+  test("a native-module failure keeps nobody rather than throwing", async () => {
+    store.getItemAsync.mockRejectedValueOnce(NATIVE_MODULE_FAILURE);
+    await expect(readKeptPerson()).resolves.toBeNull();
+  });
+
+  test("a write the keystore refuses is silent — the next cold start is Unreachable", async () => {
+    store.setItemAsync.mockRejectedValueOnce(NATIVE_MODULE_FAILURE);
+    await expect(writeKeptPerson(AGENT)).resolves.toBeUndefined();
+  });
+
+  test("clearing removes the person and nothing else", async () => {
+    store.deleteItemAsync.mockResolvedValueOnce(undefined);
+    await clearKeptPerson();
+    expect(store.deleteItemAsync).toHaveBeenCalledWith(KEPT_PERSON_KEY);
+    expect(store.deleteItemAsync).not.toHaveBeenCalledWith(SESSION_COOKIE_KEY);
+  });
+
+  test("a delete the keystore refuses is silent rather than thrown", async () => {
+    store.deleteItemAsync.mockRejectedValueOnce(NATIVE_MODULE_FAILURE);
+    await expect(clearKeptPerson()).resolves.toBeUndefined();
+  });
+});
+
 describe("round trip", () => {
   test("what is written is what is read back", async () => {
     const disk: Record<string, string> = {};
@@ -118,6 +181,25 @@ describe("round trip", () => {
 
     await clearSessionCookie();
     await expect(readSessionCookie()).resolves.toBeNull();
+  });
+
+  test("the cookie and the person go in and come back together", async () => {
+    const disk: Record<string, string> = {};
+    store.setItemAsync.mockImplementation(async (key, value) => {
+      disk[key] = value;
+    });
+    store.getItemAsync.mockImplementation(async (key) => disk[key] ?? null);
+    store.deleteItemAsync.mockImplementation(async (key) => {
+      delete disk[key];
+    });
+
+    await writeSessionCookie(COOKIE);
+    await writeKeptPerson(AGENT);
+    await expect(readKeptPerson()).resolves.toEqual(AGENT);
+
+    await clearSessionCookie();
+    await clearKeptPerson();
+    await expect(readKeptPerson()).resolves.toBeNull();
   });
 
   test("clearing the retired key does not disturb the stored cookie", async () => {

@@ -89,6 +89,7 @@ describe("what the machine does with a finished attempt", () => {
     expect(after({ kind: "settled", outcome })).toEqual({
       status: "signed-in",
       user: CUSTOMER,
+      stale: false,
     });
   });
 

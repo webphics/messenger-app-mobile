@@ -8,6 +8,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { AppState } from "react-native";
 
 import {
   authTransition,
@@ -16,6 +17,7 @@ import {
 } from "@/lib/auth-machine";
 import type { AuthOutcome, MagicLinkRequestOutcome } from "@/lib/auth-response";
 import {
+  confirmSession,
   hydrateAuth,
   onSessionExpired,
   requestMagicLink as sendMagicLink,
@@ -63,6 +65,15 @@ type AuthContextValue = {
   signOut: () => Promise<void>;
   /** Try hydration again after an Unreachable cold start. */
   retry: () => void;
+  /**
+   * Ask the API to confirm a Stale session, if this one is Stale.
+   *
+   * A no-op otherwise, so a caller does not have to know which kind of session
+   * it is holding — it only has to know that the API just answered something.
+   * `RealtimeProvider` is the caller: a socket that connected is this app's one
+   * event-shaped proof that the server is reachable again.
+   */
+  confirmStaleSession: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -82,14 +93,83 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (state.status !== "hydrating") return;
 
     let live = true;
-    void hydrateAuth().then((outcome) => {
-      if (live) dispatch({ type: "hydrated", outcome });
+    void hydrateAuth().then((result) => {
+      if (live) dispatch({ type: "hydrated", ...result });
     });
 
     return () => {
       live = false;
     };
   }, [state.status]);
+
+  /** Whether a confirmation is already out. Two would ask the same question twice. */
+  const confirming = useRef(false);
+
+  const stale = state.status === "signed-in" && state.stale;
+
+  /**
+   * Read by `confirmStaleSession`, which is stable and therefore cannot close
+   * over the render's value. Synced in an effect declared before the one that
+   * calls it, so the first confirmation of a Stale session sees `true`.
+   */
+  const staleNow = useRef(false);
+  useEffect(() => {
+    staleNow.current = stale;
+  }, [stale]);
+
+  /**
+   * Ask the API who this is, when this session is one nobody has confirmed.
+   *
+   * Stable, because the socket effect that calls it must not be torn down and
+   * rebuilt every time this changes — which is why the flag is read from a ref
+   * rather than closed over. Guarded twice: a session that is not Stale has
+   * nothing to confirm, and a confirmation already out is not asked twice.
+   *
+   * `confirmSession` goes out as an authenticated request, so the answer this
+   * function cannot see is the one that matters most: a cookie that expired
+   * while there was no signal ends the session the ordinary way, through the
+   * expiry listener below, rather than through anything here.
+   */
+  const confirmStaleSession = useCallback(() => {
+    if (!staleNow.current || confirming.current) return;
+    confirming.current = true;
+
+    void confirmSession()
+      .then((outcome) => {
+        // Anything else leaves the session exactly as it is: still signed in,
+        // still unconfirmed, still drawing what this device holds.
+        if (outcome?.kind === "signed-in") {
+          dispatch({ type: "confirmed", user: outcome.user });
+        }
+      })
+      .finally(() => {
+        confirming.current = false;
+      });
+  }, []);
+
+  /**
+   * The two moments this provider can see for itself.
+   *
+   * Once on the way in, because the launch that produced a Stale session may
+   * have raced a network that came back a second later; and then on every
+   * return to the foreground, because that is what a phone coming out of a
+   * pocket looks like from in here. The third moment — the network itself
+   * coming back while the app is open — is the socket's, and it calls
+   * `confirmStaleSession` directly. No timer and no retry loop: a Stale session
+   * is a working session, so there is nothing to poll for.
+   */
+  useEffect(() => {
+    if (!stale) return;
+
+    confirmStaleSession();
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active") confirmStaleSession();
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [stale, confirmStaleSession]);
 
   /**
    * The other way a session ends. `lib/auth-service` has already discarded the
@@ -192,6 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestMagicLink,
       signOut,
       retry,
+      confirmStaleSession,
     }),
     [
       state,
@@ -201,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestMagicLink,
       signOut,
       retry,
+      confirmStaleSession,
     ],
   );
 
