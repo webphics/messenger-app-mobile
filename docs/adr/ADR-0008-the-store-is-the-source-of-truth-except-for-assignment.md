@@ -23,6 +23,9 @@ over the same rows on, and a Store restored from disk can present one that was t
 was in a pocket. Reads and sends are cheap to be wrong about and easy to correct; claiming a thread
 somebody else is already answering is neither.
 
+The database is unencrypted, and what that costs is qualified by ADR-0011: the reasoning holds only
+while the file stays on the phone, so the file is excluded from both platforms' device backups.
+
 The cost is two copies of the truth and a write on every state change, which is the standard price of
 this arrangement — it is Redux with persistence, not an invention. What it buys is the thing that
 started this: a cold start draws the last thing the device knew instead of a spinner, and a screen
