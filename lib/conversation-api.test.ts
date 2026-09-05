@@ -1,6 +1,7 @@
 import { API_BASE_URL } from '@/lib/api-config'
 import { clearCsrfPair, setSessionCookie } from '@/lib/api-client'
 import {
+  addReaction,
   createStaffDm,
   engageConversation,
   ensureSupportConversation,
@@ -10,6 +11,7 @@ import {
   listMyOrganizations,
   listStaffDirectory,
   markConversationRead,
+  removeReaction,
   sendMessage,
   takeOverConversation,
   uploadAttachment,
@@ -515,6 +517,81 @@ describe('markConversationRead', () => {
     expect(await markConversationRead('missing')).toEqual({
       ok: false,
       failure: { kind: 'refused', message: 'Conversation not found' },
+    })
+  })
+})
+
+describe('addReaction', () => {
+  const REACTED = { ...MESSAGE_ROW, reactions: [{ emoji: '❤️', userId: 'customer-1' }] }
+
+  test('posts the emoji to the message reactions path, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope(REACTED))
+
+    const result = await addReaction('conv-1', 'msg-1', '❤️')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/messages/msg-1/reactions`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(calls[1]?.init.body).toBe(JSON.stringify({ emoji: '❤️' }))
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        id: 'msg-1',
+        reactions: [{ emoji: '❤️', userId: 'customer-1' }],
+      }),
+    })
+  })
+
+  test('escapes the ids rather than letting them shape the path', async () => {
+    enqueue(csrfResponse(), envelope(REACTED))
+
+    await addReaction('conv 1/..', 'msg 1/..', '❤️')
+
+    expect(calls[1]?.url).toBe(
+      `${API_BASE_URL}/conversations/conv%201%2F../messages/msg%201%2F../reactions`,
+    )
+  })
+
+  test('reports a request that never landed as unreachable', async () => {
+    enqueue(csrfResponse(), new TypeError('Network request failed'))
+
+    expect(await addReaction('conv-1', 'msg-1', '❤️')).toEqual({
+      ok: false,
+      failure: { kind: 'unreachable' },
+    })
+  })
+
+  test('repeats what the server said when it refused', async () => {
+    enqueue(csrfResponse(), response(403, { statusCode: 403, message: 'You cannot write here' }))
+
+    expect(await addReaction('conv-1', 'msg-1', '❤️')).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'You cannot write here' },
+    })
+  })
+})
+
+describe('removeReaction', () => {
+  test('deletes at the same path, and sends no body', async () => {
+    enqueue(csrfResponse(), envelope(MESSAGE_ROW))
+
+    const result = await removeReaction('conv-1', 'msg-1')
+
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/messages/msg-1/reactions`)
+    expect(calls[1]?.init.method).toBe('DELETE')
+    expect(calls[1]?.init.body).toBeUndefined()
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ reactions: [] }) })
+  })
+
+  test('reports a 401 as an expired session rather than a refusal', async () => {
+    enqueue(csrfResponse(), response(401, { statusCode: 401, message: 'Unauthorized' }))
+
+    expect(await removeReaction('conv-1', 'msg-1')).toEqual({
+      ok: false,
+      failure: { kind: 'unauthorised' },
     })
   })
 })

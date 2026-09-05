@@ -89,9 +89,27 @@ type MessageBubbleProps = {
    * after it is stacked below, inside whatever chrome the first chose.
    */
   attachments?: AttachmentView[]
-  onOpenMenu: (payload: OpenMenuPayload) => void
+  /**
+   * Absent where the long press has nothing to open — a thread this person may
+   * only read, where they can neither reply nor react.
+   *
+   * The gesture goes with it rather than the menu alone: a long press dims the
+   * bubble as it begins, and the dimming is only ever undone by the menu it
+   * opened closing again. One that opened nothing would leave the bubble dark.
+   */
+  onOpenMenu?: (payload: OpenMenuPayload) => void
   onReply: (messageId: string) => void
-  onToggleReaction: (messageId: string, emoji: string) => void
+  /**
+   * Absent where this message cannot be reacted to — a thread this person may
+   * only read, and a message the server has never seen.
+   *
+   * Absent rather than refused, because the chip row is the one place a
+   * reaction is offered *outside* the long-press menu: a tap on a chip toggles
+   * it. Where nothing can come of that, the chips are still drawn — they are
+   * what other people reacted, which is worth reading — and simply are not
+   * buttons.
+   */
+  onToggleReaction?: (messageId: string, emoji: string) => void
 }
 
 const SWIPE_REPLY = 56
@@ -401,7 +419,7 @@ const ReactionBadge = memo(function ReactionBadge({
   reactions: ReactionGroup[]
   outgoing: boolean
   currentUserId: string
-  onToggleReaction: (emoji: string) => void
+  onToggleReaction?: (emoji: string) => void
 }) {
   if (reactions.length === 0) return null
   const total = reactions.reduce((n, r) => n + r.userIds.length, 0)
@@ -412,20 +430,26 @@ const ReactionBadge = memo(function ReactionBadge({
         outgoing ? 'right-2' : 'left-2',
       )}
     >
-      {reactions.map((reaction) => (
-        <Pressable
-          key={reaction.emoji}
-          accessibilityRole="button"
-          accessibilityLabel={`React ${reaction.emoji}`}
-          onPress={() => {
-            hapticSelection()
-            onToggleReaction(reaction.emoji)
-          }}
-          className="px-0.5 active:opacity-60"
-        >
-          <Text variant="meta">{reaction.emoji}</Text>
-        </Pressable>
-      ))}
+      {reactions.map((reaction) =>
+        onToggleReaction ? (
+          <Pressable
+            key={reaction.emoji}
+            accessibilityRole="button"
+            accessibilityLabel={`React ${reaction.emoji}`}
+            onPress={() => {
+              hapticSelection()
+              onToggleReaction(reaction.emoji)
+            }}
+            className="px-0.5 active:opacity-60"
+          >
+            <Text variant="meta">{reaction.emoji}</Text>
+          </Pressable>
+        ) : (
+          <View key={reaction.emoji} className="px-0.5">
+            <Text variant="meta">{reaction.emoji}</Text>
+          </View>
+        ),
+      )}
       {total > 1 ? (
         <Text
           variant="label"
@@ -526,6 +550,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   const reportOpen = useCallback(
     (absX: number, absY: number) => {
+      if (!onOpenMenu) return
       const size = sizeRef.current
       const fallback = () => {
         onOpenMenu({
@@ -560,30 +585,37 @@ export const MessageBubble = memo(function MessageBubble({
     onReply(messageId)
   }, [messageId, onReply])
 
-  const handleToggleReaction = useCallback(
-    (emoji: string) => {
-      onToggleReaction(messageId, emoji)
-    },
+  const handleToggleReaction = useMemo(
+    () =>
+      onToggleReaction
+        ? (emoji: string) => {
+            onToggleReaction(messageId, emoji)
+          }
+        : undefined,
     [messageId, onToggleReaction],
   )
 
   const gesture = useMemo(
     () =>
       Gesture.Race(
-        Gesture.LongPress()
-          .minDuration(LONG_PRESS_MS)
-          .maxDistance(12)
-          .onBegin(() => {
-            tint.value = withTiming(0.55, { duration: 80 })
-          })
-          .onStart((e) => {
-            tint.value = 1
-            runOnJS(hapticMedium)()
-            runOnJS(reportOpen)(e.absoluteX, e.absoluteY)
-          })
-          .onFinalize((_, ok) => {
-            if (!ok) tint.value = withTiming(0, { duration: 60 })
-          }),
+        ...(onOpenMenu
+          ? [
+              Gesture.LongPress()
+                .minDuration(LONG_PRESS_MS)
+                .maxDistance(12)
+                .onBegin(() => {
+                  tint.value = withTiming(0.55, { duration: 80 })
+                })
+                .onStart((e) => {
+                  tint.value = 1
+                  runOnJS(hapticMedium)()
+                  runOnJS(reportOpen)(e.absoluteX, e.absoluteY)
+                })
+                .onFinalize((_, ok) => {
+                  if (!ok) tint.value = withTiming(0, { duration: 60 })
+                }),
+            ]
+          : []),
         Gesture.Pan()
           .activeOffsetX(18)
           .failOffsetY([-18, 18])
@@ -602,7 +634,7 @@ export const MessageBubble = memo(function MessageBubble({
             swipedHaptic.value = false
           }),
       ),
-    [handleReply, reportOpen, swipedHaptic, tint, x],
+    [handleReply, onOpenMenu, reportOpen, swipedHaptic, tint, x],
   )
 
   const swipeStyle = useAnimatedStyle(() => ({

@@ -239,6 +239,7 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
       onRetrySend={thread.retrySend}
       sendError={thread.sendError}
       onDismissSendError={thread.dismissSendError}
+      onToggleReaction={thread.react}
       onAssign={assignment.assign}
       assigning={assignment.assigning}
       assignError={assignment.error}

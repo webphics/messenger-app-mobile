@@ -699,6 +699,32 @@ const PREVIEW_LENGTH = 140
  * exactly as it was. The `conversation.updated` beside it carries the whole row
  * and adds it; inventing one from a message would mean guessing a type and an
  * organization the payload does not carry.
+ *
+ * And a message no newer than the row's newest is not news about the row. The
+ * API broadcasts `message.created` for every change to a message, not only for a
+ * new one — a receipt advancing, and now a reaction somebody put on something
+ * said yesterday. Read as an arrival, one of those drags the row's timestamp
+ * back to the reacted message's, rewrites the preview with its body, and drops
+ * the conversation down an order sorted on exactly that. The thread still wants
+ * every one of them, which is why the rule is here rather than at the socket:
+ * `applyIncomingMessage` merges them by id and the bubble changes; the list has
+ * nothing to learn from one.
+ *
+ * Strictly newer rather than newer-or-equal, because of the order the API emits
+ * in: `message.created` goes out before the `conversation.updated` beside it, so
+ * a genuinely new message always arrives while the row still describes the one
+ * before it. Two messages inside one millisecond would cost the second its
+ * count, and the next list fetch corrects that.
+ *
+ * The row's receipt is left to that `conversation.updated`. A message
+ * re-broadcast because its receipt advanced carries the timestamp it always had
+ * and is turned away here — which changes nothing in practice, since the list
+ * was already dropping it a layer up: `createCountedMessages` remembers the ids
+ * it has counted and `ConversationInboxProvider` drops a repeat outright. That
+ * guard exists because adding is not idempotent; this one because moving a row
+ * backwards in time is not either. They overlap and neither covers the other:
+ * that one lets a reaction on a message it never counted through, and this one
+ * lets the second of two messages in one conversation through.
  */
 export function withIncomingMessage(
   conversations: Conversation[],
@@ -710,6 +736,10 @@ export function withIncomingMessage(
   if (index === -1) return conversations
 
   const held = conversations[index]
+  // Parsed rather than compared as text: both are the API's own ISO strings, and
+  // the rest of this module already reads a timestamp as a number.
+  if (Date.parse(message.createdAt) <= conversationActivityAt(held)) return conversations
+
   const mine = isOutgoing(message, viewerId)
 
   const next = [...conversations]
