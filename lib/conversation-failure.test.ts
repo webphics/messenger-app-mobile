@@ -1,4 +1,4 @@
-import { assignmentRefusal, failureNotice } from '@/lib/conversation-failure'
+import { assignmentRefusal, failureNotice, readRefusal } from '@/lib/conversation-failure'
 
 describe('failureNotice', () => {
   test('offers a retry for a request that never arrived', () => {
@@ -63,5 +63,29 @@ describe('assignmentRefusal', () => {
 
   test('says nothing about an expired session, which is already leaving the screen', () => {
     expect(assignmentRefusal({ kind: 'unauthorised' })).toBeNull()
+  })
+})
+
+describe('readRefusal', () => {
+  test('says what is drawn is what this device had, rather than that it is all there is', () => {
+    expect(readRefusal({ kind: 'unreachable' })).toBe(
+      'No connection. This is what this device already had.',
+    )
+  })
+
+  test('repeats a refusal in the server’s own words', () => {
+    expect(readRefusal({ kind: 'refused', message: 'Too many requests.' })).toBe(
+      'Too many requests.',
+    )
+  })
+
+  test('does not blame the person for a body it could not read', () => {
+    expect(readRefusal({ kind: 'malformed' })).toBe(
+      'The server answered with something this app did not understand.',
+    )
+  })
+
+  test('says nothing about an expired session over a thread that is already leaving', () => {
+    expect(readRefusal({ kind: 'unauthorised' })).toBeNull()
   })
 })

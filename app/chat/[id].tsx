@@ -230,6 +230,7 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
       loading={thread.loading}
       failure={thread.failure}
       onRetry={thread.retry}
+      onDismissFailure={thread.dismissFailure}
       onLoadOlder={thread.loadOlder}
       loadingOlder={thread.loadingOlder}
       refreshing={thread.refreshing}

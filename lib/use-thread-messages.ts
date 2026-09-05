@@ -94,6 +94,13 @@ export type ThreadMessages = {
   refreshing: boolean
   failure: ApiFailure | null
   /**
+   * Put away a read failure reported beside Messages that are still drawn.
+   *
+   * Only that one: over a thread with nothing to draw the failure is the whole
+   * screen, and there is nothing underneath for putting it away to reveal.
+   */
+  dismissFailure: () => void
+  /**
    * Why the last send did not land, in the API's own words.
    *
    * Separate from `failure`, which is about reading the thread and replaces what
@@ -738,6 +745,7 @@ export function useThreadMessages(
   const messages = useMemo(() => threadMessages(state), [state])
   const delivery = useMemo(() => deliveryStates(state.unsent), [state.unsent])
 
+  const dismissFailure = useCallback(() => setFailure(null), [])
   const dismissSendError = useCallback(() => setSendError(null), [])
 
   return {
@@ -747,6 +755,7 @@ export function useThreadMessages(
     loadingOlder,
     refreshing,
     failure,
+    dismissFailure,
     sendError,
     dismissSendError,
     loadOlder,
