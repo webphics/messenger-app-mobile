@@ -211,9 +211,16 @@ export function useThreadMessages(
   /** Whose copy of this thread is on this device. A phone is shared; a Store is not. */
   const ownerId = author?.id ?? null
 
+  /**
+   * Who is reading this thread — one object, because a page, a socket event and
+   * the Store must not be told different things about the same person.
+   *
+   * The id is empty for the roles still on local data, which sign nothing in and
+   * so have no Store, no Outbox and no echo to resolve.
+   */
   const viewer = useMemo<ThreadViewer | null>(
-    () => (conversationType ? { role, conversationType } : null),
-    [role, conversationType],
+    () => (conversationType ? { id: ownerId ?? '', role, conversationType } : null),
+    [ownerId, role, conversationType],
   )
 
   /** Which thread the answers coming back belong to, and which load of it. */
@@ -302,7 +309,7 @@ export function useThreadMessages(
 
   const fetchPage = useCallback(
     async (cursor: string | undefined, mine: number) => {
-      if (!conversationId || !conversationType) return
+      if (!conversationId || !viewer) return
       if (inFlight.current) return
       inFlight.current = true
 
@@ -321,14 +328,14 @@ export function useThreadMessages(
       setFailure(null)
       setState((thread) =>
         cursor
-          ? applyMessagePage(thread, page.value, { role, conversationType })
-          : applyNewestPage(thread, page.value, { role, conversationType }),
+          ? applyMessagePage(thread, page.value, viewer)
+          : applyNewestPage(thread, page.value, viewer),
       )
       setLoading(false)
       setLoadingOlder(false)
       setRefreshing(false)
     },
-    [conversationId, conversationType, role],
+    [conversationId, viewer],
   )
 
   useEffect(() => {
@@ -451,17 +458,9 @@ export function useThreadMessages(
     // whole thread for a row's preview would put the largest request in the app
     // on the path of every message anyone sends.
     if (event.kind !== 'message') return
-    if (event.conversationId !== conversationId || !conversationType) return
+    if (event.conversationId !== conversationId || !viewer) return
 
-    setState((thread) =>
-      applyIncomingMessage(thread, event.message, {
-        // Empty for the roles still on local data, which send nothing and so
-        // have no echo to confirm.
-        id: author?.id ?? '',
-        role,
-        conversationType,
-      }),
-    )
+    setState((thread) => applyIncomingMessage(thread, event.message, viewer))
   })
 
   /**

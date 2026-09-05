@@ -545,9 +545,24 @@ describe('fromOutboxRows', () => {
     ]
 
     expect(fromOutboxRows(toOutboxRows('viewer-1', 'conv-1', written))).toEqual([
-      { message: written[0], state: 'failed' },
-      { message: written[1], state: 'failed' },
+      { message: written[0], state: 'failed', restored: true },
+      { message: written[1], state: 'failed', restored: true },
     ])
+  })
+
+  /**
+   * The mark that tells a Restored entry from a send that failed while somebody
+   * watched. Nothing on screen shows it — both say *Not sent* — and what reads
+   * it is the rule that resolves one the API turns out to hold; see
+   * `UnsentMessage` in `lib/conversation-state`.
+   */
+  it('marks every row Restored, because a row is all this device has been told', () => {
+    const rows = toOutboxRows('viewer-1', 'conv-1', [
+      customerMessage('local-1', '2026-08-13T08:00:00.000Z'),
+      customerMessage('local-2', '2026-08-13T08:01:00.000Z'),
+    ])
+
+    expect(fromOutboxRows(rows).map((entry) => entry.restored)).toEqual([true, true])
   })
 
   /**
@@ -597,7 +612,7 @@ describe('fromOutboxRows', () => {
     })
 
     expect(fromOutboxRows(toOutboxRows('viewer-1', 'conv-1', [written]))).toEqual([
-      { message: written, state: 'failed' },
+      { message: written, state: 'failed', restored: true },
     ])
   })
 

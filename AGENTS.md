@@ -69,7 +69,20 @@ had. Ten seconds, and deliberately shorter than a Request deadline: sizing the b
 whatever is happening underneath only moves the number up, and the question is what somebody is
 asked to watch rather than what the network is allowed to take. Being cut off costs little — the
 Restored rows are already there, and a launch with none gets the list's own failure state, which is
-a screen a person can act on. A Try again that succeeds starts a launch, so it is bounded too. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`. What a cold start with no network knows: `docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`. What never leaves the phone: `docs/adr/ADR-0011-the-store-does-not-leave-the-phone-in-a-backup.md`.
+a screen a person can act on. A Try again that succeeds starts a launch, so it is bounded too. #53
+stopped a Restored message the API turned out to have received from offering to send itself again:
+the confirmed copy used to arrive beside it, the same words twice, one delivered and one marked
+*Not sent* under a *Retry* that would have posted a third. What the socket path could not read is
+now a property of the entry — `restored`, set once by `fromOutboxRows` and gone the moment somebody
+taps *Retry* — so a send that failed while somebody watched still keeps its place and its offer, and
+the rule is one a table can be written for. The page path learned it too, since a page is the more
+likely of the two to bring the copy back, and it learned it narrowly: only the viewer's own
+messages, only ones the viewer is actually shown, only Restored entries rather than anything a send
+of this session put there, and only Messages this device has never held — which the copy of an
+Outbox entry is by construction and history that reads the same is not. Deliberately not a
+comparison of times: the entry's timestamp is this phone's clock and the copy's is the server's, and
+the copy can anyway be older than Messages that arrived before the process died, since what stopped
+was the send and not the socket. Auth now needs a Development client — everything else still runs in Expo Go; see the README. Domain glossary: `CONTEXT.md`. Credential pattern: `docs/adr/ADR-0004-mirror-the-web-credential-pattern.md`. Google audience arrangement: `docs/adr/ADR-0005-the-google-audience-arrangement.md`. The socket handshake: `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`. How a file reaches the API: `docs/adr/ADR-0007-a-file-is-streamed-not-serialised.md`. Where the screens read from: `docs/adr/ADR-0008-the-store-is-the-source-of-truth-except-for-assignment.md`. What a cold start with no network knows: `docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`. What never leaves the phone: `docs/adr/ADR-0011-the-store-does-not-leave-the-phone-in-a-backup.md`.
 
 ## Interactions
 

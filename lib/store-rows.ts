@@ -355,9 +355,15 @@ export function toOutboxRows(
  * Rows back into the Unsent Messages of a thread, oldest first.
  *
  * Every one comes back *failed*, which is the whole of the state mapping — see
- * `OutboxRow`. Sorted through `mergeMessages` like a page of history, so the
- * order a restored Message is drawn in is decided by the same function that
- * orders the thread it is drawn into.
+ * `OutboxRow` — and every one comes back marked `restored`, which is the whole
+ * of the rest of it. The mark is what lets the thread tell these apart from a
+ * send that failed while somebody watched, and so resolve one the API turns out
+ * to hold rather than draw it beside its own confirmed copy; see
+ * `UnsentMessage` in `lib/conversation-state`.
+ *
+ * Sorted through `mergeMessages` like a page of history, so the order a restored
+ * Message is drawn in is decided by the same function that orders the thread it
+ * is drawn into.
  *
  * An unreadable row is dropped rather than thrown over, the same rule the
  * Messages follow. What it costs is one message a person will not see again,
@@ -380,5 +386,9 @@ export function fromOutboxRows(rows: readonly unknown[]): UnsentMessage[] {
     }
   }
 
-  return mergeMessages([], messages).map((message) => ({ message, state: 'failed' }))
+  return mergeMessages([], messages).map((message) => ({
+    message,
+    state: 'failed' as const,
+    restored: true,
+  }))
 }
