@@ -26,7 +26,6 @@ import { conversationTitle } from '@/lib/conversation-title'
 import {
   isLocalId,
   isOutgoing,
-  mergeMessages,
   messageSenderName,
   type DeliveryState,
   type SendDraft,
@@ -38,7 +37,7 @@ import {
   quoteLayoutMode,
   type BubbleContent,
 } from '@/lib/message-attachment'
-import { groupReactions, toggleReaction } from '@/lib/message-react'
+import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
 import { buildThreadRows, type ThreadRow } from '@/lib/thread-rows'
@@ -92,6 +91,18 @@ type ThreadScreenProps = {
   /** Why the last send did not land, in the API's own words. See `useThreadMessages`. */
   sendError?: string | null
   onDismissSendError?: () => void
+  /**
+   * A reaction tapped on a bubble, on its way to the API.
+   *
+   * This screen decides nothing about it — not what the tap means, not what it
+   * leaves the message holding. It reports the tap and draws whatever comes back
+   * in `messages`, so the reaction on screen is the one that has been written
+   * rather than one this screen is remembering.
+   *
+   * Required, like `onSendMessage` and for the same reason: a reaction row that
+   * reported nowhere is exactly what this screen used to have.
+   */
+  onToggleReaction: (messageId: string, emoji: string) => void
   /**
    * Claim this thread, or take it from whoever holds it.
    *
@@ -311,7 +322,7 @@ function ThreadEmpty({
 
 export function ThreadScreen({
   conversation,
-  messages: fetched,
+  messages,
   viewer,
   organizationNames,
   loading = false,
@@ -326,6 +337,7 @@ export function ThreadScreen({
   onRetrySend,
   sendError = null,
   onDismissSendError,
+  onToggleReaction,
   onAssign,
   assigning = false,
   assignError = null,
@@ -346,18 +358,6 @@ export function ThreadScreen({
    * reading it they are the same sentence about the same message.
    */
   const [refusal, setRefusal] = useState<string | null>(null)
-
-  /**
-   * What this screen did to the thread: a message typed into the composer, and a
-   * reaction tapped on one that came from the server.
-   *
-   * Held apart from the fetched pages and merged over them during render, rather
-   * than copied into one list an effect keeps in step. Both are keyed by id, so
-   * a local edit of a fetched message shadows it and a locally-typed message
-   * simply joins — and a new page never has to be reconciled with anything.
-   */
-  const [local, setLocal] = useState<Message[]>([])
-  const messages = useMemo(() => mergeMessages(fetched, local), [fetched, local])
 
   /**
    * Whether this person may write here.
@@ -460,6 +460,21 @@ export function ThreadScreen({
     setMenu(null)
   }, [])
 
+  /**
+   * Whether this message can be reacted to at all.
+   *
+   * Two ways it cannot: the API refuses a reaction from someone who may only
+   * read the thread, and a message this device is still carrying has no id the
+   * server would recognise. Both are decided here rather than swallowed in the
+   * handler, because a control that does nothing is worse than no control —
+   * where this is false the emoji tray is not offered and the chips are not
+   * buttons.
+   */
+  const canReact = useCallback(
+    (messageId: string) => !readOnly && !isLocalId(messageId),
+    [readOnly],
+  )
+
   const openMenu = useCallback((payload: OpenMenuPayload) => {
     const host = hostRef.current
     if (!host) return
@@ -476,20 +491,10 @@ export function ThreadScreen({
 
   const handleToggleReaction = useCallback(
     (messageId: string, emoji: string) => {
-      const target = messages.find((message) => message.id === messageId)
-      if (target) {
-        const reacted = {
-          ...target,
-          reactions: toggleReaction(target.reactions, emoji, viewer.id),
-        }
-        setLocal((held) => [
-          ...held.filter((message) => message.id !== messageId),
-          reacted,
-        ])
-      }
+      onToggleReaction?.(messageId, emoji)
       setMenu(null)
     },
-    [messages, viewer.id],
+    [onToggleReaction],
   )
 
   const handleReply = useCallback(
@@ -588,18 +593,22 @@ export function ThreadScreen({
           enter={isLocalId(item.message.id)}
           delivery={delivery?.get(item.message.id)}
           onRetrySend={onRetrySend}
-          onOpenMenu={openMenu}
+          // Nothing for it to open in a thread this person may only read: they
+          // can neither reply nor react in one.
+          onOpenMenu={readOnly ? undefined : openMenu}
           onReply={handleReply}
-          onToggleReaction={handleToggleReaction}
+          onToggleReaction={canReact(item.message.id) ? handleToggleReaction : undefined}
         />
       )
     },
     [
+      canReact,
       handleReply,
       handleToggleReaction,
       viewer.id,
       menuId,
       openMenu,
+      readOnly,
       quotedById,
       delivery,
       onRetrySend,
@@ -684,7 +693,11 @@ export function ThreadScreen({
         <MessageActions
           anchor={menu}
           onDismiss={dismissMenu}
-          onReact={(emoji) => handleToggleReaction(menu.messageId, emoji)}
+          onReact={
+            canReact(menu.messageId)
+              ? (emoji) => handleToggleReaction(menu.messageId, emoji)
+              : undefined
+          }
           onReply={readOnly ? undefined : () => handleReply(menu.messageId)}
         />
       ) : null}

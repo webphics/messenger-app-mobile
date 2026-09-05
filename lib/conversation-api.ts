@@ -257,6 +257,43 @@ export async function markConversationRead(id: string): Promise<ApiResult<Conver
 }
 
 /**
+ * Put this person's reaction on a message, or take it off again.
+ *
+ * Two endpoints rather than one, because the API models it as two, and one
+ * reaction per person per message either way: an add replaces whatever they
+ * reacted with before rather than joining it, which is the rule
+ * `toggleReaction` already encodes on this side. So the caller works out what a
+ * tap means and these only carry it.
+ *
+ * Both answer with the message as it now stands, reactions included — the same
+ * DTO a page carries — so the answer merges into the thread by id like any other
+ * copy of that message. The API broadcasts the same message to everyone else in
+ * the conversation, which is how their bubbles learn about it.
+ */
+export async function addReaction(
+  id: string,
+  messageId: string,
+  emoji: string,
+): Promise<ApiResult<Message>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/reactions`,
+    { method: 'POST', body: { emoji } },
+  )
+  return readOutcome(outcome, parseMessage)
+}
+
+export async function removeReaction(
+  id: string,
+  messageId: string,
+): Promise<ApiResult<Message>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/reactions`,
+    { method: 'DELETE' },
+  )
+  return readOutcome(outcome, parseMessage)
+}
+
+/**
  * The organizations the signed-in person belongs to.
  *
  * A Customer's support conversation is per-organization, so this is what names

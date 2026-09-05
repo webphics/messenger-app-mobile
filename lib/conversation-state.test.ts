@@ -1019,6 +1019,31 @@ describe('withIncomingMessage', () => {
     expect(withIncomingMessage(rows, 'conv-9', event.message, 'customer-1')).toBe(rows)
   })
 
+  test('a reaction on an older message leaves the row exactly as it was', () => {
+    // What the API broadcasts when somebody reacts: the reacted message, whole,
+    // on `message.created`. Read as an arrival it would drag the row back to
+    // yesterday and preview it with yesterday's body.
+    const reacted = messageCreatedEvent('a', '2026-08-12T08:00:00.000Z', { body: 'Yesterday' })
+
+    expect(withIncomingMessage(rows, 'conv-1', reacted.message, 'customer-1')).toBe(rows)
+  })
+
+  test('nor does one on the newest message, which shares the row’s timestamp', () => {
+    const reacted = messageCreatedEvent('a', '2026-08-13T08:00:00.000Z')
+
+    expect(withIncomingMessage(rows, 'conv-1', reacted.message, 'customer-1')).toBe(rows)
+  })
+
+  test('a row nobody has written in yet still takes its first message', () => {
+    const empty = [conversation({ id: 'conv-1', lastMessageAt: null, unreadCount: 0 })]
+    const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z')
+
+    expect(withIncomingMessage(empty, 'conv-1', event.message, 'customer-1')[0]).toMatchObject({
+      lastMessageAt: '2026-08-13T10:00:00.000Z',
+      unreadCount: 1,
+    })
+  })
+
   test('previews a long message at the length the API previews it', () => {
     const event = messageCreatedEvent('b', '2026-08-13T10:00:00.000Z', { body: 'x'.repeat(200) })
 

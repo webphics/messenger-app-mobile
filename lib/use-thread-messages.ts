@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
+  addReaction,
   listMessages,
+  removeReaction,
   sendMessage,
   uploadAttachment,
   MESSAGE_PAGE_LIMIT,
@@ -35,6 +37,7 @@ import {
   failSend,
   findUnsent,
   isLocalId,
+  mergeMessages,
   refuseSend,
   LOCAL_ID_PREFIX,
   threadContinues,
@@ -46,6 +49,7 @@ import {
   type ThreadState,
   type ThreadViewer,
 } from '@/lib/conversation-state'
+import { toggleReaction } from '@/lib/message-react'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
 
@@ -114,6 +118,14 @@ export type ThreadMessages = {
   send: (draft: SendDraft) => void
   /** Send a failed message again, in place. */
   retrySend: (localId: string) => void
+  /**
+   * React to a message, or take back the reaction already on it.
+   *
+   * One call for both, because to the person it is one tap: `toggleReaction`
+   * reads what they are holding and answers what they should be holding, and
+   * this carries whichever of the two endpoints that turned out to mean.
+   */
+  react: (messageId: string, emoji: string) => void
 }
 
 /**
@@ -221,6 +233,16 @@ export function useThreadMessages(
    */
   const delivering = useRef(new Set<string>())
   /**
+   * How many reactions this screen has sent for each message.
+   *
+   * A tap answers immediately and the request follows it, so two taps on one
+   * bubble put two requests out and the second is the one on screen. This is
+   * what tells the first one's answer that it is stale — the same job
+   * `generation` does for a page, kept per message because reacting to one
+   * bubble says nothing about another.
+   */
+  const reacting = useRef(new Map<string, number>())
+  /**
    * The current state, for the callbacks that must read it without being rebuilt
    * by it. Retry lives on a memoised bubble, and a callback that changed
    * identity on every page and every send would re-render every bubble in the
@@ -320,6 +342,7 @@ export function useThreadMessages(
       inFlight.current = false
       onScreen.current = null
       delivering.current.clear()
+      reacting.current.clear()
     }
   }, [conversationId, fetchPage])
 
@@ -561,6 +584,87 @@ export function useThreadMessages(
   )
 
   /**
+   * A reaction tapped on a bubble.
+   *
+   * The same three steps a send has, in the same order: the bubble changes
+   * first, the request goes after it, and a refusal puts the bubble back. It is
+   * the smallest thing in the app that does all three, which is the point of it
+   * — if the arrangement is wrong anywhere it is wrong here too.
+   *
+   * What a tap means is `toggleReaction`'s to decide and not this one's: one
+   * reaction per person per message, so a second emoji replaces the first rather
+   * than joining it, and the same emoji twice takes it off. Whether that comes
+   * out as an add or a remove is read off the answer rather than off the tap.
+   *
+   * A message this device is still carrying is not one to react to. It has no
+   * id the server would recognise; the screen does not offer the row on one, and
+   * this refuses it again.
+   *
+   * The optimistic reaction reaches the disk, because everything in
+   * `state.messages` does — so a process that dies with the request out restores
+   * a reaction that may never have been written. That is the Store being a few
+   * seconds behind, which ADR-0008 accepts everywhere but assignment: the next
+   * page of this thread carries the server's copy and replaces it. It is not the
+   * Outbox's case, where the *message* itself may never have existed.
+   */
+  const react = useCallback(
+    (messageId: string, emoji: string) => {
+      if (!conversationId || !author || isLocalId(messageId)) return
+
+      // From the ref for the same reason a retry is: this is about to start a
+      // request, which a `setState` updater may not do.
+      const before = held.current.messages.find((message) => message.id === messageId)
+      if (!before) return
+
+      const reactions = toggleReaction(before.reactions, emoji, author.id)
+      const added = reactions.some(
+        (reaction) => reaction.userId === author.id && reaction.emoji === emoji,
+      )
+
+      const mine = (reacting.current.get(messageId) ?? 0) + 1
+      reacting.current.set(messageId, mine)
+      setState((thread) => ({
+        ...thread,
+        messages: mergeMessages(thread.messages, [{ ...before, reactions }]),
+      }))
+
+      void (async () => {
+        const answer = added
+          ? await addReaction(conversationId, messageId, emoji)
+          : await removeReaction(conversationId, messageId)
+
+        if (onScreen.current !== conversationId) return
+        // A later tap on the same bubble is already on screen, and its own
+        // answer is the one worth having. Rolling this one back would undo a
+        // reaction the person can see and has not been refused.
+        if (reacting.current.get(messageId) !== mine) return
+
+        setState((thread) => {
+          const now = thread.messages.find((message) => message.id === messageId)
+          if (!now) return thread
+
+          // Onto the copy the thread holds now rather than onto the one the tap
+          // read: a receipt can have advanced while the request was out, and
+          // putting the whole older copy back would take that with it. Only this
+          // person's reaction is put back for the same reason — somebody else's,
+          // arriving over the socket in that window, did happen.
+          const settled = answer.ok
+            ? answer.value
+            : {
+                ...now,
+                reactions: [
+                  ...now.reactions.filter((reaction) => reaction.userId !== author.id),
+                  ...before.reactions.filter((reaction) => reaction.userId === author.id),
+                ],
+              }
+          return { ...thread, messages: mergeMessages(thread.messages, [settled]) }
+        })
+      })()
+    },
+    [author, conversationId],
+  )
+
+  /**
    * Every confirmed Message this thread reaches, written through to the Store.
    *
    * Observed here rather than written at each transition, the way the shared
@@ -650,6 +754,7 @@ export function useThreadMessages(
     retry,
     send,
     retrySend,
+    react,
   }
 }
 

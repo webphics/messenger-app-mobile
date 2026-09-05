@@ -82,6 +82,15 @@ staff screens only. Distinct from a System notice, which *is* in the thread and 
 a message.
 _Avoid_: Comment, private message, annotation
 
+**Reaction**:
+One emoji a person puts on a Message, and one per person per Message — picking another replaces the
+last rather than joining it, which is the API's rule and `toggleReaction`'s. Drawn as a chip row
+under the bubble, one chip per emoji with a count. A tap changes the bubble before the request
+leaves and a refusal puts it back, so a chip on screen is one that has been written or is about to
+be. Somebody else's arrives as the reacted Message over the Realtime connection, and persists with
+it.
+_Avoid_: Like, vote, emoji (bare, when the reaction is meant)
+
 ### Session
 
 **Session cookie**:

@@ -24,7 +24,8 @@ export type { ReactionAnchor };
 type MessageActionsProps = {
   anchor: ReactionAnchor;
   onDismiss: () => void;
-  onReact: (emoji: string) => void;
+  /** Absent where the message cannot be reacted to — see `MessageBubble`. */
+  onReact?: (emoji: string) => void;
   /** Absent where the thread has no composer to open a reply in. */
   onReply?: () => void;
 };
@@ -62,6 +63,10 @@ export function MessageActions({
         onPressIn={onDismiss}
         className="absolute inset-0"
       />
+      {/* Absent where nothing can come of a tap: a message the server has never
+          seen has no id to react to, and a thread this person may only read is
+          one the API refuses a reaction in. */}
+      {onReact ? (
       <Animated.View
         pointerEvents="auto"
         style={[
@@ -90,6 +95,7 @@ export function MessageActions({
           </TactilePressable>
         ))}
       </Animated.View>
+      ) : null}
 
       {/* Absent where the thread is read-only: a Reply with no composer to open
           would be a control that does nothing. */}

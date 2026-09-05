@@ -166,7 +166,22 @@ Broadcasts are in-inbox announcements (later), not stories.
      Attachment restores with its message, URI and all, but the picker's copy lives in the system
      cache and the system reclaims that — so a retry reads the file first and says which one has
      gone rather than failing on it (`lib/staged-file`). The table took the schema to version 4.
-   - 6g. Real reactions.
+   - 6g. **A reaction is real (done)** — the reaction row on a bubble used to write to an overlay
+     the thread screen held and nothing else, so it meant nothing and did not outlive the screen.
+     A tap now applies through the same three steps a send does and in the same order: the bubble
+     changes first, the request follows it, and a refusal or a dead network puts the bubble back.
+     `toggleReaction` was already written and table-tested and is unchanged — one reaction per
+     person per Message, so a second emoji replaces the first — and whether that came out as the
+     API's add or its remove is read off its answer rather than off the tap. A reaction somebody
+     else makes arrives as the reacted Message on `message.created` and folds in through
+     `applyIncomingMessage` like any other copy of it, and because Messages persist it persists
+     with them. It is deliberately the last ticket in the spec: the smallest feature that exercises
+     the whole write path, so an architecture that was wrong would be wrong here too.
+     The one thing it did turn up is that the *list* must ignore that broadcast: read as an
+     arrival, a reaction on yesterday's message dragged the row's timestamp back to yesterday,
+     previewed it with yesterday's body and dropped the conversation down an order sorted on
+     exactly that. `withIncomingMessage` now takes only a message newer than the row's newest;
+     the thread still takes every one of them.
 
 ## Session
 
