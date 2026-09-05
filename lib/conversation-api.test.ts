@@ -34,6 +34,9 @@ jest.mock('@/lib/keychain', () => ({
   writeSessionCookie: jest.fn(async () => true),
   clearSessionCookie: jest.fn(async () => true),
   clearRetiredCredential: jest.fn(async () => undefined),
+  readKeptPerson: jest.fn(async () => null),
+  writeKeptPerson: jest.fn(async () => undefined),
+  clearKeptPerson: jest.fn(async () => undefined),
 }))
 
 jest.mock('@/lib/legacy-session', () => ({

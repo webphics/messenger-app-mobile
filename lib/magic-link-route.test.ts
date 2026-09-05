@@ -65,7 +65,7 @@ describe("starting the check", () => {
   const tooEarly: [string, AuthState][] = [
     ["hydration has not finished", HYDRATING],
     ["a check is already in flight", SUBMITTING],
-    ["there is already a session", { status: "signed-in", user: CUSTOMER }],
+    ["there is already a session", { status: "signed-in", user: CUSTOMER, stale: false }],
     ["the API could not be reached", UNREACHABLE],
   ];
 
@@ -104,14 +104,14 @@ describe("what the route shows", () => {
 
   test("a verified link lands in the Hub the server chose", () => {
     for (const role of ["customer", "agent", "admin"] as const) {
-      expect(magicLinkStage(TOKEN, { status: "signed-in", user: { ...CUSTOMER, role } }, true)).toEqual(
+      expect(magicLinkStage(TOKEN, { status: "signed-in", user: { ...CUSTOMER, role }, stale: false }, true)).toEqual(
         { kind: "navigate", href: ROLE_HREF[role] },
       );
     }
   });
 
   test("a first-time email reaches the Customer Hub like any other Customer", () => {
-    expect(magicLinkStage(TOKEN, { status: "signed-in", user: CUSTOMER }, true)).toEqual({
+    expect(magicLinkStage(TOKEN, { status: "signed-in", user: CUSTOMER, stale: false }, true)).toEqual({
       kind: "navigate",
       href: ROLE_HREF.customer,
     });
@@ -120,7 +120,7 @@ describe("what the route shows", () => {
   test("a link tapped by someone who already has a session lands in their Hub", () => {
     // Not verified: spending the token would mean ending a live session first,
     // and a tampered link would then have cost them one.
-    expect(magicLinkStage(TOKEN, { status: "signed-in", user: CUSTOMER }, false)).toEqual({
+    expect(magicLinkStage(TOKEN, { status: "signed-in", user: CUSTOMER, stale: false }, false)).toEqual({
       kind: "navigate",
       href: ROLE_HREF.customer,
     });
@@ -160,7 +160,7 @@ describe("what the route shows", () => {
       SIGNED_OUT,
       { status: "signed-out", notice: "something was said" },
       SUBMITTING,
-      { status: "signed-in", user: CUSTOMER },
+      { status: "signed-in", user: CUSTOMER, stale: false },
       UNREACHABLE,
     ];
     for (const state of every) {
