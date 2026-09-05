@@ -21,7 +21,6 @@ import { attachmentViews, primaryAttachmentView } from '@/lib/attachment-view'
 import { rejectUploadReason } from '@/lib/attachment-upload'
 import { composerAccess, type ComposerAction } from '@/lib/composer-access'
 import type { ApiFailure } from '@/lib/conversation-api'
-import { failureNotice } from '@/lib/conversation-failure'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
   isLocalId,
@@ -40,6 +39,7 @@ import {
 import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
+import { threadNotice, type ThreadNotice } from '@/lib/thread-notice'
 import { buildThreadRows, type ThreadRow } from '@/lib/thread-rows'
 import {
   anchorFromPayload,
@@ -65,15 +65,17 @@ type ThreadScreenProps = {
   /**
    * Why the thread could not be read, when it could not be.
    *
-   * Only ever drawn over an empty thread. A page that failed while Messages are
-   * already on screen — a scroll into history with no signal, a refresh that did
-   * not land — takes nothing away from what is there and says nothing about it:
-   * the Messages are still the Messages, and an error over them would be about a
-   * request rather than about the thread.
+   * Drawn over an empty thread, and beside a thread that is not. A page that
+   * failed while Messages are already on screen — a scroll into history with no
+   * signal, a refresh that did not land — takes nothing away from what is there:
+   * the Messages are still the Messages, and it goes in one line above the
+   * composer instead. `threadNotice` is where the two are told apart.
    */
   failure?: ApiFailure | null
   /** Ask for the first page again. Offered beside the reason it did not arrive. */
   onRetry?: () => void
+  /** Put away a read failure reported beside Messages that are still drawn. */
+  onDismissFailure?: () => void
   /** Scrolling to the top of the thread asks for the page before it. */
   onLoadOlder?: () => void
   loadingOlder?: boolean
@@ -194,15 +196,16 @@ function ReadOnlyNotice({
 }
 
 /**
- * Why the last send did not land.
+ * A red line above the composer, and a way to put it away.
  *
- * Directly above the composer rather than as an alert, because the bubble it is
- * about is still on screen a few rows up, still marked *Not sent*, and still
- * offering a retry — a modal over all of that would hide the thing it is
- * explaining. Dismissible, so a refusal a person has read and acted on does not
- * sit over the composer for the rest of the conversation.
+ * Two things use it and both sit beside a thread that is still on screen: a send
+ * that did not land, in the API's own words, and a page of the thread that did
+ * not arrive. Neither takes anything away from what is drawn, which is why both
+ * are a strip rather than a screen, and both are dismissed rather than retried —
+ * the Message is still there to send again, and the page comes back on the next
+ * pull or the next reconnect.
  */
-function SendErrorNotice({
+function FailureStrip({
   message,
   onDismiss,
 }: {
@@ -222,7 +225,9 @@ function SendErrorNotice({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Dismiss"
-          hitSlop={10}
+          // A 14px glyph, so the touchable it stands for is drawn out to the 44px
+          // a finger needs rather than to the icon a design put there.
+          hitSlop={16}
           onPress={onDismiss}
           className="shrink-0 active:opacity-60"
         >
@@ -268,19 +273,17 @@ function SystemNotice({ body }: { body: string }) {
  * back are what keep a thread that could not be read from being a dead end, and
  * an empty thread is often exactly right: a conversation nobody has said
  * anything in yet.
+ *
+ * Which of the three it is, is `threadNotice`'s decision rather than this one's.
  */
-function ThreadEmpty({
-  loading,
-  failure,
+function ThreadPlaceholder({
+  notice,
   onRetry,
-  readOnly,
 }: {
-  loading: boolean
-  failure: ApiFailure | null
+  notice: ThreadNotice
   onRetry?: () => void
-  readOnly: boolean
 }) {
-  if (loading && !failure) {
+  if (notice.kind === 'loading') {
     return (
       <View pointerEvents="none" className="absolute inset-0 items-center justify-center">
         <ActivityIndicator accessibilityLabel="Loading messages…" />
@@ -288,14 +291,7 @@ function ThreadEmpty({
     )
   }
 
-  const notice = failure
-    ? failureNotice(failure, 'Could not load this conversation')
-    : {
-        title: 'No messages yet',
-        hint: readOnly
-          ? 'Nothing has been posted here yet.'
-          : 'Write the first message to start this conversation.',
-      }
+  if (notice.kind !== 'empty' && notice.kind !== 'failed') return null
 
   return (
     <View
@@ -311,7 +307,7 @@ function ThreadEmpty({
       <Text variant="meta" className="text-center text-muted">
         {notice.hint}
       </Text>
-      {failure && onRetry ? (
+      {notice.kind === 'failed' && onRetry ? (
         <Button variant="outline" className="mt-4" onPress={onRetry}>
           <Text>Try again</Text>
         </Button>
@@ -328,6 +324,7 @@ export function ThreadScreen({
   loading = false,
   failure = null,
   onRetry,
+  onDismissFailure,
   onLoadOlder,
   loadingOlder = false,
   refreshing = false,
@@ -388,6 +385,25 @@ export function ThreadScreen({
   const rows = useMemo(
     () => buildThreadRows(messages, { viewerId: viewer.id, namesSenders: isGroup }),
     [messages, viewer.id, isGroup],
+  )
+
+  /**
+   * What the thread says about itself, beyond its Messages.
+   *
+   * Counted off `messages` rather than off `rows`, because a day separator is a
+   * row and is not something anybody wrote. The second count is what the API has
+   * answered with: an Unsent Message is on screen and is not the thread having
+   * been read, which is the difference between a strip in the corner and a
+   * screen that says this device could not find out.
+   */
+  const confirmed = useMemo(
+    () => messages.reduce((count, message) => (isLocalId(message.id) ? count : count + 1), 0),
+    [messages],
+  )
+
+  const pageNotice = useMemo(
+    () => threadNotice({ drawn: messages.length, confirmed, loading, failure, readOnly }),
+    [messages.length, confirmed, loading, failure, readOnly],
   )
 
   /**
@@ -661,16 +677,12 @@ export function ThreadScreen({
               : undefined
           }
         />
-        {rows.length === 0 ? (
-          <ThreadEmpty
-            loading={loading}
-            failure={failure}
-            onRetry={onRetry}
-            readOnly={readOnly}
-          />
-        ) : null}
+        <ThreadPlaceholder notice={pageNotice} onRetry={onRetry} />
       </View>
-      {notice ? <SendErrorNotice message={notice} onDismiss={dismissNotice} /> : null}
+      {pageNotice.kind === 'stale' ? (
+        <FailureStrip message={pageNotice.message} onDismiss={onDismissFailure} />
+      ) : null}
+      {notice ? <FailureStrip message={notice} onDismiss={dismissNotice} /> : null}
       {access.kind === 'read-only' ? (
         <ReadOnlyNotice
           reason={access.reason}
