@@ -68,6 +68,21 @@ those directories today, but the default has flipped: a later slice writing some
 document directory is backed up unless it says otherwise, where before it would have been left out by
 accident. Anything of that kind belongs in `EXCLUSIONS` beside the Store.
 
+## The flipped default is a failing test, not a note
+
+The paragraph above is the sentence nobody reads at the moment they add a file write, so it is also a
+guard: `plugins/document-directory-guard.js` names the ways of reaching the document directory, and
+`plugins/document-directory-guard.test.ts` fails when anything under `lib/`, `app/` or `components/`
+names one of them. Its message is the point of it — it names this ADR and `EXCLUSIONS` in
+`plugins/backup-exclusion.js`, so whoever trips it is told what the decision is rather than that a
+string is banned.
+
+There is no allowlist and no exception entry: the way past it is to write the file under `Paths.cache`,
+which neither platform backs up, or to add the directory to `EXCLUSIONS` and widen the guard on
+purpose. It does not fire on the cache for that reason, and it lives beside the plugin rather than
+under `lib/` for a smaller one — a module in `lib/` that named the patterns would trip itself, and the
+exception that fixed that is exactly the hole this is here to prevent.
+
 ## Verifying it
 
 Not by reading the manifest, which is what the rules *say*. On Android:
