@@ -70,3 +70,41 @@ mentions."
 Message. Engage and Takeover are not push events either — `handleConversationEngaged` writes a row and
 passes no `pushTo`, so an Admin taking a thread from an Agent does not buzz a desktop today. Whether
 either of those should buzz a phone is open, and belongs in the push spec rather than here.
+
+## The audience, settled
+
+The line above said the group fan-out was the one to look at twice before shipping. It has been.
+
+**Mobile pushes a group or announcement message to its members, and not to an Admin who is not one.**
+The Notification row is unchanged — Admins still get it, and still reach company-run rooms without
+joining them — but the push stops at the membership. Taking the recipient list unsubtracted would have
+put every group and every announcement in the organization on every Admin's lock screen, which is the
+same complaint this file refused to inflict on agents' desktops, moved to the device where it is
+harder to ignore. An Admin who wants a room on their phone can be a member of it.
+
+Three events beyond a Message are pushed, and each is something that happens *to* the recipient rather
+than something said to them:
+
+- **Transfer** — a thread moved into your queue. Already a web push event.
+- **Engage and Takeover** — the thread you were holding is now somebody else's.
+  `handleConversationEngaged` writes a row and passes no `pushTo` today, so this is a mobile-only
+  push, and the API side is a `pushTo` on a handler that currently has none.
+- **Added to a group** — one push, when it happens. This is the one with no API side at all yet:
+  `group.member_added` is heard only by the activity log, so it needs a new notification kind before
+  there is anything for a transport to carry.
+
+## Per-event opt-out is not in this phase, and will not be a copy of web's
+
+Mute stays the only granularity: per person, per conversation, applied before the recipient list is
+frozen, killing the row and the push together.
+
+Web's per-event control is enforced in the service worker — the server sends everything and
+`PushPayload.event` lets the browser drop what the recipient turned off. That shape does not port.
+Expo's push service sends notification-type messages, which Android's system tray renders directly
+when the app is backgrounded or killed, and `setNotificationHandler` runs only in the foreground —
+which is precisely when a push is suppressed anyway. A client-side filter would be a toggle that
+silently does nothing in every case it exists for.
+
+So when per-event control is wanted, it belongs on the server, deciding not to dispatch, next to the
+mute check that already works that way. Nothing is lost by waiting: the web preference is browser-local
+rather than an account setting, so there is no stored choice for a phone to contradict.
