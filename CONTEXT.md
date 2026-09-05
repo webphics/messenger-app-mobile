@@ -465,6 +465,18 @@ on the thread it is about. There is no background connection behind it and there
 one — a Push notification is how a closed app learns anything at all.
 _Avoid_: Notification (bare — say which), local notification, alert, background message
 
+**Push audience**:
+Which of a Notification row's recipients this phone is also woken for. Nearly all of them: a Message
+in any conversation the person is a recipient of, which reaches the Unassigned pool without a rule of
+its own because an unassigned Support DM's recipients *are* the whole staff pool. The one
+subtraction is a group or an announcement, which stops at its members — every Admin is a recipient of
+those without being a member, and their row is not a reason to put every room in the organization on
+their lock screen. Three more push without being a Message, because each is something that happens to
+the recipient rather than something said to them: a Transfer, an Engage or Takeover of the thread
+they held, and being added to a group. Deliberately not the web audience, which is Support DMs only
+and staff only; see ADR-0009.
+_Avoid_: Recipients (that is the row's list — say which), subscribers, targets
+
 **Notification row**:
 The API's own record that something happened for a person, written by its `notifications` module and
 announced as `notification.created`. Older and broader than a Push notification, which is one
