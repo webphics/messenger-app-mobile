@@ -1,5 +1,5 @@
 import { conversationTitle } from '@/lib/conversation-title'
-import { findOffersConversation, sortConversations } from '@/lib/conversation-state'
+import { findOffersConversation, sortConversations } from '@/lib/conversation-list'
 import { canViewConversation } from '@/lib/rbac'
 import { isStaffConversation } from '@/lib/types'
 import type { Conversation, UserRole } from '@/lib/types'

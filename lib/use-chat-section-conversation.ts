@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { useConversationInbox } from '@/lib/conversation-inbox'
 import { canViewConversation } from '@/lib/rbac'
 import { getSession, getSessionUser } from '@/lib/session'
-import type { MessageAuthor } from '@/lib/conversation-state'
+import type { MessageAuthor } from '@/lib/thread-state'
 import type { Conversation, UserRole } from '@/lib/types'
 
 /**

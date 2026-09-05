@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '@/lib/api-config'
 import { attachmentViews } from '@/lib/attachment-view'
-import { isSystemMessage } from '@/lib/conversation-state'
+import { isSystemMessage } from '@/lib/thread-state'
 import type { AttachmentView, Message } from '@/lib/types'
 
 /**

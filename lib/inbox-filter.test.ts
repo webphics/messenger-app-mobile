@@ -6,7 +6,7 @@ import {
   listInboxConversations,
   listUnassignedConversations,
 } from '@/lib/inbox-filter'
-import { mergeConversation, withReassignment } from '@/lib/conversation-state'
+import { mergeConversation, withReassignment } from '@/lib/conversation-list'
 import { CONVERSATIONS } from '@/lib/mock-data'
 import { isStaffConversation } from '@/lib/types'
 
