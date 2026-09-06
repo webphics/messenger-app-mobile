@@ -78,12 +78,21 @@ function asPermission(status: string): PushPermission {
   return status === 'granted' || status === 'denied' ? status : 'undetermined'
 }
 
-/** What the platform says now, or `undetermined` when it cannot be asked. */
-async function readPermission(): Promise<PushPermission> {
+/**
+ * The two fields the decision is made from, together because neither answers on
+ * its own — see `lib/push-rules` on why the status alone is not enough.
+ */
+type PermissionState = { status: PushPermission; canAskAgain: boolean }
+
+/** A platform that cannot be read has decided nothing and closed nothing. */
+const UNREADABLE: PermissionState = { status: 'undetermined', canAskAgain: true }
+
+async function readPermission(): Promise<PermissionState> {
   try {
-    return asPermission((await Notifications.getPermissionsAsync()).status)
+    const answer = await Notifications.getPermissionsAsync()
+    return { status: asPermission(answer.status), canAskAgain: answer.canAskAgain }
   } catch {
-    return 'undetermined'
+    return UNREADABLE
   }
 }
 
@@ -116,8 +125,8 @@ function rememberAsked(): void {
 export async function ensurePushPermission(
   trigger: PermissionTrigger,
 ): Promise<PushPermission> {
-  const status = await readPermission()
-  if (!shouldAskForPermission({ status, trigger, askedBefore: hasAsked() })) {
+  const { status, canAskAgain } = await readPermission()
+  if (!shouldAskForPermission({ status, canAskAgain, trigger, askedBefore: hasAsked() })) {
     return status
   }
 
