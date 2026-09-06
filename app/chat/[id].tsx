@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import {
   Redirect,
@@ -14,6 +14,7 @@ import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
+import { getConversation } from "@/lib/conversation-api";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
 import { findOffersConversation } from "@/lib/conversation-list";
@@ -161,6 +162,56 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
    * pool on the tap that lost the race.
    */
   const { addConversation } = inbox;
+
+  /**
+   * A conversation this device has never held.
+   *
+   * The list is where every row comes from, and it is enough for every way a
+   * thread is normally opened: they are all taps on a row that is already in it.
+   * A tapped Push notification is the one that is not — the thread it names can
+   * be a conversation this phone has never seen, and on a launch whose own list
+   * fetch failed or was abandoned it can be one this phone was not told about.
+   * So the row is asked for on its own, once, and put in the list where the
+   * screen already reads it from.
+   *
+   * The Offers alias is excluded because it is not an id: it resolves against
+   * the list or it does not exist, and asking the API for `offers` would be a
+   * request that can only 404.
+   *
+   * A refusal ends it. `tried` is what stops the ask repeating, and it is the
+   * id rather than a flag so that moving between two threads this device does
+   * not hold asks once for each. Until then the launch screen stays up, because
+   * *not found* and *not asked yet* are different things and only one of them is
+   * worth telling somebody about.
+   *
+   * The other way a row goes missing — deleted out from under somebody reading
+   * it — comes through here too, and costs one request that answers 404 and a
+   * moment of the launch screen before the same notice as before. Left that way
+   * rather than told apart: asking the server about a row this client removed on
+   * a socket event is the more honest of the two, and a screen that has to
+   * remember what it used to hold to decide is a worse trade than one request.
+   */
+  const missing =
+    inbox.status === "ready" && conversation === null && routeId !== OFFERS_ALIAS;
+  const [tried, setTried] = useState<string | null>(null);
+  const resolving = missing && tried !== routeId;
+
+  useEffect(() => {
+    if (!missing || tried === routeId) return;
+
+    let live = true;
+    void (async () => {
+      const fresh = await getConversation(routeId);
+      if (!live) return;
+      if (fresh.ok) addConversation(fresh.value);
+      else setTried(routeId);
+    })();
+
+    return () => {
+      live = false;
+    };
+  }, [missing, tried, routeId, addConversation]);
+
   const assignment = useConversationAssignment(
     openedId,
     user?.id ?? null,
@@ -202,7 +253,7 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
   // Puts this device in the conversation's room for as long as the thread is up.
   useConversationRoom(openedId);
 
-  if (inbox.status === "loading") return <AppLoadingScreen />;
+  if (inbox.status === "loading" || resolving) return <AppLoadingScreen />;
   if (inbox.status === "failed") {
     const notice = failureNotice(inbox.failure);
     return <ChatNotice title={notice.title} hint={notice.hint} home={role} />;
