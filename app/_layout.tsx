@@ -30,6 +30,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
 import { SessionEndRedirect } from "@/components/auth/session-end";
+import { PushRegistration } from "@/components/push/push-registration";
 import { AuthProvider } from "@/lib/auth-context";
 import { ConversationInboxProvider } from "@/lib/conversation-inbox";
 import { RealtimeProvider } from "@/lib/realtime-context";
@@ -97,6 +98,9 @@ export default function RootLayout() {
       ) : null}
       <AuthProvider>
         <SessionEndRedirect />
+        {/* Renders nothing: the permission is asked for once and this device's
+            push token is kept current, both keyed on there being a session. */}
+        <PushRegistration />
         {/* Outside the inbox, because the inbox is one of the things that
             listens to it, and inside the auth provider, because a connection
             needs a session to authenticate its handshake with. */}

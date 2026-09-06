@@ -46,6 +46,7 @@ the app — still runs in Expo&nbsp;Go exactly as it did.
 | Requesting a magic link | yes | yes |
 | Opening a magic link (`enki://`) | no | yes |
 | Google sign-in | **no** | yes |
+| Push notifications | **no** | yes |
 | Everything after sign-in | yes | yes |
 
 Build one and install it once; after that `pnpm start` serves it the same way it serves Expo Go.
@@ -98,6 +99,32 @@ Read the SHA-1 from the keystore it shows and add it to the Android OAuth client
 before writing anything else off as broken: a build signed with different credentials — a different
 machine, a rotated keystore, a local `pnpm build:apk` — produces a Google sign-in that fails with
 nothing on screen to explain it, because there is nothing to say.
+
+## Push notifications
+
+`expo-notifications` is a native module too, so a Push notification is the second thing that needs a
+development client. Everything around it degrades rather than breaks: Expo&nbsp;Go has carried no
+remote push since SDK&nbsp;53, so no token can be read there, no device is registered, and the app is
+exactly the app it is without any of this.
+
+Android is the only platform wired — there is no iOS build profile in this repo and APNs needs an
+Apple Developer account. Nothing in the client is Android-specific; iOS is a key uploaded to Expo and
+a build profile.
+
+Dispatch goes through Expo's push service, so the EAS project needs FCM credentials before a
+notification reaches a phone:
+
+```bash
+eas credentials --platform android
+```
+
+Pick *Push Notifications: Manage your FCM Api Key* and upload the service-account key from the
+Firebase project. Without it a token still reads and still registers — the dispatch is what fails,
+at Expo, with nothing on the phone to say so.
+
+The API side is `POST /push/devices`; see the API repo's `docs/api/push.md`, and
+`docs/adr/ADR-0009-mobile-push-is-a-second-transport.md` for why mobile has a transport of its own
+rather than the browser subscription route beside it.
 
 ## Builds
 
