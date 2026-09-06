@@ -1,4 +1,4 @@
-import { router, usePathname } from 'expo-router'
+import { router } from 'expo-router'
 import {
   createContext,
   useCallback,
@@ -12,7 +12,6 @@ import {
 
 import { useAuth } from '@/lib/auth-context'
 import { chatHref } from '@/lib/chat-route-id'
-import { LAUNCH_PATHNAME } from '@/lib/hub-routes'
 import { addPushTapListener, takeTappedConversation } from '@/lib/push-device'
 
 /**
@@ -37,23 +36,22 @@ import { addPushTapListener, takeTappedConversation } from '@/lib/push-device'
 type PushIntentView = {
   /** The thread a launch should open over the Hub, or null for an ordinary one. */
   pendingThread: string | null
+  /**
+   * Told by the launch screen while it is the screen — which is exactly while a
+   * Pending thread is worth holding, because the gate is the only thing that
+   * reads one.
+   */
+  setLaunchOnScreen: (onScreen: boolean) => void
   /** Called by the Launch gate once it has acted on the Pending thread, either way. */
   clearPendingThread: () => void
 }
 
 const PushIntentContext = createContext<PushIntentView | null>(null)
 
-/**
- * `children` is one element handed down from the root layout and never rebuilt
- * here, so the pathname this subscribes to re-renders this component and nothing
- * under it: React bails out on a child whose element is identical. The context
- * value moves only when the Pending thread does.
- */
 export function PushIntentProvider({ children }: { children: ReactNode }) {
   const { state } = useAuth()
   const [pendingThread, setPendingThread] = useState<string | null>(null)
 
-  const atLaunch = usePathname() === LAUNCH_PATHNAME
   const signedIn = state.status === 'signed-in'
   /**
    * Both are facts about the moment a tap arrives, so the listener reads them
@@ -61,13 +59,29 @@ export function PushIntentProvider({ children }: { children: ReactNode }) {
    * between screens or their session settled would be a subscription torn down
    * and rebuilt for nothing, and a tap landing in the gap would be lost.
    */
-  const atLaunchRef = useRef(atLaunch)
   const signedInRef = useRef(signedIn)
 
   useEffect(() => {
-    atLaunchRef.current = atLaunch
     signedInRef.current = signedIn
-  }, [atLaunch, signedIn])
+  }, [signedIn])
+
+  /**
+   * Whether the launch screen is the screen, told by that screen rather than
+   * read off the router — which is the distinction the emulator had to make.
+   * A route group is not part of a path, so the Customer Hub —
+   * `app/(customer)/(home)/index` — has the pathname `/` exactly as `app/index`
+   * does, and a tap on the Hub was held for a gate that had already gone.
+   *
+   * Asking the screen instead answers the question actually being asked: not
+   * *where is the router*, but *is there still something that will read a
+   * Pending thread*. It is also right for a cold start that never draws the
+   * launch screen at all — a magic link opens its own route, and a tap there
+   * navigates rather than waiting for a gate that will never run.
+   */
+  const atLaunchRef = useRef(false)
+  const setLaunchOnScreen = useCallback((onScreen: boolean) => {
+    atLaunchRef.current = onScreen
+  }, [])
 
   useEffect(() => {
     // The tap that started this launch, which no listener can be registered in
@@ -104,8 +118,8 @@ export function PushIntentProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ pendingThread, clearPendingThread }),
-    [pendingThread, clearPendingThread],
+    () => ({ pendingThread, setLaunchOnScreen, clearPendingThread }),
+    [pendingThread, setLaunchOnScreen, clearPendingThread],
   )
 
   return <PushIntentContext.Provider value={value}>{children}</PushIntentContext.Provider>

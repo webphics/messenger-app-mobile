@@ -5,16 +5,6 @@ import type { UserRole } from "@/lib/types";
 /** Where anyone without a session goes. */
 export const SIGN_IN_HREF = "/(auth)/sign-in" as Href;
 
-/**
- * The launch screen's pathname — `app/index`, and the only route the Launch gate
- * is ever on.
- *
- * Named here with the other routes rather than spelled where it is read, for the
- * reason the Customer group is: a route this app agrees about by coincidence is
- * one that goes wrong silently when it moves.
- */
-export const LAUNCH_PATHNAME = "/";
-
 export const ROLE_HREF: Record<UserRole, Href> = {
   customer: "/(customer)" as Href,
   agent: "/(agent)" as Href,
