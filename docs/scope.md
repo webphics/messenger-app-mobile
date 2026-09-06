@@ -115,7 +115,10 @@ Broadcasts are in-inbox announcements (later), not stories.
 
      Needs the API: a `pushTo` on `handleConversationEngaged`, which writes a row and pushes
      nothing, and a notification kind for `group.member_added`, which today is heard only by the
-     activity log. Android only until there is an iOS build profile. See
+     activity log. Needed it once already, for the shade: every dispatch that names a conversation
+     carries a Notification tag of `<conversation>:<notification>`, because on Android Firebase draws
+     the notification itself and nothing of the payload survives into the thing the app reads back.
+     See `CONTEXT.md`. Android only until there is an iOS build profile. See
      `docs/adr/ADR-0009-mobile-push-is-a-second-transport.md`.
 
      The permission is asked for in two places: after a first sign-in, and when a Message first

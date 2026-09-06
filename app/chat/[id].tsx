@@ -17,6 +17,7 @@ import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
 import { getConversation } from "@/lib/conversation-api";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
+import { useThreadOnScreen } from "@/lib/in-app-banner";
 import { findOffersConversation } from "@/lib/conversation-list";
 import { isOutgoing } from "@/lib/thread-state";
 import { messagesHref, ROLE_HREF } from "@/lib/hub-routes";
@@ -252,6 +253,15 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
 
   // Puts this device in the conversation's room for as long as the thread is up.
   useConversationRoom(openedId);
+
+  /**
+   * And says so, so that a Message already arriving as a bubble does not also
+   * arrive as a strip over the top of it. This screen is the only thing that
+   * knows which thread is open — the route id is not always the conversation id,
+   * since the Offers alias resolves against the list — which is the same reason
+   * the read above lives here. See `lib/in-app-banner`.
+   */
+  useThreadOnScreen(openedId);
 
   if (inbox.status === "loading" || resolving) return <AppLoadingScreen />;
   if (inbox.status === "failed") {

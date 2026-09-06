@@ -30,6 +30,7 @@ import {
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { createCountedMessages } from '@/lib/realtime-events'
 import { createLaunchDeadline, type LaunchDeadline } from '@/lib/launch-deadline'
+import { dismissConversationNotifications } from '@/lib/push-device'
 import type { Conversation, ConversationFetch, Organization, UserRole } from '@/lib/types'
 
 /**
@@ -401,6 +402,14 @@ function useConversationInboxState(): ConversationInboxView {
     // holds can be older than the thread being opened, and the API is the one
     // that knows which messages the receipt is missing from.
     void markConversationRead(id)
+
+    // And the shade goes with the badge. A read that left three notifications
+    // for this thread standing in it would be a second unread count, disagreeing
+    // with the one that has just gone — and every way a thread is read runs
+    // through here, whether it was opened from the app or from one of the
+    // notifications being cleared, so there is one call site and no path around
+    // it. Nothing waits for it; see `dismissConversationNotifications`.
+    void dismissConversationNotifications(id)
   }, [])
 
   /**
