@@ -1,4 +1,6 @@
 import {
+  conversationIdFromPush,
+  notificationIdFromPush,
   shouldAskForPermission,
   type PermissionAsk,
   type PermissionTrigger,
@@ -66,5 +68,108 @@ describe('a permission already granted', () => {
         ).toBe(false)
       }
     }
+  })
+})
+
+/**
+ * The second table: what a tapped notification means.
+ *
+ * Every row is a payload rather than a device, because that is what this is —
+ * `realtime-events`' rule moved onto the other transport. A dispatch this build
+ * cannot read answers null and the launch proceeds; nothing here throws, and a
+ * malformed one must not be able to take a cold start with it.
+ */
+describe('the conversation a tapped notification names', () => {
+  /** What the API actually dispatches. See `expo-push.service.ts`. */
+  function response(data: unknown) {
+    return {
+      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      notification: { request: { content: { data } } },
+    }
+  }
+
+  const PAYLOAD = {
+    notificationPublicId: 'ntf_01',
+    kind: 'message.created',
+    conversationPublicId: 'cnv_01',
+    preview: 'Are you still there?',
+  }
+
+  it('answers the conversation the dispatch named', () => {
+    expect(conversationIdFromPush(response(PAYLOAD))).toBe('cnv_01')
+  })
+
+  it('reads nothing else off the payload — the routing is the id alone', () => {
+    expect(conversationIdFromPush(response({ conversationPublicId: 'cnv_02' }))).toBe('cnv_02')
+  })
+
+  /**
+   * The API's own type says this is nullable: a kind that is not about a
+   * conversation dispatches with none, and there is nowhere for that tap to go
+   * but where the launch was going anyway.
+   */
+  it('answers null for a dispatch about no conversation', () => {
+    expect(conversationIdFromPush(response({ ...PAYLOAD, conversationPublicId: null }))).toBeNull()
+  })
+
+  it.each([
+    ['no payload at all', undefined],
+    ['null', null],
+    ['a string where the object should be', 'cnv_01'],
+    ['an array, which is an object and is not a record', ['cnv_01']],
+    ['an id that is not a string', { conversationPublicId: 7 }],
+    ['an id that is empty', { conversationPublicId: '' }],
+    ['a payload naming everything but the conversation', { kind: 'message.created' }],
+  ])('answers null for %s', (_case, data) => {
+    expect(conversationIdFromPush(response(data))).toBeNull()
+  })
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['a string', 'tapped'],
+    ['an array', []],
+    ['a response with no notification on it', {}],
+    ['a notification with no request on it', { notification: {} }],
+    ['a request with no content on it', { notification: { request: {} } }],
+    ['a content that is not a record', { notification: { request: { content: 'hi' } } }],
+  ])('answers null rather than throwing for %s', (_case, tapped) => {
+    expect(conversationIdFromPush(tapped)).toBeNull()
+  })
+})
+
+/**
+ * The other half of the payload table: which notification this is.
+ *
+ * Not about where a tap goes — `push-device` uses it to tell the second report
+ * of one tap from a second tap — but read here so that the walk down to it is
+ * the walk `conversationIdFromPush` is tested through.
+ */
+describe('the notification a tap names', () => {
+  function response(request: unknown) {
+    return { notification: { request } }
+  }
+
+  it('answers the identifier the platform gave it', () => {
+    expect(notificationIdFromPush(response({ identifier: 'ntf_01' }))).toBe('ntf_01')
+  })
+
+  it.each([
+    ['a request naming no identifier', {}],
+    ['an identifier that is not a string', { identifier: 7 }],
+    ['an identifier that is empty', { identifier: '' }],
+    ['a request that is not a record', 'ntf_01'],
+    ['no request at all', undefined],
+  ])('answers null for %s', (_case, request) => {
+    expect(notificationIdFromPush(response(request))).toBeNull()
+  })
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['a string', 'tapped'],
+    ['a response with no notification on it', {}],
+  ])('answers null rather than throwing for %s', (_case, tapped) => {
+    expect(notificationIdFromPush(tapped)).toBeNull()
   })
 })

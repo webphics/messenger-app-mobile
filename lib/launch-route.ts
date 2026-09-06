@@ -1,6 +1,7 @@
 import type { Href } from "expo-router";
 
 import type { AuthState } from "@/lib/auth-machine";
+import { chatHref } from "@/lib/chat-route-id";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
 import type { ConversationFetch } from "@/lib/types";
 
@@ -22,16 +23,34 @@ import type { ConversationFetch } from "@/lib/types";
  * animation, so leaving on Hydration alone hands over a Hub that fills in
  * underneath the person a moment later.
  *
- * How long that wait may run is not decided here and deliberately not: the two
- * inputs stay two, and the Launch deadline arrives as a third thing the fetch
+ * How long that wait may run is not decided here and deliberately not: no input
+ * here is a clock, and the Launch deadline arrives as a third thing the fetch
  * can *say* rather than as a clock this module or the launch screen holds. See
  * #52, and `lib/launch-deadline` for the clock itself.
+ *
+ * The third input is a notification somebody tapped, and it is here for the same
+ * reason the fetch is: there is one answer to where a launch lands, and a second
+ * route deciding it separately would be a second answer that has to agree with
+ * this one. It changes exactly one row — a signed-in person with a Hub behind
+ * them opens the thread instead of the Hub. Every other row is what it was,
+ * including the wait: a thread Restores from the Store and draws immediately,
+ * but the Hub underneath it has to exist for Back to mean anything. See #59.
  */
 
 export type LaunchDestination =
   /** Hydration has not settled, or the list is still coming. Keep the launch animation up. */
   | { kind: "wait" }
-  | { kind: "navigate"; href: Href }
+  | {
+      kind: "navigate";
+      href: Href;
+      /**
+       * What has to be on the stack underneath `href` before the launch lands on
+       * it, or absent when `href` is the whole of it. Only a tapped notification
+       * asks for this: the thread is where somebody is going and the Hub is what
+       * Back has to find when they leave it.
+       */
+      behind?: Href;
+    }
   /** A Session cookie is held but the API did not answer: a screen here, not a route. */
   | { kind: "unreachable" };
 
@@ -42,6 +61,14 @@ const TO_SIGN_IN: LaunchDestination = { kind: "navigate", href: SIGN_IN_HREF };
 export function launchDestination(
   state: AuthState,
   conversationFetch: ConversationFetch,
+  /**
+   * The conversation a tapped notification asked for, or null — which is both
+   * an ordinary launch and a dispatch `lib/push-rules` could not read. The two
+   * answer alike deliberately: a malformed payload must not be able to do
+   * anything to a launch, and the way to guarantee that is for it to arrive here
+   * as the same value a launch nobody tapped does.
+   */
+  pendingThread: string | null = null,
 ): LaunchDestination {
   switch (state.status) {
     case "hydrating":
@@ -57,14 +84,23 @@ export function launchDestination(
     // told to stop waiting, and with the Store there are Restored rows behind
     // the Hub for it to hand over — the load it gave up on lands in them if it
     // ever answers.
-    case "signed-in":
-      return conversationFetch === "outstanding"
-        ? WAIT
-        : { kind: "navigate", href: ROLE_HREF[state.user.role] };
+    case "signed-in": {
+      if (conversationFetch === "outstanding") return WAIT;
+      const hub = ROLE_HREF[state.user.role];
+      return pendingThread
+        ? { kind: "navigate", href: chatHref(pendingThread), behind: hub }
+        : { kind: "navigate", href: hub };
+    }
+    // A Session cookie is held but the API did not answer, so a tapped thread is
+    // worth keeping rather than dropped: the cookie is still good, the Store is
+    // still there, and a retry that reaches the API comes back round to the
+    // signed-in row above with the same thread pending.
     case "unreachable":
       return UNREACHABLE;
     // No session, so no list was ever asked for: whatever the fetch says, it is
-    // not about this person.
+    // not about this person. A tapped thread is dropped here rather than held —
+    // the Session end that took the cookie took the Store the thread would have
+    // drawn from, so there is nothing to open.
     case "signed-out":
       return TO_SIGN_IN;
     // Not reachable from a cold start — a submit only ever comes from the

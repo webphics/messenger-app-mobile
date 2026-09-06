@@ -248,7 +248,9 @@ Conversation fetch has **settled**. Settled means answered, failed, **or** aband
 deadline — with the Store there is something to draw whichever it is, and an animation held open on
 a bad network is the failure the gate exists to prevent. Both halves count in either order. Hydration's Unreachable outcome is not part of
 it: that is a screen with a retry on it rather than a Hub to hand over. What bounds the wait is the
-**Launch deadline**. The decision is `lib/launch-route`.
+**Launch deadline**. Where the launch then *lands* takes one more input — a **Pending thread** — but
+the gate itself is unchanged by it: a tapped notification does not shorten the wait, because the Hub
+underneath the thread still has to exist. The decision is `lib/launch-route`.
 _Avoid_: Splash gate, minimum display (that is only the animation's own half), loading gate
 
 **Launch deadline**:
@@ -484,6 +486,17 @@ installation rather than to the person using it. Registered under whoever is sig
 session, because it rotates and a row holding an old one dispatches into nothing. Not a credential:
 it authenticates nobody and is registered *with* the Session cookie rather than instead of it.
 _Avoid_: Device token (that is the FCM one underneath), subscription (that is the browser's), push ID
+
+**Pending thread**:
+The conversation a tapped Push notification asked for, held only while nothing can act on it yet — a
+cold start, where Hydration, Restore and the Launch gate are all in front of it. It is the Launch
+gate's third input rather than a route of its own, so a signed-in launch opens that thread over the
+role's Hub and every other outcome is what it always was: no session sends the person to sign-in and
+drops it, and Unreachable keeps it, because that cookie is still good. A tap while the app is running
+never becomes one — there is a Hub already, so the listener navigates. Held in `lib/push-intent`,
+decided in `lib/launch-route`, read out of the payload by `lib/push-rules`.
+_Avoid_: Deep link (that is the magic link's mechanism), initial route, notification route, intent
+(bare — that is Android's own word for something else)
 
 **Notification row**:
 The API's own record that something happened for a person, written by its `notifications` module and

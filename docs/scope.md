@@ -148,8 +148,11 @@ Broadcasts are in-inbox announcements (later), not stories.
      A tap while the app is running does not go near any of that — the listener navigates. A tap
      with no session goes to sign-in and the intent is dropped, because a Session end wiped the Store
      the thread would have drawn from; a tap that lands on Unreachable keeps it, because that cookie
-     is still good. A conversation this device does not know needs nothing special: the thread
-     fetches what it cannot Restore, and says so when it cannot.
+     is still good. A conversation this device does not know is the one part that was not free: the
+     thread screen resolves its row from the Conversation list, so a thread nobody had fetched read
+     as *Conversation unavailable*. It asks the API for that one row and adds it to the list, once
+     per id; the Messages under it were always fine, since the thread fetches what it cannot
+     Restore and #49 gave it a state that says so when it cannot.
    - 5e. i18n, list virtualization.
 6. The Store — one in-memory copy of everything the screens read, written through to SQLite on the
    device and read back at the next cold start, so a launch draws the last thing this phone knew

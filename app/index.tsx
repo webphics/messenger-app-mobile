@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
@@ -7,6 +7,7 @@ import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { useAuth } from "@/lib/auth-context";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { launchDestination } from "@/lib/launch-route";
+import { usePushIntent } from "@/lib/push-intent";
 
 /**
  * How long the launch animation stays up *after it is actually on screen*.
@@ -22,6 +23,11 @@ export default function Index() {
   // every screen after this one reads, and asking for it twice would be two
   // lists with one of them thrown away.
   const { conversationFetch } = useConversationInbox();
+  // The third input to the gate: the thread a tapped notification asked for, or
+  // null on a launch nobody tapped anything to start. Held outside this screen
+  // because the tap is reported while the process is still coming up — see
+  // `lib/push-intent`.
+  const { pendingThread, clearPendingThread } = usePushIntent();
   const [animationReady, setAnimationReady] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   /**
@@ -46,8 +52,13 @@ export default function Index() {
   // Where Hydration says this person belongs, and whether there is yet anything
   // to show them there. The mapping is `lib/launch-route`; what is left here is
   // only the timing around it.
-  const destination = launchDestination(state, conversationFetch);
+  const destination = launchDestination(state, conversationFetch, pendingThread);
   const targetHref = destination.kind === "navigate" ? destination.href : null;
+  // What has to be on the stack underneath the target before the launch lands on
+  // it. Only a tapped notification asks for one, and it is the whole reason Back
+  // out of that thread leaves the thread rather than the app.
+  const behindHref =
+    destination.kind === "navigate" ? (destination.behind ?? null) : null;
 
   // Started from `animationReady`, never from mount. `AppLoadingScreen` reports
   // ready when the WebP has decoded, and reports it anyway if the decode stalls
@@ -83,12 +94,37 @@ export default function Index() {
     retry();
   }, [retry]);
 
-  const handleFinish = useCallback(() => {
-    if (targetHref && !navigatedRef.current) {
+  /**
+   * Hand the launch over.
+   *
+   * One place rather than two, because the two callers — the animation
+   * finishing, and a retry that succeeded after it was gone — have to land the
+   * same way, and a tap makes that two calls rather than one: the Hub replaces
+   * the launch screen and the thread is pushed onto it, so Back finds the Hub.
+   *
+   * The Pending thread is cleared whichever destination this was. A launch that sent
+   * somebody to sign-in has dropped it deliberately — the Session end that took
+   * the cookie took the Store the thread would have drawn from — and a launch
+   * that opened the thread has spent it.
+   */
+  const handOver = useCallback(
+    (href: Href, behind: Href | null) => {
+      if (navigatedRef.current) return;
       navigatedRef.current = true;
-      router.replace(targetHref);
-    }
-  }, [targetHref]);
+      if (behind) {
+        router.replace(behind);
+        router.push(href);
+      } else {
+        router.replace(href);
+      }
+      clearPendingThread();
+    },
+    [clearPendingThread],
+  );
+
+  const handleFinish = useCallback(() => {
+    if (targetHref) handOver(targetHref, behindHref);
+  }, [targetHref, behindHref, handOver]);
 
   // Gated on `animationReady` rather than shown the instant Hydration fails:
   // `AppLoadingScreen` owns hiding the native splash, so unmounting it before it
@@ -109,10 +145,9 @@ export default function Index() {
   // Once the animation is gone, nothing is left to call `onFinish`, so the
   // navigation a successful retry earns has to be made here instead.
   useEffect(() => {
-    if (!retryStarted || !targetHref || navigatedRef.current) return;
-    navigatedRef.current = true;
-    router.replace(targetHref);
-  }, [retryStarted, targetHref]);
+    if (!retryStarted || !targetHref) return;
+    handOver(targetHref, behindHref);
+  }, [retryStarted, targetHref, behindHref, handOver]);
 
   if (showUnreachable || retrying) {
     return <UnreachableScreen retrying={retrying} onRetry={handleRetry} />;

@@ -4,6 +4,8 @@ import { Platform } from 'react-native'
 
 import type { PushPlatform } from '@/lib/conversation-api'
 import {
+  conversationIdFromPush,
+  notificationIdFromPush,
   shouldAskForPermission,
   type PermissionTrigger,
   type PushPermission,
@@ -159,5 +161,83 @@ export async function readPushToken(): Promise<string | null> {
     return (await Notifications.getExpoPushTokenAsync()).data
   } catch {
     return null
+  }
+}
+
+/**
+ * The notification that started this launch, once it has been handed on.
+ *
+ * The response a tap cold-starts the app with is reachable from both sides: the
+ * read below, and a listener registered early enough that the platform hands it
+ * the same response. Which of the two arrives first is not this app's to decide,
+ * and a thread opened twice is a thread somebody has to press Back through
+ * twice — so the launch's own tap is remembered here and the listener drops it
+ * once.
+ *
+ * Once, and only that one: it is cleared as it is used, so a person who taps the
+ * same notification again later is not silently ignored. Nothing else is
+ * remembered, because nothing else is reported twice.
+ */
+let launchTap: string | null = null
+
+/**
+ * The conversation a tap that started this launch asked for, or null.
+ *
+ * Read rather than listened for, because a cold start has nowhere to deliver an
+ * event to: the process is still coming up while the platform is reporting the
+ * tap, and a listener that has not been registered yet misses it. The Launch
+ * gate takes this as its third input — see `lib/launch-route`.
+ *
+ * *Take* rather than read: it records the notification so the listener does not
+ * hand the same tap on again. Which is also why it answers null on a build with
+ * no native side rather than throwing — a throw here would be a launch that
+ * never happens, a worse failure than a tap that lands on the Hub.
+ */
+export function takeTappedConversation(): string | null {
+  try {
+    const response = Notifications.getLastNotificationResponse()
+    const conversationId = conversationIdFromPush(response)
+    if (conversationId === null) return null
+
+    launchTap = notificationIdFromPush(response)
+    return conversationId
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Subscribe to taps while the app is running. Answers the unsubscribe.
+ *
+ * These never reach the Launch gate — there is no launch to gate, and the person
+ * is already somewhere — so what this feeds is a navigation rather than a
+ * decision about where a launch lands.
+ */
+export function addPushTapListener(
+  onTap: (conversationId: string) => void,
+): () => void {
+  try {
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const conversationId = conversationIdFromPush(response)
+        if (conversationId === null) return
+
+        // The launch's own tap, reported a second time. Forgotten as it is
+        // dropped: the next report of this notification is a person tapping it
+        // again, and that one opens the thread.
+        const notificationId = notificationIdFromPush(response)
+        if (notificationId !== null && notificationId === launchTap) {
+          launchTap = null
+          return
+        }
+
+        onTap(conversationId)
+      },
+    )
+    return () => subscription.remove()
+  } catch {
+    // No native side to subscribe to: nothing arrives, and taking back a
+    // subscription that was never made is a no-op rather than a throw.
+    return () => {}
   }
 }

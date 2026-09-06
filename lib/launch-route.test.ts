@@ -1,4 +1,5 @@
 import type { AuthState } from "@/lib/auth-machine";
+import { chatHref } from "@/lib/chat-route-id";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
 import { launchDestination } from "@/lib/launch-route";
 import type { ConversationFetch, SessionUser, UserRole } from "@/lib/types";
@@ -311,4 +312,120 @@ test("every auth state lands on a destination, and none is mutated", () => {
       expect(JSON.stringify(state)).toBe(before);
     }
   }
+});
+
+/**
+ * The third input: a notification somebody tapped.
+ *
+ * Deliberately not a second route. The launch already answers where it lands as
+ * a function of Hydration and the fetch, and a tap is one more thing that answer
+ * has to account for — so the rows below are the existing rows with a thread
+ * pending, and all but one of them are unchanged. See #59.
+ */
+describe("a notification tapped for a thread", () => {
+  const THREAD = "cnv_01";
+  const threadHref = chatHref(THREAD);
+
+  // The row the ticket is about, and the only one that changes.
+  test("signed in and settled opens the thread rather than the Hub", () => {
+    const roles: UserRole[] = ["customer", "agent", "admin"];
+    for (const role of roles) {
+      for (const fetch of SETTLED) {
+        expect(launchDestination(signedIn(role), fetch, THREAD)).toEqual({
+          kind: "navigate",
+          href: threadHref,
+          behind: ROLE_HREF[role],
+        });
+      }
+    }
+  });
+
+  /**
+   * Back has to leave the thread rather than the app, and a thread pushed onto
+   * nothing has nothing to go back to. The Hub is named beside the thread rather
+   * than replaced by it for that reason — the wait below is the other half of
+   * the same promise.
+   */
+  test("names the Hub the thread is opened over, for the role the server gave", () => {
+    expect(launchDestination(signedIn("agent"), "answered", THREAD)).toMatchObject({
+      behind: ROLE_HREF.agent,
+    });
+    expect(launchDestination(stale("customer"), "answered", THREAD)).toMatchObject({
+      behind: ROLE_HREF.customer,
+    });
+  });
+
+  // The thread Restores from the Store and draws immediately, but the Hub
+  // underneath it still has to exist — so a tap buys nothing off the wait.
+  test("still waits for the fetch, exactly as a launch with no thread does", () => {
+    const roles: UserRole[] = ["customer", "agent", "admin"];
+    for (const role of roles) {
+      expect(launchDestination(signedIn(role), "outstanding", THREAD)).toEqual({
+        kind: "wait",
+      });
+    }
+    expect(launchDestination(stale("agent"), "outstanding", THREAD)).toEqual({
+      kind: "wait",
+    });
+    expect(launchDestination({ status: "hydrating" }, "answered", THREAD)).toEqual({
+      kind: "wait",
+    });
+  });
+
+  /**
+   * The Session end that took the cookie took the Store the thread would have
+   * drawn from, so there is nothing to open. Sign-in, and the intent is dropped
+   * rather than held against a session that no longer exists.
+   */
+  test("signed out goes to sign-in and names no thread", () => {
+    for (const fetch of EVERY_FETCH) {
+      expect(
+        launchDestination({ status: "signed-out", notice: null }, fetch, THREAD),
+      ).toEqual({ kind: "navigate", href: SIGN_IN_HREF });
+      expect(launchDestination({ status: "submitting" }, fetch, THREAD)).toEqual({
+        kind: "navigate",
+        href: SIGN_IN_HREF,
+      });
+    }
+  });
+
+  /**
+   * That cookie is still good, so the intent is worth keeping: this stays the
+   * screen with the retry on it, and a retry that reaches the API comes back
+   * round to the row above with the same thread pending.
+   */
+  test("unreachable stays unreachable, and stays distinguishable from signed out", () => {
+    for (const fetch of EVERY_FETCH) {
+      expect(launchDestination({ status: "unreachable" }, fetch, THREAD)).toEqual({
+        kind: "unreachable",
+      });
+    }
+    expect(launchDestination({ status: "unreachable" }, "answered", THREAD)).not.toEqual(
+      launchDestination({ status: "signed-out", notice: null }, "answered", THREAD),
+    );
+  });
+
+  /**
+   * A dispatch `push-rules` could not read answers null, and null has to be the
+   * ordinary launch rather than anything of its own — that is what keeps a
+   * malformed payload from being able to break a launch.
+   */
+  test("no thread is every row exactly as it was", () => {
+    const states: AuthState[] = [
+      { status: "hydrating" },
+      { status: "signed-out", notice: null },
+      { status: "submitting" },
+      signedIn("customer"),
+      signedIn("agent"),
+      stale("admin"),
+      { status: "unreachable" },
+    ];
+    for (const state of states) {
+      for (const fetch of EVERY_FETCH) {
+        expect(launchDestination(state, fetch, null)).toEqual(
+          launchDestination(state, fetch),
+        );
+      }
+    }
+  });
 });

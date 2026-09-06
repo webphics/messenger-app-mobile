@@ -33,6 +33,7 @@ import { SessionEndRedirect } from "@/components/auth/session-end";
 import { PushRegistration } from "@/components/push/push-registration";
 import { AuthProvider } from "@/lib/auth-context";
 import { ConversationInboxProvider } from "@/lib/conversation-inbox";
+import { PushIntentProvider } from "@/lib/push-intent";
 import { RealtimeProvider } from "@/lib/realtime-context";
 import { colors } from "@/lib/tokens";
 
@@ -110,55 +111,61 @@ export default function RootLayout() {
             them, and the chat route sits beside the tab groups rather than
             inside one. */}
           <ConversationInboxProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: colors.bg },
-                animation: "default",
-                gestureEnabled: true,
-              }}
-            >
-              <Stack.Screen
-                name="chat/[id]"
-                options={{
+            {/* Above the navigator, because the tap that started a cold launch
+              is reported while the process is still coming up — before any
+              screen exists to hear it — and the launch screen reads it from
+              here as the third input to its gate. */}
+            <PushIntentProvider>
+              <Stack
+                screenOptions={{
                   headerShown: false,
                   contentStyle: { backgroundColor: colors.bg },
+                  animation: "default",
+                  gestureEnabled: true,
                 }}
-              />
-              {/* The two screens a thread's header opens. Beside `chat/[id]`
-                rather than under it: the thread owns that path outright. */}
-              <Stack.Screen
-                name="chat/details/[id]"
-                options={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.bg },
-                }}
-              />
-              <Stack.Screen
-                name="chat/media/[id]"
-                options={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.bg },
-                }}
-              />
-              <Stack.Screen
-                name="(auth)"
-                options={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.bg },
-                }}
-              />
-              {/* The magic link's landing route. Named here so a cold start opened by
-                a link gets the same chrome as every other screen rather than the
-                navigator's defaults. */}
-              <Stack.Screen
-                name="auth/magic-link"
-                options={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: colors.bg },
-                }}
-              />
-            </Stack>
+              >
+                <Stack.Screen
+                  name="chat/[id]"
+                  options={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.bg },
+                  }}
+                />
+                {/* The two screens a thread's header opens. Beside `chat/[id]`
+                  rather than under it: the thread owns that path outright. */}
+                <Stack.Screen
+                  name="chat/details/[id]"
+                  options={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.bg },
+                  }}
+                />
+                <Stack.Screen
+                  name="chat/media/[id]"
+                  options={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.bg },
+                  }}
+                />
+                <Stack.Screen
+                  name="(auth)"
+                  options={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.bg },
+                  }}
+                />
+                {/* The magic link's landing route. Named here so a cold start opened by
+                  a link gets the same chrome as every other screen rather than the
+                  navigator's defaults. */}
+                <Stack.Screen
+                  name="auth/magic-link"
+                  options={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: colors.bg },
+                  }}
+                />
+              </Stack>
+            </PushIntentProvider>
           </ConversationInboxProvider>
         </RealtimeProvider>
       </AuthProvider>

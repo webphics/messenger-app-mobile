@@ -1,12 +1,20 @@
+import { asRecord } from '@/lib/api-envelope'
+
 /**
- * When this app may put the operating system's notification dialog in front of
- * somebody, decided as a pure function of what the platform already says, which
- * moment is asking, and whether this device has ever asked at all.
+ * The two decisions about a Push notification that are not about the platform:
+ * whether this app may put the operating system's permission dialog in front of
+ * somebody, and what an arriving payload means.
  *
- * Pure, and importing nothing native, so the decision most likely to be got
- * wrong is the one with no mocks in front of it. `lib/push-device` next door
- * owns `expo-notifications` and does what this says — the same split as
- * `store-rows`/`conversation-store` and `attachment-budget`/`attachment-cache`.
+ * Both are tables, and both are pure and import nothing native, so the parts
+ * most likely to be got wrong are the ones with no mocks in front of them.
+ * `lib/push-device` next door owns `expo-notifications` and does what this says
+ * — the same split as `store-rows`/`conversation-store` and
+ * `attachment-budget`/`attachment-cache`.
+ *
+ * # The permission
+ *
+ * When the dialog may be raised, decided from what the platform already says,
+ * which moment is asking, and whether this device has ever asked at all.
  *
  * ## Why a guard at all
  *
@@ -85,4 +93,57 @@ export function shouldAskForPermission({
     case 'message':
       return !askedBefore
   }
+}
+
+/**
+ * # The payload
+ *
+ * What a tapped notification means, read the way `realtime-events` reads the
+ * other transport: every step of the walk is a check rather than an assumption,
+ * and anything unexpected answers null rather than throwing. A dispatch arrives
+ * from a server this app does not control, at the one moment this app has
+ * nothing else on screen — a malformed one must not be able to break a launch.
+ *
+ * Both readers below take the whole response rather than the part of it they
+ * want, so that the digging is table-tested too: `notification.request.content`
+ * is three shapes deep and each of them is a place a dispatch can be wrong. It
+ * is also why `push-device` knows none of this shape, despite owning the module
+ * the response comes from.
+ */
+
+/** The `request` a response carries, or null when the response is not one. */
+function requestOf(response: unknown): Record<string, unknown> | null {
+  return asRecord(asRecord(asRecord(response)?.notification)?.request)
+}
+
+/** A field that is a usable id, or null — an empty string is not one. */
+function asId(value: unknown): string | null {
+  return typeof value === 'string' && value !== '' ? value : null
+}
+
+/**
+ * The conversation a tapped notification is about, or null for a dispatch this
+ * build cannot read.
+ *
+ * Null is not an error. The API's own payload type says `conversationPublicId`
+ * is nullable — a kind that is not about a conversation dispatches with none —
+ * and a tap on one of those has nowhere to go but where the launch was already
+ * going.
+ */
+export function conversationIdFromPush(response: unknown): string | null {
+  const content = asRecord(requestOf(response)?.content)
+  return asId(asRecord(content?.data)?.conversationPublicId)
+}
+
+/**
+ * What the platform calls this notification, or null when it does not say.
+ *
+ * The one thing about a tap that is not about where it goes: the response that
+ * starts a cold launch is reachable both from the read and from a listener
+ * registered early enough, and this is how `push-device` tells the second
+ * report of one tap from a second tap. Read here rather than there so that the
+ * walk down to it stays in the module the walk is tested in.
+ */
+export function notificationIdFromPush(response: unknown): string | null {
+  return asId(requestOf(response)?.identifier)
 }
