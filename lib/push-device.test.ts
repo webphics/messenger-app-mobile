@@ -52,8 +52,15 @@ const notifications = Notifications as jest.Mocked<typeof Notifications>
 const ASKED_FILE = `file:///cache/${PUSH_PERMISSION_ASKED_FILE}`
 
 /** Only the fields this module reads; the platform sends a good deal more. */
-function permission(status: 'granted' | 'denied' | 'undetermined') {
-  return { status, granted: status === 'granted' } as Notifications.NotificationPermissionsStatus
+function permission(
+  status: 'granted' | 'denied' | 'undetermined',
+  canAskAgain = true,
+) {
+  return {
+    status,
+    canAskAgain,
+    granted: status === 'granted',
+  } as Notifications.NotificationPermissionsStatus
 }
 
 beforeEach(() => {
@@ -130,11 +137,29 @@ describe('ensurePushPermission', () => {
     expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled()
   })
 
-  it.each(['granted', 'denied'] as const)('does not re-request a permission already %s', async (status) => {
-    notifications.getPermissionsAsync.mockResolvedValue(permission(status))
+  it('does not re-request a permission already granted', async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(permission('granted'))
 
-    expect(await ensurePushPermission('sign-in')).toBe(status)
+    expect(await ensurePushPermission('sign-in')).toBe('granted')
     expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled()
+  })
+
+  it('does not request one the platform will not draw a dialog for', async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(permission('denied', false))
+
+    expect(await ensurePushPermission('sign-in')).toBe('denied')
+    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled()
+  })
+
+  /**
+   * What the emulator caught. Android 13+ reports a never-asked permission as
+   * `denied`, so this is the ordinary first ask rather than an edge case.
+   */
+  it('raises the dialog on the denied-but-askable state Android reports first', async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(permission('denied'))
+
+    expect(await ensurePushPermission('sign-in')).toBe('granted')
+    expect(notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1)
   })
 
   it('records nothing when the dialog itself failed, so the ask is still owed', async () => {

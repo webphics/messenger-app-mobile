@@ -15,6 +15,22 @@
  * chance — it is a no-op shaped like a prompt, and a person who never sees it
  * cannot tell it from the app not asking. Every rule here exists to keep the one
  * dialog for the one moment somebody can actually answer it.
+ *
+ * ## Why `denied` is not the refusal it reads as
+ *
+ * The obvious rule — ask only while the status is `undetermined` — is wrong on
+ * the one platform this ships to, and wrong in the direction that draws nothing
+ * at all. `expo-notifications` answers Android 13+ by reading
+ * `areNotificationsEnabled()` before the runtime permission, and that is false
+ * on a fresh install, so a phone nobody has ever asked reports `denied`. It was
+ * a silent no-op on the emulator until it was watched for.
+ *
+ * So the platform's status is not what decides this. `canAskAgain` is: it is the
+ * platform saying whether a request would draw a dialog at all, and it is false
+ * exactly when one would not — refused twice on Android, refused once on iOS,
+ * or turned off in settings. What it cannot say is whether the one dialog it
+ * would still draw has already been drawn, because Android reports a dismissal
+ * and a single refusal identically. That is the whole job of `askedBefore`.
  */
 
 /** Where the platform stands, as `expo-notifications` reports it. */
@@ -32,6 +48,11 @@ export type PermissionTrigger = 'sign-in' | 'message'
 
 export type PermissionAsk = {
   status: PushPermission
+  /**
+   * Whether the platform would still draw the dialog. The load-bearing field:
+   * see the note above on why the status is not.
+   */
+  canAskAgain: boolean
   trigger: PermissionTrigger
   /**
    * Whether the dialog has ever been raised on this device — a fact about the
@@ -43,12 +64,17 @@ export type PermissionAsk = {
 
 export function shouldAskForPermission({
   status,
+  canAskAgain,
   trigger,
   askedBefore,
 }: PermissionAsk): boolean {
-  // Granted has nothing left to ask for, and denied is the refusal that draws
-  // nothing. Only the undetermined status is a question anybody can answer.
-  if (status !== 'undetermined') return false
+  // Nothing left to ask for.
+  if (status === 'granted') return false
+
+  // The platform has closed the question. Deliberately the only thing that
+  // reads as a refusal here — `denied` on its own does not, because on Android
+  // that is also what never-asked looks like.
+  if (!canAskAgain) return false
 
   // Exhaustive rather than a membership test, so a third trigger has to answer
   // this question rather than inheriting an answer. Both of today's answer
