@@ -184,9 +184,17 @@ Broadcasts are in-inbox announcements (later), not stories.
      Two endings are worth naming. Hydration's Unreachable outcome does not come through here, for
      the reason it does not wipe the Store: the cookie is kept, so the registration is kept, and
      pushes go on arriving. And a Session expiry is a `DELETE` that will fail — the cookie is dead
-     by definition, which is how the expiry was noticed — so the row survives it. What closes that
-     is the API's own upsert: a registration takes a row over rather than adding one, so the next
-     person to sign in on this phone owns the token and the previous person's dispatches stop.
+     by definition, which is how the expiry was noticed — so the row survives it, and no client can
+     do anything about that. The next person to sign in on this phone takes the row over rather than
+     adding one, which closes it for a phone somebody picks up again and *not* for one nobody
+     touches: an expired session there goes on receiving previews. Removing the row server-side when
+     a session ends is #57's story 38 and is the only thing that closes it properly.
+
+     The sign-out has one ordering in it. The `DELETE` and `POST /auth/logout` both go under a cookie
+     this client has already given up, and the logout is the one that makes the other impossible, so
+     it waits — briefly. Briefly, because holding it back keeps the session alive on the server,
+     which is a worse thing to leave running than a device row; four seconds buys the ordering on a
+     healthy phone and gives it up on one where nothing was going to work anyway.
    - 5e. i18n, list virtualization.
 6. The Store — one in-memory copy of everything the screens read, written through to SQLite on the
    device and read back at the next cold start, so a launch draws the last thing this phone knew

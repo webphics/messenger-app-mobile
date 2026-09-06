@@ -229,6 +229,33 @@ describe('pushDeregistrationSettled', () => {
     expect(settled).toBe(true)
   })
 
+  /**
+   * The bound. Holding the logout back keeps the session alive on the server,
+   * which is a worse thing to leave running than a device row — so past a few
+   * seconds the wait is given up and the logout goes.
+   */
+  it('gives the ordering up rather than leaving the session alive', async () => {
+    jest.useFakeTimers()
+    try {
+      rememberPushRegistration(TOKEN)
+      request.mockReturnValueOnce(new Promise<HttpOutcome>(() => {}))
+
+      void deregisterPushDevice(COOKIE)
+      let settled = false
+      const waiting = pushDeregistrationSettled().then(() => {
+        settled = true
+      })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      jest.advanceTimersByTime(4_000)
+      await waiting
+      expect(settled).toBe(true)
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
   // Whatever it did. The gate is about ordering, not about success — a `DELETE`
   // the API refused still has to have been refused before the logout goes.
   it('answers rather than rejecting when the deregistration failed', async () => {
