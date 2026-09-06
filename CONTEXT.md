@@ -465,10 +465,24 @@ trimming (the operations are `evictAttachmentFiles` and, for the database, `plan
 The banner the operating system draws when a Message arrives and this app is not in front of the
 person. Delivered by Expo's push service against a token this device registered, and *not* the same
 thing as the Notification row the API writes: a row is written for every recipient of every message,
-and only some of them are worth waking a phone for. Suppressed entirely when the app is foregrounded
-on the thread it is about. There is no background connection behind it and there is not going to be
-one — a Push notification is how a closed app learns anything at all.
+and only some of them are worth waking a phone for. Never drawn at all while the app is in front of
+the person — the thread it is about is either on screen, where the bubble already says it, or it is
+not, where the In-app banner does. There is no background connection behind it and there is not going
+to be one — a Push notification is how a closed app learns anything at all.
 _Avoid_: Notification (bare — say which), local notification, alert, background message
+
+**Notification tag**:
+`<conversation>:<notification>`, set by the API on every dispatch that names a conversation, and on
+Android the only part of one that survives into the shade. Expo sends an FCM `notification` block so
+that a closed phone draws something at all, which means Firebase draws it before any of this app's
+code runs — and what the app reads back later is the *Android* notification: a title, a body, and
+none of the payload the tap path reads. So the routing travels in the tag as well, which is what a
+read has to match on to clear the right thread's notifications. Prefixed by the conversation so a
+thread can be cleared at once; suffixed by the notification so the tag stays unique, because Android
+*replaces* a notification sharing a tag and a bare conversation id would silently collapse a thread
+down to its newest message. Read by `notificationIdsForConversation`, which prefers the payload
+wherever it survived.
+_Avoid_: Collapse key, group key, thread id (that is iOS's), notification key (that is Android's own)
 
 **Notification permission**:
 The operating system's own answer to whether this app may draw a Push notification at all, held by
@@ -537,9 +551,19 @@ _Avoid_: Notification (bare), in-app notification, activity, feed item
 
 **In-app banner**:
 What a Message gets instead of a Push notification when the app is open on some other screen: a
-strip at the top of the current screen naming the sender, tappable into the thread, gone on its own.
-Neither the OS's surface nor a second unread count — the Conversation row and the tab badge have
-already moved by the time it appears, and it exists to say *which* thread moved.
+strip at the top of the current screen naming the sender, tappable into the thread, gone on its own
+after five seconds and dismissible by hand before that. Neither the OS's surface nor a second unread
+count — the Conversation row and the tab badge have already moved by the time it appears, and it
+exists to say *which* thread moved.
+
+Fed by the socket rather than by an arriving dispatch, which is the load-bearing choice in it: the
+strip has to appear for somebody who refused the Notification permission, whose conversations move
+exactly as everybody else's do, and the socket is already what moves the row and the badge. One
+event, three surfaces. Four kinds of Message never get one — a viewer's own, a System notice, one in
+the thread on screen, and one that arrived while the app was behind something, which the operating
+system has already drawn. The first two are `bannerNotice`'s; the last two are facts about the
+moment rather than about the Message, and the thread on screen is declared by the thread screen
+rather than read off the router, for the reason a Pending thread is.
 _Avoid_: Toast (that is for something the person just did), snackbar, heads-up notification, alert
 
 **Mute**:

@@ -6,6 +6,7 @@ import type { PushPlatform } from '@/lib/conversation-api'
 import {
   conversationIdFromPush,
   notificationIdFromPush,
+  notificationIdsForConversation,
   shouldAskForPermission,
   shouldOfferSystemSettings,
   type PermissionTrigger,
@@ -28,6 +29,40 @@ import {
  * native side at all — each ends with no registration and an app that works
  * exactly as it does without any of this.
  */
+
+/**
+ * Nothing the operating system draws while this app is in front of the person.
+ *
+ * The handler is asked about a dispatch that arrives in the foreground and
+ * nothing else — a phone that is asleep or behind another app never reaches
+ * here, which is the case a Push notification exists for. So the answer is a
+ * constant rather than a decision: while somebody is looking at this app, this
+ * app is what tells them, through the row that has already moved, the tab badge
+ * beside it, and the In-app banner that says which of them it was.
+ *
+ * That covers both foreground cases at once and is why neither needs to be
+ * distinguished here. A Message for the thread on screen is already drawn as a
+ * bubble; one for another thread gets the strip. Drawing the platform's own
+ * surface over either would be the app reporting something the person can see,
+ * and on the thread they are reading, telling them what they are reading.
+ *
+ * Set at module scope, because the handler has to be registered before a
+ * dispatch arrives rather than when a screen gets around to mounting, and Expo
+ * documents it that way. Guarded like everything else here: a build with no
+ * native side has no handler to set and is not failed by saying so.
+ */
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: false,
+      shouldShowList: false,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    }),
+  })
+} catch {
+  // No native module to hand this to. Nothing arrives, so nothing is drawn.
+}
 
 /**
  * Whether the dialog has ever been raised on this installation.
@@ -276,5 +311,38 @@ export function addPushTapListener(
     // No native side to subscribe to: nothing arrives, and taking back a
     // subscription that was never made is a no-op rather than a throw.
     return () => {}
+  }
+}
+
+/**
+ * Take one conversation's notifications out of the shade.
+ *
+ * Called by the read itself rather than by a screen — `markRead` in
+ * `lib/conversation-inbox` is the one funnel every read runs through, whether
+ * the thread was opened from the app or from the notification that is being
+ * cleared — so there is one call site and no way to open a thread that misses
+ * it.
+ *
+ * Only that conversation's, which is `notificationIdsForConversation`'s whole
+ * job: a shade cleared wholesale would hide threads nobody has looked at, and
+ * the disagreement with the badge this exists to fix would simply change
+ * direction.
+ *
+ * Nothing waits for it and nothing is failed by it. A shade that cannot be read
+ * is a notification somebody dismisses by hand, which is what they did before
+ * any of this.
+ */
+export async function dismissConversationNotifications(
+  conversationId: string,
+): Promise<void> {
+  try {
+    const presented = await Notifications.getPresentedNotificationsAsync()
+    await Promise.all(
+      notificationIdsForConversation(presented, conversationId).map((id) =>
+        Notifications.dismissNotificationAsync(id),
+      ),
+    )
+  } catch {
+    // See above. The shade keeps what it holds.
   }
 }

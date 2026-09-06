@@ -2,6 +2,7 @@ import {
   PERMISSION_TRIGGERS,
   conversationIdFromPush,
   notificationIdFromPush,
+  notificationIdsForConversation,
   shouldAskForPermission,
   shouldAskOnMessage,
   shouldOfferSystemSettings,
@@ -303,5 +304,134 @@ describe('the notification a tap names', () => {
     ['a response with no notification on it', {}],
   ])('answers null rather than throwing for %s', (_case, tapped) => {
     expect(notificationIdFromPush(tapped)).toBeNull()
+  })
+})
+
+/**
+ * The third thing read off a payload, and the only one that is not about a tap.
+ *
+ * Reading a thread has to take that thread's notifications out of the shade and
+ * nobody else's: clearing too few leaves a second unread count disagreeing with
+ * the badge, and clearing too many hides a conversation nobody has looked at.
+ */
+describe('the notifications standing in the shade for one conversation', () => {
+  function presented(identifier: unknown, conversationPublicId: unknown) {
+    return { request: { identifier, content: { data: { conversationPublicId } } } }
+  }
+
+  it('names every notification for the conversation that was read', () => {
+    expect(
+      notificationIdsForConversation(
+        [presented('a', 'cnv_01'), presented('b', 'cnv_01')],
+        'cnv_01',
+      ),
+    ).toEqual(['a', 'b'])
+  })
+
+  it('leaves another conversation’s where they are', () => {
+    expect(
+      notificationIdsForConversation(
+        [presented('a', 'cnv_01'), presented('b', 'cnv_02'), presented('c', 'cnv_01')],
+        'cnv_01',
+      ),
+    ).toEqual(['a', 'c'])
+  })
+
+  it('names nothing when the shade holds nothing for it', () => {
+    expect(notificationIdsForConversation([presented('a', 'cnv_02')], 'cnv_01')).toEqual([])
+  })
+
+  /**
+   * A dispatch this build cannot read is not a reason to clear one it can, so
+   * every unreadable row is simply unmatched rather than treated as a wildcard.
+   */
+  it.each([
+    ['a notification that is not a record', 'a'],
+    ['a notification with no request on it', {}],
+    ['a request that is not a record', { request: 7 }],
+    ['a request with no content on it', { request: { identifier: 'a' } }],
+    ['a dispatch about no conversation', presented('a', null)],
+    ['a conversation id that is not a string', presented('a', 7)],
+    ['an identifier the platform did not give', presented(undefined, 'cnv_01')],
+    ['an identifier that is empty', presented('', 'cnv_01')],
+  ])('matches nothing on %s', (_case, notification) => {
+    expect(notificationIdsForConversation([notification], 'cnv_01')).toEqual([])
+  })
+
+  /**
+   * The Android case, and on the one platform this ships to the only one: FCM
+   * drew the notification itself, so nothing of the dispatch survives in it and
+   * the tag the API set is what says which thread it belongs to.
+   */
+  describe('a notification the platform drew itself', () => {
+    function foreign(tag: string) {
+      return {
+        request: {
+          identifier: `expo-notifications://foreign_notifications?tag=${encodeURIComponent(tag)}&id=0`,
+          content: { data: { 'android.title': 'Admin', 'android.text': 'Hello' } },
+        },
+      }
+    }
+
+    it('is named by the conversation its tag begins with', () => {
+      expect(notificationIdsForConversation([foreign('cnv_01:ntf_01')], 'cnv_01')).toEqual([
+        'expo-notifications://foreign_notifications?tag=cnv_01%3Antf_01&id=0',
+      ])
+    })
+
+    /** The tag is per notification, so a thread's notifications do not collapse. */
+    it('names every notification a thread has standing', () => {
+      expect(
+        notificationIdsForConversation(
+          [foreign('cnv_01:ntf_01'), foreign('cnv_02:ntf_02'), foreign('cnv_01:ntf_03')],
+          'cnv_01',
+        ),
+      ).toHaveLength(2)
+    })
+
+    it.each([
+      ['the tag Firebase invents for itself', 'FCM-Notification:8637759'],
+      ['a tag naming a conversation and nothing else', 'cnv_01'],
+      ['a tag beginning with the separator', ':cnv_01'],
+    ])('matches nothing on %s', (_case, tag) => {
+      expect(notificationIdsForConversation([foreign(tag)], 'cnv_01')).toEqual([])
+    })
+
+    it.each([
+      ['an identifier naming no tag', 'expo-notifications://foreign_notifications?id=0'],
+      ['an identifier that is not a string', 7],
+      ['an identifier that is not valid percent-encoding', '?tag=cnv%2'],
+    ])('answers nothing rather than throwing for %s', (_case, identifier) => {
+      expect(
+        notificationIdsForConversation([{ request: { identifier } }], 'cnv_01'),
+      ).toEqual([])
+    })
+
+    /** The payload is the truth wherever it survived, and it survives on iOS. */
+    it('prefers the payload to the tag when the dispatch is still readable', () => {
+      const both = {
+        request: {
+          identifier: 'expo-notifications://foreign_notifications?tag=cnv_02%3Antf_01&id=0',
+          content: { data: { conversationPublicId: 'cnv_01' } },
+        },
+      }
+
+      expect(notificationIdsForConversation([both], 'cnv_01')).toHaveLength(1)
+      expect(notificationIdsForConversation([both], 'cnv_02')).toEqual([])
+    })
+  })
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['a record where the list should be', { 0: presented('a', 'cnv_01') }],
+    ['a string', 'cnv_01'],
+  ])('answers nothing rather than throwing for %s', (_case, shade) => {
+    expect(notificationIdsForConversation(shade, 'cnv_01')).toEqual([])
+  })
+
+  /** Nothing is named by an empty id, which is what an unreadable route is. */
+  it('clears nothing for a conversation with no id', () => {
+    expect(notificationIdsForConversation([presented('a', '')], '')).toEqual([])
   })
 })

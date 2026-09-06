@@ -152,16 +152,26 @@ export function shouldOfferSystemSettings(standing: PermissionStanding): boolean
  * from a server this app does not control, at the one moment this app has
  * nothing else on screen — a malformed one must not be able to break a launch.
  *
- * Both readers below take the whole response rather than the part of it they
- * want, so that the digging is table-tested too: `notification.request.content`
- * is three shapes deep and each of them is a place a dispatch can be wrong. It
- * is also why `push-device` knows none of this shape, despite owning the module
- * the response comes from.
+ * Every reader below takes the whole thing it was handed rather than the part of
+ * it it wants, so that the digging is table-tested too:
+ * `notification.request.content` is three shapes deep and each of them is a
+ * place a dispatch can be wrong. It is also why `push-device` knows none of this
+ * shape, despite owning the module the responses come from.
  */
+
+/** The `request` a notification carries, or null when it is not one. */
+function requestOfNotification(notification: unknown): Record<string, unknown> | null {
+  return asRecord(asRecord(notification)?.request)
+}
 
 /** The `request` a response carries, or null when the response is not one. */
 function requestOf(response: unknown): Record<string, unknown> | null {
-  return asRecord(asRecord(asRecord(response)?.notification)?.request)
+  return requestOfNotification(asRecord(response)?.notification)
+}
+
+/** The conversation a notification is about, wherever it is being read from. */
+function conversationOf(request: Record<string, unknown> | null): string | null {
+  return asId(asRecord(asRecord(request?.content)?.data)?.conversationPublicId)
 }
 
 /** A field that is a usable id, or null — an empty string is not one. */
@@ -179,8 +189,7 @@ function asId(value: unknown): string | null {
  * going.
  */
 export function conversationIdFromPush(response: unknown): string | null {
-  const content = asRecord(requestOf(response)?.content)
-  return asId(asRecord(content?.data)?.conversationPublicId)
+  return conversationOf(requestOf(response))
 }
 
 /**
@@ -194,4 +203,79 @@ export function conversationIdFromPush(response: unknown): string | null {
  */
 export function notificationIdFromPush(response: unknown): string | null {
   return asId(requestOf(response)?.identifier)
+}
+
+/**
+ * The conversation an Android notification names in its tag.
+ *
+ * The second way to read one, and on the one platform this ships to it is the
+ * only way. Expo's push service sends an FCM `notification` block so that a
+ * closed phone draws something at all — which means Firebase draws it, before
+ * any code of this app's runs, and what `getPresentedNotificationsAsync` hands
+ * back for one of those is the *Android* notification: a title, a body, and
+ * none of the payload. The dispatch is not lost, it was never in the thing being
+ * read.
+ *
+ * So the routing travels somewhere the platform does keep: the notification's
+ * tag, which the API sets to `<conversation>:<notification>` and which
+ * `expo-notifications` hands back inside the identifier it makes for a
+ * notification it did not post itself. Unique per notification, so nothing in a
+ * thread collapses into anything else; prefixed by the conversation, so the
+ * shade can be read a thread at a time.
+ *
+ * Anything else parses to something that is not a conversation id and therefore
+ * matches nothing — the tag Firebase invents for itself, `FCM-Notification:<n>`,
+ * included.
+ */
+function conversationFromTag(identifier: unknown): string | null {
+  if (typeof identifier !== 'string') return null
+
+  const tag = /[?&]tag=([^&]*)/.exec(identifier)?.[1]
+  if (tag === undefined) return null
+
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(tag)
+  } catch {
+    // A tag that is not valid percent-encoding is not one this app wrote.
+    return null
+  }
+
+  const separator = decoded.indexOf(':')
+  return separator > 0 ? decoded.slice(0, separator) : null
+}
+
+/**
+ * Which of the notifications standing in the shade belong to one conversation.
+ *
+ * The third thing read off a payload, and the only one that is not about a tap:
+ * a shade holding three notifications for a thread somebody has just read is a
+ * second unread count, disagreeing with the badge that has already gone. What
+ * clears them is the read itself — see `dismissConversationNotifications` — and
+ * this is the part of it that can be written a table for.
+ *
+ * Every notification is walked the way a tap is, and one that cannot be read is
+ * simply not matched: a dispatch this build does not understand is not a reason
+ * to clear somebody else's, and clearing more than the conversation named would
+ * be the same disagreement in the other direction.
+ */
+export function notificationIdsForConversation(
+  presented: unknown,
+  conversationId: string,
+): string[] {
+  if (!Array.isArray(presented) || conversationId === '') return []
+
+  const ids: string[] = []
+  for (const notification of presented) {
+    const request = requestOfNotification(notification)
+    // The payload first, because it is the truth when it survived; the tag when
+    // it did not, which on Android is every notification drawn while this app
+    // was not running.
+    const named = conversationOf(request) ?? conversationFromTag(request?.identifier)
+    if (named !== conversationId) continue
+
+    const id = asId(request?.identifier)
+    if (id !== null) ids.push(id)
+  }
+  return ids
 }

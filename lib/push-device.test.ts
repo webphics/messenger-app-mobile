@@ -4,6 +4,7 @@ import { Linking } from 'react-native'
 import {
   PUSH_PERMISSION_ASKED_FILE,
   addPushTapListener,
+  dismissConversationNotifications,
   ensurePushPermission,
   needsSystemNotificationSettings,
   openSystemNotificationSettings,
@@ -25,6 +26,19 @@ const mockCalls: string[] = []
 const mockTapListeners: ((response: never) => void)[] = []
 const mockRemoved: unknown[] = []
 
+/**
+ * The presentation handler this module registers as it is imported.
+ *
+ * Kept rather than read back off the mock, because it is registered before any
+ * `beforeEach` has run and the call itself is cleared away by the first one.
+ * `var`, and declared without a value: the registration happens while this
+ * file's own imports are still being run, which is before a `const` at this
+ * scope exists at all, and a hoisted binding is the one thing the factory below
+ * can reach at that moment.
+ */
+// eslint-disable-next-line no-var
+var mockHandler: { handleNotification: () => Promise<unknown> } | undefined
+
 /** The cache, small enough to read: one file's contents by name. */
 const mockCache = new Map<string, string>()
 let mockCacheReadFails = false
@@ -32,6 +46,11 @@ let mockCacheWriteFails = false
 
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 6 },
+  setNotificationHandler: jest.fn((handler) => {
+    mockHandler = handler
+  }),
+  getPresentedNotificationsAsync: jest.fn(),
+  dismissNotificationAsync: jest.fn(),
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   setNotificationChannelAsync: jest.fn(),
@@ -94,6 +113,10 @@ beforeEach(() => {
   notifications.getPermissionsAsync.mockResolvedValue(permission('undetermined'))
   notifications.requestPermissionsAsync.mockResolvedValue(permission('granted'))
   notifications.getLastNotificationResponse.mockReturnValue(null)
+  notifications.getPresentedNotificationsAsync.mockResolvedValue([])
+  notifications.dismissNotificationAsync.mockImplementation(async (id) => {
+    mockCalls.push(`dismiss:${id}`)
+  })
   notifications.addNotificationResponseReceivedListener.mockImplementation(
     (listener) => {
       mockTapListeners.push(listener)
@@ -404,5 +427,75 @@ describe('addPushTapListener', () => {
     })
 
     expect(() => addPushTapListener(() => {})()).not.toThrow()
+  })
+})
+
+/**
+ * The handler is registered as this module is imported rather than by a screen,
+ * because a dispatch can arrive before any screen has mounted. What it answers
+ * is a constant: while the app is in front of somebody, the app is what tells
+ * them — see the note on it.
+ */
+describe('a notification arriving while the app is in front of the person', () => {
+  it('is drawn by nothing the operating system owns', async () => {
+    expect(mockHandler).toBeDefined()
+
+    await expect(mockHandler?.handleNotification()).resolves.toEqual({
+      shouldShowBanner: false,
+      shouldShowList: false,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    })
+  })
+})
+
+describe('dismissConversationNotifications', () => {
+  function presented(identifier: string, conversationPublicId: string) {
+    return {
+      request: { identifier, content: { data: { conversationPublicId } } },
+    } as unknown as Notifications.Notification
+  }
+
+  it('takes the read conversation’s notifications out of the shade', async () => {
+    notifications.getPresentedNotificationsAsync.mockResolvedValue([
+      presented('a', 'cnv_01'),
+      presented('b', 'cnv_01'),
+    ])
+
+    await dismissConversationNotifications('cnv_01')
+
+    expect(mockCalls).toEqual(['dismiss:a', 'dismiss:b'])
+  })
+
+  /** A shade cleared wholesale would hide threads nobody has looked at. */
+  it('leaves another conversation’s where they are', async () => {
+    notifications.getPresentedNotificationsAsync.mockResolvedValue([
+      presented('a', 'cnv_01'),
+      presented('b', 'cnv_02'),
+    ])
+
+    await dismissConversationNotifications('cnv_01')
+
+    expect(mockCalls).toEqual(['dismiss:a'])
+  })
+
+  it('does nothing when the shade holds nothing for it', async () => {
+    await dismissConversationNotifications('cnv_01')
+
+    expect(mockCalls).toEqual([])
+  })
+
+  it.each([
+    ['the shade cannot be read', () => {
+      notifications.getPresentedNotificationsAsync.mockRejectedValue(new Error('no shade'))
+    }],
+    ['a notification refuses to be dismissed', () => {
+      notifications.getPresentedNotificationsAsync.mockResolvedValue([presented('a', 'cnv_01')])
+      notifications.dismissNotificationAsync.mockRejectedValue(new Error('gone'))
+    }],
+  ])('does not fail a read when %s', async (_case, arrange) => {
+    arrange()
+
+    await expect(dismissConversationNotifications('cnv_01')).resolves.toBeUndefined()
   })
 })
