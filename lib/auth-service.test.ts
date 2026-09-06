@@ -26,8 +26,9 @@ import {
   writeSessionCookie,
 } from "@/lib/keychain";
 import { purgeMockSession } from "@/lib/legacy-session";
+import { pushDeregistrationSettled } from "@/lib/push-registry";
 import { getSessionUser, setSessionUser } from "@/lib/session";
-import { wipeStoreAndAttachments } from "@/lib/session-wipe";
+import { endSessionOnDevice } from "@/lib/session-wipe";
 
 jest.mock("@/lib/api-client", () => {
   let held: string | null = null;
@@ -68,7 +69,14 @@ jest.mock("@/lib/google-session", () => ({
 // what they do with a wipe is tested where each of them owns one. What matters
 // here is only which moments reach this at all.
 jest.mock("@/lib/session-wipe", () => ({
-  wipeStoreAndAttachments: jest.fn(async () => undefined),
+  endSessionOnDevice: jest.fn(async () => undefined),
+}));
+
+// The `DELETE` the wipe fires needs the same cookie the logout is about to
+// invalidate, so signing out waits for it. What it does is `lib/push-registry`'s
+// to say; that it is waited for is this file's.
+jest.mock("@/lib/push-registry", () => ({
+  pushDeregistrationSettled: jest.fn(async () => undefined),
 }));
 
 jest.mock("@/lib/keychain", () => ({
@@ -91,7 +99,10 @@ const releaseGoogle = releaseGoogleSession as jest.MockedFunction<
 const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCookie>;
 const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
 const clearCookie = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
-const wipe = wipeStoreAndAttachments as jest.MockedFunction<typeof wipeStoreAndAttachments>;
+const wipe = endSessionOnDevice as jest.MockedFunction<typeof endSessionOnDevice>;
+const deregistered = pushDeregistrationSettled as jest.MockedFunction<
+  typeof pushDeregistrationSettled
+>;
 const readPerson = readKeptPerson as jest.MockedFunction<typeof readKeptPerson>;
 const writePerson = writeKeptPerson as jest.MockedFunction<typeof writeKeptPerson>;
 const clearPerson = clearKeptPerson as jest.MockedFunction<typeof clearKeptPerson>;
@@ -571,6 +582,56 @@ describe("a Session end takes the Store with it", () => {
     await signOut();
 
     expect(wipe).toHaveBeenCalledTimes(1);
+  });
+
+  // The one thing a Session end destroys that is not on this device: the push
+  // registration, removed with a request, and a request needs a credential the
+  // line above has already discarded. Captured before it goes, the way the
+  // logout call's is.
+  test("the ending credential travels with the wipe, so the push row can go", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    request.mockResolvedValueOnce(ok(true));
+
+    await signOut();
+
+    expect(wipe).toHaveBeenCalledWith(STORED);
+  });
+
+  // Nothing to authenticate with is not nothing to wipe. Both halves on this
+  // device still go; only the request has no credential to make itself under.
+  test("a moment with no credential still wipes, with nothing to present", async () => {
+    readCookie.mockResolvedValueOnce(null);
+
+    await hydrateAuth();
+
+    expect(wipe).toHaveBeenCalledWith(null);
+  });
+
+  // Ending the session on the server makes the `DELETE` impossible, so the two
+  // cannot be left to race for the last moments of a session this client has
+  // already given up.
+  test("the logout does not overtake the deregistration it would refuse", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    let removedRow = () => {};
+    deregistered.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        removedRow = resolve;
+      }),
+    );
+    request.mockResolvedValueOnce(ok(true));
+
+    const ending = signOut();
+    await Promise.resolve();
+    expect(request).not.toHaveBeenCalledWith("/auth/logout", expect.anything());
+
+    removedRow();
+    await ending;
+    expect(request).toHaveBeenCalledWith("/auth/logout", {
+      method: "POST",
+      cookie: STORED,
+    });
   });
 
   test("a Session expiry destroys it too", async () => {

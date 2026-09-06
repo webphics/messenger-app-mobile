@@ -8,6 +8,7 @@ import {
   ensurePushPermission,
   readPushToken,
 } from "@/lib/push-device";
+import { rememberPushRegistration } from "@/lib/push-registry";
 import { shouldAskOnMessage, type PermissionTrigger } from "@/lib/push-rules";
 import { useRealtimeEvents } from "@/lib/realtime-context";
 
@@ -33,6 +34,11 @@ async function askAndRegister(
   // under, and the request would go out on a credential already discarded.
   if (!token || !stillSignedIn()) return false;
 
+  // Before the request rather than after its answer, and unconditionally: a row
+  // may well have been written by a request whose answer was lost, and a Session
+  // end that removes nothing is cheaper than one that leaves a row behind. See
+  // `PUSH_REGISTERED_TOKEN_FILE`.
+  rememberPushRegistration(token);
   await registerPushDevice(token, PUSH_PLATFORM);
   return true;
 }
@@ -82,22 +88,32 @@ export function PushRegistration() {
   const stale = state.status === "signed-in" && state.stale;
 
   /**
-   * What this process has already done about push.
+   * What this session has already done about push, and for whom.
    *
-   * `registered` is set only by a registration that actually went out, so every
-   * other ending — a permission that is not granted, a token that could not be
-   * read, a session that went while the dialog was up — leaves the second
-   * trigger something to do. `running` is one attempt at a time, so a Message
-   * landing while the first trigger still has the dialog up does not raise a
-   * second. `askedOnMessage` is the second trigger's own once: an ask it made
-   * and lost is not worth remaking per message.
+   * A session rather than this process, which is the whole of what these have to
+   * get right. A process outlives a session — signing out and back in on the
+   * same phone, as somebody else or as the same person again, is one process
+   * with two sessions in it — and since #61 a Session end takes the device row
+   * away with it, so a second sign-in that thought it had already registered
+   * would be a phone the API cannot dispatch to until the next launch. They are
+   * cleared by the Session end below, and they name a person as well, so that
+   * neither half of the question has to be inferred from the other.
    *
-   * None of the three is the guard that matters. That is the record of the ask
-   * under `Paths.cache`, and it is the one that outlives the process.
+   * `registeredFor` is set only by a registration that actually went out, so
+   * every other ending — a permission that is not granted, a token that could
+   * not be read, a session that went while the dialog was up — leaves the
+   * second trigger something to do. `askedOnMessage` is that trigger's own
+   * once: an ask it made and lost is not worth remaking per message.
+   * `running` is one attempt at a time and is the one that is *not* per person,
+   * because two attempts at once is a fact about this process whoever they are
+   * for.
+   *
+   * None of them is the guard that matters. That is the record of the ask under
+   * `Paths.cache`, and it is the one that outlives the process.
    */
-  const registered = useRef(false);
+  const registeredFor = useRef<string | null>(null);
   const running = useRef(false);
-  const askedOnMessage = useRef(false);
+  const askedOnMessageFor = useRef<string | null>(null);
 
   /**
    * Who is signed in *now*, read when the work below comes back rather than when
@@ -110,21 +126,30 @@ export function PushRegistration() {
   }, [viewerId]);
 
   const run = useCallback(async (trigger: PermissionTrigger, viewer: string) => {
-    if (running.current) return;
+    if (running.current || registeredFor.current === viewer) return;
 
     running.current = true;
     try {
-      registered.current ||= await askAndRegister(
+      const sent = await askAndRegister(
         trigger,
         () => viewer === viewerIdRef.current,
       );
+      if (sent) registeredFor.current = viewer;
     } finally {
       running.current = false;
     }
   }, []);
 
   useEffect(() => {
-    if (viewerId) void run("sign-in", viewerId);
+    // A Session end. The row this process registered has gone with it, so what
+    // this session did about push is no longer true of the next one.
+    if (!viewerId) {
+      registeredFor.current = null;
+      askedOnMessageFor.current = null;
+      return;
+    }
+
+    void run("sign-in", viewerId);
   }, [viewerId, stale, run]);
 
   /**
@@ -134,7 +159,8 @@ export function PushRegistration() {
    *
    * Three things have to be true of the moment, and only the first is about the
    * Message: it has to be somebody else's, it has to arrive while the app is in
-   * front of the person, and this process must have nothing registered already.
+   * front of the person, and this process must have registered nothing for them
+   * already.
    *
    * The foreground check is the one that keeps the trigger honest. The socket is
    * not torn down when the app goes behind something, so a reply can land while
@@ -145,11 +171,12 @@ export function PushRegistration() {
    */
   useRealtimeEvents((event) => {
     if (!viewerId || event.kind !== "message") return;
-    if (registered.current || askedOnMessage.current || running.current) return;
+    if (registeredFor.current === viewerId || running.current) return;
+    if (askedOnMessageFor.current === viewerId) return;
     if (!shouldAskOnMessage(event.message, viewerId)) return;
     if (AppState.currentState !== "active") return;
 
-    askedOnMessage.current = true;
+    askedOnMessageFor.current = viewerId;
     void run("message", viewerId);
   });
 
