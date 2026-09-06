@@ -399,8 +399,9 @@ is a message that is gone.
 _Avoid_: Queue (nothing drains it), retry queue, pending messages, drafts (a draft was never sent)
 
 **Wipe**:
-Destroying everything this device holds of somebody's Conversations — the database file itself, not
-the rows in it, and the downloaded documents with it. Every moment that discards the Session cookie
+Destroying everything a session left behind — the database file itself, not the rows in it, the
+downloaded documents with it, and this device's Device registration, which is the one item on the
+list that is not on the device. Every moment that discards the Session cookie
 reaches it, and they are not only the two that end a session: signing out, a Session expiry, a cold
 start that finds no cookie, and a sign-in the API refused. The third covers a sign-out the operating
 system killed halfway; the fourth is not a Session end at all and wipes anyway, because nothing on
@@ -409,7 +410,9 @@ none of it. What a Wipe removes stays removed: it bars the people it took the St
 Restore again, so a socket event landing in the moment between the credential going and the screens
 being told cannot write the list back. A Wipe cannot fail a Session end — a database the platform
 will not delete is not something the person being signed out can do anything about, so signing out
-completes regardless, as it already does when telling the server fails. Not Eviction, which is about
+completes regardless, as it already does when telling the server fails; the Device registration is
+the same rule reaching off the phone, started and not waited for. Not Restore's opposite either:
+Hydration's Unreachable outcome keeps the cookie, so it keeps both the Store and the registration. Not Eviction, which is about
 size and keeps the database: a Wipe is about entitlement and leaves none of it. The database is
 excluded from both platforms' device backups so it cannot be lifted off the phone by a backup tool,
 while the rest of the app is still backed up — a deny-list, which is why a test fails when the app's
@@ -498,6 +501,21 @@ installation rather than to the person using it. Registered under whoever is sig
 session, because it rotates and a row holding an old one dispatches into nothing. Not a credential:
 it authenticates nobody and is registered *with* the Session cookie rather than instead of it.
 _Avoid_: Device token (that is the FCM one underneath), subscription (that is the browser's), push ID
+
+**Device registration**:
+The API's row saying this phone's Push token belongs to the person signed in on it, and the third
+thing a Wipe destroys. Written by every registration and removed by a Session end
+(`DELETE /push/devices`, owner-scoped and idempotent), so a phone handed to somebody else stops
+showing the previous person's conversations on its lock screen. Its removal is subordinate the way
+the rest of a Wipe is: the ending Session cookie is captured before it goes and presented to the
+`DELETE`, nothing on the device waits for the answer, and a failure is a row the API keeps for a
+while longer rather than a sign-out that did not happen. A Session expiry is that failure by
+definition — the cookie is dead, which is how the expiry was noticed — and what closes it is the
+next registration on this phone, which moves the row to its new owner rather than adding one. Which
+token to name is a record under `Paths.cache`, beside the record of the ask and outliving a Session
+end for the same reason. Held in `lib/push-registry`.
+_Avoid_: Subscription (that is the browser's), device, enrolment, the token (that is the string
+inside it)
 
 **Pending thread**:
 The conversation a tapped Push notification asked for, held only while nothing can act on it yet — a

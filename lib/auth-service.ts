@@ -375,9 +375,10 @@ export async function verifyMagicLink(token: string): Promise<AuthOutcome> {
  * and the half of the time the logout lands first the device row survives a
  * sign-out that was meant to remove it.
  *
- * None of this is felt: `AuthProvider` has already dispatched the sign-out and
- * moved the screens before this function is called, so what waits here is a
- * promise nobody is watching.
+ * Nobody feels the wait: `AuthProvider` has already dispatched the sign-out and
+ * moved the screens before this function is called. The session does, which is
+ * why the gate gives up after a few seconds rather than after a deadline — see
+ * `pushDeregistrationSettled`.
  */
 export async function signOut(): Promise<void> {
   const ending = getSessionCookie();

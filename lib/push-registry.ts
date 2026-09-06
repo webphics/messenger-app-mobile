@@ -5,12 +5,12 @@ import { apiRequest } from '@/lib/api-client'
 /**
  * What this device told the API to dispatch to, and how it takes that back.
  *
- * Split off `lib/push-device` rather than sitting in it, because the two answer
- * to different things. That module is the one place `expo-notifications` is
- * imported — the dialog, the channel, the token Expo issues — and this one never
- * touches it: it is a name written down and a request about the name. The split
- * is what keeps a Session end from dragging the whole notifications native side
- * in behind it, since `lib/session-wipe` reaches this and `lib/auth-service`
+ * Split off `lib/push-device` rather than sitting in it, and the line between
+ * them is the native import rather than anything about what they do — both write
+ * a small record under `Paths.cache`. That module is the one place
+ * `expo-notifications` is imported; this one never touches it, which is what
+ * keeps a Session end from dragging the whole notifications native side in
+ * behind it, since `lib/session-wipe` reaches this and `lib/auth-service`
  * reaches that.
  *
  * Nothing here throws. Every ending is a row the API keeps for a while longer,
@@ -38,6 +38,20 @@ import { apiRequest } from '@/lib/api-client'
  * there is no timer here and no loop, the same as the registration beside it.
  */
 export const PUSH_REGISTERED_TOKEN_FILE = 'push-registered-token'
+
+/**
+ * The deregistration that is still going, or the last one that went.
+ *
+ * A module-level slot rather than a return value threaded up, because the only
+ * thing that wants it is `signOut` and the only path between them runs through
+ * `forgetCredential` and `endSessionOnDevice` — neither of which has any use for
+ * it, and both of which would have to carry it in their signature for the one
+ * caller in four that does.
+ *
+ * Overwritten rather than accumulated: a second Session end while one is still
+ * going is a session that ended twice, and the gate wants the latest of them.
+ */
+let inFlight: Promise<void> = Promise.resolve()
 
 /** Where the last registered token is kept. See the constant above. */
 function registeredTokenFile(): File {
@@ -122,7 +136,24 @@ export function deregisterPushDevice(cookie: string | null): Promise<void> {
 }
 
 /**
- * The deregistration this Session end fired, once it has been answered.
+ * How long a sign-out will hold its logout back for the `DELETE` above.
+ *
+ * Deliberately far shorter than a Request deadline, because this is not a bound
+ * on the request — that one already has one, four of them in the pathological
+ * case. It is a bound on how long the *session on the server* may be left alive
+ * to buy the ordering below, and past a couple of seconds that trade goes the
+ * wrong way round: a live session reads somebody's conversations, and a live
+ * device row shows a preview until the next person to sign in takes it over.
+ *
+ * So it is sized to the case it exists for — a healthy phone, a pre-flight and
+ * a `DELETE` — rather than to the case where nothing is going to work anyway. A
+ * network slow enough to exceed this is one where the logout is unlikely to
+ * land either.
+ */
+const LOGOUT_HELD_FOR_MS = 4_000
+
+/**
+ * Wait for the deregistration this Session end fired, but not for long.
  *
  * There is one caller and one reason for it: signing out ends the session on the
  * server, and that request makes every other one impossible — including the
@@ -137,21 +168,28 @@ export function deregisterPushDevice(cookie: string | null): Promise<void> {
  * request of its own. It costs the person nothing, because a sign-out has
  * already changed the screens by the time any of this runs — see `signOut`.
  *
- * Answers immediately when nothing is in flight, which is every moment but this
- * one.
+ * It costs the *session* something, which is why it is bounded. Giving up here
+ * abandons only the ordering: the `DELETE` is still going, and may still land
+ * first or land uselessly, but the logout stops waiting to find out.
+ *
+ * Answers at once when nothing is in flight, which is every moment but this one.
  */
-export function pushDeregistrationSettled(): Promise<void> {
-  return inFlight
+export async function pushDeregistrationSettled(): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      inFlight,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, LOGOUT_HELD_FOR_MS)
+      }),
+    ])
+  } finally {
+    // Or the bound outlives the thing it was bounding, and holds a timer open
+    // on every sign-out that did not need one.
+    clearTimeout(timer)
+  }
 }
 
-/**
- * The deregistration that is still going, or the last one that went.
- *
- * A module-level slot rather than a value passed around, because the thing that
- * has to wait for it — the logout — is three files away from the thing that
- * fired it, and neither is holding the other's promise.
- */
-let inFlight: Promise<void> = Promise.resolve()
 
 async function removeDevice(cookie: string | null): Promise<void> {
   try {
