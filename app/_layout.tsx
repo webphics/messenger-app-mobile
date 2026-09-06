@@ -99,13 +99,16 @@ export default function RootLayout() {
       ) : null}
       <AuthProvider>
         <SessionEndRedirect />
-        {/* Renders nothing: the permission is asked for once and this device's
-            push token is kept current, both keyed on there being a session. */}
-        <PushRegistration />
         {/* Outside the inbox, because the inbox is one of the things that
             listens to it, and inside the auth provider, because a connection
             needs a session to authenticate its handshake with. */}
         <RealtimeProvider>
+          {/* Renders nothing: the permission is asked for at the two moments
+              that ask — and once — and this device's push token is kept current,
+              both keyed on there being a session. Inside the socket rather than
+              beside it, because the second of those moments is a Message
+              arriving. */}
+          <PushRegistration />
           {/* Inside the auth provider and outside the navigator: the signed-in
             person's conversations are fetched once for every screen that reads
             them, and the chat route sits beside the tab groups rather than

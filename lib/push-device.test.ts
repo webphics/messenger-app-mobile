@@ -1,9 +1,12 @@
 import * as Notifications from 'expo-notifications'
+import { Linking } from 'react-native'
 
 import {
   PUSH_PERMISSION_ASKED_FILE,
   addPushTapListener,
   ensurePushPermission,
+  needsSystemNotificationSettings,
+  openSystemNotificationSettings,
   readPushToken,
   takeTappedConversation,
 } from '@/lib/push-device'
@@ -210,6 +213,73 @@ describe('ensurePushPermission', () => {
     mockCacheWriteFails = true
 
     await expect(ensurePushPermission('sign-in')).resolves.toBe('granted')
+  })
+})
+
+/**
+ * The route Settings offers, at the boundary this module owns: which two facts
+ * are read, and that a platform which cannot answer says nothing rather than
+ * throwing. *When* the route is warranted is `lib/push-rules`, table-tested next
+ * door with no mocks, and is not re-tested through this.
+ */
+describe('needsSystemNotificationSettings', () => {
+  it('offers the route once the dialog has been drawn and answered with nothing', async () => {
+    mockCache.set(ASKED_FILE, 'asked')
+
+    expect(await needsSystemNotificationSettings()).toBe(true)
+  })
+
+  it('offers nothing while the ask is still to come', async () => {
+    expect(await needsSystemNotificationSettings()).toBe(false)
+  })
+
+  it('offers nothing to somebody who granted it', async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(permission('granted'))
+    mockCache.set(ASKED_FILE, 'asked')
+
+    expect(await needsSystemNotificationSettings()).toBe(false)
+  })
+
+  it('offers the route when the platform will not draw a dialog at all', async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(permission('denied', false))
+
+    expect(await needsSystemNotificationSettings()).toBe(true)
+  })
+
+  it('answers no rather than throwing when the platform cannot be read', async () => {
+    notifications.getPermissionsAsync.mockRejectedValueOnce(new Error('no native module'))
+
+    expect(await needsSystemNotificationSettings()).toBe(false)
+  })
+
+  /**
+   * The other half of that: an unreadable platform says nothing is decided and
+   * nothing is closed, so what is left deciding is the record of the ask. A
+   * device that has asked and cannot say what came of it has one place left to
+   * go, and this offers it rather than leaving somebody with neither a dialog
+   * nor a route.
+   */
+  it('offers the route when the platform cannot be read and this device has asked', async () => {
+    notifications.getPermissionsAsync.mockRejectedValueOnce(new Error('no native module'))
+    mockCache.set(ASKED_FILE, 'asked')
+
+    expect(await needsSystemNotificationSettings()).toBe(true)
+  })
+})
+
+describe('openSystemNotificationSettings', () => {
+  it('sends the person to this app’s own page in the operating system', async () => {
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue()
+
+    await openSystemNotificationSettings()
+
+    expect(openSettings).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not fail when the platform refuses to open it', async () => {
+    jest.spyOn(Linking, 'openSettings').mockRejectedValueOnce(new Error('no activity'))
+
+    await expect(openSystemNotificationSettings()).resolves.toBeUndefined()
   })
 })
 

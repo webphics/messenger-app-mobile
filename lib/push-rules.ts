@@ -1,4 +1,6 @@
 import { asRecord } from '@/lib/api-envelope'
+import { isOutgoing, isSystemMessage } from '@/lib/thread-state'
+import type { Message } from '@/lib/types'
 
 /**
  * The two decisions about a Push notification that are not about the platform:
@@ -54,14 +56,17 @@ export type PushPermission = 'undetermined' | 'granted' | 'denied'
  */
 export type PermissionTrigger = 'sign-in' | 'message'
 
-export type PermissionAsk = {
+/** Every moment that asks, so a rule can be written over all of them at once. */
+export const PERMISSION_TRIGGERS: PermissionTrigger[] = ['sign-in', 'message']
+
+/** Everything the decisions below read except which moment is asking. */
+export type PermissionStanding = {
   status: PushPermission
   /**
    * Whether the platform would still draw the dialog. The load-bearing field:
    * see the note above on why the status is not.
    */
   canAskAgain: boolean
-  trigger: PermissionTrigger
   /**
    * Whether the dialog has ever been raised on this device — a fact about the
    * installation, because that is the scope the platform's own once is. It
@@ -69,6 +74,8 @@ export type PermissionAsk = {
    */
   askedBefore: boolean
 }
+
+export type PermissionAsk = PermissionStanding & { trigger: PermissionTrigger }
 
 export function shouldAskForPermission({
   status,
@@ -93,6 +100,47 @@ export function shouldAskForPermission({
     case 'message':
       return !askedBefore
   }
+}
+
+/**
+ * Whether an arriving Message is one of the moments that asks.
+ *
+ * The half of the second trigger that is about the Message rather than about
+ * the platform: a reply landing from somebody else is the question answering
+ * itself, and the two kinds that are not are this viewer's own message and a
+ * System notice. Both are the app talking about itself — nobody is watching for
+ * either, and neither is a reason to put a dialog in front of anybody.
+ *
+ * Whether the app is actually in front of the person is not asked here, because
+ * that is not a fact about the Message; `PushRegistration` reads it.
+ */
+export function shouldAskOnMessage(message: Message, viewerId: string): boolean {
+  return !isSystemMessage(message) && !isOutgoing(message, viewerId)
+}
+
+/**
+ * Whether Settings should offer a route into the operating system's own
+ * notification settings.
+ *
+ * The one place the answer can still be changed, offered exactly when it is the
+ * *only* place: notifications are not on, and no moment this app has left will
+ * put the dialog in front of anybody again. Which is why this is defined against
+ * the table above rather than as `status === 'denied'` — the two are not the
+ * same set at either end.
+ *
+ * A phone that has never been asked reports `denied` on Android and is not
+ * offered this, because the ask is still coming and a person sent to system
+ * settings before ever seeing the dialog has been asked to do by hand what the
+ * app was about to do for them. And somebody who dismissed the dialog once is
+ * offered it while the platform still says `canAskAgain` — that field is about
+ * whether a dialog would be *drawn*, and `askedBefore` is what says it already
+ * has been. Nothing here nags: it is a row on a screen somebody chose to open.
+ */
+export function shouldOfferSystemSettings(standing: PermissionStanding): boolean {
+  if (standing.status === 'granted') return false
+  return PERMISSION_TRIGGERS.every(
+    (trigger) => !shouldAskForPermission({ ...standing, trigger }),
+  )
 }
 
 /**

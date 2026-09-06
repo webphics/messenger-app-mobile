@@ -1,10 +1,14 @@
 import {
+  PERMISSION_TRIGGERS,
   conversationIdFromPush,
   notificationIdFromPush,
   shouldAskForPermission,
+  shouldAskOnMessage,
+  shouldOfferSystemSettings,
   type PermissionAsk,
-  type PermissionTrigger,
+  type PushPermission,
 } from '@/lib/push-rules'
+import type { CustomerMessage, StaffMessage } from '@/lib/types'
 
 function ask(overrides: Partial<PermissionAsk> = {}): PermissionAsk {
   return {
@@ -16,7 +20,8 @@ function ask(overrides: Partial<PermissionAsk> = {}): PermissionAsk {
   }
 }
 
-const TRIGGERS: PermissionTrigger[] = ['sign-in', 'message']
+/** The module's own list, so a third trigger reaches every row below. */
+const TRIGGERS = PERMISSION_TRIGGERS
 
 describe('a device that has never asked', () => {
   it.each(TRIGGERS)('asks on the %s trigger', (trigger) => {
@@ -68,6 +73,133 @@ describe('a permission already granted', () => {
         ).toBe(false)
       }
     }
+  })
+})
+
+/**
+ * Which arriving Message is one of the moments that asks.
+ *
+ * A viewer of each kind, because who *sent* a message is read differently on
+ * either side of the company: a Customer's Support DM carries `fromCompany` and
+ * no sender at all, and Staff read a sender's id. Both are `isOutgoing`'s
+ * problem and tested there; what is tested here is that this asks it, and that a
+ * System notice is nobody's reply.
+ */
+describe('an arriving message', () => {
+  const SHARED = {
+    id: 'msg_01',
+    body: 'Are you still there?',
+    messageType: 'text',
+    createdAt: '2026-08-13T08:00:00.000Z',
+    replyTo: null,
+    reactions: [],
+    attachments: [],
+    receiptStatus: 'sent',
+  } satisfies Omit<CustomerMessage, 'fromCompany'>
+
+  /** What a Customer receives: the company speaks as one voice and names nobody. */
+  function toCustomer(overrides: Partial<CustomerMessage> = {}): CustomerMessage {
+    return { ...SHARED, fromCompany: true, ...overrides }
+  }
+
+  /** What Staff receive: a sender, which is who `isOutgoing` reads. */
+  function toStaff(senderId: string, overrides: Partial<StaffMessage> = {}): StaffMessage {
+    return {
+      ...SHARED,
+      sender: { id: senderId, name: 'Jonah Reed', role: 'agent' },
+      ...overrides,
+    }
+  }
+
+  it('asks when the company has answered a Customer', () => {
+    expect(shouldAskOnMessage(toCustomer(), 'cust-1')).toBe(true)
+  })
+
+  it('asks a staff viewer when somebody else wrote it', () => {
+    expect(shouldAskOnMessage(toStaff('agent-2'), 'agent-1')).toBe(true)
+  })
+
+  it('does not ask on the viewer’s own message', () => {
+    expect(shouldAskOnMessage(toCustomer({ fromCompany: false }), 'cust-1')).toBe(false)
+    expect(shouldAskOnMessage(toStaff('agent-1'), 'agent-1')).toBe(false)
+  })
+
+  /** Nobody is watching for the app to say somebody joined a thread. */
+  it('does not ask on a System notice, whoever it reaches', () => {
+    expect(
+      shouldAskOnMessage(toCustomer({ messageType: 'system' }), 'cust-1'),
+    ).toBe(false)
+    expect(
+      shouldAskOnMessage(toStaff('agent-2', { messageType: 'system' }), 'agent-1'),
+    ).toBe(false)
+  })
+})
+
+/**
+ * The same table again, written out in full.
+ *
+ * The rows above say *why* each answer is what it is and are the ones worth
+ * reading; this one says that nothing is missing — every combination of the
+ * three fields the platform and the cache can be in, against both moments that
+ * ask and against the route Settings offers when neither will.
+ *
+ * The two columns are here together because they are one decision seen from
+ * both sides: a standing this app can still ask about is never one to send
+ * somebody to system settings over, and the moment that stops being true is the
+ * moment the row is worth showing. Written as literals rather than derived from
+ * anything, so a change to either rule has to change a row here.
+ */
+describe('every standing the permission can be in', () => {
+  type Row = {
+    status: PushPermission
+    canAskAgain: boolean
+    askedBefore: boolean
+    asks: boolean
+    offersSettings: boolean
+  }
+
+  const TABLE: Row[] = [
+    // Nobody has asked yet, and the platform would draw the dialog. The one
+    // standing that asks — and `denied` is the same standing on Android 13+.
+    { status: 'undetermined', canAskAgain: true, askedBefore: false, asks: true, offersSettings: false },
+    { status: 'denied', canAskAgain: true, askedBefore: false, asks: true, offersSettings: false },
+
+    // The dialog has been drawn and answered with nothing. The platform would
+    // draw it again and must not be asked to; system settings is what is left.
+    { status: 'undetermined', canAskAgain: true, askedBefore: true, asks: false, offersSettings: true },
+    { status: 'denied', canAskAgain: true, askedBefore: true, asks: false, offersSettings: true },
+
+    // The platform has closed the question — refused twice on Android, once on
+    // iOS, or turned off in settings. Whether this app ever asked is moot.
+    { status: 'undetermined', canAskAgain: false, askedBefore: false, asks: false, offersSettings: true },
+    { status: 'undetermined', canAskAgain: false, askedBefore: true, asks: false, offersSettings: true },
+    { status: 'denied', canAskAgain: false, askedBefore: false, asks: false, offersSettings: true },
+    { status: 'denied', canAskAgain: false, askedBefore: true, asks: false, offersSettings: true },
+
+    // Granted. Nothing to ask for and nothing to send anybody to settings about.
+    { status: 'granted', canAskAgain: true, askedBefore: false, asks: false, offersSettings: false },
+    { status: 'granted', canAskAgain: true, askedBefore: true, asks: false, offersSettings: false },
+    { status: 'granted', canAskAgain: false, askedBefore: false, asks: false, offersSettings: false },
+    { status: 'granted', canAskAgain: false, askedBefore: true, asks: false, offersSettings: false },
+  ]
+
+  it.each(TABLE)(
+    '$status, canAskAgain $canAskAgain, askedBefore $askedBefore: asks $asks, offers settings $offersSettings',
+    ({ asks, offersSettings, ...standing }) => {
+      for (const trigger of TRIGGERS) {
+        expect(shouldAskForPermission({ ...standing, trigger })).toBe(asks)
+      }
+      expect(shouldOfferSystemSettings(standing)).toBe(offersSettings)
+    },
+  )
+
+  it('covers every combination there is', () => {
+    const standings = TABLE.map(
+      ({ status, canAskAgain, askedBefore }) => `${status}/${canAskAgain}/${askedBefore}`,
+    )
+    // Three statuses, two platform answers, two records of an ask, each once.
+    expect(new Set(standings).size).toBe(3 * 2 * 2)
+    expect(standings).toHaveLength(new Set(standings).size)
   })
 })
 
