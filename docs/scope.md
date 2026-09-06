@@ -168,6 +168,25 @@ Broadcasts are in-inbox announcements (later), not stories.
      as *Conversation unavailable*. It asks the API for that one row and adds it to the list, once
      per id; the Messages under it were always fine, since the thread fetches what it cannot
      Restore and #49 gave it a state that says so when it cannot.
+
+     A Session end takes the registration with it, so a phone handed to somebody else stops showing
+     the previous person's support conversations on its lock screen. It is the third thing on the
+     list `session-wipe` already held — the database, the downloaded documents, and now the row in
+     the API's device table — which is what makes signing out, a Session expiry and a refused
+     credential one path rather than three call sites. The `DELETE` needs a credential and the
+     Session end has already discarded it, so the ending cookie is captured and handed down, exactly
+     as it is to `POST /auth/logout`; a moment with none simply makes no request. Nothing waits for
+     it and nothing is failed by it: it is the only half of a wipe that talks to a network, so it is
+     started and not awaited, and a sign-out completes whether or not the row went. Which token is a
+     record under `Paths.cache` beside the record of the ask, written by every registration, so the
+     `DELETE` names the token the last one sent and reading it costs no round trip to Expo.
+
+     Two endings are worth naming. Hydration's Unreachable outcome does not come through here, for
+     the reason it does not wipe the Store: the cookie is kept, so the registration is kept, and
+     pushes go on arriving. And a Session expiry is a `DELETE` that will fail — the cookie is dead
+     by definition, which is how the expiry was noticed — so the row survives it. What closes that
+     is the API's own upsert: a registration takes a row over rather than adding one, so the next
+     person to sign in on this phone owns the token and the previous person's dispatches stop.
    - 5e. i18n, list virtualization.
 6. The Store — one in-memory copy of everything the screens read, written through to SQLite on the
    device and read back at the next cold start, so a launch draws the last thing this phone knew

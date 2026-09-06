@@ -37,7 +37,8 @@ import {
   MAGIC_LINK_UNCONFIGURED_NOTICE,
 } from "@/lib/magic-link-config";
 import { setSessionUser } from "@/lib/session";
-import { wipeStoreAndAttachments } from "@/lib/session-wipe";
+import { pushDeregistrationSettled } from "@/lib/push-registry";
+import { endSessionOnDevice } from "@/lib/session-wipe";
 import type { SessionUser } from "@/lib/types";
 
 /**
@@ -117,8 +118,9 @@ async function applyOutcome(
 }
 
 /**
- * Discard the credential, and everything on this device that was only readable
- * because of it.
+ * Discard the credential, everything on this device that was only readable
+ * because of it, and the registration that let the API reach this phone as the
+ * person it belonged to.
  *
  * The Store is wiped here rather than at each of the ways a session can end, so
  * that there is one answer to "what does a Session end leave behind" and it is
@@ -142,12 +144,18 @@ async function applyOutcome(
  * on a transport failure without discarding anything, so a kept cookie is a kept
  * Store — the one case where a Restored list is all there is to show.
  *
- * The wipe cannot fail this. `wipeStoreAndAttachments` swallows what it can, and
- * it is caught here as well — the guarantee belongs to the Session end rather
- * than to the implementation of one of the things it destroys, in the same
- * spirit as signing out completing when the server cannot be told.
+ * The wipe cannot fail this. `endSessionOnDevice` swallows what it can, and it is
+ * caught here as well — the guarantee belongs to the Session end rather than to
+ * the implementation of one of the things it destroys, in the same spirit as
+ * signing out completing when the server cannot be told.
  */
 async function forgetCredential(): Promise<void> {
+  // Read before the line below takes it away. The push registration is removed
+  // with a request, and a request needs a credential — this is the same capture
+  // `signOut` makes for `POST /auth/logout`, made here so that all three moments
+  // that end a session have one rather than only the one that signs out.
+  const ending = getSessionCookie();
+
   credentialEpoch += 1;
   setSessionCookie(null);
   clearCsrfPair();
@@ -158,7 +166,7 @@ async function forgetCredential(): Promise<void> {
   // exists — or, worse on a shared device, hand their name to whoever picks the
   // phone up next.
   await clearKeptPerson();
-  await wipeStoreAndAttachments().catch(() => {});
+  await endSessionOnDevice(ending).catch(() => {});
 }
 
 /**
@@ -359,6 +367,17 @@ export async function verifyMagicLink(token: string): Promise<AuthOutcome> {
  * which the person has already been shown the sign-in screen and whatever they
  * do next would still carry the old cookie. The cookie is captured and handed to
  * the logout call explicitly, so the server still learns which session ended.
+ *
+ * And it goes last on the wire as well as last here. Ending the session on the
+ * server makes every other request under that cookie impossible, and the wipe
+ * has just fired one — the push deregistration, which needs this same credential
+ * and is deliberately not waited for. Sent without the gate below, the two race,
+ * and the half of the time the logout lands first the device row survives a
+ * sign-out that was meant to remove it.
+ *
+ * None of this is felt: `AuthProvider` has already dispatched the sign-out and
+ * moved the screens before this function is called, so what waits here is a
+ * promise nobody is watching.
  */
 export async function signOut(): Promise<void> {
   const ending = getSessionCookie();
@@ -371,6 +390,8 @@ export async function signOut(): Promise<void> {
   await releaseGoogleSession();
 
   if (ending) {
+    // Last, and after the request the wipe fired. See above.
+    await pushDeregistrationSettled();
     await apiRequest(SIGN_OUT_PATH, { method: "POST", cookie: ending });
   }
 }
