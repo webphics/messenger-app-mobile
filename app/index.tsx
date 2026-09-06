@@ -27,7 +27,7 @@ export default function Index() {
   // null on a launch nobody tapped anything to start. Held outside this screen
   // because the tap is reported while the process is still coming up — see
   // `lib/push-intent`.
-  const { pendingThread, clearPendingThread } = usePushIntent();
+  const { pendingThread, setLaunchOnScreen, clearPendingThread } = usePushIntent();
   const [animationReady, setAnimationReady] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   /**
@@ -48,6 +48,14 @@ export default function Index() {
    */
   const [retryStarted, setRetryStarted] = useState(false);
   const navigatedRef = useRef(false);
+
+  // While this screen is up, a tapped notification is worth holding: this is the
+  // only thing that reads one. Once it is gone the listener navigates instead —
+  // see `lib/push-intent`.
+  useEffect(() => {
+    setLaunchOnScreen(true);
+    return () => setLaunchOnScreen(false);
+  }, [setLaunchOnScreen]);
 
   // Where Hydration says this person belongs, and whether there is yet anything
   // to show them there. The mapping is `lib/launch-route`; what is left here is
