@@ -8,6 +8,14 @@ module.exports = defineConfig([
     ignores: ["dist/*"],
   },
   {
+    // The CommonJS Node scripts that build the native project: the Expo CLI
+    // evaluates them outside Metro, so they are the one place module-scope
+    // Node globals are legitimate. `require` and `module` already pass; this
+    // adds the one the flat config does not declare.
+    files: ["app.config.js", "plugins/*.js"],
+    languageOptions: { globals: { __dirname: "readonly" } },
+  },
+  {
     // eslint-plugin-react-hooks v7 (pulled in by SDK 57) enables the React
     // Compiler rules, which model a Reanimated shared value as a React ref:
     // `immutability` rejects the `sv.value = x` assignment and `refs` rejects

@@ -23,7 +23,19 @@
  * plus the signing certificate fingerprint registered against the Android OAuth
  * client, neither of which lives in the bundle. That fingerprint is the one
  * piece of this feature no build can check for you — see the README.
+ *
+ * ## And why Firebase joined it
+ *
+ * Push needs `google-services.json` in the native project, and it is the same
+ * shape of problem for the same reason: it comes from a console rather than
+ * from the repo, and a checkout without it still has to run. Naming it
+ * unconditionally in `app.json` would fail every prebuild on a machine that has
+ * never set FCM up — including a checkout that only wants Expo Go, where push
+ * does not work anyway. So it is named only when it is there.
  */
+
+const { existsSync } = require("node:fs");
+const { join } = require("node:path");
 
 /**
  * `123-abc.apps.googleusercontent.com` becomes
@@ -46,11 +58,29 @@ function iosUrlScheme(clientId) {
     : null;
 }
 
+/**
+ * The Firebase config, if this checkout has one.
+ *
+ * Resolved against this file rather than the working directory, because the
+ * Expo CLI does not promise to be run from the project root.
+ */
+function googleServicesFile() {
+  const relative = "./google-services.json";
+  return existsSync(join(__dirname, relative)) ? relative : undefined;
+}
+
 module.exports = ({ config }) => {
   const scheme = iosUrlScheme(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
+  const services = googleServicesFile();
 
   return {
     ...config,
+    android: {
+      ...config.android,
+      // Spread conditionally: an explicit `undefined` is a key Expo's schema
+      // sees, and it reads it as a path that is empty rather than absent.
+      ...(services ? { googleServicesFile: services } : {}),
+    },
     plugins: [
       ...(config.plugins ?? []),
       ...(scheme
