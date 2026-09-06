@@ -134,8 +134,23 @@ Broadcasts are in-inbox announcements (later), not stories.
      this device has asked — because Android reports a dismissal and a single refusal identically
      and `canAskAgain` cannot separate them. The flag lives under `Paths.cache`, so that it outlives
      a Session end, as the platform's own once does, and does not outlive the install, which a copy
-     riding a device backup onto a phone with a reset permission would. Somebody who
-     has said no is offered a route into system settings from Settings, not another prompt.
+     riding a device backup onto a phone with a reset permission would.
+
+     The second trigger asks three things of the moment and only the first is about the Message:
+     that somebody else wrote it — a viewer's own message and a System notice are the app talking
+     about itself — that the app is in front of the person, because the socket is not torn down when
+     it goes behind something and a dialog raised into a pocket is answered by nobody and spent for
+     good, and that this process has nothing registered already, since a phone the first trigger
+     registered has nothing left for the second to do.
+
+     Which is also what decides the Settings row: somebody who has said no is offered a route into
+     the platform's own settings, and it is offered exactly when neither trigger will ever ask
+     again — the same standing read the other way round, rather than a second rule about `denied`.
+     A phone that has never been asked reports `denied` on Android and is offered nothing, because
+     the ask is still coming; somebody who dismissed the dialog is offered it while the platform
+     still says it would draw one, because `askedBefore` says it already has. Read again on every
+     foreground, since the answer changes out there and not in here. No prompt, no nag, and nothing
+     that arrives uninvited: it is a row on a screen somebody chose to open.
 
      A tap opens the thread it is about, and the cold start is the whole of the problem — Hydration,
      Restore and the Launch gate are all in front of it. It is not a second route: `launchDestination`

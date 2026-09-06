@@ -2,6 +2,7 @@ import { LogOut } from "@/components/icons";
 import { ScrollView, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 
+import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -99,6 +100,13 @@ export function SettingsScreen() {
           <Text className="text-danger">Sign out</Text>
         </Button>
       </Animated.View>
+
+      {/* Last, and absent unless the operating system's own settings are the
+          only place notifications can still be turned on. Below Sign out
+          because whether it appears at all is settled a frame or two after this
+          screen draws, and nothing that arrives late belongs above a
+          destructive control somebody is already reaching for. */}
+      <NotificationPermissionRow />
     </ScrollView>
   );
 }

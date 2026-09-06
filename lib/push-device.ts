@@ -1,12 +1,13 @@
 import { File, Paths } from 'expo-file-system'
 import * as Notifications from 'expo-notifications'
-import { Platform } from 'react-native'
+import { Linking, Platform } from 'react-native'
 
 import type { PushPlatform } from '@/lib/conversation-api'
 import {
   conversationIdFromPush,
   notificationIdFromPush,
   shouldAskForPermission,
+  shouldOfferSystemSettings,
   type PermissionTrigger,
   type PushPermission,
 } from '@/lib/push-rules'
@@ -141,6 +142,42 @@ export async function ensurePushPermission(
 
   rememberAsked()
   return answered
+}
+
+/**
+ * Whether the only place left to turn notifications on is the operating
+ * system's own settings.
+ *
+ * Read on a screen rather than acted on: `lib/push-rules` decides it, and what
+ * it decides is whether Settings shows a row at all. Asked again whenever this
+ * app comes back to the foreground, because the answer changes while it is not
+ * running — which is the whole point of sending somebody out to change it.
+ *
+ * A platform that cannot be read says nothing has been decided and nothing has
+ * been closed, which is the same value the ask is read under and the quiet
+ * answer on a device nobody has asked: no row. A build with no native side has
+ * nothing to offer a route into anyway.
+ */
+export async function needsSystemNotificationSettings(): Promise<boolean> {
+  const { status, canAskAgain } = await readPermission()
+  return shouldOfferSystemSettings({ status, canAskAgain, askedBefore: hasAsked() })
+}
+
+/**
+ * Open the operating system's settings for this app.
+ *
+ * Both platforms land on the app's own page, one tap from its notifications —
+ * there is no deeper destination `Linking` can name on iOS, and one page for
+ * both is the honest thing to write a label against. Nothing here throws and
+ * nothing waits on it: a platform that refuses leaves the person on Settings,
+ * where they already were.
+ */
+export async function openSystemNotificationSettings(): Promise<void> {
+  try {
+    await Linking.openSettings()
+  } catch {
+    // Nothing to say and nowhere to say it. See the note above.
+  }
 }
 
 /**

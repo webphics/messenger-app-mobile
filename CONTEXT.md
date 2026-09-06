@@ -467,6 +467,18 @@ on the thread it is about. There is no background connection behind it and there
 one — a Push notification is how a closed app learns anything at all.
 _Avoid_: Notification (bare — say which), local notification, alert, background message
 
+**Notification permission**:
+The operating system's own answer to whether this app may draw a Push notification at all, held by
+the platform rather than by the API and scoped to the installation rather than to whoever is signed
+in. Asked for at two moments and once: after a first sign-in, and when a Message somebody else wrote
+first arrives, with the app in front of the person, for somebody that first never reached. Both platforms draw their dialog once and refuse a later request
+without drawing anything, so both triggers are guarded on the same standing — `canAskAgain` plus a
+record of the ask under `Paths.cache`, never the status, which on Android 13+ reads `denied` on a
+phone nobody has asked. Once neither trigger will ever ask again, Settings offers a route into the
+platform's own settings, which is by then the only place the answer can change.
+_Avoid_: Notification setting (that is the platform's screen), opt-in, subscribing (that is the
+browser's), turning notifications on (say whose — the OS's or a Mute)
+
 **Push audience**:
 Which of a Notification row's recipients this phone is also woken for. Nearly all of them: a Message
 in any conversation the person is a recipient of, which reaches the Unassigned pool without a rule of
