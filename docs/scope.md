@@ -121,10 +121,20 @@ Broadcasts are in-inbox announcements (later), not stories.
      The permission is asked for in two places: after a first sign-in, and when a Message first
      arrives for somebody who has not been asked. The second is the one that earns it — a person
      watching a reply land is being asked a question they can answer from what is in front of them —
-     and the first is there so the common case does not wait for it. Both are guarded on the
-     permission still being undetermined, because they have to be: Android 13+ and iOS each show the
-     system dialog once, and a request after a denial is refused without drawing anything. So the
-     second trigger fires for somebody the first never reached, never as a second ask. Somebody who
+     and the first is there so the common case does not wait for it. Both are guarded, because they
+     have to be: Android 13+ and iOS each show the system dialog once, and a request after a denial
+     is refused without drawing anything. So the second trigger fires for somebody the first never
+     reached, never as a second ask.
+
+     The guard is *not* "while the status is undetermined", which is what this said until #58 was
+     run on the emulator and drew nothing. `expo-notifications` answers Android 13+ by reading
+     `areNotificationsEnabled()` before the runtime permission, and that is false on a fresh
+     install, so a phone nobody has ever asked reports `denied`. What decides it is `canAskAgain`,
+     the platform saying whether a request would draw a dialog at all, plus a flag recording whether
+     this device has asked — because Android reports a dismissal and a single refusal identically
+     and `canAskAgain` cannot separate them. The flag lives under `Paths.cache`, so that it outlives
+     a Session end, as the platform's own once does, and does not outlive the install, which a copy
+     riding a device backup onto a phone with a reset permission would. Somebody who
      has said no is offered a route into system settings from Settings, not another prompt.
 
      A tap opens the thread it is about, and the cold start is the whole of the problem — Hydration,
