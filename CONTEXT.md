@@ -477,6 +477,14 @@ they held, and being added to a group. Deliberately not the web audience, which 
 and staff only; see ADR-0009.
 _Avoid_: Recipients (that is the row's list — say which), subscribers, targets
 
+**Push token**:
+The string Expo's push service dispatches against — `ExponentPushToken[…]`, issued to this
+installation rather than to the person using it. Registered under whoever is signed in
+(`POST /push/devices`, idempotent on the token) after a sign-in and on every launch that finds a
+session, because it rotates and a row holding an old one dispatches into nothing. Not a credential:
+it authenticates nobody and is registered *with* the Session cookie rather than instead of it.
+_Avoid_: Device token (that is the FCM one underneath), subscription (that is the browser's), push ID
+
 **Notification row**:
 The API's own record that something happened for a person, written by its `notifications` module and
 announced as `notification.created`. Older and broader than a Push notification, which is one

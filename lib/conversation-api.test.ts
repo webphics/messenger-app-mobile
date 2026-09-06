@@ -11,6 +11,7 @@ import {
   listMyOrganizations,
   listStaffDirectory,
   markConversationRead,
+  registerPushDevice,
   removeReaction,
   sendMessage,
   takeOverConversation,
@@ -1076,6 +1077,91 @@ describe('sending a message that carries attachments', () => {
     expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
       body: 'Just words',
       messageType: 'text',
+    })
+  })
+})
+
+
+describe('registerPushDevice', () => {
+  /** What the API answers with: the row it wrote, which no caller here reads. */
+  const DEVICE_ROW = {
+    publicId: 'device-1',
+    token: 'ExponentPushToken[abc]',
+    platform: 'android',
+    createdAt: '2026-09-06T00:00:00.000Z',
+  }
+
+  test('posts the token to the device path, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope(DEVICE_ROW, 201))
+
+    const result = await registerPushDevice('ExponentPushToken[abc]', 'android')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/push/devices`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result.ok).toBe(true)
+  })
+
+  test('sends the token and the platform, and nothing else the route would refuse', async () => {
+    enqueue(csrfResponse(), envelope(DEVICE_ROW, 201))
+
+    await registerPushDevice('ExponentPushToken[abc]', 'android')
+
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
+      token: 'ExponentPushToken[abc]',
+      platform: 'android',
+    })
+  })
+
+  test('carries the Session cookie beside the CSRF cookie', async () => {
+    enqueue(csrfResponse(), envelope(DEVICE_ROW, 201))
+
+    await registerPushDevice('ExponentPushToken[abc]', 'android')
+
+    expect((calls[1]?.init.headers as Record<string, string>).Cookie).toBe(
+      'better-auth.session_token=abc.def; csrf-token=cookie-value',
+    )
+  })
+
+  test('reports a request that never arrived as unreachable', async () => {
+    enqueue(csrfResponse(), new TypeError('Network request failed'))
+
+    expect(await registerPushDevice('ExponentPushToken[abc]', 'android')).toEqual({
+      ok: false,
+      failure: { kind: 'unreachable' },
+    })
+  })
+
+  /**
+   * An ordinary refusal rather than anything a screen has to handle: a device at
+   * the API's ceiling, or a token it will not take, changes nothing about the
+   * app.
+   */
+  test('reports a refusal with what the API said about it', async () => {
+    enqueue(
+      csrfResponse(),
+      response(403, {
+        statusCode: 403,
+        code: 'push_device_limit_reached',
+        message: 'Too many devices are registered.',
+      }),
+    )
+
+    expect(await registerPushDevice('ExponentPushToken[abc]', 'android')).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Too many devices are registered.' },
+    })
+  })
+
+  test('reports a session the API stopped accepting as unauthorised', async () => {
+    enqueue(csrfResponse(), response(401, { statusCode: 401, message: 'Unauthorized' }))
+
+    expect(await registerPushDevice('ExponentPushToken[abc]', 'android')).toEqual({
+      ok: false,
+      failure: { kind: 'unauthorised' },
     })
   })
 })

@@ -28,7 +28,9 @@ import type {
 } from '@/lib/types'
 
 /**
- * The conversation endpoints, over the one transport this app has.
+ * The conversation endpoints, over the one transport this app has — and, since
+ * #58, the push-device one beside them, which is not a conversation endpoint but
+ * is the same authenticated call and gains nothing from a module of its own.
  *
  * Everything here goes through `authenticatedRequest`, so the Session cookie and
  * the CSRF pair are handled exactly as they are for signing in, and a cookie the
@@ -480,4 +482,42 @@ export async function createNote(
     { method: 'POST', body: { text } },
   )
   return readOutcome(outcome, parseNote)
+}
+
+/** Which half of the API's `platform` a registration comes from. */
+export type PushPlatform = 'android' | 'ios'
+
+/**
+ * The answer to a request nothing reads back.
+ *
+ * The envelope is still checked, so a body this client cannot make sense of is
+ * still `malformed` — what is dropped is only the row inside it, which echoes
+ * the token the caller has just sent.
+ */
+function acknowledged(): void {
+  return undefined
+}
+
+/**
+ * Register this installation's Expo push token, so a closed app can be reached.
+ *
+ * Mobile's own route, not the browser subscription one beside it: that takes a
+ * VAPID `PushSubscription` and an `ExponentPushToken` satisfies none of its
+ * shape. See `docs/adr/ADR-0009-mobile-push-is-a-second-transport.md`.
+ *
+ * Idempotent on the token, which is what makes it safe to send on every launch
+ * — and necessary to, because a token rotates and a row holding an old one
+ * dispatches into nothing. Fire-and-forget in the sense the Store's writes are:
+ * every failure here is one of the ordinary four, and no screen handles any of
+ * them.
+ */
+export async function registerPushDevice(
+  token: string,
+  platform: PushPlatform,
+): Promise<ApiResult<void>> {
+  const outcome = await authenticatedRequest('/push/devices', {
+    method: 'POST',
+    body: { token, platform },
+  })
+  return readOutcome(outcome, acknowledged)
 }
