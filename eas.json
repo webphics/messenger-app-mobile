@@ -9,12 +9,24 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
+        "EXPO_PUBLIC_MAGIC_LINK_ORIGIN": "enki://",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "935513852405-nkjrlg9aoghevdo56bdpv1f3bcmcj74d.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
+        "EXPO_PUBLIC_MAGIC_LINK_ORIGIN": "enki://",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "935513852405-nkjrlg9aoghevdo56bdpv1f3bcmcj74d.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
       }
     }
   }
