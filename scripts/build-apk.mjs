@@ -97,7 +97,57 @@ if (!existsSync(logoXml)) {
   );
 }
 
-writeFileSync(join(android, "local.properties"), `sdk.dir=${sdk.replace(/\\/g, "/")}\n`);
+/**
+ * The CMake the NDK build runs with, and the reason this is not left to default.
+ *
+ * The SDK ships 3.22.1 and AGP picks it unless told otherwise. Under it every CMake
+ * project in this build -- `:app`, reanimated, worklets, screens -- dies with
+ *
+ *     ninja: error: manifest 'build.ninja' still dirty after 100 tries
+ *
+ * because `file(GLOB ... CONFIGURE_DEPENDS)` re-triggers regeneration on every pass
+ * and the regeneration never settles. It is not the path-length trap guarded above,
+ * not stale `.cxx` output, and not a dependency state: it reproduces from a fresh
+ * `node_modules` on a single ABI. 3.30.5 builds the same tree without complaint.
+ *
+ * Picks the newest installed version at or above 3.30, and says so rather than
+ * failing when there is none, so a machine with only 3.22.1 still attempts the build
+ * instead of being silently misconfigured here.
+ */
+function cmakeDir() {
+  const cmakeRoot = join(sdk, "cmake");
+  if (!existsSync(cmakeRoot)) return null;
+
+  const usable = readdirSync(cmakeRoot)
+    .map(name => ({ name, parts: name.split(".").map(Number) }))
+    .filter(v => v.parts.length >= 2 && v.parts.every(Number.isFinite))
+    .filter(v => v.parts[0] > 3 || (v.parts[0] === 3 && v.parts[1] >= 30))
+    .sort(
+      (a, b) =>
+        b.parts[0] - a.parts[0] ||
+        b.parts[1] - a.parts[1] ||
+        (b.parts[2] ?? 0) - (a.parts[2] ?? 0),
+    );
+
+  return usable.length > 0 ? join(cmakeRoot, usable[0].name) : null;
+}
+
+const cmake = cmakeDir();
+if (!cmake) {
+  console.warn(
+    'No CMake 3.30+ in the SDK. The NDK build will fall back to the default (likely ' +
+      "3.22.1), which loops on \"build.ninja still dirty\". Install one with " +
+      'sdkmanager "cmake;3.30.5".',
+  );
+}
+
+// Forward slashes on both: local.properties is a Java properties file, so a lone
+// backslash is an escape and the path arrives with its separators eaten.
+writeFileSync(
+  join(android, "local.properties"),
+  `sdk.dir=${sdk.replace(/\\/g, "/")}\n` +
+    (cmake ? `cmake.dir=${cmake.replace(/\\/g, "/")}\n` : ""),
+);
 
 const env = {
   ...process.env,
