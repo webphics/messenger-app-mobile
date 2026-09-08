@@ -40,7 +40,12 @@ in step instead of one, and a verification step that is permanently harder to re
   not break the build or the account sheet; it breaks verification, several steps later, in a way
   that reads as a credential problem.
 - **iOS additionally needs its own client**, for the native flow and for the reversed URL scheme
-  `app.config.js` writes into the Info.plist. Android needs no identifier in the bundle at all: it
+  `app.config.js` writes into the Info.plist. **It does not change the audience.** The iOS client is
+  passed to `GoogleSignin.configure` alongside the web one, and the token it mints still carries the
+  web client as `aud` — so the API's single-audience check is as true on iOS as on Android, and
+  nothing on the server moves when iOS ships. Nor does the plugin want a `GoogleService-Info.plist`:
+  given `iosUrlScheme` it takes its without-Firebase path, which writes to `Info.plist` and stops
+  there. Adding a plist would configure a Firebase iOS app that nothing in this repo reads. Android needs no identifier in the bundle at all: it
   is identified by package name plus the **signing certificate SHA-1 fingerprint** registered
   against the Android OAuth client. A build signed with different credentials — a different machine,
   a rotated EAS keystore — produces a sign-in that fails with nothing on screen to explain it. See
