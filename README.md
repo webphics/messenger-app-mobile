@@ -100,6 +100,31 @@ before writing anything else off as broken: a build signed with different creden
 machine, a rotated keystore, a local `pnpm build:apk` — produces a Google sign-in that fails with
 nothing on screen to explain it, because there is nothing to say.
 
+`google-services.json` is **not** part of this. It is the Firebase config for push, its `oauth_client`
+array is empty, and nothing in the sign-in path reads it. The root copy is tracked deliberately — EAS
+builds from a git archive, so a file left untracked never reaches the build server and Android push
+loses its configuration on cloud builds while working perfectly on your machine. It carries no secret:
+a Firebase Android API key is an identifier restricted by package name and SHA-1, and it ships inside
+the APK either way. The copy under `android/app/` is generated and stays ignored with the rest of
+`android/`.
+
+### iOS: the client, and the plist you do not need
+
+An iOS OAuth client is created against the **bundle identifier**, and that is the whole of it. The
+config plugin takes `iosUrlScheme` — the client id reversed, which `app.config.js` derives — and that
+selects its without-Firebase path, which writes to `Info.plist` and nothing else. So:
+
+- **No `GoogleService-Info.plist`.** Adding one configures a Firebase iOS app that nothing here reads.
+- **No `ios/` directory.** It is generated at build time like `android/`.
+- **No API change.** The token's audience is still the web client — see ADR-0005.
+
+Two things are worth settling before the client is created, because both are expensive afterwards.
+The bundle identifier is still `com.anonymous.enki`, the `create-expo-app` placeholder; once it exists
+in the Apple Developer portal and an OAuth client, changing it means a new OAuth client, a new
+Firebase Android app, and a new App Store record. And `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` goes into
+`eas.json` only once there is a real value for it — EAS rejects an empty string in an `env` block
+outright, and an absent variable is already what the app reads as “no iOS client”.
+
 ## Push notifications
 
 `expo-notifications` is a native module too, so a Push notification is the second thing that needs a

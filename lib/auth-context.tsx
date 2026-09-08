@@ -60,8 +60,14 @@ type AuthContextValue = {
    * Ask for a sign-in link. Deliberately outside the state machine: no session
    * is established or refused, so the screen owns the outcome and the answer is
    * returned rather than dispatched.
+   *
+   * `name` names the account the link would create, and is ignored for one that
+   * already exists -- see `requestMagicLink` in `lib/auth-service`.
    */
-  requestMagicLink: (email: string) => Promise<MagicLinkRequestOutcome>;
+  requestMagicLink: (
+    email: string,
+    name?: string,
+  ) => Promise<MagicLinkRequestOutcome>;
   signOut: () => Promise<void>;
   /** Try hydration again after an Unreachable cold start. */
   retry: () => void;
@@ -248,7 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const requestMagicLink = useCallback(
-    (email: string) => sendMagicLink(email),
+    (email: string, name?: string) => sendMagicLink(email, name),
     [],
   );
 

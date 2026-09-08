@@ -39,10 +39,18 @@ outside the Zod envelope, the exception filter, and the CSRF layer.
   web.
 - **The API needs no changes for this client.** Nothing is added, nothing is waived, nothing is
   configured. That is the strongest property of this decision and the reason to prefer it.
-- **Two-factor is still deferred on mobile.** The handoff between password-accepted and
-  code-verified rides a short-lived `better-auth.two_factor` cookie. A cookie-holding client can in
-  principle carry it, so this is no longer blocked by transport — but it is still out of scope for
-  the first slice and needs its own work.
+- **Two-factor is still deferred on mobile, and the reason is on this side.** The handoff between
+  password-accepted and code-verified rides a short-lived `better-auth.two_factor` cookie. A
+  cookie-holding client can in principle carry it, so this is not blocked by transport — and it is
+  not blocked by the API either: `POST /auth/two-factor/verify-totp` carries no auth guard and
+  returns session cookies, so it is reachable from a native client today. Only
+  `verify-backup-code` is guarded. What blocks it is here: `findSessionCookie` in `lib/api-client`
+  keeps the session cookie and discards everything else, so the challenge cookie is thrown away the
+  moment it arrives. Closing that needs a new `AuthOutcome`, a new `AuthState`, a code-entry screen,
+  and a second thing for the client to hold — which is the bookkeeping this decision exists to keep
+  small, so it stays its own piece of work rather than a rider on this one. Until then all three
+  sign-in paths refuse a challenge with one sentence, and the API repo's `docs/api/auth.md` describes
+  this as an API-side gap, which it is not.
 - **This client gives up the session cookie cache.** The API enables
   `session.cookieCache`, which lets a browser skip the Postgres lookup on guarded routes by
   presenting a signed `better-auth.session_data` cookie beside the session token. Only the session

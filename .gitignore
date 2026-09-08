@@ -44,6 +44,10 @@ example
 # generated native folders
 /ios
 /android
+# The `google-services.json` under `android/app/` is generated with them. The copy
+# at the repo root is tracked deliberately: EAS builds from a git archive, so an
+# ignored file never reaches the build server, and Android push would lose its
+# configuration on cloud builds while working on the machine that made them.
 
 # local agent scratch
 .claude/

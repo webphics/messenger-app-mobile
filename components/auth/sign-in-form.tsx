@@ -122,6 +122,14 @@ export function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  /**
+   * What to call the account a link would create.
+   *
+   * Not part of `LinkRequest`, because it is not something a request produced —
+   * it is what someone typed, and it has to survive a refusal and a resend the
+   * same way the address does.
+   */
+  const [name, setName] = useState("");
   const [linkRequest, setLinkRequest] = useState<LinkRequest>(NO_LINK_REQUEST);
   const sendingLink = linkRequest.sending;
   /**
@@ -217,7 +225,9 @@ export function SignInForm() {
     // its way the first one is still the true answer to "where did it go".
     setLinkRequest((prev) => ({ ...prev, sending: true, failure: null }));
 
-    const message = magicLinkRequestNotice(await requestMagicLink(trimmed));
+    const message = magicLinkRequestNotice(
+      await requestMagicLink(trimmed, name),
+    );
     if (message) {
       hapticWarning();
       setLinkRequest((prev) => ({ ...prev, sending: false, failure: message }));
@@ -450,6 +460,31 @@ export function SignInForm() {
             <View className="h-px flex-1 bg-line" />
           </View>
 
+          <View className="mt-4">
+            <Text variant="label" className="mb-1.5 text-ink">
+              Your Name <Text variant="label" className="text-muted">(optional)</Text>
+            </Text>
+            <Input
+              className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
+              placeholder="Jordan Ellis"
+              accessibilityLabel="Your name, optional"
+              autoCapitalize="words"
+              autoCorrect={false}
+              autoComplete="name"
+              textContentType="name"
+              returnKeyType="send"
+              onSubmitEditing={() => void onRequestLink()}
+              value={name}
+              onChangeText={setName}
+            />
+            {/* No `FieldError` beneath it, and no validation behind it: there is
+                no rule a name can fail, and inventing one here would be the only
+                place on this screen that turned someone away over a preference. */}
+          </View>
+
+          {/* Deliberately not cleared when the name changes, unlike the address.
+              The confirmation names where a link went, and editing a name does
+              not move it. */}
           {linkRequest.sentTo !== null ? (
             <View
               className="mt-4 flex-row items-start gap-2.5 rounded-2xl border border-line/70 bg-primary-soft/40 p-3.5"
@@ -500,7 +535,7 @@ export function SignInForm() {
               that no longer exists. */}
           <Text variant="meta" className="mt-2.5 text-center text-muted">
             No account yet? No password needed — the link makes one when you open
-            it.
+            it, under the name above.
           </Text>
 
           {/*
