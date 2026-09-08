@@ -318,18 +318,34 @@ export async function signInWithGoogle(): Promise<GoogleResult> {
  * capture here and nothing for `applyOutcome` to apply. That is also why a
  * request in flight cannot be invalidated by a sign-out: there is nothing in it
  * to invalidate.
+ *
+ * `name` is spent only if this link goes on to *create* the account. The API
+ * stores it beside the token and reads it back at `createUser`, and it never
+ * renames someone who already exists -- so a returning person who types one
+ * changes nothing, and there is no way to tell them that without answering the
+ * question this flow exists not to answer, which is whether the address is
+ * already known. It is sent when given and omitted when not, rather than sent
+ * empty: the API would accept `""` and store it, and a nameless account is the
+ * thing the field is here to prevent.
  */
 export async function requestMagicLink(
   email: string,
+  name?: string,
 ): Promise<MagicLinkRequestOutcome> {
   if (MAGIC_LINK_ORIGIN === null) {
     return { kind: "refused", message: MAGIC_LINK_UNCONFIGURED_NOTICE };
   }
 
+  const person = name?.trim() ?? "";
+
   return interpretMagicLinkRequest(
     await apiRequest(MAGIC_LINK_REQUEST_PATH, {
       method: "POST",
-      body: { email: email.trim(), url: MAGIC_LINK_ORIGIN },
+      body: {
+        email: email.trim(),
+        ...(person ? { name: person } : {}),
+        url: MAGIC_LINK_ORIGIN,
+      },
     }),
   );
 }

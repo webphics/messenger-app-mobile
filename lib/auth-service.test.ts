@@ -932,6 +932,54 @@ describe("requesting a magic link", () => {
 
     expect(request).toHaveBeenCalledTimes(2);
   });
+
+  test("a name is sent, since verifying the link is what creates the account", async () => {
+    request.mockResolvedValueOnce(SENT);
+
+    await requestMagicLink("first-timer@talo.test", "Jordan Ellis");
+
+    expect(request).toHaveBeenCalledWith(
+      "/auth/magic-link",
+      expect.objectContaining({
+        body: {
+          email: "first-timer@talo.test",
+          name: "Jordan Ellis",
+          url: "https://app.example.com",
+        },
+      }),
+    );
+  });
+
+  test("a typed name is trimmed, the way the address already is", async () => {
+    request.mockResolvedValueOnce(SENT);
+
+    await requestMagicLink("first-timer@talo.test", "  Jordan Ellis \n");
+
+    expect(request).toHaveBeenCalledWith(
+      "/auth/magic-link",
+      expect.objectContaining({
+        body: expect.objectContaining({ name: "Jordan Ellis" }),
+      }),
+    );
+  });
+
+  // The field is optional, and the API would take an empty string and store it —
+  // so an untouched field has to leave the key off the body entirely, or it
+  // creates exactly the nameless account it exists to prevent.
+  test.each([
+    ["nothing was passed", undefined],
+    ["the field was left empty", ""],
+    ["the field holds only whitespace", "   \n\t"],
+  ])("no name is sent when %s", async (_case, typed) => {
+    request.mockResolvedValueOnce(SENT);
+
+    await requestMagicLink("first-timer@talo.test", typed);
+
+    expect(request).toHaveBeenCalledWith("/auth/magic-link", {
+      method: "POST",
+      body: { email: "first-timer@talo.test", url: "https://app.example.com" },
+    });
+  });
 });
 
 describe("verifying a magic link", () => {
