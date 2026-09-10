@@ -10,6 +10,9 @@
       "android": {
         "buildType": "apk"
       },
+      "ios": {
+        "simulator": true
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
         "EXPO_PUBLIC_MAGIC_LINK_ORIGIN": "enki://",
