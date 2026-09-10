@@ -2,7 +2,6 @@ import { router, useFocusEffect } from "expo-router";
 import { BookOpen, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, TextInput, View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { HelpSearchField } from "@/components/hub/help-search-field";
 import { InScreenHeader } from "@/components/in-screen-header";
@@ -11,7 +10,6 @@ import { Text } from "@/components/ui/text";
 import { knowledgeHref } from "@/lib/hub-routes";
 import { filterKnowledge } from "@/lib/knowledge-filter";
 import { listKnowledge } from "@/lib/mock-catalog";
-import { settleEnter } from "@/lib/motion-enter";
 import {
   makeRefreshControl,
   useSimulatedRefresh,
@@ -24,7 +22,6 @@ type KnowledgeSearchScreenProps = {
 };
 
 export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
-  const reduceMotion = useReducedMotion();
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<KnowledgeArticle[]>(listKnowledge);
@@ -98,15 +95,15 @@ export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
             <Text variant="title" className="text-ink">
               {item.title}
             </Text>
-            <Animated.View entering={settleEnter(!!reduceMotion)}>
-              <Text
-                variant="meta"
-                className="mt-1.5 text-ink-soft"
-                numberOfLines={2}
-              >
-                {item.body}
-              </Text>
-            </Animated.View>
+            {/* No entrance: this is a FlatList row's own body, not something
+                arriving — it would fade in again on every recycle. */}
+            <Text
+              variant="meta"
+              className="mt-1.5 text-ink-soft"
+              numberOfLines={2}
+            >
+              {item.body}
+            </Text>
             {item.tags.length > 0 ? (
               <View className="mt-3 flex-row flex-wrap gap-1.5">
                 {item.tags.map((tag) => (

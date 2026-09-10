@@ -13,13 +13,12 @@ import Animated, {
   cancelAnimation,
   Extrapolation,
   interpolate,
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 
 import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { MessageMedia } from '@/components/chat/message-media'
@@ -35,7 +34,8 @@ import {
 import { replyCaption, type ReactionGroup } from '@/lib/message-react'
 import { messageStatusLabel } from '@/lib/message-status'
 import { deskMessageEnter } from '@/lib/motion-enter'
-import { motion } from '@/lib/motion'
+import { easing } from '@/lib/motion-easing'
+import { motion, rubberBand } from '@/lib/motion'
 import {
   measureWindowOrPage,
   type OpenMenuPayload,
@@ -113,6 +113,14 @@ type MessageBubbleProps = {
 }
 
 const SWIPE_REPLY = 56
+/**
+ * How far a swipe can travel before the bubble stops tracking the finger.
+ *
+ * Past this it keeps only `motion.rubberBand` of every further pixel: a hard
+ * stop reads as the gesture having died under the thumb, which is the one thing
+ * a swipe-to-reply must never say while the finger is still down.
+ */
+const SWIPE_LIMIT = 72
 const LONG_PRESS_MS = 150
 
 /**
@@ -537,7 +545,7 @@ export const MessageBubble = memo(function MessageBubble({
       return
     }
     if (!selected && tint.value !== 0) {
-      tint.value = withTiming(0, { duration: 60 })
+      tint.set(withTiming(0, { duration: 60, easing: easing.out }))
     }
   }, [selected, tint])
 
@@ -604,15 +612,18 @@ export const MessageBubble = memo(function MessageBubble({
                 .minDuration(LONG_PRESS_MS)
                 .maxDistance(12)
                 .onBegin(() => {
-                  tint.value = withTiming(0.55, { duration: 80 })
+                  tint.set(
+                    withTiming(0.55, { duration: 80, easing: easing.out }),
+                  )
                 })
                 .onStart((e) => {
                   tint.value = 1
-                  runOnJS(hapticMedium)()
-                  runOnJS(reportOpen)(e.absoluteX, e.absoluteY)
+                  scheduleOnRN(hapticMedium)
+                  scheduleOnRN(reportOpen, e.absoluteX, e.absoluteY)
                 })
                 .onFinalize((_, ok) => {
-                  if (!ok) tint.value = withTiming(0, { duration: 60 })
+                  if (!ok)
+                    tint.set(withTiming(0, { duration: 60, easing: easing.out }))
                 }),
             ]
           : []),
@@ -620,18 +631,30 @@ export const MessageBubble = memo(function MessageBubble({
           .activeOffsetX(18)
           .failOffsetY([-18, 18])
           .onUpdate((e) => {
-            x.value = Math.max(0, Math.min(e.translationX, 80))
-            if (x.value >= SWIPE_REPLY && !swipedHaptic.value) {
-              swipedHaptic.value = true
-              runOnJS(hapticLight)()
-            } else if (x.value < SWIPE_REPLY) {
-              swipedHaptic.value = false
+            x.set(rubberBand(e.translationX, SWIPE_LIMIT))
+            if (x.get() >= SWIPE_REPLY && !swipedHaptic.get()) {
+              swipedHaptic.set(true)
+              scheduleOnRN(hapticLight)
+            } else if (x.get() < SWIPE_REPLY) {
+              swipedHaptic.set(false)
             }
           })
           .onEnd(() => {
-            if (x.value >= SWIPE_REPLY) runOnJS(handleReply)()
-            x.value = withSpring(0, motion.springs.overlay)
-            swipedHaptic.value = false
+            if (x.get() >= SWIPE_REPLY) scheduleOnRN(handleReply)
+            // Timing rather than a spring, and this is the one gesture in the
+            // app where that is right: the release is not the drag continuing,
+            // it is the drag being undone. The outcome was already decided the
+            // moment the finger lifted, so there is no momentum worth keeping —
+            // and a spring handed outward velocity pushes the bubble further
+            // right before it comes back, which is the ease-in nobody asked
+            // for. Full speed from the first frame, then settle.
+            x.set(
+              withTiming(0, {
+                duration: motion.durations.release,
+                easing: easing.out,
+              }),
+            )
+            swipedHaptic.set(false)
           }),
       ),
     [handleReply, onOpenMenu, reportOpen, swipedHaptic, tint, x],

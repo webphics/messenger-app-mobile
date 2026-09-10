@@ -225,12 +225,11 @@ export function InboxScreen({
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: Conversation; index: number }) => (
+    ({ item }: { item: Conversation }) => (
       <ConversationRow
         conversation={item}
         onPress={openConversation}
         organizationNames={organizationNames}
-        index={index}
       />
     ),
     [openConversation, organizationNames],

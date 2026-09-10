@@ -485,7 +485,7 @@ export function Composer({
             accessibilityLabel="Attach"
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
             onPress={() => setAttachOpen(true)}
-            className="mb-0.5 size-11 items-center justify-center rounded-full bg-line/35 border border-line/80 active:scale-95"
+            className="mb-0.5 size-11 items-center justify-center rounded-full bg-line/35 border border-line/80"
           >
             <Plus color={colors.inkSoft} size={20} />
           </TactilePressable>
@@ -512,7 +512,7 @@ export function Composer({
               accessibilityRole="button"
               accessibilityLabel="Record voice note"
               onPress={() => void startRecording()}
-              className="mb-0.5 size-11 items-center justify-center rounded-full bg-line/35 border border-line/80 active:scale-95"
+              className="mb-0.5 size-11 items-center justify-center rounded-full bg-line/35 border border-line/80"
             >
               <Mic color={colors.inkSoft} size={20} />
             </TactilePressable>
@@ -524,7 +524,7 @@ export function Composer({
                 accessibilityLabel="Send"
                 disabled={!canSend}
                 onPress={handleSend}
-                className="mb-0.5 size-11 items-center justify-center rounded-full bg-primary shadow-sm shadow-primary/30 active:scale-95"
+                className="mb-0.5 size-11 items-center justify-center rounded-full bg-primary shadow-sm shadow-primary/30"
               >
                 <Send color={colors.primaryForeground} size={17} />
               </TactilePressable>

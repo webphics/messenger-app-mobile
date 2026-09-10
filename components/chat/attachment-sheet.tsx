@@ -6,16 +6,32 @@ import {
   X,
 } from '@/components/icons'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Animated,
+  Dimensions,
   Modal,
-  PanResponder,
   Pressable,
   View,
+  type LayoutChangeEvent,
 } from 'react-native'
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+  type PanGesture,
+} from 'react-native-gesture-handler'
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  type SharedValue,
+} from 'react-native-reanimated'
+import { scheduleOnRN } from 'react-native-worklets'
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -31,6 +47,7 @@ import {
 } from '@/lib/attachments'
 import { hapticLight, hapticSelection } from '@/lib/haptics'
 import { motion } from '@/lib/motion'
+import { shouldDismissSheet } from '@/lib/sheet-dismiss'
 import { colors, screenBottomPad } from '@/lib/tokens'
 import type { AttachmentView } from '@/lib/types'
 
@@ -106,22 +123,33 @@ const DENIED_COPY = {
 } as const
 
 function SheetSurface({
-  translateY,
+  y,
+  drag,
+  onMeasure,
   children,
 }: {
-  translateY: Animated.Value
+  y: SharedValue<number>
+  /** Wrapped around the surface itself — `GestureDetector` needs the ref. */
+  drag: PanGesture
+  onMeasure: (height: number) => void
   children: ReactNode
 }) {
   const insets = useSafeAreaInsets()
   const bottomPad = screenBottomPad(insets.bottom, 16)
+  const style = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }))
 
   return (
-    <Animated.View
-      style={[{ transform: [{ translateY }] }, { paddingBottom: bottomPad }]}
-      className="rounded-t-3xl border-t border-line/80 bg-surface px-4 pt-2 shadow-2xl shadow-black/20"
-    >
-      {children}
-    </Animated.View>
+    <GestureDetector gesture={drag}>
+      <Animated.View
+        onLayout={(e: LayoutChangeEvent) => {
+          onMeasure(e.nativeEvent.layout.height)
+        }}
+        style={[style, { paddingBottom: bottomPad }]}
+        className="rounded-t-3xl border-t border-line/80 bg-surface px-4 pt-2 shadow-2xl shadow-black/20"
+      >
+        {children}
+      </Animated.View>
+    </GestureDetector>
   )
 }
 
@@ -131,34 +159,102 @@ export function AttachmentSheet({
   onPicked,
   onInsertText,
 }: AttachmentSheetProps) {
-  // Lazy initialiser, not `useRef(new Animated.Value(400))`: useRef evaluates
-  // its argument on every render and discards all but the first, so the plain
-  // form allocates a throwaway Animated.Value per render.
-  const [translateY] = useState(() => new Animated.Value(400))
+  // Somewhere to start before the sheet has been laid out. Replaced by the
+  // real height on the first `onLayout`, which is well before a finger can
+  // reach it, but a sheet that opened from a guess would still be a sheet that
+  // opened.
+  const [restingHeight] = useState(() => Dimensions.get('window').height)
+  const height = useSharedValue(restingHeight)
+  const y = useSharedValue(restingHeight)
+  const reduceMotion = useReducedMotion()
   const [pendingId, setPendingId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (visible) {
-      translateY.setValue(400)
-      Animated.spring(translateY, {
-        toValue: 0,
-        damping: motion.springs.overlay.damping,
-        stiffness: motion.springs.overlay.stiffness,
-        mass: motion.springs.overlay.mass,
-        useNativeDriver: true,
-      }).start()
-    }
-  }, [visible, translateY])
+  const measure = useCallback(
+    (measured: number) => {
+      if (measured > 0) height.set(measured)
+    },
+    [height],
+  )
 
-  function dismiss() {
-    Animated.timing(translateY, {
-      toValue: 400,
-      duration: motion.durations.overlay,
-      useNativeDriver: true,
-    }).start(() => {
-      onClose()
-    })
-  }
+  useEffect(() => {
+    if (!visible) return
+    y.set(height.get())
+    if (reduceMotion) {
+      y.set(0)
+      return
+    }
+    y.set(withSpring(0, motion.springs.overlay))
+  }, [visible, reduceMotion, height, y])
+
+  const dismiss = useCallback(
+    (velocity = 0) => {
+      if (reduceMotion) {
+        y.set(height.get())
+        onClose()
+        return
+      }
+      // Clamped: past the bottom edge is off screen, and a sheet that
+      // overshot would spring back up into view on its way out.
+      y.set(
+        withSpring(
+          height.get(),
+          { ...motion.springs.overlay, velocity, overshootClamping: true },
+          (done) => {
+            if (done) scheduleOnRN(onClose)
+          },
+        ),
+      )
+    },
+    [height, onClose, reduceMotion, y],
+  )
+
+  /**
+   * One gesture over the whole sheet rather than a handler per region.
+   *
+   * `activeOffsetY` is what keeps the option rows tappable: a press that never
+   * travels 12px vertically is never claimed here, so the pan only exists once
+   * somebody has plainly started dragging. Everything below runs on the UI
+   * thread — the sheet follows the finger whatever React is doing.
+   */
+  const drag = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-12, 12])
+        .failOffsetX([-24, 24])
+        .onUpdate((e) => {
+          // Down is the way out and tracks exactly; up is resistance, because
+          // there is nothing above this sheet to drag it to.
+          y.set(
+            e.translationY >= 0
+              ? e.translationY
+              : e.translationY * motion.rubberBand,
+          )
+        })
+        .onEnd((e) => {
+          if (
+            shouldDismissSheet({
+              travel: e.translationY,
+              velocity: e.velocityY,
+              height: height.get(),
+            })
+          ) {
+            scheduleOnRN(hapticLight)
+            scheduleOnRN(dismiss, e.velocityY)
+            return
+          }
+          y.set(withSpring(0, { ...motion.springs.overlay, velocity: e.velocityY }))
+        }),
+    [dismiss, height, y],
+  )
+
+  const backdropStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      y.get(),
+      [0, height.get()],
+      [1, 0],
+      Extrapolation.CLAMP,
+    ),
+  }))
 
   function handleSelectText(insertText: string) {
     hapticSelection()
@@ -195,175 +291,88 @@ export function AttachmentSheet({
     }
   }
 
-  // Dedicated PanResponder for the top grab handle + header area (circled section).
-  // Lazy initialiser for the same reason as translateY above — PanResponder.create
-  // builds an object and six closures, and useRef would rebuild them every render.
-  const [headerPanResponder] = useState(() =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 2 || Math.abs(gesture.dy) > Math.abs(gesture.dx)
-      },
-      onMoveShouldSetPanResponderCapture: (_, gesture) => {
-        return gesture.dy > 2
-      },
-      onPanResponderMove: (_, gesture) => {
-        if (gesture.dy > 0) {
-          translateY.setValue(gesture.dy)
-        } else {
-          translateY.setValue(gesture.dy * 0.15)
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 45 || gesture.vy > 0.25) {
-          hapticLight()
-          dismiss()
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            damping: motion.springs.overlay.damping,
-            stiffness: motion.springs.overlay.stiffness,
-            mass: motion.springs.overlay.mass,
-            useNativeDriver: true,
-          }).start()
-        }
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(translateY, {
-          toValue: 0,
-          damping: motion.springs.overlay.damping,
-          stiffness: motion.springs.overlay.stiffness,
-          mass: motion.springs.overlay.mass,
-          useNativeDriver: true,
-        }).start()
-      },
-    }),
-  )
-
-  // PanResponder for downward drag on the option list area
-  const [bodyPanResponder] = useState(() =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: (_, gesture) => {
-        return gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
-      },
-      onMoveShouldSetPanResponderCapture: (_, gesture) => {
-        return gesture.dy > 12 && Math.abs(gesture.dy) > Math.abs(gesture.dx)
-      },
-      onPanResponderMove: (_, gesture) => {
-        if (gesture.dy > 0) {
-          translateY.setValue(gesture.dy)
-        } else {
-          translateY.setValue(gesture.dy * 0.15)
-        }
-      },
-      onPanResponderRelease: (_, gesture) => {
-        if (gesture.dy > 55 || gesture.vy > 0.3) {
-          hapticLight()
-          dismiss()
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            damping: motion.springs.overlay.damping,
-            stiffness: motion.springs.overlay.stiffness,
-            mass: motion.springs.overlay.mass,
-            useNativeDriver: true,
-          }).start()
-        }
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(translateY, {
-          toValue: 0,
-          damping: motion.springs.overlay.damping,
-          stiffness: motion.springs.overlay.stiffness,
-          mass: motion.springs.overlay.mass,
-          useNativeDriver: true,
-        }).start()
-      },
-    }),
-  )
-
-  const backdropOpacity = translateY.interpolate({
-    inputRange: [0, 260],
-    outputRange: [1, 0],
-    extrapolate: 'clamp',
-  })
-
   return (
     <Modal
       visible={visible}
       transparent
       animationType="none"
-      onRequestClose={dismiss}
+      onRequestClose={() => dismiss()}
     >
-      <SafeAreaProvider>
-        <View className="flex-1 justify-end">
-          <Animated.View
-            style={{ opacity: backdropOpacity }}
-            className="absolute inset-0 bg-black/40"
-          >
-            <Pressable className="flex-1" onPress={dismiss} />
-          </Animated.View>
+      {/* A `Modal` is its own view root on Android: gestures inside it are not
+          seen by the app's `GestureHandlerRootView`, so the sheet brings one. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <View className="flex-1 justify-end">
+            <Animated.View
+              style={backdropStyle}
+              className="absolute inset-0 bg-black/40"
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss"
+                className="flex-1"
+                onPress={() => dismiss()}
+              />
+            </Animated.View>
 
-          <SheetSurface translateY={translateY}>
-            <View {...headerPanResponder.panHandlers} className="pb-3 pt-1">
-              <View className="items-center py-2.5">
-                <View className="h-1.5 w-12 rounded-full bg-line" />
+            <SheetSurface y={y} drag={drag} onMeasure={measure}>
+              <View className="pb-3 pt-1">
+                <View className="items-center py-2.5">
+                  <View className="h-1.5 w-12 rounded-full bg-line" />
+                </View>
+
+                <View className="flex-row items-center justify-between px-1">
+                  <Text variant="title" className="font-bold text-ink">
+                    Share & Attach
+                  </Text>
+                  <TactilePressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Close"
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    onPress={() => dismiss()}
+                    className="size-8 items-center justify-center rounded-full bg-line/80"
+                  >
+                    <X color={colors.inkSoft} size={16} />
+                  </TactilePressable>
+                </View>
               </View>
 
-              <View className="flex-row items-center justify-between px-1">
-                <Text variant="title" className="font-bold text-ink">
-                  Share & Attach
-                </Text>
-                <TactilePressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Close"
-                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  onPress={dismiss}
-                  className="size-8 items-center justify-center rounded-full bg-line/80"
-                >
-                  <X color={colors.inkSoft} size={16} />
-                </TactilePressable>
+              <View className="gap-2 pb-1">
+                {ATTACHMENT_OPTIONS.map((item) => (
+                  <TactilePressable
+                    key={item.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
+                    accessibilityState={{
+                      disabled: pendingId !== null,
+                      busy: pendingId === item.id,
+                    }}
+                    disabled={pendingId !== null}
+                    onPress={() => void handleOption(item)}
+                    className="flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-3.5 shadow-xs shadow-black/8 active:bg-primary-soft/40"
+                  >
+                    <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
+                      {pendingId === item.id ? (
+                        <ActivityIndicator color={colors.primary} size="small" />
+                      ) : (
+                        <item.icon color={colors.primary} size={22} />
+                      )}
+                    </View>
+                    <View className="min-w-0 flex-1">
+                      <Text variant="meta" className="font-semibold text-ink">
+                        {item.title}
+                      </Text>
+                      <Text variant="label" className="mt-0.5 font-normal text-muted">
+                        {item.subtitle}
+                      </Text>
+                    </View>
+                  </TactilePressable>
+                ))}
               </View>
-            </View>
-
-            <View {...bodyPanResponder.panHandlers} className="gap-2 pb-1">
-              {ATTACHMENT_OPTIONS.map((item) => (
-                <TactilePressable
-                  key={item.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={item.title}
-                  accessibilityState={{
-                    disabled: pendingId !== null,
-                    busy: pendingId === item.id,
-                  }}
-                  disabled={pendingId !== null}
-                  onPress={() => void handleOption(item)}
-                  className="flex-row items-center gap-3.5 rounded-2xl border border-line/70 bg-surface p-3.5 shadow-xs shadow-black/8 active:bg-primary-soft/40"
-                >
-                  <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
-                    {pendingId === item.id ? (
-                      <ActivityIndicator color={colors.primary} size="small" />
-                    ) : (
-                      <item.icon color={colors.primary} size={22} />
-                    )}
-                  </View>
-                  <View className="min-w-0 flex-1">
-                    <Text variant="meta" className="font-semibold text-ink">
-                      {item.title}
-                    </Text>
-                    <Text variant="label" className="mt-0.5 font-normal text-muted">
-                      {item.subtitle}
-                    </Text>
-                  </View>
-                </TactilePressable>
-              ))}
-            </View>
-          </SheetSurface>
-        </View>
-      </SafeAreaProvider>
+            </SheetSurface>
+          </View>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </Modal>
   )
 }

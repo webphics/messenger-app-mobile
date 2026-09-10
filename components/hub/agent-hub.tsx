@@ -1,6 +1,5 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import {
   BookOpen,
@@ -29,7 +28,6 @@ import {
   listUnassignedConversations,
 } from "@/lib/inbox-filter";
 import { knowledgeListHref } from "@/lib/hub-routes";
-import { settleDownEnter } from "@/lib/motion-enter";
 import { getSessionUser } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
@@ -38,7 +36,6 @@ const PENDING_COUNT = "—";
 
 export function AgentHub() {
   const me = getSessionUser();
-  const reduceMotion = useReducedMotion();
   const inbox = useConversationInbox();
   /*
    * The list this hub counts, once there is one.
@@ -59,18 +56,17 @@ export function AgentHub() {
       <View className="px-4">
         <HubHeader settingsHref={"/(agent)/settings" as Href} />
 
-        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+        <View>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
             {hubEyebrow("agent")}
           </Text>
           <Text variant="display" className="mt-0.5 text-ink">
             {hubGreeting("agent", firstName(me?.name ?? ""))}
           </Text>
-        </Animated.View>
+        </View>
 
         {/* Live Queue Overview Card */}
-        <Animated.View
-          entering={settleDownEnter(!!reduceMotion, 20)}
+        <View
           className="mt-4 overflow-hidden rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
@@ -97,11 +93,10 @@ export function AgentHub() {
               onPress={() => router.navigate("/(agent)/unassigned" as Href)}
             />
           </View>
-        </Animated.View>
+        </View>
 
         {/* Quick Actions */}
-        <Animated.View
-          entering={settleDownEnter(!!reduceMotion, 60)}
+        <View
           className="mt-4 flex-row gap-3"
         >
           <ActionTile
@@ -119,7 +114,7 @@ export function AgentHub() {
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("agent"))}
           />
-        </Animated.View>
+        </View>
 
         {recent ? (
           <View className="mt-4">
@@ -131,7 +126,7 @@ export function AgentHub() {
         ) : null}
 
         {/* Search Knowledge Trigger */}
-        <Animated.View entering={settleDownEnter(!!reduceMotion, 100)}>
+        <View>
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Search knowledge"
@@ -144,7 +139,7 @@ export function AgentHub() {
             </Text>
             <Sparkles color={colors.muted} size={16} />
           </TactilePressable>
-        </Animated.View>
+        </View>
 
         {/* Unassigned Pool Row Card */}
         <ActionRow

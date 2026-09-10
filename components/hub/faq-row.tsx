@@ -6,7 +6,7 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
-import { settleEnter } from "@/lib/motion-enter";
+import { disclosureEnter } from "@/lib/motion-enter";
 import { colors } from "@/lib/tokens";
 import type { FaqItem } from "@/lib/types";
 
@@ -53,7 +53,7 @@ export const FaqRow = memo(function FaqRow({
         )}
       </View>
       {open ? (
-        <Animated.View entering={settleEnter(!!reduceMotion)}>
+        <Animated.View entering={disclosureEnter(!!reduceMotion)}>
           <Text
             variant="meta"
             className="mt-2.5 border-t border-line/60 pt-2.5 text-ink-soft"

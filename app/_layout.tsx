@@ -29,6 +29,7 @@ import { Appearance, AppState, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
+import { useRootStackAnimation } from "@/lib/use-stack-chrome";
 import { SessionEndRedirect } from "@/components/auth/session-end";
 import { PushRegistration } from "@/components/push/push-registration";
 import { AuthProvider } from "@/lib/auth-context";
@@ -66,6 +67,7 @@ function hideNativeSplash() {
 const SPLASH_BACKSTOP_MS = 6000;
 
 export default function RootLayout() {
+  const stackAnimation = useRootStackAnimation();
   useFonts({
     Manrope: Manrope_400Regular,
     "Manrope-Medium": Manrope_500Medium,
@@ -129,7 +131,7 @@ export default function RootLayout() {
                   screenOptions={{
                     headerShown: false,
                     contentStyle: { backgroundColor: colors.bg },
-                    animation: "default",
+                    animation: stackAnimation,
                     gestureEnabled: true,
                   }}
                 >

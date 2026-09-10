@@ -29,7 +29,7 @@ export function RecentThreadCard({
   const online = conversationPeer(conversation)?.isOnline === true;
 
   return (
-    <Animated.View entering={settleEnter(!!reduceMotion, 80)}>
+    <Animated.View entering={settleEnter(!!reduceMotion)}>
       <TactilePressable
         accessibilityRole="button"
         accessibilityLabel="Open recent message"

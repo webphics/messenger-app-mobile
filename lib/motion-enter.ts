@@ -1,18 +1,21 @@
 import {
   FadeIn,
   FadeInDown,
-  FadeInRight,
   FadeOutUp,
   ZoomIn,
 } from "react-native-reanimated";
 
-import { motion, staggerDelay } from "@/lib/motion";
+import { motion } from "@/lib/motion";
 import { layoutAnimation } from "@/lib/reduced-motion";
 
 /**
  * Focal: Enki Blue bubble settles onto the Clear Desk in its list slot.
  * Thread FlatList is inverted — never use positive translateY (that drives
  * the bubble into the composer). Scale + opacity only (ZoomIn, not FadeInDown).
+ *
+ * Only ever the viewer's own just-sent Message: history scrolling past is not
+ * arriving, and a bubble that lands every time it is recycled says something
+ * happened when nothing did.
  */
 export function deskMessageEnter(reduceMotion: boolean) {
   return (
@@ -29,7 +32,14 @@ export function deskMessageEnter(reduceMotion: boolean) {
   );
 }
 
-/** Quiet opacity settle — rows, cards, auth fields. */
+/**
+ * Quiet opacity settle — an overlay, an empty state, an auth field.
+ *
+ * Deliberately not available to a row inside a `FlatList`: a virtualized list
+ * mounts a row every time it scrolls into the window, so an entrance there is
+ * not an entrance at all — it is the same fade replayed under the thumb, on the
+ * one surface a person touches most.
+ */
 export function settleEnter(reduceMotion: boolean, delayMs = 0) {
   return layoutAnimation(
     reduceMotion,
@@ -40,7 +50,7 @@ export function settleEnter(reduceMotion: boolean, delayMs = 0) {
   );
 }
 
-/** Hub / settings section rises onto the desk. */
+/** A strip arriving above what is already on screen — a reply bar, a banner. */
 export function settleDownEnter(reduceMotion: boolean, delayMs = 0) {
   return layoutAnimation(
     reduceMotion,
@@ -51,30 +61,17 @@ export function settleDownEnter(reduceMotion: boolean, delayMs = 0) {
   );
 }
 
-/** Horizontal carousel / chart card arrive. */
-export function settleRightEnter(reduceMotion: boolean, delayMs = 0) {
+/**
+ * An expand revealing its own body.
+ *
+ * Opacity and nothing else, and short: the row has already resized underneath
+ * the finger that asked for it, so this is feedback on a tap rather than a
+ * thing arriving, and it is spent tens of times a day.
+ */
+export function disclosureEnter(reduceMotion: boolean) {
   return layoutAnimation(
     reduceMotion,
-    FadeInRight.springify()
-      .damping(motion.springs.rise.damping)
-      .stiffness(motion.springs.rise.stiffness)
-      .delay(delayMs),
-  );
-}
-
-/** Inbox / directory rows — capped stagger so long lists stay snappy. */
-export function listItemEnter(reduceMotion: boolean, index: number) {
-  return settleEnter(reduceMotion, staggerDelay(index));
-}
-
-/** Unread badge / role check — feedback pop, not entrance choreography. */
-export function popEnter(reduceMotion: boolean) {
-  return layoutAnimation(
-    reduceMotion,
-    ZoomIn.springify()
-      .damping(motion.springs.tray.damping)
-      .stiffness(motion.springs.tray.stiffness)
-      .mass(motion.springs.tray.mass),
+    FadeIn.duration(motion.durations.disclosure),
   );
 }
 

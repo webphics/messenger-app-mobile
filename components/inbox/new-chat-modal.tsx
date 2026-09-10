@@ -15,7 +15,7 @@ import { createStaffDm, listStaffDirectory } from "@/lib/conversation-api";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
 import { initials } from "@/lib/display";
-import { listItemEnter, settleEnter } from "@/lib/motion-enter";
+import { settleEnter } from "@/lib/motion-enter";
 import {
   filterStaff,
   presenceLabel,
@@ -147,7 +147,6 @@ type ContactPickerRowProps = {
   expanded: boolean;
   /** What the API said when this row's request was refused. */
   refusal: string | null;
-  index?: number;
 };
 
 /**
@@ -172,9 +171,7 @@ const ContactPickerRow = memo(function ContactPickerRow({
   busy,
   expanded,
   refusal,
-  index = 0,
 }: ContactPickerRowProps) {
-  const reduceMotion = useReducedMotion();
   const intent = staffDmIntent(person);
   const disabled = intent.kind === "impossible" || busy;
   const subtitle =
@@ -186,8 +183,9 @@ const ContactPickerRow = memo(function ContactPickerRow({
     onSelect(person);
   }, [onSelect, person]);
 
+  // No entrance: the picker is a FlatList, so a row animates on every recycle.
   return (
-    <Animated.View entering={listItemEnter(!!reduceMotion, index)}>
+    <View>
       <TactilePressable
         accessibilityRole="button"
         accessibilityLabel={rowLabel(person, intent)}
@@ -281,7 +279,7 @@ const ContactPickerRow = memo(function ContactPickerRow({
           </View>
         </View>
       ) : null}
-    </Animated.View>
+    </View>
   );
 });
 
@@ -377,7 +375,7 @@ function NewChatSheet({
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: StaffDirectoryUser; index: number }) => (
+    ({ item }: { item: StaffDirectoryUser }) => (
       <ContactPickerRow
         person={item}
         onSelect={handleSelect}
@@ -385,7 +383,6 @@ function NewChatSheet({
         busy={busyId === item.id}
         expanded={expandedId === item.id}
         refusal={refusal?.id === item.id ? refusal.message : null}
-        index={index}
       />
     ),
     [busyId, expandedId, handlePickOrganization, handleSelect, refusal],

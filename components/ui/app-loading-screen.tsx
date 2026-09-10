@@ -3,14 +3,15 @@ import * as SplashScreen from "expo-splash-screen";
 import { useCallback, useEffect, useRef } from "react";
 import { StyleSheet, useWindowDimensions } from "react-native";
 import Animated, {
-  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { launchAnimationSize } from "@/lib/launch-animation";
+import { easing } from "@/lib/motion-easing";
 import { colors } from "@/lib/tokens";
 
 /**
@@ -78,20 +79,22 @@ export function AppLoadingScreen({
   useEffect(() => {
     if (isFinishing) {
       if (reduceMotion) {
-        opacity.value = 0;
+        opacity.set(0);
         onFinish?.();
       } else {
-        opacity.value = withTiming(0, { duration: 300 }, (finished) => {
-          if (finished && onFinish) {
-            runOnJS(onFinish)();
-          }
-        });
+        opacity.set(
+          withTiming(0, { duration: 300, easing: easing.out }, (finished) => {
+            if (finished && onFinish) {
+              scheduleOnRN(onFinish);
+            }
+          }),
+        );
       }
     }
   }, [isFinishing, reduceMotion, onFinish, opacity]);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+    opacity: opacity.get(),
   }));
 
   return (

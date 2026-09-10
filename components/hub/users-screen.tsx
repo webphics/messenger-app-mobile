@@ -52,13 +52,8 @@ export function UsersScreen() {
   }, []);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: Person; index: number }) => (
-      <UserRow
-        person={item}
-        open={item.id === openId}
-        onPress={toggleOpen}
-        index={index}
-      />
+    ({ item }: { item: Person }) => (
+      <UserRow person={item} open={item.id === openId} onPress={toggleOpen} />
     ),
     [openId, toggleOpen],
   );
