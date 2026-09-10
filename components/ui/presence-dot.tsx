@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { cn } from "@/lib/cn";
+import { easing } from "@/lib/motion-easing";
 import { motion } from "@/lib/motion";
 
 type PresenceDotProps = {
@@ -27,20 +28,30 @@ export function PresenceDot({ className, breathe = false }: PresenceDotProps) {
 
   useEffect(() => {
     if (!breathe || reduceMotion) {
-      opacity.value = 1;
+      opacity.set(1);
       return;
     }
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.4, { duration: motion.durations.breathe }),
-        withTiming(1, { duration: motion.durations.breathe }),
+    // `inOut` and not `out`: a breathe is the one loop in the app with no
+    // cause and no end, so both halves should be as soft as each other.
+    opacity.set(
+      withRepeat(
+        withSequence(
+          withTiming(0.4, {
+            duration: motion.durations.breathe,
+            easing: easing.inOut,
+          }),
+          withTiming(1, {
+            duration: motion.durations.breathe,
+            easing: easing.inOut,
+          }),
+        ),
+        -1,
+        false,
       ),
-      -1,
-      false,
     );
   }, [breathe, opacity, reduceMotion]);
 
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const style = useAnimatedStyle(() => ({ opacity: opacity.get() }));
 
   return (
     <Animated.View

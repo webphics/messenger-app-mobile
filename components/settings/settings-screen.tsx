@@ -1,6 +1,5 @@
 import { LogOut } from "@/components/icons";
 import { ScrollView, View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -11,7 +10,6 @@ import { confirmSignOut } from "@/lib/confirm-sign-out";
 import { getDevUser } from "@/lib/dev-user";
 import { initials } from "@/lib/display";
 import { hubEyebrow } from "@/lib/hub-chrome";
-import { settleDownEnter } from "@/lib/motion-enter";
 import {
   makeRefreshControl,
   useSimulatedRefresh,
@@ -28,7 +26,6 @@ export function SettingsScreen() {
   // Falls back to the mock person only when there is no signed-in name to show,
   // so this card never pairs a fixture's name with a real email address.
   const displayName = account?.name ?? me.displayName;
-  const reduceMotion = useReducedMotion();
   const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
 
   async function onSignOut() {
@@ -41,8 +38,7 @@ export function SettingsScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={makeRefreshControl(refreshing, onRefresh)}
     >
-      <Animated.View
-        entering={settleDownEnter(!!reduceMotion)}
+      <View
         className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
       >
         <Avatar alt={displayName} className="size-14">
@@ -72,10 +68,9 @@ export function SettingsScreen() {
             </Text>
           </View>
         </View>
-      </Animated.View>
+      </View>
 
-      <Animated.View
-        entering={settleDownEnter(!!reduceMotion, 80)}
+      <View
         className="my-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
       >
         <View className="mb-4 flex-row items-center justify-between border-b border-line/60 pb-3">
@@ -99,7 +94,7 @@ export function SettingsScreen() {
           <LogOut color={colors.danger} size={18} />
           <Text className="text-danger">Sign out</Text>
         </Button>
-      </Animated.View>
+      </View>
 
       {/* Last, and absent unless the operating system's own settings are the
           only place notifications can still be turned on. Below Sign out

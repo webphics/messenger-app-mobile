@@ -47,12 +47,11 @@ export function ChartsSection() {
           gap,
         }}
       >
-        {charts.map((chart, i) => (
+        {charts.map((chart) => (
           <ChartCard
             key={chart.id}
             chart={chart}
             cardWidth={cardWidth}
-            index={i}
             onPress={() => router.push(chartHref(chart.id))}
           />
         ))}

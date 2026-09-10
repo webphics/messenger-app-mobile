@@ -2,7 +2,9 @@ import { useLayoutEffect } from "react";
 import { Reply } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
+  ReduceMotion,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
   withSpring,
   withTiming,
@@ -10,6 +12,7 @@ import Animated, {
 
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { easing } from "@/lib/motion-easing";
 import { motion } from "@/lib/motion";
 import { REACT_EMOJIS } from "@/lib/message-react";
 import {
@@ -36,20 +39,27 @@ export function MessageActions({
   onReact,
   onReply,
 }: MessageActionsProps) {
-  const scale = useSharedValue(0.85);
+  const reduceMotion = useReducedMotion();
+  // The tray appears where a finger just was, so Reduce Motion keeps the fade
+  // — it is what says something opened — and drops only the scale.
+  const scale = useSharedValue(reduceMotion ? 1 : 0.85);
   const opacity = useSharedValue(0);
 
   useLayoutEffect(() => {
-    scale.value = withSpring(1, motion.springs.tray);
-    opacity.value = withTiming(1, { duration: motion.durations.flash });
+    scale.set(
+      withSpring(1, { ...motion.springs.tray, reduceMotion: ReduceMotion.System }),
+    );
+    opacity.set(
+      withTiming(1, { duration: motion.durations.flash, easing: easing.out }),
+    );
   }, [opacity, scale]);
 
   const trayAnim = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
+    opacity: opacity.get(),
+    transform: [{ scale: scale.get() }],
   }));
   const replyAnim = useAnimatedStyle(() => ({
-    opacity: opacity.value,
+    opacity: opacity.get(),
   }));
 
   const trayPos = trayStyle(anchor, anchor.outgoing, anchor.hostWidth);

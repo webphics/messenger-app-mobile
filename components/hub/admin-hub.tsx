@@ -1,6 +1,5 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { BookOpen, MessageCircle, Plus, ShieldCheck } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
@@ -17,7 +16,6 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread } from "@/lib/inbox-filter";
 import { knowledgeListHref } from "@/lib/hub-routes";
 import { PEOPLE } from "@/lib/mock-data";
-import { settleDownEnter } from "@/lib/motion-enter";
 import { getSessionUser } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
@@ -26,7 +24,6 @@ const PENDING_COUNT = "—";
 
 export function AdminHub() {
   const me = getSessionUser();
-  const reduceMotion = useReducedMotion();
   const inbox = useConversationInbox();
   /*
    * Real, and org-wide: an Admin's `GET /conversations` is already the broad set
@@ -45,18 +42,17 @@ export function AdminHub() {
       <View className="px-4">
         <HubHeader settingsHref={"/(admin)/settings" as Href} />
 
-        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+        <View>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
             {hubEyebrow("admin")}
           </Text>
           <Text variant="display" className="mt-0.5 text-ink">
             {hubGreeting("admin", firstName(me?.name ?? ""))}
           </Text>
-        </Animated.View>
+        </View>
 
         {/* System Health / Overview Stats */}
-        <Animated.View
-          entering={settleDownEnter(!!reduceMotion, 20)}
+        <View
           className="mt-4 overflow-hidden rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
         >
           <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
@@ -84,11 +80,10 @@ export function AdminHub() {
               onPress={() => router.navigate("/(admin)/conversations" as Href)}
             />
           </View>
-        </Animated.View>
+        </View>
 
         {/* Admin Navigation Quick Grid */}
-        <Animated.View
-          entering={settleDownEnter(!!reduceMotion, 60)}
+        <View
           className="mt-4 flex-row gap-3"
         >
           <ActionTile
@@ -106,7 +101,7 @@ export function AdminHub() {
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("admin"))}
           />
-        </Animated.View>
+        </View>
 
         {recent ? (
           <View className="mt-4">

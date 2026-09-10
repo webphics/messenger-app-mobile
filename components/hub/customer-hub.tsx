@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import { View } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
 
 import { HelpCircle, MessageCircle, Search } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
@@ -17,12 +16,10 @@ import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { latestInboxThread } from "@/lib/inbox-filter";
 import { CUSTOMER_HREF } from "@/lib/hub-routes";
-import { settleDownEnter } from "@/lib/motion-enter";
 import { getSessionUser } from "@/lib/session";
 
 export function CustomerHub() {
   const user = getSessionUser();
-  const reduceMotion = useReducedMotion();
   const inbox = useConversationInbox();
   // The most recent real thread, or nothing at all while the list is still out
   // or could not be fetched — the hub is not where a fetch failure is explained,
@@ -35,17 +32,16 @@ export function CustomerHub() {
       <View className="px-4">
         <HubHeader settingsHref={CUSTOMER_HREF.settings} />
 
-        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+        <View>
           <Text variant="label" className="mt-5 uppercase tracking-wider text-muted">
             {hubEyebrow("customer")}
           </Text>
           <Text variant="display" className="mt-0.5 text-ink">
             {hubGreeting("customer", firstName(user?.name ?? ""))}
           </Text>
-        </Animated.View>
+        </View>
 
-        <Animated.View
-          entering={settleDownEnter(!!reduceMotion, 40)}
+        <View
           className="mt-4 flex-row gap-3"
         >
           <ActionTile
@@ -60,7 +56,7 @@ export function CustomerHub() {
             hint="Browse guides"
             onPress={() => router.navigate(CUSTOMER_HREF.help)}
           />
-        </Animated.View>
+        </View>
 
         {recent ? (
           <View className="mt-4">
@@ -76,7 +72,7 @@ export function CustomerHub() {
           </View>
         ) : null}
 
-        <Animated.View entering={settleDownEnter(!!reduceMotion, 80)}>
+        <View>
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Search for help"
@@ -88,7 +84,7 @@ export function CustomerHub() {
               Search for help & answers…
             </Text>
           </TactilePressable>
-        </Animated.View>
+        </View>
       </View>
 
       <OffersCarousel />

@@ -46,8 +46,8 @@ export function KnowledgeList({ group }: KnowledgeListProps) {
   );
 
   const renderItem = useCallback(
-    ({ item, index }: { item: KnowledgeArticle; index: number }) => (
-      <KnowledgeRow article={item} onPress={openArticle} index={index} />
+    ({ item }: { item: KnowledgeArticle }) => (
+      <KnowledgeRow article={item} onPress={openArticle} />
     ),
     [openArticle],
   );

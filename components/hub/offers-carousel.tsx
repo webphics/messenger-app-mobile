@@ -83,12 +83,11 @@ export function OffersCarousel() {
           gap,
         }}
       >
-        {offers.map((offer, i) => (
+        {offers.map((offer) => (
           <OfferCard
             key={offer.id}
             offer={offer}
             cardWidth={cardWidth}
-            index={i}
             onPress={openOffers}
           />
         ))}
