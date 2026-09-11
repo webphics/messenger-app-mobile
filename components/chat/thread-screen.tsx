@@ -454,6 +454,21 @@ export function ThreadScreen({
     },
   ).current
 
+  const onScrollToIndexFailed = useCallback(
+    (info: { index: number; averageItemLength: number }) => {
+      listRef.current?.scrollToOffset({
+        offset: info.averageItemLength * info.index,
+        animated: false,
+      })
+      // One frame is not enough on a cold window: the rows have to mount and
+      // measure before the second attempt has anything better to go on.
+      setTimeout(() => {
+        listRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 1 })
+      }, 80)
+    },
+    [],
+  )
+
   const jumpToDayStart = useCallback(() => {
     const mark = dayMarks[topRowIndex]
     if (!mark) return
@@ -779,6 +794,15 @@ export function ThreadScreen({
           onEndReachedThreshold={0.4}
           viewabilityConfig={viewabilityConfig}
           onViewableItemsChanged={onViewableItemsChanged}
+          /*
+            The day pill can ask for a row far outside the rendered window, and
+            `scrollToIndex` throws for one the list has not measured -- with
+            `windowSize={5}` that is most of a long thread, so the jump would fail
+            exactly when it is most useful. The fallback is the documented one:
+            land on an estimate, which renders the rows around it, then ask again
+            now that the real offset is knowable.
+          */
+          onScrollToIndexFailed={onScrollToIndexFailed}
           ListFooterComponent={
             loadingOlder ? (
               <View className="items-center py-3">
