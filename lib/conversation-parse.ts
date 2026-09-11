@@ -381,6 +381,11 @@ export function parseLabels(value: unknown): Label[] {
   return labels(value)
 }
 
+/** One label, as the create and update routes answer with it. */
+export function parseLabel(value: unknown): Label | null {
+  return label(value)
+}
+
 /**
  * One internal note.
  *
