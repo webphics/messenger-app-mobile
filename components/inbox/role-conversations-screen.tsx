@@ -50,6 +50,7 @@ export function RoleConversationsScreen({
       showChips={isStaff}
       showCompose={showCompose}
       viewerId={user?.id}
+      savedInboxesFor={user?.role ?? null}
       title="Messages"
     />
   );

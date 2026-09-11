@@ -95,6 +95,17 @@ export type InboxFilter = {
   organizationNames?: ReadonlyMap<string, string>
   /** Who is looking, for the chip that asks which threads are theirs. */
   viewerId?: string
+  /**
+   * The selected custom inbox's organizations, or null for the unified one.
+   *
+   * A saved inbox is a set of organizations and nothing else, so it narrows
+   * the same list rather than fetching a different one — the API already
+   * scoped `GET /conversations` by who is asking, and this can only ever
+   * narrow within that. An inbox naming an organization the person has since
+   * left simply stops matching, which is the same thing the API does with the
+   * `organizationId` query it also accepts.
+   */
+  organizationIds?: ReadonlySet<string> | null
 }
 
 /**
@@ -106,11 +117,19 @@ export type InboxFilter = {
  */
 export function filterConversations(
   list: Conversation[],
-  { query, chip, organizationNames = new Map(), viewerId }: InboxFilter,
+  {
+    query,
+    chip,
+    organizationNames = new Map(),
+    viewerId,
+    organizationIds = null,
+  }: InboxFilter,
 ): Conversation[] {
   const q = query.trim().toLowerCase()
   const mine = viewerId ? new Set(listAssignedConversations(viewerId, list).map((row) => row.id)) : null
   const filtered = list.filter((conversation) => {
+    if (organizationIds && !organizationIds.has(conversation.organizationId)) return false
+
     const resolved = isResolved(conversation)
     if (chip === 'open' && resolved) return false
     if (chip === 'resolved' && !resolved) return false

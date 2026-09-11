@@ -1,9 +1,10 @@
 import { useNavigation, useRouter } from "expo-router";
-import { CloudOff, Inbox, MessageCircle, SquarePen } from "@/components/icons";
+import { CloudOff, Inbox, ListFilter, MessageCircle, SquarePen } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, View } from "react-native";
 
 import { ConversationRow } from "@/components/inbox/conversation-row";
+import { ManageInboxesSheet } from "@/components/inbox/manage-inboxes-sheet";
 import { NewChatModal } from "@/components/inbox/new-chat-modal";
 import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
@@ -11,13 +12,14 @@ import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { cn } from "@/lib/cn";
 import { filterConversations, type InboxChip } from "@/lib/inbox-filter";
+import { useCustomInboxes } from "@/lib/use-custom-inboxes";
 import { settleEnter } from "@/lib/motion-enter";
 import {
   makeRefreshControl,
   useSimulatedRefresh,
 } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
-import type { Conversation } from "@/lib/types";
+import type { Conversation, UserRole } from "@/lib/types";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 
 /**
@@ -153,6 +155,12 @@ type InboxScreenProps = {
   organizationNames?: ReadonlyMap<string, string>;
   /** Who is looking, so the Mine chip knows whose threads to keep. */
   viewerId?: string;
+  /**
+   * Which role is reading, for the saved inboxes — a Customer has none and is
+   * refused the endpoint. Absent on the pool, which is one queue and not a
+   * place to filter by organization.
+   */
+  savedInboxesFor?: UserRole | null;
   /** Set while the first fetch is out and there is nothing to show yet. */
   loading?: boolean;
   /** What went wrong, when the list could not be fetched at all. */
@@ -169,6 +177,7 @@ export function InboxScreen({
   title,
   organizationNames,
   viewerId,
+  savedInboxesFor = null,
   loading = false,
   error = null,
   refreshing: refreshingProp,
@@ -179,6 +188,13 @@ export function InboxScreen({
   const [query, setQuery] = useState("");
   const [chip, setChip] = useState<InboxChip>("all");
   const [composeOpen, setComposeOpen] = useState(false);
+  const [inboxesOpen, setInboxesOpen] = useState(false);
+  /*
+   * A saved inbox is a set of organizations and nothing else, so it narrows
+   * the rows already held rather than fetching a different list. Selecting
+   * one therefore costs no request, and works with no signal.
+   */
+  const savedInboxes = useCustomInboxes(savedInboxesFor);
   const [epoch, setEpoch] = useState(0);
   const simulated = useSimulatedRefresh(() => {
     setEpoch((n) => n + 1);
@@ -214,8 +230,18 @@ export function InboxScreen({
       chip: showChips ? chip : "all",
       organizationNames,
       viewerId,
+      organizationIds: savedInboxes.organizationIds,
     });
-  }, [conversations, query, chip, showChips, organizationNames, viewerId, epoch]);
+  }, [
+    conversations,
+    query,
+    chip,
+    showChips,
+    organizationNames,
+    viewerId,
+    savedInboxes.organizationIds,
+    epoch,
+  ]);
 
   const openConversation = useCallback(
     (conversationId: string) => {
@@ -244,6 +270,61 @@ export function InboxScreen({
           placeholder="Search conversations…"
           accessibilityLabel="Search conversations"
         />
+
+        {savedInboxesFor && savedInboxesFor !== "customer" ? (
+          <View className="mt-3 flex-row flex-wrap items-center gap-2">
+            {/*
+              Nothing saved yet is one control rather than a row: an "All
+              inboxes" chip that is the only chip narrows nothing and is
+              selected against no alternative. What is worth offering there is
+              the way to make the first one.
+            */}
+            {savedInboxes.inboxes.length > 0
+              ? [null, ...savedInboxes.inboxes.map((inbox) => inbox.id)].map((id) => {
+                  const inbox = savedInboxes.inboxes.find((row) => row.id === id);
+                  const label = inbox?.name ?? "All inboxes";
+                  const selected = savedInboxes.selectedId === id;
+                  return (
+                    <TactilePressable
+                      key={id ?? "unified"}
+                      accessibilityRole="button"
+                      accessibilityLabel={label}
+                      accessibilityState={{ selected }}
+                      onPress={() => savedInboxes.select(id)}
+                      className={cn(
+                        "min-h-9 justify-center rounded-xl border px-3",
+                        selected
+                          ? "border-primary/40 bg-primary-soft"
+                          : "border-line/80 bg-line/35",
+                      )}
+                    >
+                      <Text
+                        variant="label"
+                        className={
+                          selected ? "font-semibold text-primary" : "text-ink-soft"
+                        }
+                      >
+                        {label}
+                      </Text>
+                    </TactilePressable>
+                  );
+                })
+              : null}
+            <TactilePressable
+              accessibilityRole="button"
+              accessibilityLabel="Saved inboxes"
+              onPress={() => setInboxesOpen(true)}
+              className="min-h-9 flex-row items-center gap-1.5 justify-center rounded-xl border border-dashed border-line px-3"
+            >
+              <ListFilter color={colors.muted} size={16} />
+              {savedInboxes.inboxes.length === 0 ? (
+                <Text variant="label" className="text-muted">
+                  Saved inboxes
+                </Text>
+              ) : null}
+            </TactilePressable>
+          </View>
+        ) : null}
 
         {showChips ? (
           <View className="mt-3 flex-row gap-2">
@@ -299,6 +380,12 @@ export function InboxScreen({
           )
         }
         refreshControl={makeRefreshControl(refreshing, onRefresh)}
+      />
+
+      <ManageInboxesSheet
+        visible={inboxesOpen}
+        onClose={() => setInboxesOpen(false)}
+        view={savedInboxes}
       />
 
       <NewChatModal
