@@ -13,8 +13,10 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { canLabel, canReadNotes } from "@/lib/conversation-details";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { getSession } from "@/lib/session";
+import { canManageAssignment } from "@/lib/thread-actions";
 import { useChatSectionConversation } from "@/lib/use-chat-section-conversation";
 import { useConversationDetails } from "@/lib/use-conversation-details";
+import { useThreadManagement } from "@/lib/use-thread-management";
 
 /**
  * What a conversation is, beside what was said in it.
@@ -63,6 +65,19 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
     onUpdated: addConversation,
   });
 
+  /**
+   * Closing and transferring answer with the conversation too, so they go the
+   * same way a label change does: into the shared list, where the pill above
+   * and the inbox row behind both read it.
+   */
+  const management = useThreadManagement(
+    ready ? conversationId : null,
+    ready ? section.conversation : null,
+    addConversation,
+  );
+  const manageable =
+    ready && canManageAssignment(section.conversation, section.author);
+
   if (section.status === "loading") return <AppLoadingScreen />;
   if (section.status === "denied") return <Redirect href={ROLE_HREF[section.home]} />;
 
@@ -72,6 +87,7 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
       viewerRole={section.viewerRole}
       organizationNames={section.organizationNames}
       details={details}
+      management={manageable ? management : undefined}
     />
   );
 }

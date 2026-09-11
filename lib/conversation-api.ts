@@ -6,6 +6,7 @@ import {
   parseContacts,
   parseConversation,
   parseConversations,
+  parseLabel,
   parseLabels,
   parseMessage,
   parseMessages,
@@ -23,6 +24,7 @@ import type {
   ConversationNote,
   ConversationType,
   Label,
+  LabelColor,
   Message,
   MessageAttachment,
   Organization,
@@ -343,6 +345,88 @@ export async function takeOverConversation(id: string): Promise<ApiResult<Conver
   return readOutcome(outcome, parseConversation)
 }
 
+
+/**
+ * Hand a Support DM to another Agent. The API's `transfer` action.
+ *
+ * Only the assignee may, only while the thread is engaged, and only to an
+ * Agent who is not already holding it — `assertCanTransfer`, mirrored in
+ * `lib/thread-actions` so nothing offers what the API would refuse. An Admin
+ * bypasses the capability check but not the assignee one: an Admin who wants
+ * somebody else's thread takes it over first.
+ *
+ * Answers with the conversation as it now stands, so the row goes into the
+ * shared list and the composer closes behind the person who gave it away.
+ */
+export async function transferConversation(
+  id: string,
+  agentId: string,
+): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/transfer`,
+    { method: 'POST', body: { agentId } },
+  )
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * Close a Support DM. The API's `close` action.
+ *
+ * The assignee's, like Transfer, and for the same reason: it ends the work,
+ * and the person who did the work is the one who knows it is done. Not final —
+ * the Customer writing in reopens it, and it returns to whoever closed it —
+ * which is why nothing here treats it as destructive.
+ */
+export async function closeConversation(id: string): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/close`,
+    { method: 'POST' },
+  )
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * Define a label, rename one, or retire one.
+ *
+ * Admin only — both routes are `@Roles(['admin'])` — and organization-wide:
+ * the same set is offered on every thread, so this is a change to the
+ * vocabulary rather than to any one conversation.
+ *
+ * Archiving is the retirement, and it is not a delete: an archived label stays
+ * on the threads already wearing it, because removing it from those would
+ * rewrite what somebody recorded. `offerableLabels` is what stops it being
+ * offered again.
+ */
+export async function createLabel(
+  name: string,
+  color: LabelColor,
+): Promise<ApiResult<Label>> {
+  const outcome = await authenticatedRequest('/conversations/labels', {
+    method: 'POST',
+    body: { name, color },
+  })
+  return readOutcome(outcome, parseLabel)
+}
+
+export async function updateLabel(
+  labelId: string,
+  changes: { name?: string; color?: LabelColor; archived?: boolean },
+): Promise<ApiResult<Label>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/labels/${encodeURIComponent(labelId)}`,
+    {
+      method: 'PATCH',
+      // `.strict()` and "at least one", so each absent key is a field left
+      // alone rather than one cleared.
+      body: {
+        ...(changes.name === undefined ? {} : { name: changes.name }),
+        ...(changes.color === undefined ? {} : { color: changes.color }),
+        ...(changes.archived === undefined ? {} : { archived: changes.archived }),
+      },
+    },
+  )
+  return readOutcome(outcome, parseLabel)
+}
 
 /**
  * The attachment schema a send takes, which is not the one a message answers with.

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AlertCircle, ChevronRight, Image as ImageIcon, Plus, X } from '@/components/icons'
 import { InScreenHeader } from '@/components/in-screen-header'
+import { ThreadManagementSection } from '@/components/chat/thread-management-section'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
@@ -36,6 +37,7 @@ import type {
   ConversationDetails,
   LabelsState,
 } from '@/lib/use-conversation-details'
+import type { ThreadManagement } from '@/lib/use-thread-management'
 import { isStaffConversation } from '@/lib/types'
 import type { Conversation, ConversationNote, Label, UserRole } from '@/lib/types'
 
@@ -44,6 +46,12 @@ type ConversationDetailsScreenProps = {
   viewerRole: UserRole
   organizationNames?: ReadonlyMap<string, string>
   details: ConversationDetails
+  /**
+   * Closing and transferring, for the one person the API grants them to.
+   * Absent for everybody else, which is how the section stays undrawn rather
+   * than drawn and disabled — see `canManageAssignment`.
+   */
+  management?: ThreadManagement
 }
 
 /**
@@ -65,6 +73,7 @@ export function ConversationDetailsScreen({
   viewerRole,
   organizationNames,
   details,
+  management,
 }: ConversationDetailsScreenProps) {
   const insets = useSafeAreaInsets()
   const keyboardInset = useKeyboardInset()
@@ -205,6 +214,8 @@ export function ConversationDetailsScreen({
             ))}
           </Section>
         ) : null}
+
+        {management ? <ThreadManagementSection management={management} /> : null}
 
         {showLabels ? (
           <LabelsSection

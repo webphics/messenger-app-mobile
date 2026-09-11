@@ -1,7 +1,7 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
 
-import { BookOpen, MessageCircle, Plus, ShieldCheck } from "@/components/icons";
+import { BookOpen, MessageCircle, Plus, ShieldCheck, Tags } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
 import { ActionTile, StatTile } from "@/components/hub/action-tile";
 import { ChartsSection } from "@/components/hub/charts-section";
@@ -115,6 +115,21 @@ export function AdminHub() {
 
       {/* Analytics & Charts Carousel */}
       <ChartsSection />
+
+      {/* Administration — the org-wide settings, as opposed to any one thread */}
+      <View className="mt-5 gap-3 px-4">
+        <Text variant="label" className="uppercase tracking-wider text-muted">
+          Administration
+        </Text>
+        <ActionRow
+          icon={Tags}
+          tone="neutral"
+          title="Labels"
+          hint="The vocabulary every staff member can put on a conversation"
+          accessibilityLabel="Labels"
+          onPress={() => router.push("/(admin)/labels" as Href)}
+        />
+      </View>
 
       {/* Admin Actions */}
       <View className="mt-5 px-4">

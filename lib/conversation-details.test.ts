@@ -7,6 +7,7 @@ import {
   conversationTypeLabel,
   labelChipColors,
   offerableLabels,
+  orderedLabels,
 } from '@/lib/conversation-details'
 import type { Conversation, Label } from '@/lib/types'
 
@@ -220,5 +221,26 @@ describe('conversationPeerRole', () => {
   test('a group has no single other side, and neither has a Customer payload', () => {
     expect(conversationPeerRole(staff({ type: 'group' }))).toBeNull()
     expect(conversationPeerRole(customer())).toBeNull()
+  })
+})
+
+describe('orderedLabels', () => {
+  function label(overrides: Partial<Label> = {}): Label {
+    return { id: 'l', name: 'Billing', color: 'blue', archived: false, ...overrides }
+  }
+
+  test('live labels come first, then the retired ones', () => {
+    const rows = [
+      label({ id: '1', name: 'Zeta' }),
+      label({ id: '2', name: 'Alpha', archived: true }),
+      label({ id: '3', name: 'Beta' }),
+    ]
+    expect(orderedLabels(rows).map((row) => row.id)).toEqual(['3', '1', '2'])
+  })
+
+  test('the array it was handed is left alone', () => {
+    const rows = [label({ id: '1', name: 'Zeta' }), label({ id: '2', name: 'Alpha' })]
+    orderedLabels(rows)
+    expect(rows.map((row) => row.id)).toEqual(['1', '2'])
   })
 })

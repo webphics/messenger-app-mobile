@@ -169,3 +169,32 @@ const LABEL_HEX: Record<LabelColor, { wash: string; ink: string }> = {
 export function labelChipColors(color: LabelColor): { wash: string; ink: string } {
   return LABEL_HEX[color]
 }
+
+/** Every colour a label may wear, in the order the picker offers them. */
+export const LABEL_COLOR_CHOICES: readonly LabelColor[] = [
+  'slate',
+  'red',
+  'orange',
+  'amber',
+  'green',
+  'teal',
+  'blue',
+  'violet',
+  'pink',
+]
+
+/**
+ * The label vocabulary, in the order an Admin reads it: live labels first,
+ * alphabetically, then the retired ones after them.
+ *
+ * Archived labels are not hidden. They stay on the threads already wearing
+ * them, so an Admin wondering why a chip they cannot offer is still appearing
+ * has to be able to find the label and see that it is retired — and bring it
+ * back, which is the same switch the other way.
+ */
+export function orderedLabels(labels: Label[]): Label[] {
+  return [...labels].sort((a, b) => {
+    if (a.archived !== b.archived) return a.archived ? 1 : -1
+    return a.name.localeCompare(b.name)
+  })
+}
