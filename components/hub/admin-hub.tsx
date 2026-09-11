@@ -1,7 +1,7 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
 
-import { BookOpen, MessageCircle, Plus, ShieldCheck, Tags } from "@/components/icons";
+import { BookOpen, MessageCircle, Plus, ShieldCheck, Tags, Users } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
 import { ActionTile, StatTile } from "@/components/hub/action-tile";
 import { ChartsSection } from "@/components/hub/charts-section";
@@ -13,9 +13,8 @@ import { Text } from "@/components/ui/text";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { useConversationInbox } from "@/lib/conversation-inbox";
-import { latestInboxThread } from "@/lib/inbox-filter";
+import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
 import { knowledgeListHref } from "@/lib/hub-routes";
-import { PEOPLE } from "@/lib/mock-data";
 import { getSessionUser } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
@@ -32,10 +31,12 @@ export function AdminHub() {
    */
   const counted = inbox.status === "ready" ? inbox.conversations : null;
   const recent = counted && me ? latestInboxThread(counted) : undefined;
-  // Still the mock directory: user management is its own endpoint and its own
-  // ticket, and this tile links to the screen that reads it.
-  const onlineCount = PEOPLE.filter((p) => p.isOnline).length;
-  const totalUsers = PEOPLE.length;
+  /*
+   * The pool, out of everything an Admin can see. Both halves come from the
+   * list already held, so the tile costs no request — and it is the number
+   * worth waking up to, which the mock user count that stood here never was.
+   */
+  const unassigned = counted ? listUnassignedConversations(counted).length : null;
 
   return (
     <HubScroll>
@@ -67,11 +68,12 @@ export function AdminHub() {
 
           <View className="mt-3 flex-row items-center justify-between gap-3">
             <StatTile
-              value={String(onlineCount)}
-              suffix={`/${totalUsers}`}
-              label="Active users"
-              accessibilityLabel="People"
-              onPress={() => router.navigate("/(admin)/contacts" as Href)}
+              value={unassigned === null ? PENDING_COUNT : String(unassigned)}
+              label="Unassigned"
+              tone="primary"
+              alert={unassigned !== null && unassigned > 0}
+              accessibilityLabel="Unassigned pool"
+              onPress={() => router.navigate("/(admin)/unassigned" as Href)}
             />
             <StatTile
               value={counted === null ? PENDING_COUNT : String(counted.length)}
@@ -121,6 +123,14 @@ export function AdminHub() {
         <Text variant="label" className="uppercase tracking-wider text-muted">
           Administration
         </Text>
+        <ActionRow
+          icon={Users}
+          tone="neutral"
+          title="Accounts"
+          hint="Create, invite, change roles, ban, sign out"
+          accessibilityLabel="Accounts"
+          onPress={() => router.push("/(admin)/users" as Href)}
+        />
         <ActionRow
           icon={Tags}
           tone="neutral"
