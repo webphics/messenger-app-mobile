@@ -414,3 +414,34 @@ export type CustomInbox = {
   name: string
   organizationIds: string[]
 }
+
+/** What an Agent may do beyond reading and writing. Admin bypasses all four. */
+export type AgentPermission = 'transfer' | 'close' | 'manage_labels' | 'staff_dm'
+
+/**
+ * A person as the Admin directory holds them, which is a great deal more than
+ * a `Contact`: the account itself, its state, and where it belongs.
+ *
+ * `isBanned` is the API's computed answer rather than the raw column — bans
+ * expire lazily, so the column stays true after the expiry passes and only
+ * this field accounts for it.
+ */
+export type ManagedUser = {
+  id: string
+  name: string | null
+  email: string
+  phone: string | null
+  role: UserRole
+  emailVerified: boolean
+  is2faEnabled: boolean
+  isBanned: boolean
+  banReason: string | null
+  banExpires: string | null
+  activeSessionCount: number
+  /** Accepted memberships. Invitations are the two lists beside it. */
+  organizations: Organization[]
+  pendingInvitations: { id: string; organization: Organization }[]
+  declinedInvitations: { id: string; organization: Organization }[]
+  createdAt: string
+  updatedAt: string
+}

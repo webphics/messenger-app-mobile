@@ -9,6 +9,7 @@ export default function AdminHomeLayout() {
     <Stack screenOptions={chrome}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
+      <Stack.Screen name="users" options={{ title: "Accounts" }} />
       <Stack.Screen name="labels" options={{ title: "Labels" }} />
       <Stack.Screen name="faq" options={{ title: "FAQ" }} />
       <Stack.Screen name="faq-add" options={{ title: "Add FAQ" }} />
