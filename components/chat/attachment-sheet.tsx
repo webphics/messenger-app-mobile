@@ -166,6 +166,8 @@ export function AttachmentSheet({
   const [restingHeight] = useState(() => Dimensions.get('window').height)
   const height = useSharedValue(restingHeight)
   const y = useSharedValue(restingHeight)
+  /** Where the sheet was when the finger landed on it. */
+  const start = useSharedValue(0)
   const reduceMotion = useReducedMotion()
   const [pendingId, setPendingId] = useState<string | null>(null)
 
@@ -221,19 +223,25 @@ export function AttachmentSheet({
       Gesture.Pan()
         .activeOffsetY([-12, 12])
         .failOffsetX([-24, 24])
+        .onStart(() => {
+          // Where the sheet actually is, which is not always where it rests: a
+          // finger landing on one still springing open has to carry on from the
+          // frame the eye last saw. Tracking the raw translation instead would
+          // read the sheet as being at 0 and snap it there on the first frame.
+          start.set(y.get())
+        })
         .onUpdate((e) => {
           // Down is the way out and tracks exactly; up is resistance, because
           // there is nothing above this sheet to drag it to.
-          y.set(
-            e.translationY >= 0
-              ? e.translationY
-              : e.translationY * motion.rubberBand,
-          )
+          const next = start.get() + e.translationY
+          y.set(next >= 0 ? next : next * motion.rubberBand)
         })
         .onEnd((e) => {
           if (
             shouldDismissSheet({
-              travel: e.translationY,
+              // How far down the sheet is, not how far the finger moved — the
+              // two differ for exactly the grab `onStart` exists to handle.
+              travel: y.get(),
               velocity: e.velocityY,
               height: height.get(),
             })
@@ -244,7 +252,7 @@ export function AttachmentSheet({
           }
           y.set(withSpring(0, { ...motion.springs.overlay, velocity: e.velocityY }))
         }),
-    [dismiss, height, y],
+    [dismiss, height, start, y],
   )
 
   const backdropStyle = useAnimatedStyle(() => ({

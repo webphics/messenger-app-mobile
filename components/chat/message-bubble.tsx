@@ -544,7 +544,7 @@ export const MessageBubble = memo(function MessageBubble({
       isFirstMount.current = false
       return
     }
-    if (!selected && tint.value !== 0) {
+    if (!selected && tint.get() !== 0) {
       tint.set(withTiming(0, { duration: 60, easing: easing.out }))
     }
   }, [selected, tint])
@@ -617,7 +617,7 @@ export const MessageBubble = memo(function MessageBubble({
                   )
                 })
                 .onStart((e) => {
-                  tint.value = 1
+                  tint.set(1)
                   scheduleOnRN(hapticMedium)
                   scheduleOnRN(reportOpen, e.absoluteX, e.absoluteY)
                 })
@@ -639,8 +639,11 @@ export const MessageBubble = memo(function MessageBubble({
               swipedHaptic.set(false)
             }
           })
-          .onEnd(() => {
-            if (x.get() >= SWIPE_REPLY) scheduleOnRN(handleReply)
+          .onEnd((_, ok) => {
+            // `ok` is false where the drag was taken away rather than let go —
+            // a parent claiming the touch, the screen going. The bubble still
+            // goes home, but a reply nobody finished asking for is not opened.
+            if (ok && x.get() >= SWIPE_REPLY) scheduleOnRN(handleReply)
             // Timing rather than a spring, and this is the one gesture in the
             // app where that is right: the release is not the drag continuing,
             // it is the drag being undone. The outcome was already decided the
@@ -661,14 +664,14 @@ export const MessageBubble = memo(function MessageBubble({
   )
 
   const swipeStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.value }],
+    transform: [{ translateX: x.get() }],
   }))
   const tintStyle = useAnimatedStyle(() => ({
-    opacity: tint.value,
+    opacity: tint.get(),
   }))
   const iconStyle = useAnimatedStyle(() => ({
     opacity: interpolate(
-      x.value,
+      x.get(),
       [0, 20, SWIPE_REPLY],
       [0, 0.35, 1],
       Extrapolation.CLAMP,
@@ -676,7 +679,7 @@ export const MessageBubble = memo(function MessageBubble({
     transform: [
       {
         scale: interpolate(
-          x.value,
+          x.get(),
           [0, SWIPE_REPLY],
           [0.55, 1],
           Extrapolation.CLAMP,

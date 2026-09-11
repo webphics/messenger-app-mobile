@@ -74,23 +74,23 @@ export function FloatingTabBar({
 
   useEffect(() => {
     if (reduceMotion) {
-      activeIndex.value = state.index;
+      activeIndex.set(state.index);
       return;
     }
-    activeIndex.value = withSpring(state.index, motion.springs.overlay);
+    activeIndex.set(withSpring(state.index, motion.springs.overlay));
   }, [state.index, reduceMotion, activeIndex]);
 
   const onCapsuleLayout = (e: LayoutChangeEvent) => {
     const inner = e.nativeEvent.layout.width - CAPSULE_PAD * 2;
     if (inner <= 0 || tabCount === 0) return;
     // Width is layout-derived; set once — do not animate layout props.
-    tabWidth.value = inner / tabCount;
+    tabWidth.set(inner / tabCount);
   };
 
   const indicatorStyle = useAnimatedStyle(() => ({
-    width: tabWidth.value,
+    width: tabWidth.get(),
     transform: [
-      { translateX: CAPSULE_PAD + activeIndex.value * tabWidth.value },
+      { translateX: CAPSULE_PAD + activeIndex.get() * tabWidth.get() },
     ],
   }));
 

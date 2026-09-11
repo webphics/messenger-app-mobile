@@ -201,10 +201,10 @@ export function Composer({
 
   useEffect(() => {
     if (reduceMotion) {
-      ready.value = canSend || recording ? 1 : 0.92
+      ready.set(canSend || recording ? 1 : 0.92)
       return
     }
-    ready.value = withSpring(canSend || recording ? 1 : 0.92, motion.springs.press)
+    ready.set(withSpring(canSend || recording ? 1 : 0.92, motion.springs.press))
   }, [canSend, ready, recording, reduceMotion])
 
   // Unmounting mid-recording (hardware back, tapping through to another thread)
@@ -266,8 +266,8 @@ export function Composer({
   }, [elapsedMs, recording])
 
   const sendStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ready.value }],
-    opacity: 0.4 + ready.value * 0.6,
+    transform: [{ scale: ready.get() }],
+    opacity: 0.4 + ready.get() * 0.6,
   }))
 
   /**
