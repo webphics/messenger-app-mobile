@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Reply } from "@/components/icons";
+import { Info, Reply } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -24,6 +24,9 @@ import { colors } from "@/lib/tokens";
 
 export type { ReactionAnchor };
 
+/** One row's worth, so Info clears the Reply pill it sits under. */
+const INFO_OFFSET = 52;
+
 type MessageActionsProps = {
   anchor: ReactionAnchor;
   onDismiss: () => void;
@@ -31,6 +34,12 @@ type MessageActionsProps = {
   onReact?: (emoji: string) => void;
   /** Absent where the thread has no composer to open a reply in. */
   onReply?: () => void;
+  /**
+   * Message info. Absent on anybody else's message and on one this device is
+   * still carrying — the API answers 403 for the first and knows nothing of the
+   * second, so neither is offered rather than offered and refused.
+   */
+  onInfo?: () => void;
 };
 
 export function MessageActions({
@@ -38,6 +47,7 @@ export function MessageActions({
   onDismiss,
   onReact,
   onReply,
+  onInfo,
 }: MessageActionsProps) {
   const reduceMotion = useReducedMotion();
   // The tray appears where a finger just was, so Reduce Motion keeps the fade
@@ -132,6 +142,39 @@ export function MessageActions({
           <Reply color={colors.primary} size={18} />
           <Text variant="meta" className="font-semibold text-primary">
             Reply
+          </Text>
+        </TactilePressable>
+      </Animated.View>
+      ) : null}
+
+      {/* Message info, on the viewer's own messages. It sits under Reply rather
+          than in the tray: the tray is emoji, one tap each, and this leaves the
+          thread for a screen of its own. */}
+      {onInfo ? (
+      <Animated.View
+        pointerEvents="auto"
+        style={[
+          {
+            position: "absolute",
+            elevation: 24,
+            zIndex: 30,
+            ...replyPos,
+            top: replyPos.top + INFO_OFFSET,
+          },
+          replyAnim,
+        ]}
+      >
+        <TactilePressable
+          accessibilityRole="button"
+          accessibilityLabel="Message info"
+          onPress={() => {
+            onInfo();
+          }}
+          className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line/80 bg-surface px-5 py-2 shadow-2xl shadow-black/20"
+        >
+          <Info color={colors.primary} size={18} />
+          <Text variant="meta" className="font-semibold text-primary">
+            Info
           </Text>
         </TactilePressable>
       </Animated.View>

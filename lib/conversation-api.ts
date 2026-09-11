@@ -9,6 +9,7 @@ import {
   parseLabel,
   parseLabels,
   parseMessage,
+  parseMessageReceipts,
   parseMessages,
   parseNote,
   parseNotes,
@@ -27,6 +28,7 @@ import type {
   LabelColor,
   Message,
   MessageAttachment,
+  MessageReceipts,
   Organization,
   StaffDirectoryUser,
 } from '@/lib/types'
@@ -284,6 +286,23 @@ export async function addReaction(
     { method: 'POST', body: { emoji } },
   )
   return readOutcome(outcome, parseMessage)
+}
+
+/**
+ * Who has read one message, and when.
+ *
+ * Sender-only on the API: asking about somebody else's message answers 403
+ * rather than an empty list, so the control that opens this screen is gated on
+ * the same rule rather than left to discover it.
+ */
+export async function fetchMessageReceipts(
+  id: string,
+  messageId: string,
+): Promise<ApiResult<MessageReceipts>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/receipts`,
+  )
+  return readOutcome(outcome, parseMessageReceipts)
 }
 
 export async function removeReaction(

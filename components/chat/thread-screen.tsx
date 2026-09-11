@@ -8,16 +8,20 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { router } from 'expo-router'
+import { useReducedMotion } from 'react-native-reanimated'
 
 import { AlertCircle, X } from '@/components/icons'
 import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
 import { MessageActions } from '@/components/chat/message-actions'
+import { ThreadDayPill } from '@/components/chat/thread-day-pill'
 import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
 import { ThreadHeader } from '@/components/chat/thread-header'
 import { InScreenHeader } from '@/components/in-screen-header'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { attachmentViews, primaryAttachmentView } from '@/lib/attachment-view'
+import { chatMessageInfoHref } from '@/lib/chat-route-id'
 import { rejectUploadReason } from '@/lib/attachment-upload'
 import { composerAccess, type ComposerAction } from '@/lib/composer-access'
 import type { ApiFailure } from '@/lib/conversation-api'
@@ -40,7 +44,7 @@ import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
 import { threadNotice, type ThreadNotice } from '@/lib/thread-notice'
-import { buildThreadRows, type ThreadRow } from '@/lib/thread-rows'
+import { buildThreadRows, threadDayMarks, type ThreadRow } from '@/lib/thread-rows'
 import {
   anchorFromPayload,
   type OpenMenuPayload,
@@ -342,6 +346,7 @@ export function ThreadScreen({
   const keyboardInset = useKeyboardInset()
   const hostRef = useRef<View>(null)
   const listRef = useRef<FlatList<ThreadRow>>(null)
+  const reduceMotion = useReducedMotion()
   const stickToLatestRef = useRef(false)
   const [draft, setDraft] = useState('')
   const [replyTo, setReplyTo] = useState<Message | null>(null)
@@ -386,6 +391,52 @@ export function ThreadScreen({
     () => buildThreadRows(messages, { viewerId: viewer.id, namesSenders: isGroup }),
     [messages, viewer.id, isGroup],
   )
+
+  /**
+   * Which day each row sits under, and where that day begins. Worked out once
+   * per page rather than on every scroll frame — see `threadDayMarks`.
+   */
+  const dayMarks = useMemo(() => threadDayMarks(rows), [rows])
+
+  /**
+   * The row the floating pill is speaking for: the topmost one on screen.
+   *
+   * The list is inverted, so the topmost visible row is the *last* of the
+   * viewable ones rather than the first — which is also why this is a row index
+   * rather than a scroll offset. Held as an index so the label and the jump both
+   * fall out of `dayMarks` rather than being tracked separately.
+   */
+  const [topRowIndex, setTopRowIndex] = useState(0)
+  const activeDay = dayMarks[topRowIndex]
+
+  /*
+    Both held in refs because FlatList keeps the first pair it is given: a new
+    callback identity on a later render is ignored, and a changed
+    `viewabilityConfig` throws outright.
+  */
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 10 }).current
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
+      let top = -1
+      for (const item of viewableItems) {
+        if (item.index !== null && item.index > top) top = item.index
+      }
+      if (top >= 0) setTopRowIndex(top)
+    },
+  ).current
+
+  const jumpToDayStart = useCallback(() => {
+    const mark = dayMarks[topRowIndex]
+    if (!mark) return
+    // `viewPosition: 1` is the top of the screen on an inverted list: the
+    // transform flips the axis, so the scroll's "end" is what the reader sees
+    // first.
+    listRef.current?.scrollToIndex({
+      index: mark.dividerIndex,
+      animated: !reduceMotion,
+      viewPosition: 1,
+    })
+  }, [dayMarks, topRowIndex, reduceMotion])
 
   /**
    * What the thread says about itself, beyond its Messages.
@@ -475,6 +526,38 @@ export function ThreadScreen({
   const dismissMenu = useCallback(() => {
     setMenu(null)
   }, [])
+
+  /**
+   * The one bubble whose time a tap has asked for.
+   *
+   * One rather than a set: the question is "when was *that* one sent", asked of
+   * one message at a time, and keeping every previous answer on screen would
+   * slowly turn the thread into the wall of timestamps that showing the time
+   * once per run exists to avoid. Tapping the same bubble again puts it away.
+   */
+  const [revealedTimeId, setRevealedTimeId] = useState<string | null>(null)
+  const revealTime = useCallback((messageId: string) => {
+    setRevealedTimeId((current) => (current === messageId ? null : messageId))
+  }, [])
+
+  /**
+   * Message info is the sender's own record of who has seen what they wrote, so
+   * it is offered on their messages and nobody else's — the API's rule, mirrored
+   * here so the control is absent rather than present and answered with a 403.
+   * A message this device is still carrying has no id the server would know.
+   */
+  const canShowInfo = useCallback(
+    (anchor: ReactionAnchor) => anchor.outgoing && !isLocalId(anchor.messageId),
+    [],
+  )
+
+  const showMessageInfo = useCallback(
+    (messageId: string) => {
+      setMenu(null)
+      router.push(chatMessageInfoHref(conversation.id, messageId))
+    },
+    [conversation.id],
+  )
 
   /**
    * Whether this message can be reacted to at all.
@@ -601,6 +684,10 @@ export function ThreadScreen({
           attachments={attachmentViews(item.message.attachments)}
           outgoing={isOutgoing(item.message, viewer.id)}
           status={item.message.receiptStatus}
+          createdAt={item.message.createdAt}
+          showTime={item.endsRun}
+          timeRevealed={revealedTimeId === item.message.id}
+          onRevealTime={revealTime}
           senderName={item.senderName}
           quoted={quotedById.get(item.message.id)}
           reactions={groupReactions(item.message.reactions)}
@@ -628,6 +715,8 @@ export function ThreadScreen({
       quotedById,
       delivery,
       onRetrySend,
+      revealedTimeId,
+      revealTime,
     ],
   )
 
@@ -656,6 +745,8 @@ export function ThreadScreen({
           // when someone scrolls back into history, which is when older pages load.
           onEndReached={onLoadOlder}
           onEndReachedThreshold={0.4}
+          viewabilityConfig={viewabilityConfig}
+          onViewableItemsChanged={onViewableItemsChanged}
           ListFooterComponent={
             loadingOlder ? (
               <View className="items-center py-3">
@@ -677,6 +768,12 @@ export function ThreadScreen({
               : undefined
           }
         />
+        {/* Over the list rather than in it, so it stays put while the thread
+            scrolls underneath — and under the placeholder, which covers an empty
+            or unreachable thread whole. */}
+        {pageNotice ? null : (
+          <ThreadDayPill label={activeDay?.label ?? ''} onPress={jumpToDayStart} />
+        )}
         <ThreadPlaceholder notice={pageNotice} onRetry={onRetry} />
       </View>
       {pageNotice.kind === 'stale' ? (
@@ -711,6 +808,7 @@ export function ThreadScreen({
               : undefined
           }
           onReply={readOnly ? undefined : () => handleReply(menu.messageId)}
+          onInfo={canShowInfo(menu) ? () => showMessageInfo(menu.messageId) : undefined}
         />
       ) : null}
     </View>

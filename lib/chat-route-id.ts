@@ -25,6 +25,19 @@ export function chatDetailsHref(id: string): Href {
   return { pathname: '/chat/details/[id]', params: { id } }
 }
 
+/**
+ * Message info, for one message in one thread.
+ *
+ * A third section beside details and media, and it carries the conversation id
+ * in the path like the other two: the message is the subject of the screen, but
+ * the conversation is what the permission is asked about, and every one of these
+ * routes resolves that the same way. The message travels as a param rather than
+ * a second segment, which would make this the only two-id route in the app.
+ */
+export function chatMessageInfoHref(id: string, messageId: string): Href {
+  return { pathname: '/chat/message-info/[id]', params: { id, messageId } }
+}
+
 /** Resolve `/chat/:id` from search params, pathname, or segments (params often empty after Metro reload). */
 export function chatIdFromRoute(
   raw: string | string[] | undefined,
@@ -77,4 +90,11 @@ export function chatDetailsIdFromRoute(
   pathname: string,
 ): string | undefined {
   return chatSectionIdFromRoute(raw, pathname, 'details')
+}
+
+export function chatMessageInfoIdFromRoute(
+  raw: string | string[] | undefined,
+  pathname: string,
+): string | undefined {
+  return chatSectionIdFromRoute(raw, pathname, 'message-info')
 }
