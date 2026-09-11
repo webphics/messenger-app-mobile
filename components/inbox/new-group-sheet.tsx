@@ -64,7 +64,7 @@ function memberKey(item: OrganizationMember) {
 
 function GroupForm({ onClose, onCreated }: Omit<NewGroupSheetProps, "visible">) {
   const insets = useSafeAreaInsets();
-  const { addConversation } = useConversationInbox();
+  const { addConversation, reload } = useConversationInbox();
 
   const [title, setTitle] = useState("");
   const [query, setQuery] = useState("");
@@ -168,7 +168,28 @@ function GroupForm({ onClose, onCreated }: Omit<NewGroupSheetProps, "visible">) 
       (result) => {
         setBusy(false);
         if (!result.ok) {
-          setProblem(failureNotice(result.failure, "Could not create the group").hint);
+          /*
+           * A failed create is the one failure in this app that cannot be
+           * retried safely.
+           *
+           * Every other create is get-or-create — a second tap resumes the
+           * thread the first one made. This one is not: `POST
+           * /conversations/groups` inserts unconditionally, so a person who
+           * reads a failure and taps again ends up with two groups. And the
+           * failure genuinely can arrive over a group that was created: the
+           * API answered 500 after the insert had landed when this was tested
+           * against the deployed server, which is a server bug but not one a
+           * client can assume away.
+           *
+           * So the list is refetched and the message does not claim the group
+           * was not created — it says where to look. The alternative is an app
+           * that confidently reports a failure it cannot verify, over the one
+           * action where being wrong costs a duplicate.
+           */
+          reload();
+          setProblem(
+            `${failureNotice(result.failure, "Could not confirm the group").hint} If it was created it will appear in your conversations — check there before trying again.`,
+          );
           return;
         }
         addConversation(result.value);
@@ -176,7 +197,7 @@ function GroupForm({ onClose, onCreated }: Omit<NewGroupSheetProps, "visible">) 
         onCreated(result.value.id);
       },
     );
-  }, [addConversation, onClose, onCreated, organizationId, selected, title]);
+  }, [addConversation, onClose, onCreated, organizationId, reload, selected, title]);
 
   const renderMember = useCallback(
     ({ item }: { item: OrganizationMember }) => {

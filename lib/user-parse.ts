@@ -1,6 +1,6 @@
 import { asRecord } from '@/lib/api-envelope'
 import { parseOrganization } from '@/lib/org-parse'
-import type { AgentPermission, ManagedUser, Organization, UserRole } from '@/lib/types'
+import type { AgentPermission, DirectoryRole, ManagedUser, Organization } from '@/lib/types'
 
 /**
  * Reading the Admin user-management payloads.
@@ -16,7 +16,12 @@ import type { AgentPermission, ManagedUser, Organization, UserRole } from '@/lib
  * number is a person who vanishes from the directory.
  */
 
-const ROLES: readonly UserRole[] = ['admin', 'agent', 'customer']
+/**
+ * Four, not three: the API's enum carries a `developer`, and a directory that
+ * dropped those rows would hide accounts an Admin is responsible for. See
+ * `DirectoryRole`.
+ */
+const ROLES: readonly DirectoryRole[] = ['admin', 'agent', 'customer', 'developer']
 const PERMISSIONS: readonly AgentPermission[] = [
   'transfer',
   'close',

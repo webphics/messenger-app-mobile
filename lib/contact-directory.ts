@@ -1,5 +1,11 @@
 import { staffDmIntent } from '@/lib/staff-directory'
-import type { Contact, ContactKind, Organization, StaffDirectoryUser } from '@/lib/types'
+import type {
+  Contact,
+  ContactKind,
+  DirectoryRole,
+  Organization,
+  StaffDirectoryUser,
+} from '@/lib/types'
 
 /**
  * Reading the contact directory: who is in it, and what a tap on a name does.
@@ -64,6 +70,23 @@ export function contactIntent(
     return { kind: 'unavailable', reason: 'No support thread yet' }
   }
 
+  /*
+   * A staff-kind row whose role is not one of the two that can hold a DM.
+   *
+   * The API's enum has four roles and `getOrCreateStaffDm` refuses a target
+   * that is not an admin or an agent — it answers `conversationNotFoundError`,
+   * which would reach somebody as a bare "not found" about a person plainly in
+   * front of them. `toContact` calls every non-Customer `staff`, so a
+   * `developer` arrives here looking exactly like a colleague.
+   *
+   * An unknown role is refused for the same reason and by the same test: this
+   * client knows which roles the API accepts, and a role it has never heard of
+   * is not one of them.
+   */
+  if (contact.role !== 'admin' && contact.role !== 'agent') {
+    return { kind: 'unavailable', reason: 'Not a staff account' }
+  }
+
   // Staff, with no thread yet. The organization a DM binds to is the staff
   // directory's answer, and the rules for reading it already exist — one binds
   // silently, several are a choice, none means no DM can exist. Reused rather
@@ -71,7 +94,7 @@ export function contactIntent(
   const intent = staffDmIntent({
     id: contact.id,
     name: contact.name,
-    role: contact.role === 'admin' ? 'admin' : 'agent',
+    role: contact.role,
     sharedOrganizations: shared,
   })
 
@@ -138,6 +161,13 @@ export function contactChipLabel(chip: ContactChip): string {
   return CHIP_LABEL[chip]
 }
 
+const ROLE_LABEL: Record<DirectoryRole, string> = {
+  admin: 'Admin',
+  agent: 'Agent',
+  customer: 'Customer',
+  developer: 'Developer',
+}
+
 /**
  * What to say under a name.
  *
@@ -145,11 +175,17 @@ export function contactChipLabel(chip: ContactChip): string {
  * an organization rather than somebody, so "company" is the truest thing about
  * it. A row a tap cannot act on says why instead, because that is the more
  * useful of the two facts.
+ *
+ * Every role is spelled out rather than defaulted. This used to end
+ * `: 'Customer'`, which meant a role the client did not recognise was labelled
+ * as the one role it is least likely to be — a `developer` read as a Customer
+ * on screen. A row that cannot say what somebody is says nothing rather than
+ * guessing.
  */
 export function contactSubtitle(contact: Contact, intent: ContactIntent): string {
   if (intent.kind === 'unavailable') return intent.reason
   if (contact.kind === 'company') return 'Company'
-  return contact.role === 'admin' ? 'Admin' : contact.role === 'agent' ? 'Agent' : 'Customer'
+  return contact.role === null ? '' : ROLE_LABEL[contact.role]
 }
 
 /**

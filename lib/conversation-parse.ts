@@ -2,6 +2,7 @@ import { asRecord } from '@/lib/api-envelope'
 import type {
   Contact,
   ContactKind,
+  DirectoryRole,
   Conversation,
   ConversationNote,
   ConversationPerson,
@@ -49,6 +50,12 @@ const MESSAGE_TYPES: readonly MessageType[] = ['text', 'media', 'voice', 'system
 const RECEIPT_STATUSES: readonly ReceiptStatus[] = ['sent', 'delivered', 'read']
 const ROLES: readonly UserRole[] = ['admin', 'agent', 'customer']
 const CONTACT_KINDS: readonly ContactKind[] = ['company', 'customer', 'staff']
+/**
+ * Four, not three. A contact is somebody else, and the API's enum carries a
+ * `developer` this app has no Hub for — dropping the role would relabel them,
+ * and dropping the row would hide them. See `DirectoryRole`.
+ */
+const DIRECTORY_ROLES: readonly DirectoryRole[] = ['admin', 'agent', 'customer', 'developer']
 const LABEL_COLORS: readonly LabelColor[] = [
   'slate',
   'red',
@@ -444,7 +451,7 @@ export function parseContact(value: unknown): Contact | null {
     id,
     name,
     kind,
-    role: oneOf(record.role, ROLES),
+    role: oneOf(record.role, DIRECTORY_ROLES),
     conversationId: nullableText(record.conversationId),
   }
 }
