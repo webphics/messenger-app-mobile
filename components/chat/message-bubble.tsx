@@ -25,7 +25,7 @@ import { MessageMedia } from '@/components/chat/message-media'
 import { VideoThumb } from '@/components/chat/video-thumb'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
-import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics'
+import { hapticLight, hapticMedium } from '@/lib/haptics'
 import { fitImageSize } from '@/lib/image-layout'
 import {
   isImageOrVideo,
@@ -445,7 +445,6 @@ const ReactionBadge = memo(function ReactionBadge({
             accessibilityRole="button"
             accessibilityLabel={`React ${reaction.emoji}`}
             onPress={() => {
-              hapticSelection()
               onToggleReaction(reaction.emoji)
             }}
             className="px-0.5 active:opacity-60"

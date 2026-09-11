@@ -146,7 +146,6 @@ export function FloatingTabBar({
               }
               onPress={onPress}
               onLongPress={onLongPress}
-              haptic="selection"
               className="z-10 min-h-12 flex-1"
             >
               <View className="min-h-12 items-center justify-center px-1 py-2.5">

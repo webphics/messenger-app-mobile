@@ -45,7 +45,6 @@ import {
   pickFromLibrary,
   type AttachmentOutcome,
 } from '@/lib/attachments'
-import { hapticLight, hapticSelection } from '@/lib/haptics'
 import { motion } from '@/lib/motion'
 import { shouldDismissSheet } from '@/lib/sheet-dismiss'
 import { colors, screenBottomPad } from '@/lib/tokens'
@@ -246,7 +245,6 @@ export function AttachmentSheet({
               height: height.get(),
             })
           ) {
-            scheduleOnRN(hapticLight)
             scheduleOnRN(dismiss, e.velocityY)
             return
           }
@@ -265,7 +263,6 @@ export function AttachmentSheet({
   }))
 
   function handleSelectText(insertText: string) {
-    hapticSelection()
     onInsertText(insertText)
     dismiss()
   }
@@ -278,7 +275,6 @@ export function AttachmentSheet({
       return
     }
 
-    hapticSelection()
     setPendingId(option.id)
     try {
       const outcome = await option.pick()
