@@ -19,7 +19,21 @@ export type ThreadRow =
   | { type: 'day'; id: string; label: string }
   /** An Engage, Takeover or Transfer notice. A statement about the thread, not a message in it. */
   | { type: 'system'; id: string; message: Message }
-  | { type: 'message'; id: string; message: Message; senderName?: string }
+  | {
+      type: 'message'
+      id: string
+      message: Message
+      senderName?: string
+      /**
+       * Whether the next message down starts a new run.
+       *
+       * Spacing, not receipts: a run reads as one column when its bubbles sit
+       * tight together and the gap goes between runs instead — the ratio the web
+       * client draws. The list is inverted, but each cell is flipped back, so the
+       * space below a bubble is still the space before the message after it.
+       */
+      endsRun: boolean
+    }
 
 export type ThreadRowOptions = {
   viewerId: string
@@ -41,6 +55,34 @@ export type ThreadRowOptions = {
  * else, and skipping the divider for it would put a message under yesterday's
  * heading.
  */
+/**
+ * Whether `next` continues the run `message` is in: the same sender, the same
+ * day, and neither of them a notice about the thread rather than a message in
+ * it.
+ *
+ * A run is what the sender's name is drawn once for. Naming every message in a
+ * burst of six repeats the name six times for one person speaking once, which is
+ * what the web client avoids by captioning only a run's first bubble.
+ */
+function sameRun(message: Message | undefined, next: Message | undefined): boolean {
+  // No message before this one: it opens the thread, so it opens a run.
+  if (!message || !next) return false
+  if (isSystemMessage(message) || isSystemMessage(next)) return false
+  if (shouldShowDayDivider(next.createdAt, message.createdAt)) return false
+  return messageSenderKey(message) === messageSenderKey(next)
+}
+
+/**
+ * Who sent a message, for grouping only.
+ *
+ * A Customer's payload names nobody — it says whether the message came from the
+ * company — so the two shapes cannot be compared by id. Each answers with a key
+ * stable within its own shape, and a thread is never a mix of the two.
+ */
+function messageSenderKey(message: Message): string {
+  return 'sender' in message ? message.sender.id : `company:${message.fromCompany}`
+}
+
 export function buildThreadRows(
   messages: Message[],
   { viewerId, namesSenders }: ThreadRowOptions,
@@ -64,8 +106,12 @@ export function buildThreadRows(
       type: 'message',
       id: message.id,
       message,
+      // Captioned only where this message begins a run — see `sameRun`.
       senderName:
-        namesSenders && !isOutgoing(message, viewerId) ? messageSenderName(message) : undefined,
+        namesSenders && !isOutgoing(message, viewerId) && !sameRun(previous, message)
+          ? messageSenderName(message)
+          : undefined,
+      endsRun: !sameRun(message, messages[i + 1]),
     })
   }
 

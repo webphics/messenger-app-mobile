@@ -45,6 +45,7 @@ function customerMessage(id: string, createdAt: string, fromCompany: boolean): M
 
 const ME = { id: 'me', name: 'Jonah Reed' }
 const THEM = { id: 'them', name: 'Priya Raman' }
+const OTHER = { id: 'other', name: 'Sam Okafor' }
 
 /** Newest first, the way an inverted list reads them. */
 function kinds(rows: ThreadRow[]): string[] {
@@ -146,12 +147,105 @@ describe('buildThreadRows', () => {
   })
 })
 
+describe('the sender is named once per run', () => {
+  function names(messages: Parameters<typeof buildThreadRows>[0]) {
+    return buildThreadRows(messages, { viewerId: 'me', namesSenders: true })
+      .filter((row) => row.type === 'message')
+      .map((row) => `${row.id}:${row.senderName ?? '-'}`)
+  }
+
+  test('only the first message of a run carries the name', () => {
+    expect(
+      names([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 1), THEM),
+        staffMessage('m3', localIso(2026, 8, 13, 9, 2), THEM),
+      ]),
+      // Newest first, so the run's first message is the last row.
+    ).toEqual(['m3:-', 'm2:-', 'm1:Priya Raman'])
+  })
+
+  test('a different sender begins a new run', () => {
+    expect(
+      names([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 1), OTHER),
+      ]),
+    ).toEqual(['m2:Sam Okafor', 'm1:Priya Raman'])
+  })
+
+  test('a day boundary begins a new run for one sender', () => {
+    expect(
+      names([
+        staffMessage('m1', localIso(2026, 8, 12, 22), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9), THEM),
+      ]),
+    ).toEqual(['m2:Priya Raman', 'm1:Priya Raman'])
+  })
+
+  test('a notice between two messages begins a new run', () => {
+    expect(
+      names([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('sys', localIso(2026, 8, 13, 9, 1), ME, 'system'),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 2), THEM),
+      ]),
+    ).toEqual(['m2:Priya Raman', 'm1:Priya Raman'])
+  })
+
+  test('the viewer is never named above their own run', () => {
+    expect(
+      names([
+        staffMessage('m1', localIso(2026, 8, 13, 9), ME),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 1), ME),
+      ]),
+    ).toEqual(['m2:-', 'm1:-'])
+  })
+})
+
+describe('a run is spaced as one column', () => {
+  function gaps(messages: Parameters<typeof buildThreadRows>[0]) {
+    return buildThreadRows(messages, { viewerId: 'me', namesSenders: false })
+      .filter((row) => row.type === 'message')
+      .map((row) => `${row.id}:${row.endsRun}`)
+  }
+
+  test("only the run's newest message takes the gap below it", () => {
+    expect(
+      gaps([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 1), THEM),
+        staffMessage('m3', localIso(2026, 8, 13, 9, 2), THEM),
+      ]),
+      // Newest first; m3 ends the run because nothing follows it.
+    ).toEqual(['m3:true', 'm2:false', 'm1:false'])
+  })
+
+  test('a different sender ends the run below', () => {
+    expect(
+      gaps([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 1), OTHER),
+      ]),
+    ).toEqual(['m2:true', 'm1:true'])
+  })
+
+  test('a notice ends the run below', () => {
+    expect(
+      gaps([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('sys', localIso(2026, 8, 13, 9, 1), ME, 'system'),
+      ]),
+    ).toEqual(['m1:true'])
+  })
+})
+
 describe('threadDayMarks', () => {
   const rows: ThreadRow[] = [
-    { type: 'message', id: 'c', message: staffMessage('c', '2026-03-02T09:00:00.000Z', THEM) },
+    { type: 'message', id: 'c', message: staffMessage('c', '2026-03-02T09:00:00.000Z', THEM), endsRun: true },
     { type: 'day', id: 'day-b', label: 'Today' },
-    { type: 'message', id: 'b', message: staffMessage('b', '2026-03-01T10:00:00.000Z', THEM) },
-    { type: 'message', id: 'a', message: staffMessage('a', '2026-03-01T09:00:00.000Z', THEM) },
+    { type: 'message', id: 'b', message: staffMessage('b', '2026-03-01T10:00:00.000Z', THEM), endsRun: true },
+    { type: 'message', id: 'a', message: staffMessage('a', '2026-03-01T09:00:00.000Z', THEM), endsRun: false },
     { type: 'day', id: 'day-a', label: 'Yesterday' },
   ]
 
@@ -175,7 +269,7 @@ describe('threadDayMarks', () => {
 
   it('never reads undefined for a row with no divider ahead of it', () => {
     const orphan: ThreadRow[] = [
-      { type: 'message', id: 'a', message: staffMessage('a', '2026-03-01T09:00:00.000Z', THEM) },
+      { type: 'message', id: 'a', message: staffMessage('a', '2026-03-01T09:00:00.000Z', THEM), endsRun: false },
     ]
     expect(threadDayMarks(orphan)).toEqual([{ label: '', dividerIndex: 0 }])
   })
