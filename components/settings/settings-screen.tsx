@@ -1,6 +1,7 @@
 import { LogOut } from "@/components/icons";
 import { ScrollView, View } from "react-native";
 
+import { InvitationsCard } from "@/components/settings/invitations-card";
 import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -70,8 +71,13 @@ export function SettingsScreen() {
         </View>
       </View>
 
+      {/* Above Application because it is the one thing here that is waiting
+          on an answer, and it draws nothing at all when there is none. */}
+      <View className="mt-4" />
+      <InvitationsCard />
+
       <View
-        className="my-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
+        className="mb-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
       >
         <View className="mb-4 flex-row items-center justify-between border-b border-line/60 pb-3">
           <Text variant="label" className="uppercase tracking-wider text-muted">

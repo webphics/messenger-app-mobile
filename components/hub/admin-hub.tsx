@@ -1,7 +1,15 @@
 import { router, type Href } from "expo-router";
 import { View } from "react-native";
 
-import { BookOpen, MessageCircle, Plus, ShieldCheck, Tags, Users } from "@/components/icons";
+import {
+  BookOpen,
+  Building2,
+  MessageCircle,
+  Plus,
+  ShieldCheck,
+  Tags,
+  Users,
+} from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
 import { ActionTile, StatTile } from "@/components/hub/action-tile";
 import { ChartsSection } from "@/components/hub/charts-section";
@@ -123,6 +131,14 @@ export function AdminHub() {
         <Text variant="label" className="uppercase tracking-wider text-muted">
           Administration
         </Text>
+        <ActionRow
+          icon={Building2}
+          tone="neutral"
+          title="Organizations"
+          hint="The container every conversation and membership belongs to"
+          accessibilityLabel="Organizations"
+          onPress={() => router.push("/(admin)/organizations" as Href)}
+        />
         <ActionRow
           icon={Users}
           tone="neutral"
