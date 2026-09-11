@@ -1,5 +1,7 @@
 import { asRecord } from '@/lib/api-envelope'
 import type {
+  Contact,
+  ContactKind,
   Conversation,
   ConversationNote,
   ConversationPerson,
@@ -46,6 +48,7 @@ const SUPPORT_STATUSES: readonly SupportStatus[] = ['unassigned', 'engaged', 'cl
 const MESSAGE_TYPES: readonly MessageType[] = ['text', 'media', 'voice', 'system']
 const RECEIPT_STATUSES: readonly ReceiptStatus[] = ['sent', 'delivered', 'read']
 const ROLES: readonly UserRole[] = ['admin', 'agent', 'customer']
+const CONTACT_KINDS: readonly ContactKind[] = ['company', 'customer', 'staff']
 const LABEL_COLORS: readonly LabelColor[] = [
   'slate',
   'red',
@@ -411,5 +414,39 @@ export function parseNotes(value: unknown): ConversationNote[] {
   return records(value).flatMap((item) => {
     const parsed = parseNote(item)
     return parsed ? [parsed] : []
+  })
+}
+
+/**
+ * One row of the contact directory.
+ *
+ * The kind is required and the role is not: a company row is an organization
+ * rather than somebody, and the API sends null for it. A row whose kind this
+ * client does not recognise is dropped rather than guessed at — every branch
+ * downstream of here is a decision about what a tap does, and a kind nobody
+ * can read has no answer to that.
+ */
+export function parseContact(value: unknown): Contact | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  const id = text(record.id)
+  const name = text(record.name)
+  const kind = oneOf(record.kind, CONTACT_KINDS)
+  if (!id || !name || !kind) return null
+
+  return {
+    id,
+    name,
+    kind,
+    role: oneOf(record.role, ROLES),
+    conversationId: nullableText(record.conversationId),
+  }
+}
+
+export function parseContacts(value: unknown): Contact[] {
+  return records(value).flatMap((item) => {
+    const contact = parseContact(item)
+    return contact ? [contact] : []
   })
 }

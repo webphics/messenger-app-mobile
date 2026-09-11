@@ -21,9 +21,9 @@ export default function AdminLayout() {
         }}
       />
       <Tabs.Screen
-        name="users"
+        name="contacts"
         options={{
-          title: "Users",
+          title: "People",
           tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
         }}
       />

@@ -4,7 +4,7 @@ import { failureNotice } from "@/lib/conversation-failure";
 import { getSessionUser } from "@/lib/session";
 
 type RoleConversationsScreenProps = {
-  /** Agents read the shared queue but do not start threads from it. */
+  /** Off for the Unassigned pool, which is a queue rather than a place to start one. */
   showCompose?: boolean;
 };
 
@@ -16,6 +16,13 @@ type RoleConversationsScreenProps = {
  * threads, the unassigned pool, their staff DMs and their groups, an Admin
  * receives the org-wide set their policy grants, and a Customer receives their
  * own — and none of them needs a client-side filter to say so.
+ *
+ * Every role starts conversations from here, because every role has somebody
+ * to start one with: `GET /conversations/contacts` answers a Customer with the
+ * organizations they belong to, an Agent with their Customers and colleagues,
+ * and an Admin with the directory. A Customer had no way to open a second
+ * organization's support thread until this was true — the one created for them
+ * on a first visit is the first organization's and nothing offered the rest.
  *
  * What still differs by role is the chrome. Only staff get the chips: Mine is
  * the assigned list an Agent works from, and Open/Resolved filter on a status
@@ -41,7 +48,7 @@ export function RoleConversationsScreen({
       refreshing={inbox.refreshing}
       onRefresh={inbox.reload}
       showChips={isStaff}
-      showCompose={isStaff && showCompose}
+      showCompose={showCompose}
       viewerId={user?.id}
       title="Messages"
     />

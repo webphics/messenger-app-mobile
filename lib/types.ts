@@ -338,3 +338,79 @@ export type Organization = {
   id: string
   name: string
 }
+
+/**
+ * What a contact is, which is not the same as who a person is.
+ *
+ * `GET /conversations/contacts` answers with everyone the signed-in person can
+ * begin a conversation with, and the API decides that per role: a Customer
+ * receives one row per organization they belong to — the company, reached as
+ * one voice — an Agent receives the Customers whose Support DMs they can see
+ * plus every other staff member, and an Admin receives the whole directory.
+ *
+ * `conversationId` is the thread that already exists between the two, where one
+ * does. Null is not an error: it is the row a tap has to create something for,
+ * and `lib/contact-directory` is where that decision is written down.
+ */
+export type ContactKind = 'company' | 'customer' | 'staff'
+
+export type Contact = {
+  /** A person's id, or — for a company — the organization's. */
+  id: string
+  name: string
+  kind: ContactKind
+  /** Null on a company, which is an organization rather than somebody. */
+  role: UserRole | null
+  conversationId: string | null
+}
+
+/**
+ * An organization as the Admin directory lists it, which is more than the
+ * `Organization` a membership answers with: the counts are what the list is
+ * for, and they are the API's rather than anything this client tallies.
+ */
+export type OrganizationSummary = Organization & {
+  memberCount: number
+  conversationCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** One accepted member of an organization, from `GET /memberships/organization/:id`. */
+export type OrganizationMember = {
+  id: string
+  name: string
+  /** A free string on the API's schema rather than the role enum, so it is read as one. */
+  role: string
+}
+
+/** An invitation addressed to the signed-in person, from `GET /invitations/mine`. */
+export type Invitation = {
+  id: string
+  organization: Organization
+  createdAt: string
+}
+
+/**
+ * What an invite attempt did, per organization.
+ *
+ * Three lists rather than a success flag, because the API answers with three:
+ * an invitation was created, the person was already a member, or one was
+ * already pending. Only the first is news, and the other two are the reason a
+ * repeated invite is not an error.
+ */
+export type InviteOutcome = {
+  invited: Organization[]
+  alreadyMembers: Organization[]
+  alreadyInvited: Organization[]
+}
+
+/**
+ * A saved filter over the conversation list: a name and the organizations it
+ * keeps. From `GET /inboxes`, and per person rather than per organization.
+ */
+export type CustomInbox = {
+  id: string
+  name: string
+  organizationIds: string[]
+}

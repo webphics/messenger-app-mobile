@@ -304,7 +304,7 @@ export function InboxScreen({
       <NewChatModal
         visible={composeOpen}
         onClose={() => setComposeOpen(false)}
-        onOpenConversation={(conversation) => router.push(chatHref(conversation.id))}
+        onOpenConversation={(conversationId) => router.push(chatHref(conversationId))}
       />
     </View>
   );
