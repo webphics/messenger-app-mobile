@@ -69,11 +69,19 @@ type MessageBubbleProps = {
   /**
    * Whether this bubble states its own time without being asked.
    *
-   * True for the last message of a run, which is how the thread says the minute
-   * once for a burst of replies instead of six times. Every other bubble keeps
+   * True for the newest message in the thread and nothing else. Not "the last of
+   * a run": a run is consecutive messages from one sender, so in an ordinary
+   * back-and-forth every message ends one and every bubble carried a timestamp,
+   * which is the wall of chrome this exists to avoid. Every other bubble keeps
    * its time until it is tapped -- see `timeRevealed`.
    */
   showTime: boolean
+  /**
+   * What that bubble says, where it is more than the clock: "Seen 9:08 AM" on the
+   * newest message once its receipts are in. Absent everywhere else, and the
+   * bubble falls back to its own send time -- see `readStampLabel`.
+   */
+  timeLabel?: string
   /** Set while this bubble is the one whose time a tap has asked for. */
   timeRevealed?: boolean
   /**
@@ -207,13 +215,15 @@ function Receipt({
   outgoing,
   createdAt,
   showTime,
+  timeLabel,
 }: {
   status: ReceiptStatus
   outgoing: boolean
   createdAt: string
   showTime: boolean
+  timeLabel?: string
 }) {
-  const time = showTime ? formatClockTime(createdAt) : ''
+  const time = showTime ? (timeLabel ?? formatClockTime(createdAt)) : ''
   // Nothing to say: an incoming bubble whose time is not being shown has no
   // receipt to draw either, and an empty row would still take its margin.
   if (!outgoing && !time) return null
@@ -534,6 +544,7 @@ export const MessageBubble = memo(function MessageBubble({
   status,
   createdAt,
   showTime,
+  timeLabel,
   timeRevealed,
   onRevealTime,
   delivery,
@@ -937,6 +948,9 @@ export const MessageBubble = memo(function MessageBubble({
                 outgoing={outgoing}
                 createdAt={createdAt}
                 showTime={showTime || Boolean(timeRevealed)}
+                // A revealed bubble is being asked when it was sent, which is
+                // what it has; the read stamp belongs to the newest message.
+                timeLabel={showTime ? timeLabel : undefined}
               />
             )}
           </Animated.View>

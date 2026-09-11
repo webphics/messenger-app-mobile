@@ -22,6 +22,8 @@ import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { attachmentViews, primaryAttachmentView } from '@/lib/attachment-view'
 import { chatMessageInfoHref } from '@/lib/chat-route-id'
+import { readStampLabel } from '@/lib/message-read-stamp'
+import { useMessageReceipts } from '@/lib/use-message-receipts'
 import { rejectUploadReason } from '@/lib/attachment-upload'
 import { composerAccess, type ComposerAction } from '@/lib/composer-access'
 import type { ApiFailure } from '@/lib/conversation-api'
@@ -399,6 +401,33 @@ export function ThreadScreen({
   const dayMarks = useMemo(() => threadDayMarks(rows), [rows])
 
   /**
+   * The newest message in the thread: the one that states its time unasked, and
+   * the only one worth spending a request on. `messages` is oldest-first, so it
+   * is the last of them.
+   */
+  const latest = messages[messages.length - 1]
+  const latestIsMine = latest ? isOutgoing(latest, viewer.id) : false
+
+  /*
+    Only for the viewer's own newest message. Somebody else's receipts are a 403,
+    and a message this device is still carrying has no id the server knows.
+  */
+  const { state: latestReceipts } = useMessageReceipts(
+    latest && latestIsMine && !isLocalId(latest.id) ? conversation.id : null,
+    latest && latestIsMine && !isLocalId(latest.id) ? latest.id : null,
+  )
+
+  const latestStamp = useMemo(() => {
+    if (!latest) return undefined
+    return readStampLabel({
+      isMine: latestIsMine,
+      status: latest.receiptStatus,
+      createdAt: latest.createdAt,
+      receipts: latestReceipts.status === 'ready' ? latestReceipts.receipts : null,
+    })
+  }, [latest, latestIsMine, latestReceipts])
+
+  /**
    * The row the floating pill is speaking for: the topmost one on screen.
    *
    * The list is inverted, so the topmost visible row is the *last* of the
@@ -685,7 +714,8 @@ export function ThreadScreen({
           outgoing={isOutgoing(item.message, viewer.id)}
           status={item.message.receiptStatus}
           createdAt={item.message.createdAt}
-          showTime={item.endsRun}
+          showTime={item.message.id === latest?.id}
+          timeLabel={item.message.id === latest?.id ? latestStamp : undefined}
           timeRevealed={revealedTimeId === item.message.id}
           onRevealTime={revealTime}
           senderName={item.senderName}
@@ -717,6 +747,8 @@ export function ThreadScreen({
       onRetrySend,
       revealedTimeId,
       revealTime,
+      latest?.id,
+      latestStamp,
     ],
   )
 
