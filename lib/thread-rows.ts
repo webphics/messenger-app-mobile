@@ -19,20 +19,7 @@ export type ThreadRow =
   | { type: 'day'; id: string; label: string }
   /** An Engage, Takeover or Transfer notice. A statement about the thread, not a message in it. */
   | { type: 'system'; id: string; message: Message }
-  | {
-      type: 'message'
-      id: string
-      message: Message
-      senderName?: string
-      /**
-       * Whether this is the newest message of a run -- one sender, one day, no
-       * notice between. Only these state their time, so a burst of six short
-       * replies says the minute once instead of six times; the rest are a tap
-       * away. The newest message in the thread always ends a run, so the thread
-       * as a whole is never without a time on it.
-       */
-      endsRun: boolean
-    }
+  | { type: 'message'; id: string; message: Message; senderName?: string }
 
 export type ThreadRowOptions = {
   viewerId: string
@@ -54,32 +41,6 @@ export type ThreadRowOptions = {
  * else, and skipping the divider for it would put a message under yesterday's
  * heading.
  */
-/**
- * Whether two messages belong to one run: the same sender, the same day, and
- * neither of them a notice about the thread rather than a message in it.
- *
- * Read against the *next* message rather than the previous one, because a run is
- * closed by what follows it -- and this pass is still in the thread's own order,
- * oldest first, before the reversal at the end.
- */
-function sameRun(message: Message, next: Message | undefined): boolean {
-  if (!next) return false
-  if (isSystemMessage(message) || isSystemMessage(next)) return false
-  if (shouldShowDayDivider(next.createdAt, message.createdAt)) return false
-  return messageSenderKey(message) === messageSenderKey(next)
-}
-
-/**
- * Who sent a message, for the purpose of grouping only.
- *
- * A Customer's payload names nobody -- it says whether the message came from the
- * company -- so the two shapes cannot be compared by id. Each answers with a key
- * that is stable within its own shape, and a thread is never a mix of the two.
- */
-function messageSenderKey(message: Message): string {
-  return 'sender' in message ? message.sender.id : `company:${message.fromCompany}`
-}
-
 export function buildThreadRows(
   messages: Message[],
   { viewerId, namesSenders }: ThreadRowOptions,
@@ -105,7 +66,6 @@ export function buildThreadRows(
       message,
       senderName:
         namesSenders && !isOutgoing(message, viewerId) ? messageSenderName(message) : undefined,
-      endsRun: !sameRun(message, messages[i + 1]),
     })
   }
 
