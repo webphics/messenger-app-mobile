@@ -206,3 +206,43 @@ describe('filterConversations', () => {
     expect(filterConversations(all, { query: '', chip: 'resolved' }).map((c) => c.id)).not.toContain(offers.id)
   })
 })
+
+describe('filterConversations, narrowed to a custom inbox', () => {
+  const elsewhere = { ...assigned, id: 'conv-elsewhere', organizationId: 'org-elsewhere' }
+
+  test('null is the unified inbox and narrows nothing', () => {
+    const ids = filterConversations([assigned, elsewhere], {
+      query: '',
+      chip: 'all',
+      organizationIds: null,
+    }).map((c) => c.id)
+    expect(ids.sort()).toEqual(['conv-assigned', 'conv-elsewhere'])
+  })
+
+  test('a set keeps only the organizations it names', () => {
+    const ids = filterConversations([assigned, elsewhere], {
+      query: '',
+      chip: 'all',
+      organizationIds: new Set([assigned.organizationId]),
+    }).map((c) => c.id)
+    expect(ids).toEqual(['conv-assigned'])
+  })
+
+  test('an inbox naming an organization nobody is in any more simply matches nothing', () => {
+    const ids = filterConversations([assigned, elsewhere], {
+      query: '',
+      chip: 'all',
+      organizationIds: new Set(['org-gone']),
+    })
+    expect(ids).toEqual([])
+  })
+
+  test('it narrows within the other filters rather than replacing them', () => {
+    const ids = filterConversations([assigned, closed], {
+      query: '',
+      chip: 'resolved',
+      organizationIds: new Set([assigned.organizationId]),
+    }).map((c) => c.id)
+    expect(ids).toEqual([closed.id])
+  })
+})
