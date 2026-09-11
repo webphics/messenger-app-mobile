@@ -13,10 +13,22 @@ End-user role that only sees their own conversations. Reaches Home, Messages, an
 _Avoid_: Contact, client, user (when meaning this role)
 
 **Contact list**:
-The address book a staff member picks from when starting a conversation, backed by
+The address book anybody picks from when starting a conversation, backed by
 `GET /conversations/contacts`. A *contact* here is an addressable person of any role — unrelated to
-the end-user role, which is Customer. The two must not be collapsed.
-_Avoid_: Contacts (bare, when the Customer role is meant), directory, people picker
+the end-user role, which is Customer. The two must not be collapsed. The endpoint answers for all
+three roles and the row says what a tap does: a Customer's contacts are the organizations they
+belong to, an Agent's are the Customers whose Support DMs they can see plus the rest of the staff,
+and an Admin's is the whole directory. Every row already names the thread that exists between the
+two, where one does. Reached as the People tab by staff and as the New Message sheet by everyone.
+_Avoid_: Contacts (bare, when the Customer role is meant), directory, people picker, Users (that is
+the Account directory)
+
+**Account directory**:
+The Admin's list of every account, backed by `GET /users`, reached from the Admin hub. Not the
+Contact list: this is who *exists* and what may be done to them — role, ban, sessions, two-factor,
+password, deletion — where the Contact list is who you can write to. An Admin's own row offers none
+of it, which is this client's rule rather than the API's.
+_Avoid_: Users tab (the tab is People, which is the Contact list), user management console
 
 **Staff directory**:
 The list of every other Agent and Admin a staff member may write to, backed by
@@ -41,7 +53,9 @@ Support staff role. Sees assigned threads plus the unassigned pool. Cannot delet
 _Avoid_: Rep, operator
 
 **Admin**:
-Oversight role with slim mobile surface (users, unassigned, conversations, hub). Full analytics stay on web.
+Oversight role with slim mobile surface: the hub, People, the Unassigned pool, conversations, and
+the org-wide settings the hub leads to — the Account directory, Organizations and Labels. Full
+analytics and the audit log stay on web.
 _Avoid_: Superuser, owner
 
 **Hub**:
@@ -233,6 +247,43 @@ the thread goes back to the pool, and the `conversation.updated` that follows ev
 reassignment is emitted to rooms they have already been removed from. Everyone *else* learns of an
 assignment from that update, never from this.
 _Avoid_: Unassign, kicked out, access lost (that is the web client's screen, not the event)
+
+**Transfer**:
+The assignee of an engaged Support DM handing it to another Agent. The API's `transfer` action, and
+the assignee's alone — `assertCanTransfer` refuses anybody else, an Admin included, so an Admin who
+wants somebody else's thread takes it over first. The target must be an Agent and must not be the
+current holder. Distinct from Takeover, which is unilateral and names no destination but the actor.
+_Avoid_: Handover, reassign (that is what the *event* is called), escalate
+
+**Close**:
+The assignee ending an engaged Support DM. The API's `close` action, and not final: the Customer
+writing in reopens it, and it returns to whoever closed it — which is why nothing about it reads as
+destructive. Shown in the thread's state as Resolved, the word the product uses for a thread that is
+done with.
+_Avoid_: Resolve (as the action's name), archive, delete
+
+**Organization**:
+The container everything in this product belongs to — every conversation, every membership, every
+saved inbox. An Admin creates, renames and deletes them; the member and conversation counts on each
+are the API's. A Staff DM and a group each belong to exactly one.
+_Avoid_: Team (that is the API's `/team`, the single tenant name), workspace, company (a *company*
+is what a Customer's contact row for an organization is called)
+
+**Invitation**:
+The only way into an organization. An Admin invites and the person accepts; there is no route that
+grants a membership directly, so creating an account takes organization ids that become invitations
+rather than memberships. Answered from Settings, by every role, and the card draws nothing at all
+when there is nothing to answer. Declining answers one ask rather than standing as a refusal, so a
+declined organization can be offered again.
+_Avoid_: Add to organization, membership request (the direction is the other way)
+
+**Saved inbox**:
+A name and a set of organizations, private to one person, from `GET /inboxes`. Selecting one narrows
+the conversation rows already held rather than fetching a different list — the API already scoped
+`GET /conversations` by who is asking, and an inbox can only ever narrow within that — so switching
+costs no request and works with no signal. An inbox naming an organization the person has since left
+simply matches nothing.
+_Avoid_: Folder, view, filter preset, Inbox (bare — the inbox is the conversation list)
 
 **Offers**:
 In-app promo carousel plus the shared group chat `id: 'offers'`. `"Sponsored"` is a section label only.
