@@ -145,6 +145,13 @@ function keyExtractor(item: ThreadRow) {
 const NEAR_LATEST_PX = 80
 
 /**
+ * Module-level because FlatList keeps the first config it is given and throws
+ * outright on a changed one: a constant cannot change, which is the guarantee
+ * the list wants, stated where nobody can accidentally make it per-render.
+ */
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 }
+
+/**
  * Why there is no composer, where there is none.
  *
  * Sits where the composer would, because that is where someone looks to write —
@@ -462,12 +469,12 @@ export function ThreadScreen({
     activeDay && activeDay.dividerIndex !== topRowIndex ? activeDay.label : ''
 
   /*
-    Both held in refs because FlatList keeps the first pair it is given: a new
-    callback identity on a later render is ignored, and a changed
-    `viewabilityConfig` throws outright.
+    Stable for the life of the mount because FlatList keeps the first callback it
+    is given and ignores a later identity. Nothing here closes over a rendered
+    value — `setTopRowIndex` is itself stable — so an empty dependency list is
+    the whole of it, and the topmost row is the largest index on an inverted list.
   */
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 10 }).current
-  const onViewableItemsChanged = useRef(
+  const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
       let top = -1
       for (const item of viewableItems) {
@@ -475,7 +482,8 @@ export function ThreadScreen({
       }
       if (top >= 0) setTopRowIndex(top)
     },
-  ).current
+    [],
+  )
 
   const onScrollToIndexFailed = useCallback(
     (info: { index: number; averageItemLength: number }) => {
@@ -816,7 +824,7 @@ export function ThreadScreen({
           // when someone scrolls back into history, which is when older pages load.
           onEndReached={onLoadOlder}
           onEndReachedThreshold={0.4}
-          viewabilityConfig={viewabilityConfig}
+          viewabilityConfig={VIEWABILITY_CONFIG}
           onViewableItemsChanged={onViewableItemsChanged}
           /*
             The day pill can ask for a row far outside the rendered window, and
