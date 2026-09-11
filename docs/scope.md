@@ -281,6 +281,72 @@ Broadcasts are in-inbox announcements (later), not stories.
      exactly that. `withIncomingMessage` now takes only a message newer than the row's newest;
      the thread still takes every one of them.
 
+7. **Org-wide surfaces** — the half of the product that is not a thread. Everything below existed on
+   web and on the API and had no mobile counterpart at all, which is why an Agent could not start a
+   conversation and an Admin's user screen was a fixture.
+   - 7a. **The Contact list (done)** — `GET /conversations/contacts`, the one directory that answers
+     for all three roles: a Customer's organizations as companies, an Agent's Customers and
+     colleagues, an Admin's whole directory. It reaches staff as a People tab and everyone as the
+     New Message sheet, which are the same list with different chrome, because a tap means the same
+     thing in both. What a tap means is `lib/contact-directory`, pure and table-tested — a row the
+     API says already has a thread opens it, a company with none creates the support thread, a staff
+     member with none starts the DM, and one the pair share several organizations through asks which
+     first. The staff directory is read alongside it, because it is what carries
+     `sharedOrganizations` and the contacts payload does not; it may fail on its own, and a
+     directory that never answered leaves the binding to the API.
+
+     Three things here were broken rather than absent. An Agent's conversations screen passed
+     `showCompose={false}`, so the one role that writes to Customers all day could start nothing. A
+     Customer had no compose control either, which meant the support thread created on a first visit
+     was their first organization's and nothing offered the rest. And the sheet everyone else had
+     listed staff only, because it read the staff directory directly. The Admin's mock Users tab is
+     gone with them; People stands where it did.
+   - 7b. **Transfer, Close and the label vocabulary (done)** — the two staff actions the scope called
+     web-only, on Conversation details rather than in the thread's header: they are decisions taken
+     *about* a thread rather than while writing in it. `lib/thread-actions` mirrors
+     `assertCanTransfer` and `assertCanClose` as one predicate, because the API asks the same three
+     questions of each — a Support DM, engaged, held by the person asking. It deliberately does not
+     mirror the capability check underneath: an Agent's grants are not on the session payload, so an
+     Agent whose `transfer` grant was revoked is offered a control the API refuses and gets its own
+     sentence back. Withholding both from every Agent for the sake of the few was the alternative.
+     Neither action re-reads the thread first; ADR-0008's carve-out is for the pool several staff
+     compete over, and these are about a thread this person already holds.
+
+     Labels gained their other half. Putting one on a conversation has been real since 5c; defining
+     the vocabulary is Admin's, and the new screen creates one with a colour and retires one —
+     which is the delete the API does not have and should not, because an archived label stays on
+     every thread already wearing it.
+   - 7c. **The Account directory (done)** — `GET /users` and the nine routes around it, under the
+     Admin hub rather than in the tab bar, because People took that tab and answers a different
+     question. A row is a name, a role and whatever is notable; what counts as notable is
+     `lib/user-directory`, table-tested, and a healthy account flags nothing. Expanded it carries
+     invite, remove from an organization, change role, sign out everywhere, reset two-factor, set a
+     password, ban and delete, each destructive one naming who it is about. An Admin is offered none
+     of it on their own row: self-demotion, self-ban and self-delete are all permitted server-side,
+     and a phone is the worst place to discover that. The Admin hub's last mock number went with the
+     screen — "Active users" counted a fixture, and the tile is now the Unassigned pool, which comes
+     from the list already held.
+   - 7d. **Organizations, members and invitations (done)** — the container everything else belongs
+     to, which the phone could neither see nor be put in. An Admin creates, renames and deletes, with
+     the API's member and conversation counts beside each name and repeated in the deletion's
+     confirmation. Tapping one opens its members, which is two lists asked as one question: who is
+     in it, and everybody in the directory who is not — a client-side difference, because the API has
+     no endpoint for "not in this organization". Inviting is the only way in, so the button says
+     Invite and the row keeps saying Invited until the person accepts; removing is immediate and
+     reassigns what the loss made unreadable, which is the `membership_revoked` reason already
+     arriving on `conversation.reassigned`. The answering half is on Settings for every role, draws
+     nothing when there is nothing to answer, and deliberately says nothing when its fetch fails.
+   - 7e. **Saved inboxes (done)** — `GET /inboxes`: a name and a set of organizations, per person.
+     Selecting one narrows the rows already held rather than fetching a different list, so switching
+     costs no request and works with no signal; `filterConversations` gained one optional set, and
+     an inbox naming an organization the person has since left simply matches nothing. Which
+     organizations may be named is the web client's rule — an Agent's memberships, an Admin's whole
+     list — because asking an Agent for `GET /organizations` is a `403` nothing needs.
+
+   Still web-only, and deliberately: Broadcasts, Communities, the Activity log and Analytics.
+   Deleting a conversation is web-only too — it is content-destroying, admin-only and undoable by
+   nobody, and nothing on a phone needed it.
+
 ## Session
 
 Signed in = a Session cookie in `expo-secure-store` that `GET /auth/session` accepts. Role is
