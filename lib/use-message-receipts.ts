@@ -25,6 +25,16 @@ export type MessageReceiptsState =
 export function useMessageReceipts(
   conversationId: string | null,
   messageId: string | null,
+  /**
+   * The message's own receipt status, and the reason this needs no timer.
+   *
+   * Receipts move while somebody is looking at them — a thread is opened and a
+   * name appears — but there is no per-message receipt event to listen for. What
+   * there is is the message itself, rebroadcast over the socket when its status
+   * changes, which is exactly when these lists have changed. Passing it in makes
+   * that the trigger: sent to delivered to read each re-reads, and nothing polls.
+   */
+  status?: string,
 ): { state: MessageReceiptsState; reload: () => void } {
   const [state, setState] = useState<MessageReceiptsState>({ status: 'loading' })
   // A reload that lands after the screen has gone, or after the ids changed,
@@ -44,12 +54,18 @@ export function useMessageReceipts(
   }, [conversationId, messageId])
 
   useEffect(() => {
-    setState({ status: 'loading' })
+    // Not reset to `loading` on a status change: the lists on screen are still
+    // true, and blanking them to a spinner every time a receipt lands would make
+    // the one message that states its time flicker.
     void load()
     return () => {
       requestRef.current++
     }
-  }, [load])
+  }, [load, status])
+
+  useEffect(() => {
+    setState({ status: 'loading' })
+  }, [conversationId, messageId])
 
   const reload = useCallback(() => {
     void load()

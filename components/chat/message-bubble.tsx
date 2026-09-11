@@ -84,6 +84,8 @@ type MessageBubbleProps = {
   timeLabel?: string
   /** Set while this bubble is the one whose time a tap has asked for. */
   timeRevealed?: boolean
+  /** Whether a new run starts below this bubble. Decides the gap under it. */
+  endsRun?: boolean
   /**
    * Absent where a tap already means something else: a bubble built around an
    * attachment has a control inside it that opens the attachment, and a tap
@@ -224,9 +226,18 @@ function Receipt({
   timeLabel?: string
 }) {
   const time = showTime ? (timeLabel ?? formatClockTime(createdAt)) : ''
-  // Nothing to say: an incoming bubble whose time is not being shown has no
-  // receipt to draw either, and an empty row would still take its margin.
-  if (!outgoing && !time) return null
+  /*
+    The time and the receipt are one cluster, and neither is drawn unless this
+    bubble is the one stating its time.
+
+    The ticks used to draw on every outgoing bubble, which put a receipt on all
+    of them and made the thread a column of marks — the web client has never done
+    that. There, both live in the same meta span and appear together on the newest
+    message, or on any message that is asked. A receipt with no time beside it is
+    also the less useful half: "read" without "when" is what Message info exists
+    to answer.
+  */
+  if (!time) return null
 
   const read = status === 'read'
   const Icon = status === 'sent' ? Check : CheckCheck
@@ -546,6 +557,7 @@ export const MessageBubble = memo(function MessageBubble({
   showTime,
   timeLabel,
   timeRevealed,
+  endsRun = true,
   onRevealTime,
   delivery,
   onRetrySend,
@@ -775,7 +787,13 @@ export const MessageBubble = memo(function MessageBubble({
   return (
     <Animated.View
       entering={enter ? deskMessageEnter(!!reduceMotion) : undefined}
-      className="pb-3.5"
+      /*
+        A run sits tight and the breathing room goes between runs, which is what
+        makes a burst of replies read as one column rather than a list of separate
+        messages. Flat spacing under every bubble made six replies look like six
+        conversations — the ratio here is the web client's.
+      */
+      className={endsRun ? 'pb-3.5' : 'pb-1'}
     >
       <View className="justify-center" pointerEvents="box-none">
         <Animated.View style={iconStyle} className="absolute left-1 z-0">

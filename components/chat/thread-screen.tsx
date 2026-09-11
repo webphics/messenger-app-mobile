@@ -428,6 +428,7 @@ export function ThreadScreen({
   const { state: latestReceipts } = useMessageReceipts(
     latest && latestIsMine && !isLocalId(latest.id) ? conversation.id : null,
     latest && latestIsMine && !isLocalId(latest.id) ? latest.id : null,
+    latest?.receiptStatus,
   )
 
   const latestStamp = useMemo(() => {
@@ -751,6 +752,7 @@ export function ThreadScreen({
           outgoing={isOutgoing(item.message, viewer.id)}
           status={item.message.receiptStatus}
           createdAt={item.message.createdAt}
+          endsRun={item.endsRun}
           showTime={item.message.id === latest?.id}
           timeLabel={item.message.id === latest?.id ? latestStamp : undefined}
           timeRevealed={revealedTimeId === item.message.id}
