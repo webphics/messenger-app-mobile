@@ -31,6 +31,7 @@ import { conversationTitle } from '@/lib/conversation-title'
 import {
   isLocalId,
   isOutgoing,
+  isSystemMessage,
   messageSenderName,
   type DeliveryState,
   type SendDraft,
@@ -401,11 +402,23 @@ export function ThreadScreen({
   const dayMarks = useMemo(() => threadDayMarks(rows), [rows])
 
   /**
-   * The newest message in the thread: the one that states its time unasked, and
-   * the only one worth spending a request on. `messages` is oldest-first, so it
-   * is the last of them.
+   * The newest *bubble* in the thread: the one that states its time unasked, and
+   * the only one worth spending a request on.
+   *
+   * Not simply the last of `messages`. An Engage, take-over or transfer notice is
+   * a statement about the thread rather than a message in it, and it is drawn as
+   * a divider with no bubble to hang a time on — so a thread whose newest entry
+   * is one would have had no time on it anywhere. Staff see those; a Customer's
+   * have already been filtered out by here, which is why this looks past them
+   * rather than at `rows`.
    */
-  const latest = messages[messages.length - 1]
+  const latest = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i]!
+      if (!isSystemMessage(message)) return message
+    }
+    return undefined
+  }, [messages])
   const latestIsMine = latest ? isOutgoing(latest, viewer.id) : false
 
   /*
@@ -437,6 +450,15 @@ export function ThreadScreen({
    */
   const [topRowIndex, setTopRowIndex] = useState(0)
   const activeDay = dayMarks[topRowIndex]
+
+  /**
+   * Withheld while the day's own divider is the topmost row, which is exactly
+   * where a tap on the pill leaves the reader: the label would otherwise be drawn
+   * twice, a few pixels apart, with the pill covering the divider it is echoing.
+   * No measurement needed — the divider being the top row is the same fact.
+   */
+  const dayPillLabel =
+    activeDay && activeDay.dividerIndex !== topRowIndex ? activeDay.label : ''
 
   /*
     Both held in refs because FlatList keeps the first pair it is given: a new
@@ -825,11 +847,16 @@ export function ThreadScreen({
           }
         />
         {/* Over the list rather than in it, so it stays put while the thread
-            scrolls underneath — and under the placeholder, which covers an empty
-            or unreachable thread whole. */}
-        {pageNotice ? null : (
-          <ThreadDayPill label={activeDay?.label ?? ''} onPress={jumpToDayStart} />
-        )}
+            scrolls underneath.
+
+            Withheld for the three notices that cover the list whole — there is no
+            thread drawn underneath to say the day of. `none` and `stale` both
+            leave one drawn, which is why this tests the kind rather than the
+            notice: `pageNotice` is a union that is always present, so testing it
+            for truth hid the pill in every thread. */}
+        {pageNotice.kind === 'none' || pageNotice.kind === 'stale' ? (
+          <ThreadDayPill label={dayPillLabel} onPress={jumpToDayStart} />
+        ) : null}
         <ThreadPlaceholder notice={pageNotice} onRetry={onRetry} />
       </View>
       {pageNotice.kind === 'stale' ? (
