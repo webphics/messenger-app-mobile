@@ -1,0 +1,173 @@
+import { staffDmIntent } from '@/lib/staff-directory'
+import type { Contact, ContactKind, Organization, StaffDirectoryUser } from '@/lib/types'
+
+/**
+ * Reading the contact directory: who is in it, and what a tap on a name does.
+ *
+ * `GET /conversations/contacts` is the one endpoint that answers for all three
+ * roles, and every row it sends already names the conversation that exists
+ * between the two where one does. So most taps are a navigation and the rest
+ * are a get-or-create — and which of the two, and with what, is the whole of
+ * this module.
+ *
+ * Pure, and separate from the screen, because the interesting part is a table:
+ * a company with no thread yet, a staff member the viewer shares one
+ * organization with, a staff member they share several with, a Customer nobody
+ * has ever written to. Each of those is a different sentence on the row and a
+ * different request behind it, and none of them needs a running API to
+ * demonstrate.
+ */
+
+/** What tapping a contact does next. */
+export type ContactIntent =
+  /** A thread already exists. Nothing to create; open it. */
+  | { kind: 'open'; conversationId: string }
+  /** A staff DM, bound to the one organization named or to whichever the API picks. */
+  | { kind: 'staff-dm'; userId: string; organizationId?: string }
+  /** Several shared organizations: the person picks which the DM belongs to. */
+  | { kind: 'choose'; userId: string; organizations: Organization[] }
+  /** A Customer's support thread with one company, created if it is their first. */
+  | { kind: 'support'; organizationId: string }
+  /** Nothing a tap can do, and why. */
+  | { kind: 'unavailable'; reason: string }
+
+/**
+ * What the directory says about this staff member, where the directory has been
+ * read.
+ *
+ * `GET /conversations/contacts` does not carry `sharedOrganizations` and
+ * `GET /conversations/staff` does, so the People screen reads both and this is
+ * how the second reaches the first. Null is *not* the same as an empty list:
+ * null is the staff directory not having answered — which it never does for a
+ * Customer, who is refused it — and an empty list is a pair who share no
+ * organization and can hold no DM at all.
+ */
+export type SharedOrganizations = Organization[] | null
+
+export function contactIntent(
+  contact: Contact,
+  shared: SharedOrganizations = null,
+): ContactIntent {
+  // The API already resolved this, for every kind. A row that names a thread is
+  // a row with nothing left to decide, and that includes a Customer — whose
+  // support thread the viewer can open but could never create.
+  if (contact.conversationId) {
+    return { kind: 'open', conversationId: contact.conversationId }
+  }
+
+  if (contact.kind === 'company') {
+    // A company row is one organization, and its id is the organization's.
+    return { kind: 'support', organizationId: contact.id }
+  }
+
+  if (contact.kind === 'customer') {
+    return { kind: 'unavailable', reason: 'No support thread yet' }
+  }
+
+  // Staff, with no thread yet. The organization a DM binds to is the staff
+  // directory's answer, and the rules for reading it already exist — one binds
+  // silently, several are a choice, none means no DM can exist. Reused rather
+  // than restated so the two screens cannot drift.
+  const intent = staffDmIntent({
+    id: contact.id,
+    name: contact.name,
+    role: contact.role === 'admin' ? 'admin' : 'agent',
+    sharedOrganizations: shared,
+  })
+
+  if (intent.kind === 'impossible') {
+    return { kind: 'unavailable', reason: 'You share no organization' }
+  }
+  if (intent.kind === 'choose') {
+    return { kind: 'choose', userId: contact.id, organizations: intent.organizations }
+  }
+  return intent.organizationId === undefined
+    ? { kind: 'staff-dm', userId: contact.id }
+    : { kind: 'staff-dm', userId: contact.id, organizationId: intent.organizationId }
+}
+
+/**
+ * The shared organizations the staff directory reported for each person, by id.
+ *
+ * Built once per directory rather than searched per row: an Admin's contact
+ * list is the whole user table, and a linear scan inside a `renderItem` is the
+ * one place that cost lands on a scroll.
+ */
+export function sharedOrganizationsById(
+  directory: StaffDirectoryUser[],
+): ReadonlyMap<string, SharedOrganizations> {
+  return new Map(directory.map((user) => [user.id, user.sharedOrganizations]))
+}
+
+/** The directory as the search field leaves it. Matches a name or a role. */
+export function filterContacts(contacts: Contact[], query: string): Contact[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return contacts
+  return contacts.filter(
+    (contact) =>
+      contact.name.toLowerCase().includes(q) ||
+      (contact.role ?? contact.kind).toLowerCase().includes(q),
+  )
+}
+
+/** Which kinds a screen offers to narrow by, in the order they are offered. */
+export type ContactChip = 'all' | ContactKind
+
+/** Only the kinds actually present, so nobody is offered a filter that empties the list. */
+export function contactChips(contacts: Contact[]): ContactChip[] {
+  const present = new Set(contacts.map((contact) => contact.kind))
+  const ordered: ContactKind[] = ['staff', 'customer', 'company']
+  const kinds = ordered.filter((kind) => present.has(kind))
+  // One kind is not a choice: a chip row offering "All" and the only thing
+  // there is narrows nothing.
+  return kinds.length > 1 ? ['all', ...kinds] : []
+}
+
+export function narrowContacts(contacts: Contact[], chip: ContactChip): Contact[] {
+  return chip === 'all' ? contacts : contacts.filter((contact) => contact.kind === chip)
+}
+
+const CHIP_LABEL: Record<ContactChip, string> = {
+  all: 'All',
+  staff: 'Team',
+  customer: 'Customers',
+  company: 'Companies',
+}
+
+export function contactChipLabel(chip: ContactChip): string {
+  return CHIP_LABEL[chip]
+}
+
+/**
+ * What to say under a name.
+ *
+ * The role where the row has one, and the kind where it does not — a company is
+ * an organization rather than somebody, so "company" is the truest thing about
+ * it. A row a tap cannot act on says why instead, because that is the more
+ * useful of the two facts.
+ */
+export function contactSubtitle(contact: Contact, intent: ContactIntent): string {
+  if (intent.kind === 'unavailable') return intent.reason
+  if (contact.kind === 'company') return 'Company'
+  return contact.role === 'admin' ? 'Admin' : contact.role === 'agent' ? 'Agent' : 'Customer'
+}
+
+/**
+ * What the row's accessible name promises, which is what its tap does.
+ *
+ * Four different actions wear the same row — opening a thread, starting one,
+ * opening the organizations to choose between, and nothing at all — and a
+ * single "Message …" would be a promise two of them do not keep.
+ */
+export function contactRowLabel(contact: Contact, intent: ContactIntent): string {
+  switch (intent.kind) {
+    case 'open':
+      return `Open conversation with ${contact.name}`
+    case 'choose':
+      return `Message ${contact.name}, choose an organization`
+    case 'unavailable':
+      return `${contact.name}, unavailable: ${intent.reason.toLowerCase()}`
+    default:
+      return `Message ${contact.name}`
+  }
+}

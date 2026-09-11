@@ -70,8 +70,8 @@ export function AdminHub() {
               value={String(onlineCount)}
               suffix={`/${totalUsers}`}
               label="Active users"
-              accessibilityLabel="User directory"
-              onPress={() => router.navigate("/(admin)/users" as Href)}
+              accessibilityLabel="People"
+              onPress={() => router.navigate("/(admin)/contacts" as Href)}
             />
             <StatTile
               value={counted === null ? PENDING_COUNT : String(counted.length)}

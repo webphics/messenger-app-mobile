@@ -1,7 +1,9 @@
 import { authenticatedRequest } from '@/lib/auth-service'
-import { asRecord } from '@/lib/api-envelope'
+import { acknowledged, query, readOutcome } from '@/lib/api-result'
+import type { ApiResult } from '@/lib/api-result'
 import {
   parseAttachment,
+  parseContacts,
   parseConversation,
   parseConversations,
   parseLabels,
@@ -14,9 +16,9 @@ import {
 } from '@/lib/conversation-parse'
 import { UNSUPPORTED_TYPE_MESSAGE, uploadMimeType } from '@/lib/attachment-upload'
 import { storedAttachment } from '@/lib/attachment-view'
-import type { HttpOutcome } from '@/lib/auth-response'
 import type {
   AttachmentView,
+  Contact,
   Conversation,
   ConversationNote,
   ConversationType,
@@ -38,68 +40,13 @@ import type {
  * at each call site. This module adds paths, not a second way of talking to the
  * API.
  *
- * Nothing throws. A screen gets back either a value or one of four failures, and
- * the four exist because a screen answers each of them differently: a request
- * that never arrived offers a retry, an expired session sends the person to sign
- * in, a refusal has something to say, and a body this client cannot read is a
- * bug worth showing as one rather than as an empty inbox.
+ * The envelope, the four failures and the query builder are `lib/api-result`'s,
+ * shared with every other family of endpoints. The two types are re-exported
+ * here because this module was where they lived first and most of the app still
+ * names them through it.
  */
 
-export type ApiFailure =
-  | { kind: 'unreachable' }
-  /** The session is gone. Only a 401 means this; a 403 is a verdict on the request. */
-  | { kind: 'unauthorised' }
-  | { kind: 'refused'; message: string }
-  | { kind: 'malformed' }
-
-export type ApiResult<T> = { ok: true; value: T } | { ok: false; failure: ApiFailure }
-
-const DEFAULT_REFUSAL = 'The server could not answer that right now. Try again.'
-
-function refusalMessage(body: unknown): string {
-  const message = asRecord(body)?.message
-  return typeof message === 'string' && message.trim() !== '' ? message.trim() : DEFAULT_REFUSAL
-}
-
-/**
- * The envelope every API response wraps its payload in. A body that is not an
- * envelope is malformed rather than empty: the difference matters, because an
- * empty list is a legitimate answer and a broken body is not.
- */
-function envelopeData(body: unknown): { data: unknown } | null {
-  const envelope = asRecord(body)
-  return envelope && 'data' in envelope ? { data: envelope.data } : null
-}
-
-/**
- * One outcome, read into a result.
- *
- * `parse` answers null for a payload it could not read, which is the only way
- * this can produce `malformed` from a 2xx — every parser in
- * `lib/conversation-parse` is total for the shapes the API documents.
- */
-function readOutcome<T>(outcome: HttpOutcome, parse: (data: unknown) => T | null): ApiResult<T> {
-  if (!outcome.reached) return { ok: false, failure: { kind: 'unreachable' } }
-  if (outcome.status === 401) return { ok: false, failure: { kind: 'unauthorised' } }
-  if (outcome.status < 200 || outcome.status >= 300) {
-    return { ok: false, failure: { kind: 'refused', message: refusalMessage(outcome.body) } }
-  }
-
-  const envelope = envelopeData(outcome.body)
-  if (!envelope) return { ok: false, failure: { kind: 'malformed' } }
-
-  const value = parse(envelope.data)
-  return value === null
-    ? { ok: false, failure: { kind: 'malformed' } }
-    : { ok: true, value }
-}
-
-function query(params: Record<string, string | number | undefined>): string {
-  const pairs = Object.entries(params).flatMap(([key, value]) =>
-    value === undefined ? [] : [`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`],
-  )
-  return pairs.length === 0 ? '' : `?${pairs.join('&')}`
-}
+export type { ApiFailure, ApiResult } from '@/lib/api-result'
 
 /** The most messages one page may hold. The API refuses anything larger. */
 export const MESSAGE_PAGE_LIMIT = 50
@@ -149,6 +96,59 @@ export async function createStaffDm(
   const outcome = await authenticatedRequest('/conversations/staff', {
     method: 'POST',
     body: { userId, ...(organizationId ? { organizationId } : {}) },
+  })
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * Everyone this person can begin a conversation with.
+ *
+ * The one directory that answers for all three roles, which is why the People
+ * screen reads it rather than assembling the same list from three endpoints: a
+ * Customer receives their organizations as companies, an Agent receives the
+ * Customers whose Support DMs they can see plus the rest of the staff, and an
+ * Admin receives the whole directory. Each row already names the thread that
+ * exists between the two, where one does.
+ *
+ * `q` is the API's own filter. It is sent as well as filtering on this side,
+ * because an Admin's directory is the whole user table and the phone should not
+ * be the thing narrowing it.
+ */
+export async function listContacts(q?: string): Promise<ApiResult<Contact[]>> {
+  const trimmed = q?.trim()
+  const path = `/conversations/contacts${query({ q: trimmed === '' ? undefined : trimmed })}`
+  return readOutcome(await authenticatedRequest(path), parseContacts)
+}
+
+/**
+ * Start a group.
+ *
+ * Admin only — `POST /conversations/groups` is `@Roles(['admin'])`, and an
+ * Agent asking is answered `403` whatever they put in the body, so nothing
+ * offers it to one. The members are named at creation and at least one is
+ * required; the organization is what the group belongs to and what its members
+ * have to share.
+ *
+ * Answers with the conversation, like every other get-or-create here, so the
+ * row joins the shared list and the thread opens without a refetch.
+ */
+export async function createGroup(draft: {
+  title: string
+  description?: string
+  memberIds: string[]
+  organizationId: string
+}): Promise<ApiResult<Conversation>> {
+  const description = draft.description?.trim()
+  const outcome = await authenticatedRequest('/conversations/groups', {
+    method: 'POST',
+    // `.strict()`, so an empty description is an absent key rather than an
+    // empty string the schema would take at face value.
+    body: {
+      title: draft.title,
+      ...(description ? { description } : {}),
+      memberIds: draft.memberIds,
+      organizationId: draft.organizationId,
+    },
   })
   return readOutcome(outcome, parseConversation)
 }
@@ -486,17 +486,6 @@ export async function createNote(
 
 /** Which half of the API's `platform` a registration comes from. */
 export type PushPlatform = 'android' | 'ios'
-
-/**
- * The answer to a request nothing reads back.
- *
- * The envelope is still checked, so a body this client cannot make sense of is
- * still `malformed` — what is dropped is only the row inside it, which echoes
- * the token the caller has just sent.
- */
-function acknowledged(): void {
-  return undefined
-}
 
 /**
  * Register this installation's Expo push token, so a closed app can be reached.
