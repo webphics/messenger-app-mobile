@@ -33,6 +33,7 @@ import {
 } from '@/lib/message-attachment'
 import { replyCaption, type ReactionGroup } from '@/lib/message-react'
 import { messageStatusLabel } from '@/lib/message-status'
+import { formatClockTime } from '@/lib/message-receipt-format'
 import { deskMessageEnter } from '@/lib/motion-enter'
 import { easing } from '@/lib/motion-easing'
 import { motion, rubberBand } from '@/lib/motion'
@@ -64,6 +65,23 @@ type MessageBubbleProps = {
   body: string
   outgoing: boolean
   status: ReceiptStatus
+  createdAt: string
+  /**
+   * Whether this bubble states its own time without being asked.
+   *
+   * True for the last message of a run, which is how the thread says the minute
+   * once for a burst of replies instead of six times. Every other bubble keeps
+   * its time until it is tapped -- see `timeRevealed`.
+   */
+  showTime: boolean
+  /** Set while this bubble is the one whose time a tap has asked for. */
+  timeRevealed?: boolean
+  /**
+   * Absent where a tap already means something else: a bubble built around an
+   * attachment has a control inside it that opens the attachment, and a tap
+   * gesture out here would be racing it for the same touch.
+   */
+  onRevealTime?: (messageId: string) => void
   /**
    * Set only while this device is still carrying the message. It replaces the
    * receipt rather than sitting beside it: a message the server has not
@@ -187,19 +205,37 @@ function Delivery({
 function Receipt({
   status,
   outgoing,
+  createdAt,
+  showTime,
 }: {
   status: ReceiptStatus
   outgoing: boolean
+  createdAt: string
+  showTime: boolean
 }) {
-  if (!outgoing) return null
+  const time = showTime ? formatClockTime(createdAt) : ''
+  // Nothing to say: an incoming bubble whose time is not being shown has no
+  // receipt to draw either, and an empty row would still take its margin.
+  if (!outgoing && !time) return null
+
   const read = status === 'read'
   const Icon = status === 'sent' ? Check : CheckCheck
   return (
     <View
-      accessibilityLabel={messageStatusLabel(status)}
-      className="mt-1 items-end pr-1"
+      accessibilityLabel={outgoing ? messageStatusLabel(status) : undefined}
+      className={cn(
+        'mt-1 flex-row items-center gap-1',
+        outgoing ? 'justify-end pr-1' : 'justify-start pl-1',
+      )}
     >
-      <Icon color={read ? colors.primary : colors.muted} size={13} />
+      {time ? (
+        <Text variant="label" className="text-muted">
+          {time}
+        </Text>
+      ) : null}
+      {outgoing ? (
+        <Icon color={read ? colors.primary : colors.muted} size={13} />
+      ) : null}
     </View>
   )
 }
@@ -496,6 +532,10 @@ export const MessageBubble = memo(function MessageBubble({
   body,
   outgoing,
   status,
+  createdAt,
+  showTime,
+  timeRevealed,
+  onRevealTime,
   delivery,
   onRetrySend,
   senderName,
@@ -602,6 +642,10 @@ export const MessageBubble = memo(function MessageBubble({
     [messageId, onToggleReaction],
   )
 
+  const handleRevealTime = useCallback(() => {
+    onRevealTime?.(messageId)
+  }, [messageId, onRevealTime])
+
   const gesture = useMemo(
     () =>
       Gesture.Race(
@@ -623,6 +667,24 @@ export const MessageBubble = memo(function MessageBubble({
                 .onFinalize((_, ok) => {
                   if (!ok)
                     tint.set(withTiming(0, { duration: 60, easing: easing.out }))
+                }),
+            ]
+          : []),
+        /*
+          Tap reveals this bubble's own time.
+
+          Only where the bubble has nothing attached: an attachment is drawn
+          inside a control of its own that opens it, and a tap gesture out here
+          would race that control for the same touch. Those bubbles still state
+          their time when they end a run, and Message info reaches the rest.
+        */
+        ...(onRevealTime && !attachment
+          ? [
+              Gesture.Tap()
+                .maxDuration(LONG_PRESS_MS)
+                .maxDistance(12)
+                .onEnd((_, ok) => {
+                  if (ok) scheduleOnRN(handleRevealTime)
                 }),
             ]
           : []),
@@ -659,7 +721,17 @@ export const MessageBubble = memo(function MessageBubble({
             swipedHaptic.set(false)
           }),
       ),
-    [handleReply, onOpenMenu, reportOpen, swipedHaptic, tint, x],
+    [
+      attachment,
+      handleRevealTime,
+      handleReply,
+      onOpenMenu,
+      onRevealTime,
+      reportOpen,
+      swipedHaptic,
+      tint,
+      x,
+    ],
   )
 
   const swipeStyle = useAnimatedStyle(() => ({
@@ -860,7 +932,12 @@ export const MessageBubble = memo(function MessageBubble({
             {outgoing && delivery ? (
               <Delivery state={delivery} messageId={messageId} onRetry={onRetrySend} />
             ) : (
-              <Receipt status={status} outgoing={outgoing} />
+              <Receipt
+                status={status}
+                outgoing={outgoing}
+                createdAt={createdAt}
+                showTime={showTime || Boolean(timeRevealed)}
+              />
             )}
           </Animated.View>
         </GestureDetector>

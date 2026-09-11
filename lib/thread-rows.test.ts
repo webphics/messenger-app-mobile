@@ -1,4 +1,13 @@
-import { buildThreadRows, type ThreadRow } from '@/lib/thread-rows'
+import { buildThreadRows, threadDayMarks, type ThreadRow } from '@/lib/thread-rows'
+
+/**
+ * Built from local parts, so these say the same thing on a machine in any zone.
+ * A `Z` literal only asserts the intended day where the machine is at UTC --
+ * which is what let a pair of times on one local evening read as two days here.
+ */
+function localIso(y: number, m: number, d: number, hour: number, minute = 0): string {
+  return new Date(y, m - 1, d, hour, minute).toISOString()
+}
 import type { Message, MessageType } from '@/lib/types'
 
 function staffMessage(
@@ -62,8 +71,8 @@ describe('buildThreadRows', () => {
   test('opens each new day with a divider', () => {
     const rows = buildThreadRows(
       [
-        staffMessage('m1', '2026-08-12T22:00:00.000Z', THEM),
-        staffMessage('m2', '2026-08-13T09:00:00.000Z', THEM),
+        staffMessage('m1', localIso(2026, 8, 12, 22), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9), THEM),
       ],
       { viewerId: 'me', namesSenders: false },
     )
@@ -91,8 +100,8 @@ describe('buildThreadRows', () => {
   test('a system message still opens its day', () => {
     const rows = buildThreadRows(
       [
-        staffMessage('m1', '2026-08-12T22:00:00.000Z', THEM),
-        staffMessage('sys', '2026-08-13T08:00:00.000Z', ME, 'system'),
+        staffMessage('m1', localIso(2026, 8, 12, 22), THEM),
+        staffMessage('sys', localIso(2026, 8, 13, 8), ME, 'system'),
       ],
       { viewerId: 'me', namesSenders: false },
     )
@@ -134,5 +143,93 @@ describe('buildThreadRows', () => {
     })
 
     expect(rows[0]).toMatchObject({ type: 'message', senderName: undefined })
+  })
+})
+
+describe('endsRun', () => {
+  function runFlags(messages: Parameters<typeof buildThreadRows>[0]) {
+    return buildThreadRows(messages, { viewerId: 'me', namesSenders: false })
+      .filter((row) => row.type === 'message')
+      .map((row) => `${row.id}:${row.endsRun}`)
+  }
+
+  test('only the newest of a run states its time', () => {
+    expect(
+      runFlags([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 1), THEM),
+        staffMessage('m3', localIso(2026, 8, 13, 9, 2), THEM),
+      ]),
+      // Newest first, so the run's newest message is the first row.
+    ).toEqual(['m3:true', 'm2:false', 'm1:false'])
+  })
+
+  test('a different sender begins a new run', () => {
+    expect(
+      runFlags([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 1), ME),
+      ]),
+    ).toEqual(['m2:true', 'm1:true'])
+  })
+
+  test('a day boundary closes a run even for one sender', () => {
+    expect(
+      runFlags([
+        staffMessage('m1', localIso(2026, 8, 12, 22), THEM),
+        staffMessage('m2', localIso(2026, 8, 13, 9), THEM),
+      ]),
+    ).toEqual(['m2:true', 'm1:true'])
+  })
+
+  test('a notice between two messages closes the run', () => {
+    expect(
+      runFlags([
+        staffMessage('m1', localIso(2026, 8, 13, 9), THEM),
+        staffMessage('sys', localIso(2026, 8, 13, 9, 1), ME, 'system'),
+        staffMessage('m2', localIso(2026, 8, 13, 9, 2), THEM),
+      ]),
+    ).toEqual(['m2:true', 'm1:true'])
+  })
+
+  test('the newest message in the thread always states its time', () => {
+    expect(
+      runFlags([staffMessage('only', localIso(2026, 8, 13, 9), THEM)]),
+    ).toEqual(['only:true'])
+  })
+})
+
+describe('threadDayMarks', () => {
+  const rows: ThreadRow[] = [
+    { type: 'message', id: 'c', message: staffMessage('c', '2026-03-02T09:00:00.000Z', THEM), endsRun: true },
+    { type: 'day', id: 'day-b', label: 'Today' },
+    { type: 'message', id: 'b', message: staffMessage('b', '2026-03-01T10:00:00.000Z', THEM), endsRun: true },
+    { type: 'message', id: 'a', message: staffMessage('a', '2026-03-01T09:00:00.000Z', THEM), endsRun: false },
+    { type: 'day', id: 'day-a', label: 'Yesterday' },
+  ]
+
+  it('gives every row the day it sits under', () => {
+    expect(threadDayMarks(rows).map((mark) => mark.label)).toEqual([
+      'Today',
+      'Today',
+      'Yesterday',
+      'Yesterday',
+      'Yesterday',
+    ])
+  })
+
+  it('points each row at the divider that begins its day', () => {
+    expect(threadDayMarks(rows).map((mark) => mark.dividerIndex)).toEqual([1, 1, 4, 4, 4])
+  })
+
+  it('is empty for an empty thread', () => {
+    expect(threadDayMarks([])).toEqual([])
+  })
+
+  it('never reads undefined for a row with no divider ahead of it', () => {
+    const orphan: ThreadRow[] = [
+      { type: 'message', id: 'a', message: staffMessage('a', '2026-03-01T09:00:00.000Z', THEM), endsRun: false },
+    ]
+    expect(threadDayMarks(orphan)).toEqual([{ label: '', dividerIndex: 0 }])
   })
 })

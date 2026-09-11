@@ -13,6 +13,8 @@ import type {
   Message,
   MessageAttachment,
   MessageReaction,
+  MessageReceipt,
+  MessageReceipts,
   MessageReplyTo,
   MessageType,
   Organization,
@@ -320,6 +322,32 @@ export function parseMessage(value: unknown): Message | null {
   if (sender) return { ...base, sender }
 
   return { ...base, fromCompany: flag(record.fromCompany) }
+}
+
+/**
+ * One receipt. The person is optional by design — see `MessageReceipt` — but the
+ * timestamp is not: a receipt with no time is the one thing this screen exists to
+ * show, so a row missing it is dropped rather than drawn blank.
+ */
+function messageReceipt(value: unknown): MessageReceipt | null {
+  const record = asRecord(value)
+  if (!record) return null
+  const at = timestamp(record.at)
+  if (!at) return null
+  return { user: staffPerson(record.user), at }
+}
+
+export function parseMessageReceipts(value: unknown): MessageReceipts | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  const read = (raw: unknown) =>
+    records(raw).flatMap((item) => {
+      const parsed = messageReceipt(item)
+      return parsed ? [parsed] : []
+    })
+
+  return { readBy: read(record.readBy), deliveredTo: read(record.deliveredTo) }
 }
 
 export function parseMessages(value: unknown): Message[] {

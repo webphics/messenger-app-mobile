@@ -251,6 +251,29 @@ export type CustomerMessage = MessageBase & {
 
 export type Message = StaffMessage | CustomerMessage
 
+/**
+ * One person's receipt on one message: who, and when.
+ *
+ * `user` is null where the reader must not be named. A Customer in a support DM
+ * is answered by the company as one voice, so the API withholds the Agent behind
+ * it here exactly as it does on every message in the thread — and withholds the
+ * id with the name, since an id is stable across messages and would separate one
+ * Agent from another just as well.
+ */
+export type MessageReceipt = {
+  user: ConversationStaffPerson | null
+  at: string
+}
+
+/**
+ * Read implies delivered, so nobody stands in both lists, and the sender stands
+ * in neither: their own copy of what they wrote is not a receipt.
+ */
+export type MessageReceipts = {
+  readBy: MessageReceipt[]
+  deliveredTo: MessageReceipt[]
+}
+
 export function isStaffMessage(message: Message): message is StaffMessage {
   return 'sender' in message
 }
