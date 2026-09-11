@@ -82,7 +82,15 @@
       ],
       "./plugins/with-store-excluded-from-backup",
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#B83E0B",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "extra": {
       "eas": {
