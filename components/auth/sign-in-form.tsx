@@ -18,7 +18,7 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { GOOGLE_CONFIG } from "@/lib/google-config";
-import { hapticSelection, hapticSuccess, hapticWarning } from "@/lib/haptics";
+import { hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { magicLinkRequestNotice } from "@/lib/magic-link-route";
@@ -278,7 +278,6 @@ export function SignInForm() {
     setPasswordError(null);
     // A confirmation names an address, and this one has just changed.
     setLinkRequest(NO_LINK_REQUEST);
-    hapticSelection();
   }
 
   return (

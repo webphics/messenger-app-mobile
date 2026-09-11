@@ -75,7 +75,6 @@ export function BannerStrip({
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel={accessibleName(notice)}
-          haptic="light"
           onPress={onOpen}
           className="min-w-0 flex-1 flex-row items-center gap-3 rounded-2xl py-3 pl-3.5"
         >

@@ -469,7 +469,7 @@ export function Composer({
             </Text>
           </View>
           <TactilePressable
-            haptic="medium"
+            haptic="light"
             accessibilityRole="button"
             accessibilityLabel="Stop recording"
             onPress={() => void finishRecording()}
@@ -519,7 +519,6 @@ export function Composer({
           ) : (
             <Animated.View style={sendStyle}>
               <TactilePressable
-                haptic="medium"
                 accessibilityRole="button"
                 accessibilityLabel="Send"
                 disabled={!canSend}

@@ -93,7 +93,6 @@ export function MessageActions({
         {REACT_EMOJIS.map((emoji) => (
           <TactilePressable
             key={emoji}
-            haptic="selection"
             accessibilityRole="button"
             accessibilityLabel={`React ${emoji}`}
             onPress={() => {
@@ -123,7 +122,6 @@ export function MessageActions({
         ]}
       >
         <TactilePressable
-          haptic="selection"
           accessibilityRole="button"
           accessibilityLabel="Reply"
           onPress={() => {
