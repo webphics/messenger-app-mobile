@@ -38,6 +38,7 @@ export { default as Clock } from "lucide-react-native/icons/clock";
 export { default as CloudOff } from "lucide-react-native/icons/cloud-off";
 export { default as Copy } from "lucide-react-native/icons/copy";
 export { default as CornerUpLeft } from "lucide-react-native/icons/corner-up-left";
+export { default as ExternalLink } from "lucide-react-native/icons/external-link";
 export { default as Eye } from "lucide-react-native/icons/eye";
 export { default as EyeOff } from "lucide-react-native/icons/eye-off";
 export { default as FileText } from "lucide-react-native/icons/file-text";
@@ -59,6 +60,7 @@ export { default as MessageCircle } from "lucide-react-native/icons/message-circ
 export { default as MessageSquare } from "lucide-react-native/icons/message-square";
 export { default as Mic } from "lucide-react-native/icons/mic";
 export { default as MoreVertical } from "lucide-react-native/icons/ellipsis-vertical";
+export { default as Newspaper } from "lucide-react-native/icons/newspaper";
 export { default as Pause } from "lucide-react-native/icons/pause";
 export { default as Pencil } from "lucide-react-native/icons/pencil";
 export { default as Play } from "lucide-react-native/icons/play";

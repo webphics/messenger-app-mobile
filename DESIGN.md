@@ -288,7 +288,8 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Customer header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
 - **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Icon-only — no visible text label. Active item = Ember Mist inner pill behind the Enki Ember icon; idle = Muted icon, no pill. Unassigned / Conversations may show Enki Ember count badges. Destination names live in the accessible name (`aria-label`/`accessibilityLabel`) only, not as rendered text — the stack header title (e.g. **Messages**) is independent of that accessible name. Host tab bar chrome is transparent — the capsule is the only visible nav.
 - **Stacks:** Flat header (no shadow), Graphite title in Manrope-SemiBold, surface background.
-- **Customer:** Same floating capsule as Agent/Admin — tabs Home | Messages | Help.
+- **Customer:** Same floating capsule as Agent/Admin — tabs Home | Messages | Help | Wall.
+- **Wall:** A destination on the capsule for every role, last in the row and a peer of Messages rather than something inside it. Newspaper icon, no badge — a Post is published rather than addressed to anybody, so there is no unread count to carry.
 
 ### Hub ops (Agent / Admin)
 - Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not Enki Ember value tint.

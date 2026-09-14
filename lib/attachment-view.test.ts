@@ -5,6 +5,7 @@ import {
   resolveAttachmentUrl,
   toAttachmentView,
   toMessageAttachment,
+  toWallAttachmentView,
 } from '@/lib/attachment-view'
 import type { MessageAttachment } from '@/lib/types'
 
@@ -245,5 +246,36 @@ describe('against payloads a running API produced', () => {
       durationMs: 4500,
       peaks: [0.2, 0.8, 0.4],
     })
+  })
+})
+
+describe('toWallAttachmentView', () => {
+  it('takes the API’s own kind rather than classifying a MIME type', () => {
+    const view = toWallAttachmentView(
+      { kind: 'document', url: '/uploads/invoice.pdf', fileName: 'Invoice.pdf', size: 90 },
+      'https://api.example.com',
+    )
+    expect(view).toEqual({
+      kind: 'document',
+      uri: 'https://api.example.com/uploads/invoice.pdf',
+      name: 'Invoice.pdf',
+      size: 90,
+    })
+  })
+
+  it('names one the API did not, off the URL it was stored under', () => {
+    const view = toWallAttachmentView(
+      { kind: 'image', url: '/uploads/lift.png', fileName: null, size: null },
+      'https://api.example.com',
+    )
+    expect(view.name).toBe('lift.png')
+  })
+
+  it('leaves an absolute URL alone: an object store signs its own', () => {
+    const view = toWallAttachmentView(
+      { kind: 'image', url: 'https://cdn.example.com/a.png', fileName: null, size: null },
+      'https://api.example.com',
+    )
+    expect(view.uri).toBe('https://cdn.example.com/a.png')
   })
 })

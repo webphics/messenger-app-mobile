@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { HelpCircle, House, MessageCircle } from "@/components/icons";
+import { HelpCircle, House, MessageCircle, Newspaper } from "@/components/icons";
 import { FloatingTabBar } from "@/components/nav/floating-tab-bar";
 
 import { useTabChrome } from "@/lib/use-tab-chrome";
@@ -35,6 +35,15 @@ export default function CustomerLayout() {
           title: "Help",
           tabBarIcon: ({ color, size }) => (
             <HelpCircle color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="wall"
+        options={{
+          title: "Wall",
+          tabBarIcon: ({ color, size }) => (
+            <Newspaper color={color} size={size} />
           ),
         }}
       />

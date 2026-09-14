@@ -483,3 +483,61 @@ export type ManagedUser = {
   createdAt: string
   updatedAt: string
 }
+
+/**
+ * A Post, and the pieces it is made of.
+ *
+ * Not a Message, and the glossary is emphatic about it: a Message is addressed
+ * to a conversation's participants, carries Receipts and cannot be edited; a
+ * Post belongs to its author, is readable by an organization rather than sent to
+ * anybody, carries no Receipt at all, and can be edited. The two share a
+ * reactions shape and nothing else, which is why this is its own type rather
+ * than a `Message` with fields switched off — see the API's
+ * `docs/adr/ADR-0007-the-wall-is-not-a-conversation.md`.
+ *
+ * Nothing here is a Delivery state, because a Post has no delivery to report: it
+ * is published rather than sent, and there is no Outbox row for one.
+ */
+export type WallAttachmentKind = 'image' | 'video' | 'document'
+
+/**
+ * The API's own three-way kind rather than a MIME type, so a client never
+ * re-derives one. A value this app does not know is dropped at the parse rather
+ * than rendered as a broken image.
+ */
+export type WallPostAttachment = {
+  kind: WallAttachmentKind
+  url: string
+  fileName: string | null
+  size: number | null
+}
+
+/** The one labelled link a Post may carry. The label is its author's free text. */
+export type WallPostLink = {
+  label: string
+  url: string
+}
+
+export type WallPostAuthor = {
+  id: string
+  name: string
+}
+
+export type WallPostReaction = {
+  emoji: string
+  userId: string
+}
+
+export type WallPost = {
+  id: string
+  author: WallPostAuthor
+  /** The Post's whole audience, set once. A Wall spanning several needs it. */
+  organizationId: string
+  body: string | null
+  attachments: WallPostAttachment[]
+  link: WallPostLink | null
+  reactions: WallPostReaction[]
+  /** Null until somebody edits it, which is what lets a card say "Edited". */
+  editedAt: string | null
+  createdAt: string
+}
