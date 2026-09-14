@@ -24,7 +24,7 @@ import type { Conversation, Message } from '@/lib/types'
  * rather than migrating it, so a change here costs one cold start's worth of
  * Stale data and never a migration that can go wrong.
  */
-export const STORE_SCHEMA_VERSION = 4
+export const STORE_SCHEMA_VERSION = 5
 
 /**
  * How far back a thread has been read, as the Store holds it.

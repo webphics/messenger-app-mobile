@@ -541,3 +541,95 @@ export type WallPost = {
   editedAt: string | null
   createdAt: string
 }
+
+/**
+ * A Community, and the rows one holds.
+ *
+ * A named container of Groups inside one Organization, created by an Admin on
+ * web. What a phone gets is the member's half — see `CONTEXT.md` — so nothing
+ * here describes administering one, and the fields an administrator would need
+ * are deliberately not parsed.
+ *
+ * `memberIds` is the exception, and it is here for one question: whether the
+ * viewer is in this Community. An Admin's `GET /communities` answers with every
+ * Community in the product, including ones they never joined, and a Community
+ * somebody is not in has to be invisible rather than refused — so the list is
+ * narrowed on this device before anything is drawn or written. See
+ * `lib/community-list`.
+ */
+export type Community = {
+  id: string
+  name: string
+  description: string | null
+  avatarUrl: string | null
+  memberCount: number
+  /** How many Groups are linked to it, the viewer's membership of them aside. */
+  linkedGroupCount: number
+  memberIds: string[]
+  createdAt: string
+}
+
+/** How somebody gets into a Group: an ask a Moderator answers, or a walk-in. */
+export type GroupJoinPolicy = 'request' | 'open'
+
+/**
+ * One row of `GET /communities/:id/groups`, in the API's own three shapes.
+ *
+ * Three rather than one row with optional fields, because the three are
+ * different claims: the Community's pinned Announcements thread, a Group the
+ * viewer is in — which carries everything a conversation row draws — and one
+ * they are not, which carries a member count and structurally nothing else,
+ * because membership is the read boundary. A client that flattened them would
+ * have to invent an unread count for a room nobody has let it into.
+ *
+ * The third is parsed and not yet drawn. Joining is #73's, and dropping the
+ * shape here would make the Store's copy of a feed a different thing from the
+ * API's answer — a row that vanished on the way to disk and came back missing.
+ */
+export type CommunityAnnouncementsRow = {
+  kind: 'announcements'
+  id: string
+  title: string
+  lastMessageAt: string | null
+  lastMessagePreview: string | null
+  /**
+   * How much of it the viewer has not read.
+   *
+   * The feed does not say — the API's Announcements shape carries no count —
+   * so this arrives from the Conversation list, which holds the same thread and
+   * is the copy the socket keeps moving. Zero until it does, which is what a row
+   * with nothing to report looks like anyway. See `withLiveThread`.
+   */
+  unreadCount: number
+}
+
+export type CommunityMemberGroupRow = {
+  kind: 'member_group'
+  id: string
+  title: string
+  avatarUrl: string | null
+  lastMessageAt: string | null
+  lastMessagePreview: string | null
+  unreadCount: number
+  muted: boolean
+  joinPolicy: GroupJoinPolicy
+}
+
+export type CommunityJoinableGroupRow = {
+  kind: 'joinable_group'
+  id: string
+  title: string
+  avatarUrl: string | null
+  memberCount: number
+  joinPolicy: GroupJoinPolicy
+  /** Whether an ask is already open, which is never derivable from the policy. */
+  joinState: 'pending' | 'may_request'
+}
+
+export type CommunityFeedRow =
+  | CommunityAnnouncementsRow
+  | CommunityMemberGroupRow
+  | CommunityJoinableGroupRow
+
+/** The rows a Community's feed opens a conversation from: everything but a Group nobody is in. */
+export type CommunityThreadRow = CommunityAnnouncementsRow | CommunityMemberGroupRow

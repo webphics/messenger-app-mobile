@@ -158,6 +158,17 @@ export default function RootLayout() {
                       contentStyle: { backgroundColor: colors.bg },
                     }}
                   />
+                  {/* What `View all` opens out of an expanded Community on the
+                    Conversation list. Beside the chat routes rather than under a
+                    role's tabs, because the Communities tab belongs to all three
+                    roles and a Community is a place rather than a destination. */}
+                  <Stack.Screen
+                    name="community/[id]"
+                    options={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  />
                   <Stack.Screen
                     name="(auth)"
                     options={{

@@ -1,6 +1,14 @@
 import * as SQLite from 'expo-sqlite'
 
 import {
+  fromCommunityGroupRows,
+  fromCommunityRows,
+  toCommunityGroupRows,
+  toCommunityRows,
+  NO_COMMUNITIES,
+  type RestoredCommunities,
+} from '@/lib/community-rows'
+import {
   planEviction,
   RETAINED_MESSAGES_PER_THREAD,
   type StoredThread,
@@ -28,7 +36,7 @@ import {
   type ThreadViewer,
   type UnsentMessage,
 } from '@/lib/thread-state'
-import type { Conversation, Message } from '@/lib/types'
+import type { Community, CommunityFeedRow, Conversation, Message } from '@/lib/types'
 
 /**
  * The Store on disk: the only file in this app that knows SQLite exists.
@@ -79,6 +87,20 @@ import type { Conversation, Message } from '@/lib/types'
  *
  * Each of the three keeps its own queue, transaction and coalescing, and each is
  * skipped when the state handed to `saveThread` did not move it.
+ *
+ * ## And the Communities, by whoever holds the tab
+ *
+ * A third caller with the same contract: `saveCommunities` and
+ * `saveCommunityFeed` against `restoreCommunities` and `restoreCommunityFeed`.
+ * They are here rather than in a store of their own because this file is the one
+ * that knows SQLite exists, and a second one would mean a second connection to
+ * the same file; what they are *about* is next door in `lib/community-rows.ts`,
+ * which imports nothing native, exactly as `store-rows` is for the list.
+ *
+ * Both are replaced whole rather than reconciled, because a Community somebody
+ * has left and a Group that was unlinked both have to leave the disk, and a
+ * delta cannot say so. The expansion travels on the Community's own row, so a
+ * tab that was open comes back open with no write of its own.
  */
 
 const DATABASE_NAME = 'enki-store.db'
@@ -123,6 +145,23 @@ const SCHEMA = `
     payload TEXT NOT NULL,
     PRIMARY KEY (owner_id, conversation_id, id)
   );
+  CREATE TABLE communities (
+    id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    expanded INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (owner_id, id)
+  );
+  CREATE TABLE community_groups (
+    id TEXT NOT NULL,
+    community_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    PRIMARY KEY (owner_id, community_id, id)
+  );
+  CREATE INDEX community_groups_by_community
+    ON community_groups (owner_id, community_id, position);
   PRAGMA user_version = ${STORE_SCHEMA_VERSION};
 `
 
@@ -704,6 +743,7 @@ function markOutboxWritten(
  */
 function discard(): void {
   written.clear()
+  writtenCommunities.clear()
   writtenMessages.clear()
   lastThreads.clear()
   writtenOutbox.clear()
@@ -906,7 +946,13 @@ function queueOutbox(
 
 async function drain(): Promise<void> {
   try {
-    while (queued.size > 0 || queuedThreads.size > 0 || queuedOutbox.size > 0) {
+    while (
+      queued.size > 0 ||
+      queuedThreads.size > 0 ||
+      queuedOutbox.size > 0 ||
+      queuedCommunities.size > 0 ||
+      queuedFeeds.size > 0
+    ) {
       const lists = [...queued]
       queued.clear()
       for (const [ownerId, pending] of lists) await write(ownerId, pending)
@@ -918,6 +964,14 @@ async function drain(): Promise<void> {
       const outboxes = [...queuedOutbox.values()]
       queuedOutbox.clear()
       for (const pending of outboxes) await writeOutbox(pending)
+
+      const communities = [...queuedCommunities]
+      queuedCommunities.clear()
+      for (const [ownerId, pending] of communities) await writeCommunities(ownerId, pending)
+
+      const feeds = [...queuedFeeds.values()]
+      queuedFeeds.clear()
+      for (const pending of feeds) await writeCommunityFeed(pending)
     }
   } finally {
     draining = null
@@ -1282,6 +1336,220 @@ function forgetOutboxOf(ownerId: string, kept: ReadonlySet<string>): void {
 }
 
 /**
+ * The Communities this device last knew this person was in, and which of them
+ * were open.
+ *
+ * Scoped to the viewer and read synchronously, for the reasons `restoreStore` is
+ * both: the next person to sign in on this phone Restores nothing rather than
+ * somebody else's rooms, and the tab reads this while it is deciding what to
+ * draw. A database that is missing, unreadable, or written by a build with
+ * another schema Restores nothing, and none of the three is distinguishable from
+ * the outside.
+ *
+ * Only Communities the viewer is in are ever written — the narrowing happens in
+ * `lib/community-list` before this is called — so nothing here can hand a screen
+ * a Community somebody was never in.
+ */
+export function restoreCommunities(ownerId: string): RestoredCommunities {
+  if (barredOwners.has(ownerId)) return NO_COMMUNITIES
+
+  const database = connect()
+  if (!database) return NO_COMMUNITIES
+
+  try {
+    const restored = fromCommunityRows(
+      database.getAllSync('SELECT * FROM communities WHERE owner_id = ?', ownerId),
+    )
+    // What was just read is what is on disk, so writing it straight back would
+    // spend a transaction to change nothing. See `saveCommunities`.
+    writtenCommunities.set(ownerId, communityFingerprint(restored.communities, restored.expanded))
+    return restored
+  } catch {
+    // Same rule as `restoreStore`: a database that cannot be read is discarded
+    // rather than asked again for the life of the install.
+    discard()
+    return NO_COMMUNITIES
+  }
+}
+
+/**
+ * One Community's feed as this device last knew it.
+ *
+ * The same shape of answer the Communities themselves get, and read the same
+ * way: synchronously, because an expanded Community draws its rows in the frame
+ * it is expanded in, and emptily when there is nothing here rather than with any
+ * distinction between the ways there can be nothing.
+ */
+export function restoreCommunityFeed(
+  ownerId: string,
+  communityId: string,
+): CommunityFeedRow[] {
+  if (barredOwners.has(ownerId)) return []
+
+  const database = connect()
+  if (!database) return []
+
+  try {
+    return fromCommunityGroupRows(
+      database.getAllSync(
+        'SELECT * FROM community_groups WHERE owner_id = ? AND community_id = ? ORDER BY position ASC',
+        ownerId,
+        communityId,
+      ),
+    )
+  } catch {
+    discard()
+    return []
+  }
+}
+
+/**
+ * What is last known to be on disk for a person's Communities.
+ *
+ * A fingerprint rather than the identity trick `written` uses, because the
+ * expanded set is rebuilt on every toggle and the list beside it is not: two
+ * states differing only in which rooms are open have to compare unequal, and two
+ * differing in nothing have to compare equal however they were built.
+ */
+const writtenCommunities = new Map<string, string>()
+
+function communityFingerprint(
+  communities: readonly Community[],
+  expanded: ReadonlySet<string>,
+): string {
+  return communities
+    .map((community) => `${community.id}:${expanded.has(community.id) ? 1 : 0}:${community.name}`)
+    .join('|')
+}
+
+/** The newest state each person's Communities are waiting to have written. */
+const queuedCommunities = new Map<string, CommunitySnapshot>()
+
+/** One Community's feed, waiting to be written. Keyed by owner and Community. */
+const queuedFeeds = new Map<string, PendingFeed>()
+
+type PendingFeed = {
+  ownerId: string
+  communityId: string
+  rows: readonly CommunityFeedRow[]
+}
+
+export type CommunitySnapshot = {
+  communities: readonly Community[]
+  expanded: ReadonlySet<string>
+}
+
+/**
+ * Write this person's Communities through, when the queue gets to it.
+ *
+ * The same contract `saveStore` has: fire and forget, coalesced to the newest
+ * state per person, and skipped when nothing moved. The expansion travels with
+ * the list rather than on its own, because it is a column on these rows and a
+ * toggle is one more state of the same thing — which is what makes an expansion
+ * survive a relaunch without a write of its own.
+ */
+export function saveCommunities(ownerId: string, snapshot: CommunitySnapshot): Promise<void> {
+  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
+
+  const fingerprint = communityFingerprint(snapshot.communities, snapshot.expanded)
+  if (writtenCommunities.get(ownerId) === fingerprint) return draining ?? Promise.resolve()
+
+  queuedCommunities.set(ownerId, snapshot)
+  draining ??= drain()
+  return draining
+}
+
+/**
+ * Write one Community's feed through, when the queue gets to it.
+ *
+ * Replaced whole rather than reconciled, like the Conversation list and for the
+ * same reason: the feed is the unit, and a Group that has left it — unlinked, or
+ * one the viewer was removed from — has to leave the disk with it.
+ */
+export function saveCommunityFeed(
+  ownerId: string,
+  communityId: string,
+  rows: readonly CommunityFeedRow[],
+): Promise<void> {
+  if (!mayWrite(ownerId)) return draining ?? Promise.resolve()
+
+  queuedFeeds.set(threadKey(ownerId, communityId), { ownerId, communityId, rows })
+  draining ??= drain()
+  return draining
+}
+
+/**
+ * One person's Communities, one transaction.
+ *
+ * A replace rather than an upsert, because the list is the unit: a Community
+ * somebody has left — or one an Admin deleted — has to leave the disk with it,
+ * and the feed it held goes in the same statement. Left behind, that feed would
+ * be readable by anything looking at this app's data directory long after the
+ * rooms in it stopped being this person's to open.
+ */
+async function writeCommunities(ownerId: string, snapshot: CommunitySnapshot): Promise<void> {
+  const database = connect()
+  if (!database) return
+
+  const rows = toCommunityRows(ownerId, snapshot.communities, snapshot.expanded)
+
+  try {
+    await database.withTransactionAsync(async () => {
+      await database.runAsync('DELETE FROM communities WHERE owner_id = ?', ownerId)
+      for (const row of rows) {
+        await database.runAsync(
+          'INSERT INTO communities (id, owner_id, payload, expanded) VALUES (?, ?, ?, ?)',
+          row.id,
+          row.owner_id,
+          row.payload,
+          row.expanded,
+        )
+      }
+
+      await database.runAsync(
+        'DELETE FROM community_groups WHERE owner_id = ? AND community_id NOT IN (SELECT id FROM communities WHERE owner_id = ?)',
+        ownerId,
+        ownerId,
+      )
+    })
+    writtenCommunities.set(ownerId, communityFingerprint(snapshot.communities, snapshot.expanded))
+  } catch {
+    // Swallowed. The tab in memory is still right; the next Restore is poorer.
+  }
+}
+
+/** One Community's feed, one transaction. See `saveCommunityFeed`. */
+async function writeCommunityFeed(pending: PendingFeed): Promise<void> {
+  const database = connect()
+  if (!database) return
+
+  const { ownerId, communityId, rows } = pending
+  const feed = toCommunityGroupRows(ownerId, communityId, rows)
+
+  try {
+    await database.withTransactionAsync(async () => {
+      await database.runAsync(
+        'DELETE FROM community_groups WHERE owner_id = ? AND community_id = ?',
+        ownerId,
+        communityId,
+      )
+      for (const row of feed) {
+        await database.runAsync(
+          'INSERT INTO community_groups (id, community_id, owner_id, position, payload) VALUES (?, ?, ?, ?, ?)',
+          row.id,
+          row.community_id,
+          row.owner_id,
+          row.position,
+          row.payload,
+        )
+      }
+    })
+  } catch {
+    // Swallowed, like every other write here.
+  }
+}
+
+/**
  * Destroy everything this device holds about anybody's Conversations.
  *
  * The file, not its rows: a Session that has ended should leave nothing behind
@@ -1297,6 +1565,8 @@ export async function wipeStore(): Promise<void> {
   queued.clear()
   queuedThreads.clear()
   queuedOutbox.clear()
+  queuedCommunities.clear()
+  queuedFeeds.clear()
   // Nothing is left waiting, but a write already past the queue is still on its
   // way to the file this is about to remove.
   await draining?.catch(() => {})
