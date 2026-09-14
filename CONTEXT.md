@@ -265,7 +265,7 @@ _Avoid_: Resolve (as the action's name), archive, delete
 **Organization**:
 The container everything in this product belongs to — every conversation, every membership, every
 saved inbox. An Admin creates, renames and deletes them; the member and conversation counts on each
-are the API's. A Staff DM and a group each belong to exactly one.
+are the API's. A Staff DM, a group, a Community and a Post each belong to exactly one.
 _Avoid_: Team (that is the API's `/team`, the single tenant name), workspace, company (a *company*
 is what a Customer's contact row for an organization is called)
 
@@ -284,6 +284,95 @@ the conversation rows already held rather than fetching a different list — the
 costs no request and works with no signal. An inbox naming an organization the person has since left
 simply matches nothing.
 _Avoid_: Folder, view, filter preset, Inbox (bare — the inbox is the conversation list)
+
+**Community**:
+A named container of groups inside one Organization, created by an Admin on web. Its members see the
+groups linked to it and may join one; nobody outside it can see that it exists, and there is no link
+that lets anybody in — an Organization's Invitation is still the only door into anything. Reached as
+a second tab above the Conversation list rather than as a destination of its own, because what a
+Community holds is conversations. A Community carries no messages itself: the one-way thread it used
+to have is gone, and what that thread did is a Broadcast now.
+_Avoid_: Space, hub, channel group, Community announcement (retired), Wall (a different feature
+entirely)
+
+**Join policy**:
+How somebody gets into a group — *request* (a Join request a Moderator answers, and the default) or
+*open* (walk in). A property of the group, read off it rather than assumed: a row offers *Ask to
+join* or *Join* depending on it, and says so while a request is pending. Set on web only.
+_Avoid_: Approval mode, Invitation (that is an Organization's), private, locked
+
+**Join request**:
+A member of a Community asking to enter one of its groups, held until a Moderator answers. Declining
+answers one ask rather than standing as a refusal, so the person may ask again — an Invitation
+pointed the other way. Withdrawable by whoever made it.
+_Avoid_: Application, invite, pending member, knock
+
+**Write policy**:
+Who may send in a group — *everyone* (every member, and the default), *admins* (only those who run
+it), or *named* (a chosen set, alongside those who run it). A property of the group rather than of
+the person, read off the group rather than derived on the device: somebody who may not write is
+shown a locked composer saying why, and a send the policy refuses never becomes an Unsent message
+offering to go again. Set on web only.
+_Avoid_: Read-only, Mute (that is the reader's own setting), announce-only, permissions
+
+**Moderator**:
+A member of a Community who runs it and the groups in it. Scoped to that Community and granting
+nothing outside it, which is what separates it from a Capability. An Admin holds every Moderator
+power without being a member. Nothing about being one is set from a phone.
+_Avoid_: Community admin, owner, Admin (that is the server-owned role), Capability
+
+**Post**:
+A piece of writing by a Contributor, belonging to its author and readable across one Organization.
+It leads with an image — at least one is required — and may carry text up to 500 characters, further
+video and documents, and at most one labelled link button. A reader may react to it, **Vote** on it
+and **Bookmark** it, and nothing else: there are still no replies, no reposts and no quotes, and a
+Post has no reply count because nothing points back at it. It says how many distinct people have
+seen it. Its author may edit it, and an edited Post
+says so while keeping the Reactions it already had. Not a Message: a Message lives in a Conversation
+and is addressed to its participants, carries a Receipt, and cannot be edited.
+_Avoid_: Message, announcement, status, update, wall post
+
+**Wall**:
+A feed of Posts, and never a place a Post lives. The default Wall is every Organization the reader
+belongs to and is not stored anywhere — it is resolved on each read, so an Organization gained or
+lost needs no write. It is read **Recent** by default and can be read **Popular**, which ranks on
+Vote score and Viewer count within a rolling recent window; sorting reorders what membership already
+decided and never widens it. A custom Wall narrows it to named Organizations; anyone may make one and share
+it, and because what may be *shown* is still membership, two people opening one shared Wall see
+different Posts. A Wall naming only Organizations the reader has left is an empty Wall rather than a
+refusal — the same way a Saved inbox that names one simply matches nothing.
+_Avoid_: Feed, timeline, board, community wall, Saved inbox (the same shape one level away, but over
+Conversations)
+
+**Vote**:
+A reader pushing a Post up or down — at most one per person per Post, and the signal a Popular Wall
+ranks on. Where a Reaction is expression, a Vote is a judgement. A Post shows a net score and never
+how many people voted it down.
+_Avoid_: Like/dislike (those are the icons, not the concept), rating, karma, Reaction
+
+**Bookmark**:
+A Post somebody saved for themselves. Private: nobody sees another person's, and a Post never says
+how many people saved it.
+_Avoid_: Save, favourite, star, pin, collection
+
+**Viewer count**:
+How many distinct people have seen a Post, its author excluded, counted once per person ever. Not a
+Receipt — a Receipt says a Message reached the people it was addressed to, and a Post is addressed to
+nobody.
+_Avoid_: Views (bare), impressions, reach, Receipt
+
+**Contributor**:
+Somebody permitted to write Posts in a given Organization. Staff by default, a Customer by a grant an
+Admin gives. A claim about trust and not about identity — a Contributor is permitted to post, not
+verified to be anybody.
+_Avoid_: Verified user, publisher, poster, author (that is whoever wrote a given Post)
+
+**Reply to a Post**:
+Opening the reader's *own* support conversation with a reference to the Post in the composer. Never a
+thread on the Wall and never a message to the Post's author, which is what stops a Customer's Post
+becoming a way for Customers to reach each other. The word survives only because it is what the
+button says.
+_Avoid_: Comment, thread, Reply (bare — that is a Message quoting another), Message the author
 
 **Offers**:
 In-app promo carousel plus the shared group chat `id: 'offers'`. `"Sponsored"` is a section label only.
@@ -316,7 +405,7 @@ _Avoid_: Request deadline (that is the same word about a round trip, and this on
 it), launch timeout, splash timeout
 
 **Tab capsule**:
-The floating rounded nav bar at the bottom of every role. Icon-only — destination names live in the accessible name, not on screen.
+The floating rounded nav bar at the bottom of every role. Icon-only — destination names live in the accessible name, not on screen. The Wall is a destination on it, a peer of Messages rather than something inside it; Communities deliberately are not, because a Community is a place conversations live and belongs on the Conversation list.
 _Avoid_: Tab bar (that is the host navigator's own bar, kept invisible beneath), dock, bottom nav
 
 **Message**:
