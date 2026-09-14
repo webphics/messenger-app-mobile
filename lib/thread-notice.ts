@@ -1,27 +1,20 @@
 import type { ApiFailure } from '@/lib/conversation-api'
-import { failureNotice, readRefusal } from '@/lib/conversation-failure'
+import { readNotice, type ReadNotice } from '@/lib/read-notice'
 
 /**
  * What a thread has to say about itself over and above its Messages.
  *
- * Four outcomes and nothing, because the distinction worth keeping is between a
- * thread that has nothing to show and one that could not find out: an empty
- * conversation and an unreachable server would otherwise render identically,
- * and they mean opposite things — one says nobody has written anything, the
- * other says this device does not know.
+ * The four outcomes and the order between them are `lib/read-notice`, shared
+ * with the Wall since #74 — the precedence is the part that must not drift, and
+ * an empty list and an unreachable server mean opposite things on both screens.
+ * What is here is the thread's own half: its copy, and the one input a Wall has
+ * no use for.
  *
- * `stale` is the one that is not a placeholder. Messages are drawn, what is
- * drawn is still true, and a notice that replaced them would throw away the
- * thread to report a request — so the failure sits beside them in one line, the
- * way a send failure sits beside a bubble marked *Not sent*, and is dismissed
- * the same way.
+ * `readOnly` is that input. It changes nothing about which notice appears, only
+ * what an empty thread invites: a thread this person may write in asks for the
+ * first message, and one they may not says nobody has posted.
  */
-export type ThreadNotice =
-  | { kind: 'none' }
-  | { kind: 'loading' }
-  | { kind: 'empty'; title: string; hint: string }
-  | { kind: 'failed'; title: string; hint: string }
-  | { kind: 'stale'; message: string }
+export type ThreadNotice = ReadNotice
 
 export type ThreadNoticeInput = {
   /** Everything on screen, an Unsent Message of this person's own included. */
@@ -46,13 +39,6 @@ export type ThreadNoticeInput = {
 
 const REFUSED_TITLE = 'Could not load this conversation'
 
-/**
- * A failure outranks a load, and Messages outrank an empty thread.
- *
- * The order is what keeps a retry honest: it clears the failure and puts the
- * thread back into loading, so the notice it replaces is a spinner rather than
- * the same notice again until the answer arrives.
- */
 export function threadNotice({
   drawn,
   confirmed,
@@ -60,20 +46,14 @@ export function threadNotice({
   failure,
   readOnly,
 }: ThreadNoticeInput): ThreadNotice {
-  if (failure) {
-    if (confirmed === 0) return { kind: 'failed', ...failureNotice(failure, REFUSED_TITLE) }
-    const message = readRefusal(failure)
-    return message ? { kind: 'stale', message } : { kind: 'none' }
-  }
-
-  if (drawn > 0) return { kind: 'none' }
-  if (loading) return { kind: 'loading' }
-
-  return {
-    kind: 'empty',
-    title: 'No messages yet',
-    hint: readOnly
-      ? 'Nothing has been posted here yet.'
-      : 'Write the first message to start this conversation.',
-  }
+  return readNotice(
+    { drawn, confirmed, loading, failure },
+    {
+      refusedTitle: REFUSED_TITLE,
+      emptyTitle: 'No messages yet',
+      emptyHint: readOnly
+        ? 'Nothing has been posted here yet.'
+        : 'Write the first message to start this conversation.',
+    },
+  )
 }

@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { House, Inbox, MessageCircle, Users } from "@/components/icons";
+import { House, Inbox, MessageCircle, Newspaper, Users } from "@/components/icons";
 import { FloatingTabBar } from "@/components/nav/floating-tab-bar";
 
 import { useTabChrome } from "@/lib/use-tab-chrome";
@@ -40,6 +40,15 @@ export default function AdminLayout() {
           title: "Messages",
           tabBarIcon: ({ color, size }) => (
             <MessageCircle color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="wall"
+        options={{
+          title: "Wall",
+          tabBarIcon: ({ color, size }) => (
+            <Newspaper color={color} size={size} />
           ),
         }}
       />

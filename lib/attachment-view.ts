@@ -1,5 +1,10 @@
 import { API_BASE_URL } from '@/lib/api-config'
-import type { AttachmentKind, AttachmentView, MessageAttachment } from '@/lib/types'
+import type {
+  AttachmentKind,
+  AttachmentView,
+  MessageAttachment,
+  WallPostAttachment,
+} from '@/lib/types'
 
 /**
  * The API's attachment shape, rendered.
@@ -167,5 +172,33 @@ export function toMessageAttachment(view: AttachmentView): MessageAttachment {
     size: view.size,
     durationSeconds: view.durationMs == null ? null : view.durationMs / 1000,
     waveform: view.peaks ?? null,
+  }
+}
+
+/**
+ * A Post's attachment, in the shape this app already knows how to draw.
+ *
+ * A Post carries the API's own three-way kind rather than a MIME type, so there
+ * is nothing to classify — but everything downstream of a rendered attachment
+ * (the document opener, the video player, the byte count) speaks
+ * `AttachmentView`, and a second shape beside it would be a second set of those.
+ * The URL is made absolute here for the same reason a Message's is: a device has
+ * no notion of "the API" to resolve `/uploads/...` against.
+ *
+ * `audio` is not among the kinds a Post can carry. A voice note is something one
+ * person sends another; a Wall has no such thing.
+ */
+export function toWallAttachmentView(
+  attachment: WallPostAttachment,
+  baseUrl: string = API_BASE_URL,
+): AttachmentView {
+  const uri = resolveAttachmentUrl(attachment.url, baseUrl)
+  const name = attachment.fileName?.trim()
+
+  return {
+    kind: attachment.kind,
+    uri,
+    name: name && name !== '' ? name : fileNameFromUrl(uri),
+    size: attachment.size,
   }
 }
