@@ -343,7 +343,10 @@ Broadcasts are in-inbox announcements (later), not stories.
      organizations may be named is the web client's rule — an Agent's memberships, an Admin's whole
      list — because asking an Agent for `GET /organizations` is a `403` nothing needs.
 
-   Still web-only, and deliberately: Broadcasts, Communities, the Activity log and Analytics.
+   Still web-only, and deliberately: Broadcasts, the Activity log and Analytics. **Communities are
+   no longer on that list** — they come to this client along with the Wall, which is a separate
+   feature and a destination of its own. Administering a Community stays on web; a phone gets the
+   member's half. See `CONTEXT.md` for both, and the API's `docs/planning/wall.md`.
    Deleting a conversation is web-only too — it is content-destroying, admin-only and undoable by
    nobody, and nothing on a phone needed it.
 
