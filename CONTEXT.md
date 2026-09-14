@@ -290,10 +290,20 @@ A named container of groups inside one Organization, created by an Admin on web.
 groups linked to it and may join one; nobody outside it can see that it exists, and there is no link
 that lets anybody in — an Organization's Invitation is still the only door into anything. Reached as
 a second tab above the Conversation list rather than as a destination of its own, because what a
-Community holds is conversations. A Community carries no messages itself: the one-way thread it used
-to have is gone, and what that thread did is a Broadcast now.
-_Avoid_: Space, hub, channel group, Community announcement (retired), Wall (a different feature
-entirely)
+Community holds is conversations. It **expands in place** there, onto its Announcements thread and
+the Groups the viewer is in, each of them a conversation row a tap opens; only a bounded number of
+Groups are drawn, and **View all** at the end opens the **Community screen**, which is the same rows
+unbounded. A Community carries no messages of its own — what it holds is threads, and a broadcast to
+an Organization is a Broadcast rather than anything here.
+_Avoid_: Space, hub, channel group, Wall (a different feature entirely)
+
+**Announcements thread**:
+The one-way conversation pinned at the top of a Community's rows, which `GET /communities/:id/groups`
+answers first and marks `pinned`. Its own kind rather than a Group: every member is in it and nobody
+joins or leaves it, and the feed says nothing about muting it. It carries no unread count there
+either — the Conversation list holds the same thread and is where that number comes from.
+_Avoid_: Community announcement (the retired one-way *Community* itself), Broadcast (that is
+org-wide and not a conversation), Group
 
 **Join policy**:
 How somebody gets into a group — *request* (a Join request a Moderator answers, and the default) or
