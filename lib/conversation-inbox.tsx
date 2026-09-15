@@ -150,6 +150,11 @@ function applyToList(
   if (event.kind === 'deleted') return withoutConversation(conversations, event.conversationId)
   if (event.kind === 'conversation') return mergeConversation(conversations, event.conversation)
   if (event.kind === 'reassigned') return withReassignment(conversations, event.reassignment)
+  // A Post is not a Message and never reaches the Conversation list — the Wall
+  // is the only thing that reads a `post-*` event. See `lib/use-wall`.
+  if (event.kind === 'post-created' || event.kind === 'post-updated' || event.kind === 'post-removed') {
+    return conversations
+  }
   if (!viewerId) return conversations
   return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }

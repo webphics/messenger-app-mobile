@@ -33,6 +33,16 @@ export const REALTIME_EVENTS = {
   /** Outbound: asks the server to put this socket in the conversation's room. */
   conversationJoin: 'conversation.join',
   conversationLeave: 'conversation.leave',
+  /**
+   * A Post created, edited, reacted to, or removed — on its own per-organization
+   * room (`wall:<organizationId>`, or `wall:admin` for an Admin's socket), joined
+   * automatically from the same live membership resolution the support queue
+   * rooms use. Never a conversation room, and never alongside `messageCreated`: a
+   * Post is not a Message.
+   */
+  postCreated: 'post.created',
+  postUpdated: 'post.updated',
+  postRemoved: 'post.removed',
 } as const
 
 export type MessageCreated = {
@@ -129,6 +139,39 @@ export function parseConversationDeleted(payload: unknown): string | null {
 
   const id = record.conversationId
   return typeof id === 'string' && id !== '' ? id : null
+}
+
+/**
+ * A Post as it travels over `post.created` and `post.updated`, unparsed.
+ *
+ * The envelope is `{ organizationId, post }` and `post` is the same shape
+ * `POST /wall/posts` answers in `data` — but reading it into a `WallPost` is
+ * `lib/wall-parse`'s job, and that module is one this file must not reach for:
+ * `lib/wall-launch-isolation` walks the imports of every launch entry point,
+ * this file included, and fails if any of them can reach a Wall module. So the
+ * shape of a Post's fields is checked only at the point something actually
+ * draws one — this is a boundary the Wall itself parses across, not one the
+ * realtime layer resolves for it. `organizationId` is dropped: the default Wall
+ * is every organization a reader belongs to, room membership has already
+ * scoped which sockets receive the event at all, and nothing here filters
+ * further by it.
+ */
+function parsePostEnvelope(payload: unknown): { post: unknown } | null {
+  const record = asRecord(payload)
+  if (!record) return null
+  return asRecord(record.post) ? { post: record.post } : null
+}
+
+export const parsePostCreated = parsePostEnvelope
+export const parsePostUpdated = parsePostEnvelope
+
+/** A Post taken down or deleted. Nothing is left to fetch for it. */
+export function parsePostRemoved(payload: unknown): { postId: string } | null {
+  const record = asRecord(payload)
+  if (!record) return null
+
+  const postId = record.postId
+  return typeof postId === 'string' && postId !== '' ? { postId } : null
 }
 
 /**

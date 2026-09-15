@@ -17,6 +17,9 @@ import {
   parseConversationReassigned,
   parseConversationUpdated,
   parseMessageCreated,
+  parsePostCreated,
+  parsePostRemoved,
+  parsePostUpdated,
   REALTIME_EVENTS,
 } from '@/lib/realtime-events'
 import type { Conversation, Message } from '@/lib/types'
@@ -55,6 +58,16 @@ export type RealtimeEvent =
    * `parseConversationReassigned`.
    */
   | { kind: 'reassigned'; reassignment: Reassignment }
+  /**
+   * A Post created or changed — an edit, a reaction, a takedown reversed by
+   * nothing. Carried unparsed: reading `post` into a `WallPost` is
+   * `lib/wall-parse`'s job, and this file must stay one a launch can reach
+   * without reaching the Wall. See `parsePostEnvelope`.
+   */
+  | { kind: 'post-created'; post: unknown }
+  | { kind: 'post-updated'; post: unknown }
+  /** A Post deleted or taken down. Nothing is left to fetch for it. */
+  | { kind: 'post-removed'; postId: string }
   /**
    * The connection came back after dropping. Whatever was emitted while it was
    * down was emitted to nobody, so what is held is unverifiable and has to be
@@ -203,6 +216,21 @@ function useRealtimeConnection(): RealtimeValue {
     socket.on(REALTIME_EVENTS.conversationReassigned, (payload: unknown) => {
       const reassignment = parseConversationReassigned(payload)
       if (reassignment) emit({ kind: 'reassigned', reassignment })
+    })
+
+    socket.on(REALTIME_EVENTS.postCreated, (payload: unknown) => {
+      const event = parsePostCreated(payload)
+      if (event) emit({ kind: 'post-created', post: event.post })
+    })
+
+    socket.on(REALTIME_EVENTS.postUpdated, (payload: unknown) => {
+      const event = parsePostUpdated(payload)
+      if (event) emit({ kind: 'post-updated', post: event.post })
+    })
+
+    socket.on(REALTIME_EVENTS.postRemoved, (payload: unknown) => {
+      const event = parsePostRemoved(payload)
+      if (event) emit({ kind: 'post-removed', postId: event.postId })
     })
 
     return () => {
