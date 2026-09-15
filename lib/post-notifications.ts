@@ -73,7 +73,11 @@ export function postNotificationRows(
  * yet; where none is, it says they are off and is the only one that does. That
  * second case is exactly when `NotificationPermissionRow` draws itself beneath
  * this card, so the sentence that reports a closed door is the one with the way
- * out under it, and nothing here is a dead end. Nothing here asks, either: the
+ * out under it, and nothing here is a dead end. It is also why that sentence does
+ * not say notifications are *off*: the row below says exactly that, in those
+ * words, and on the emulator the two read as one sentence printed twice. So this
+ * one says what it alone knows — what it means for a Post — and leaves the state
+ * of the platform to the card that can do something about it. Nothing here asks, either: the
  * two moments that do are elsewhere, and this is a card on a screen somebody
  * chose to open.
  */
@@ -81,8 +85,8 @@ export function postNotificationCaveat(standing: PermissionStanding): string | n
   if (standing.status === 'granted') return null
 
   return shouldOfferSystemSettings(standing)
-    ? 'Notifications are turned off for Enki, so a Post will not reach this phone. ' +
-        'A switch you turn on is still kept, and it takes effect as soon as notifications are on.'
+    ? 'A Post will not reach this phone while notifications are off. ' +
+        'A switch you turn on is still kept, and it takes effect as soon as they are on.'
     : 'Notifications are not on for Enki yet, so a Post will not reach this phone. ' +
-        'A switch you turn on is still kept, and it takes effect as soon as notifications are on.'
+        'A switch you turn on is still kept, and it takes effect as soon as they are on.'
 }
