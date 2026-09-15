@@ -155,6 +155,12 @@ function applyToList(
   if (event.kind === 'post-created' || event.kind === 'post-updated' || event.kind === 'post-removed') {
     return conversations
   }
+  // A Group join request answered is the Communities screen's to re-read —
+  // see `useCommunityFeed`. The viewer's own tap already folds a newly-joined
+  // Group's conversation in through `addConversation` (`useJoinGroup`); an
+  // approval landing from elsewhere has no payload here to build one from, so
+  // it waits for the next ordinary fetch to pick it up.
+  if (event.kind === 'group-join-answered') return conversations
   if (!viewerId) return conversations
   return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }

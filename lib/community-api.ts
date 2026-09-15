@@ -1,4 +1,4 @@
-import { query, readOutcome, type ApiResult } from '@/lib/api-result'
+import { acknowledged, query, readOutcome, type ApiResult } from '@/lib/api-result'
 import { authenticatedRequest } from '@/lib/auth-service'
 import {
   parseCommunities,
@@ -18,8 +18,9 @@ import type { Community, CommunityFeedRow, GroupJoinOutcome } from '@/lib/types'
  * a request that hangs ends as an ordinary transport failure on the same
  * deadline. This module adds paths, not a second way of talking to the API.
  *
- * Two reads and, since #73, the two writes a member's own half of a Community
- * needs: joining a linked Group, and leaving the Community itself. Creating,
+ * Two reads and, since #73, the writes a member's own half of a Community
+ * needs: joining a linked Group, leaving the Community itself, and — since
+ * #88 — taking back an ask that has not been answered yet. Creating,
  * renaming, linking a Group, promoting a Moderator, answering a Join request
  * and every other route on that controller stay on web — see `docs/scope.md`.
  * A phone gets the member's half.
@@ -96,4 +97,19 @@ export async function leaveCommunity(communityId: string): Promise<ApiResult<{ i
     method: 'DELETE',
   })
   return readOutcome(outcome, parseLeftCommunity)
+}
+
+/**
+ * The requester taking their own ask back (#88). Nobody's membership changed
+ * by this, so there is nothing in the answer worth reading — see `acknowledged`.
+ */
+export async function withdrawJoinRequest(
+  communityId: string,
+  groupId: string,
+): Promise<ApiResult<void>> {
+  const outcome = await authenticatedRequest(
+    `/communities/${communityId}/groups/${groupId}/join-requests/me`,
+    { method: 'DELETE' },
+  )
+  return readOutcome(outcome, acknowledged)
 }

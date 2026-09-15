@@ -78,7 +78,7 @@ export function CommunityScreen({ communityId }: CommunityScreenProps) {
     [router],
   );
 
-  const { busyId, error: joinError, join } = useJoinGroup(
+  const { busyId, error: joinError, join, withdraw } = useJoinGroup(
     communityId,
     useCallback(
       (conversation: Conversation) => {
@@ -147,6 +147,7 @@ export function CommunityScreen({ communityId }: CommunityScreenProps) {
             busy={busyId === item.row.id}
             blocked={busyId !== null && busyId !== item.row.id}
             onJoin={join}
+            onWithdraw={withdraw}
           />
         );
       }
@@ -160,7 +161,7 @@ export function CommunityScreen({ communityId }: CommunityScreenProps) {
       item satisfies never;
       return null;
     },
-    [openConversation, busyId, join],
+    [openConversation, busyId, join, withdraw],
   );
 
   const title = community?.name ?? "Community";

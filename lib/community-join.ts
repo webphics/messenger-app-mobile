@@ -2,23 +2,25 @@ import type { ApiFailure } from '@/lib/api-result'
 import type { CommunityJoinableGroupRow } from '@/lib/types'
 
 /**
- * The one button on a Group nobody is in (#73).
+ * The one button on a Group nobody is in (#73, and #88's withdraw).
  *
- * Pure, like every decision table in this app: what the button says and
- * whether it does anything are read off the row rather than derived from a
- * tap. A pending ask offers nothing to tap — taking one back is #88's — so
- * this only ever has to say *Requested* and stop there.
+ * Pure, like every decision table in this app: what the button says and what
+ * a tap on it does are read off the row rather than derived from the tap
+ * itself. Two actions, never three: a pending ask has nothing left to *ask*
+ * for, so the same button that opened it is the one that takes it back.
  */
+
+export type JoinRowAction = 'join' | 'withdraw'
+
+/** Which of the two the button does. Always one of them — there is no third, inert state. */
+export function joinRowAction(row: CommunityJoinableGroupRow): JoinRowAction {
+  return row.joinState === 'pending' ? 'withdraw' : 'join'
+}
 
 /** What the join control says, for every combination `joinPolicy`/`joinState` can be in. */
 export function joinButtonLabel(row: CommunityJoinableGroupRow): string {
-  if (row.joinState === 'pending') return 'Requested'
+  if (row.joinState === 'pending') return 'Withdraw'
   return row.joinPolicy === 'open' ? 'Join' : 'Ask to join'
-}
-
-/** Whether tapping the join control does anything. A pending ask has nothing further to say yet. */
-export function canRequestJoin(row: CommunityJoinableGroupRow): boolean {
-  return row.joinState !== 'pending'
 }
 
 /**

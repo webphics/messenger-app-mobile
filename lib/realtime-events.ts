@@ -43,6 +43,13 @@ export const REALTIME_EVENTS = {
   postCreated: 'post.created',
   postUpdated: 'post.updated',
   postRemoved: 'post.removed',
+  /**
+   * A notification row written for this person, on the same connection and the
+   * same per-person room as everything else here — the API's one dispatch path
+   * for anything this app has not built a dedicated event for. Read narrowly:
+   * see `parseGroupJoinRequestAnswered`.
+   */
+  notificationCreated: 'notification.created',
 } as const
 
 export type MessageCreated = {
@@ -172,6 +179,43 @@ export function parsePostRemoved(payload: unknown): { postId: string } | null {
 
   const postId = record.postId
   return typeof postId === 'string' && postId !== '' ? { postId } : null
+}
+
+/**
+ * The two kinds this app reads off `notification.created` (#88): a Group join
+ * request of the asking person's own was answered.
+ *
+ * Not `group_join_requested` — that one is for whoever may answer a request,
+ * and answering stays off the phone. Everything else `notification.created`
+ * carries a kind for is a notification this app already learns about another
+ * way (a message, a reassignment) and has nothing further to do with here.
+ */
+const JOIN_REQUEST_ANSWERED_KINDS = new Set([
+  'group_join_request_approved',
+  'group_join_request_declined',
+])
+
+/**
+ * A `notification.created` payload read for the one thing a listener needs:
+ * is this a Group join request of the viewer's own being answered, and which
+ * Group was it about.
+ *
+ * `groupId` is the API's `conversationId` on this notification shape — the
+ * Group a tap on it would open — and it is only ever present on an approval;
+ * a decline opens nothing, so the API sends none and this answers `null`. A
+ * feed holding that Group as `joinable_group` is the one worth re-reading; a
+ * decline, carrying no id to match against, cannot be narrowed the same way
+ * and is read by every mounted feed — see `useCommunityFeed`.
+ */
+export function parseGroupJoinRequestAnswered(
+  payload: unknown,
+): { groupId: string | null } | null {
+  const notification = asRecord(asRecord(payload)?.notification)
+  const kind = notification?.kind
+  if (typeof kind !== 'string' || !JOIN_REQUEST_ANSWERED_KINDS.has(kind)) return null
+
+  const groupId = notification?.conversationId
+  return { groupId: typeof groupId === 'string' && groupId !== '' ? groupId : null }
 }
 
 /**

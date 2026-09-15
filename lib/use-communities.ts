@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ApiFailure } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
-import { joinLinkedGroup, listCommunities, listCommunityGroups } from '@/lib/community-api'
+import {
+  joinLinkedGroup,
+  listCommunities,
+  listCommunityGroups,
+  withdrawJoinRequest,
+} from '@/lib/community-api'
 import { communityActionRefusal } from '@/lib/community-join'
 import {
   communityTabRows,
@@ -19,6 +24,7 @@ import {
   saveCommunityFeed,
 } from '@/lib/conversation-store'
 import { useConversationInbox } from '@/lib/conversation-inbox'
+import { useRealtimeEvents } from '@/lib/realtime-context'
 import type { Community, CommunityJoinableGroupRow, Conversation } from '@/lib/types'
 
 /**
@@ -375,29 +381,63 @@ export function useCommunityFeed(communityId: string | null): {
     load()
   }, [load])
 
+  /**
+   * One of this viewer's own Group join requests was answered, somewhere —
+   * see `RealtimeEvent`'s `group-join-answered` (#88). This screen is the one
+   * place that can be showing a stale `Ask to join`, a stale pending row, or
+   * a Group that has just quietly become the viewer's to open, so it asks
+   * again rather than waiting for a pull to refresh.
+   *
+   * Narrowed where the event lets it be: an approval names the Group, and a
+   * feed that does not currently list it as `joinable_group` has nothing to
+   * learn from re-reading — this Community's rooms could not have named a
+   * pending ask on a Group it never showed as joinable. A decline names no
+   * Group at all, and a feed that is not `ready` has nothing to check
+   * against, so both re-read rather than risk sitting on a stale row.
+   */
+  useRealtimeEvents((event) => {
+    if (event.kind !== 'group-join-answered') return
+    if (event.groupId === null || feed.status !== 'ready') {
+      load()
+      return
+    }
+    if (feed.rows.some((row) => row.kind === 'joinable_group' && row.id === event.groupId)) {
+      load()
+    }
+  })
+
   return { feed, refresh, refreshing, reload: load }
 }
 
 export type JoinGroupView = {
   /** Which joinable Group has a request out, if any. */
   busyId: string | null
-  /** One line for a join the API refused, over the section rather than the row. */
+  /** One line for a join or a withdraw the API refused, over the section rather than the row. */
   error: string | null
   join: (row: CommunityJoinableGroupRow) => void
+  /** Taking back a pending ask on one of these Groups (#88). */
+  withdraw: (row: CommunityJoinableGroupRow) => void
 }
 
 /**
- * A member entering a linked Group from the Community screen (#73).
+ * A member entering a linked Group from the Community screen, or taking back
+ * an ask they opened (#73, and #88's `withdraw`).
  *
  * There is nothing to roll back: nothing here moves a row before the API
  * answers, so a refusal leaves the feed exactly as it was and only needs to
  * say so. A success re-reads the feed instead of reconstructing one row's new
  * shape from a differently-shaped answer — the same reason `useCommunityFeed`
  * reads the Store rather than trusting a write to describe itself — so
- * `onSettled` is called only once the join's own request has actually landed,
- * never at the tap, which is what makes the re-read see the join rather than
- * race it. `onJoined` is the caller's chance to fold a newly-joined Group's
- * conversation into the Conversation list before that re-read runs.
+ * `onSettled` is called only once the request has actually landed, never at
+ * the tap, which is what makes the re-read see the change rather than race
+ * it. `onJoined` is the caller's chance to fold a newly-joined Group's
+ * conversation into the Conversation list before that re-read runs; a
+ * withdraw adds nobody to anything, so it has no equivalent.
+ *
+ * One `busyId` for both actions, the same rule `joinRowAction` already
+ * enforces one row can only ever be doing one of: a tap on a second Group
+ * while the first is still out does nothing, rather than firing a second
+ * request whose answer could land in either order.
  */
 export function useJoinGroup(
   communityId: string | null,
@@ -427,7 +467,26 @@ export function useJoinGroup(
     [communityId, busyId, onJoined, onSettled],
   )
 
-  return { busyId, error, join }
+  const withdraw = useCallback(
+    (row: CommunityJoinableGroupRow) => {
+      if (!communityId || busyId) return
+      setBusyId(row.id)
+      setError(null)
+
+      void withdrawJoinRequest(communityId, row.id).then((result) => {
+        setBusyId(null)
+
+        if (!result.ok) {
+          setError(communityActionRefusal(result.failure))
+          return
+        }
+        onSettled()
+      })
+    },
+    [communityId, busyId, onSettled],
+  )
+
+  return { busyId, error, join, withdraw }
 }
 
 /**
