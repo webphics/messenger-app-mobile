@@ -149,3 +149,20 @@ export function withoutLivePost(read: WallPages, postId: string): WallPages {
   if (!read.posts.some(existing => existing.id === postId)) return read
   return { ...read, posts: read.posts.filter(existing => existing.id !== postId) }
 }
+
+/**
+ * The Saved view's own rollback: an un-bookmark the API refused, put back at
+ * the index its row held before the tap removed it.
+ *
+ * Not `withLivePost` — that is an arrival, and always goes to the top; this
+ * restores a position rather than reporting news, because the row's absence
+ * from the Saved view was the only thing the tap changed. Never duplicates: a
+ * Post already back (a second refusal answering after a retry already put it
+ * there) is left exactly where it is rather than inserted again.
+ */
+export function withRestoredPost(read: WallPages, post: WallPost, index: number): WallPages {
+  if (read.posts.some(existing => existing.id === post.id)) return read
+  const posts = [...read.posts]
+  posts.splice(Math.min(Math.max(index, 0), posts.length), 0, post)
+  return { ...read, posts }
+}

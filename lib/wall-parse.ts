@@ -23,10 +23,9 @@ import type {
  * an author, an organization, a timestamp — and everything else falls back.
  *
  * The parts of the response this client does not render yet are deliberately not
- * parsed. A Post's viewer count and whether the reader has bookmarked it each
- * belong to a ticket of their own; carrying them here would be two fields
- * nothing reads and no screen could be wrong about. `score` and `upvoteCount`
- * are the exception — #83 draws them.
+ * parsed. A Post's viewer count belongs to a ticket of its own; carrying it
+ * here would be a field nothing reads and no screen could be wrong about.
+ * `score` and `upvoteCount` (#83) and `isBookmarked` (#84) are the exceptions.
  */
 
 const ATTACHMENT_KINDS: readonly WallAttachmentKind[] = ['image', 'video', 'document']
@@ -43,6 +42,11 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | nul
 
 function optionalNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+/** Anything other than a literal `true` reads as not bookmarked, rather than as unknown. */
+function flag(value: unknown): boolean {
+  return value === true
 }
 
 /**
@@ -119,6 +123,7 @@ export function parseWallPost(data: unknown): WallPost | null {
     reactions: parseList(row.reactions, parseReaction),
     score: optionalNumber(row.score) ?? 0,
     upvoteCount: optionalNumber(row.upvoteCount) ?? 0,
+    isBookmarked: flag(row.isBookmarked),
     editedAt: text(row.editedAt),
     createdAt,
   }

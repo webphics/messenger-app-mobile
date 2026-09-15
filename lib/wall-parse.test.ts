@@ -18,6 +18,7 @@ const post = {
   reactions: [{ emoji: '🎉', userId: 'user-2' }],
   score: 4,
   upvoteCount: 5,
+  isBookmarked: true,
   editedAt: null,
   createdAt: '2026-09-14T10:00:00.000Z',
 }
@@ -34,6 +35,7 @@ describe('parseWallPost', () => {
       reactions: [{ emoji: '🎉', userId: 'user-2' }],
       score: 4,
       upvoteCount: 5,
+      isBookmarked: true,
       editedAt: null,
       createdAt: '2026-09-14T10:00:00.000Z',
     })
@@ -78,6 +80,17 @@ describe('parseWallPost', () => {
     const parsed = parseWallPost({ ...post, receiptStatus: 'read', status: 'sent' })
     expect(parsed).not.toHaveProperty('receiptStatus')
     expect(parsed).not.toHaveProperty('status')
+  })
+
+  it('reads whether the caller has bookmarked this Post', () => {
+    expect(parseWallPost({ ...post, isBookmarked: false })?.isBookmarked).toBe(false)
+    expect(parseWallPost({ ...post, isBookmarked: true })?.isBookmarked).toBe(true)
+  })
+
+  it('is false for anything but a literal true, rather than dropping the Post', () => {
+    const { isBookmarked: _isBookmarked, ...rest } = post
+    expect(parseWallPost(rest)?.isBookmarked).toBe(false)
+    expect(parseWallPost({ ...post, isBookmarked: 'yes' })?.isBookmarked).toBe(false)
   })
 })
 

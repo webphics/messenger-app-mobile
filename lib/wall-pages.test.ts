@@ -5,6 +5,7 @@ import {
   emptyWall,
   withLivePost,
   withoutLivePost,
+  withRestoredPost,
   withUpdatedPost,
   type WallPages,
 } from '@/lib/wall-pages'
@@ -23,6 +24,7 @@ function post(id: string): WallPost {
     reactions: [],
     score: 0,
     upvoteCount: 0,
+    isBookmarked: false,
     editedAt: null,
     createdAt: '2026-09-14T10:00:00.000Z',
   }
@@ -145,5 +147,33 @@ describe('a Post removed live', () => {
 
   it('does nothing for a Post already absent', () => {
     expect(withoutLivePost(read, 'z')).toBe(read)
+  })
+})
+
+describe('the Saved view putting a Post back after a refused un-bookmark', () => {
+  const read = applyFirstPage([post('c'), post('a')], LIMIT)
+
+  it('restores it at the index it held', () => {
+    const removed = post('b')
+    expect(ids(withRestoredPost(read, removed, 1))).toEqual(['c', 'b', 'a'])
+  })
+
+  it('clamps an index past the end rather than dropping the Post', () => {
+    expect(ids(withRestoredPost(read, post('z'), 99))).toEqual(['c', 'a', 'z'])
+  })
+
+  it('clamps a negative index to the front', () => {
+    expect(ids(withRestoredPost(read, post('z'), -1))).toEqual(['z', 'c', 'a'])
+  })
+
+  it('does nothing for a Post already back — a second refusal never duplicates it', () => {
+    expect(withRestoredPost(read, post('c'), 0)).toBe(read)
+  })
+
+  it('leaves the cursor and reachedEnd alone — this is not paging', () => {
+    const ended = { ...read, reachedEnd: true }
+    const next = withRestoredPost(ended, post('b'), 1)
+    expect(next.cursor).toBe(ended.cursor)
+    expect(next.reachedEnd).toBe(true)
   })
 })

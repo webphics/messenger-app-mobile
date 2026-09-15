@@ -548,6 +548,14 @@ export type WallPost = {
   score: number
   /** The upvote total alone. */
   upvoteCount: number
+  /**
+   * Whether the asking person has bookmarked this Post. Private and
+   * caller-specific — never a count, and never present in what the API
+   * broadcasts to an organization's realtime room (`docs/planning/wall-bookmarks.md`),
+   * so nothing here should ever expect it on a `post-created` or `post-updated`
+   * socket event to read true for anyone but the person who bookmarked it.
+   */
+  isBookmarked: boolean
   /** Null until somebody edits it, which is what lets a card say "Edited". */
   editedAt: string | null
   createdAt: string

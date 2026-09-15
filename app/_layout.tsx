@@ -179,6 +179,16 @@ export default function RootLayout() {
                       contentStyle: { backgroundColor: colors.bg },
                     }}
                   />
+                  {/* This person's own Saved view (#84), reached from the Wall's header
+                    rather than the Tab capsule. Beside `wall/[id]` for the same reason
+                    that route sits here rather than under a role's tabs. */}
+                  <Stack.Screen
+                    name="wall/saved"
+                    options={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  />
                   <Stack.Screen
                     name="(auth)"
                     options={{

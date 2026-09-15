@@ -125,6 +125,22 @@ export function withVoteDelta(
 }
 
 /**
+ * A tap on the bookmark control, everywhere it flips a Post in place rather
+ * than removing its row — the default Wall, a named one, and a Post's own
+ * reactions all draw the same card and the same control.
+ *
+ * Nothing to reconcile the way a reaction's array does: a bookmark is one
+ * boolean per person per Post, so the optimistic patch is simply its
+ * opposite, and putting it back on a refusal is the same call again. Not the
+ * Saved view's own toggle (`lib/use-wall-bookmarks`) — there, the Post's
+ * presence in the list *is* the bookmark, and a tap removes the row instead
+ * of flipping a flag on it.
+ */
+export function flipWallPostBookmark(post: WallPost): WallPost {
+  return { ...post, isBookmarked: !post.isBookmarked }
+}
+
+/**
  * One sentence for an edit or a removal the API refused, or nothing.
  *
  * An expired session says nothing here, the convention every write in this app

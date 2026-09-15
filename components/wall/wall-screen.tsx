@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigation } from 'expo-router'
+import { router, useNavigation } from 'expo-router'
 import { ActivityIndicator, FlatList, View } from 'react-native'
 import Animated, { useReducedMotion } from 'react-native-reanimated'
 
-import { CloudOff, Newspaper, SquarePen, X } from '@/components/icons'
+import { Bookmark, CloudOff, Newspaper, SquarePen, X } from '@/components/icons'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
 import { Text } from '@/components/ui/text'
 import { WallComposeSheet } from '@/components/wall/wall-compose-sheet'
@@ -12,7 +12,8 @@ import { settleEnter } from '@/lib/motion-enter'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
 import { colors } from '@/lib/tokens'
 import { useComposableWallOrganizations } from '@/lib/use-composable-wall-organizations'
-import { useWall, type WallView } from '@/lib/use-wall'
+import { useWall, type WallBodyView } from '@/lib/use-wall'
+import { wallSavedHref } from '@/lib/wall-route'
 import type { WallPost } from '@/lib/types'
 
 /**
@@ -141,15 +142,20 @@ function WallNothing({
 
 /**
  * Everything a Wall draws once it has posts to hold, a viewer to act as, and
- * paging of its own — every field `WallView` answers with, regardless of
- * whether it came from the default Wall or a named one.
+ * paging of its own — every field `WallBodyView` answers with, whether it
+ * came from the default Wall, a named one, or the Saved view.
  *
  * Split out of `WallScreen` for `SharedWallScreen` (#79): a shared, named Wall
  * draws exactly this, under a header naming the Wall rather than under nothing
  * at all, and duplicating the list beneath it would be the one thing the two
- * screens could disagree about by accident.
+ * screens could disagree about by accident. `WallSavedScreen` (#84) draws it
+ * a third time, fed by `lib/use-wall-bookmarks` instead of `lib/use-wall` — the
+ * only field this component itself never touches, `createPost`, is exactly
+ * the one that differs between the three, which is why the type it takes
+ * (`WallBodyView`) omits it rather than the default Wall's own hook needing a
+ * stub nobody calls.
  */
-export function WallBody({ wall }: { wall: WallView }) {
+export function WallBody({ wall }: { wall: WallBodyView }) {
   const { notice, viewer } = wall
 
   const renderItem = useCallback(
@@ -161,11 +167,20 @@ export function WallBody({ wall }: { wall: WallView }) {
           onReact={wall.react}
           myVote={wall.myVotes[item.id] ?? null}
           onVote={wall.vote}
+          onToggleBookmark={wall.toggleBookmark}
           onEdit={wall.editPost}
           onRemove={wall.removePost}
         />
       ) : null,
-    [viewer, wall.react, wall.myVotes, wall.vote, wall.editPost, wall.removePost],
+    [
+      viewer,
+      wall.react,
+      wall.myVotes,
+      wall.vote,
+      wall.toggleBookmark,
+      wall.editPost,
+      wall.removePost,
+    ],
   )
 
   return (
@@ -236,12 +251,13 @@ export function WallBody({ wall }: { wall: WallView }) {
 }
 
 /**
- * The default Wall's own screen, with Compose (#76) on the header — a
- * Contributor's way to publish, absent entirely for anyone `assertCanPost`
- * would refuse. Not on `WallBody`: a shared, named Wall (`SharedWallScreen`)
- * draws the same list underneath a different header and offers no way to
- * post into it, so the control belongs here rather than on the part the two
- * screens share.
+ * The default Wall's own screen, with Saved (#84) and Compose (#76) on the
+ * header. Saved is every reader's own way back to what they bookmarked, so it
+ * is always there; Compose is a Contributor's way to publish and absent
+ * entirely for anyone `assertCanPost` would refuse. Neither is on `WallBody`:
+ * a shared, named Wall (`SharedWallScreen`) draws the same list underneath a
+ * different header and offers a way into neither, so both controls belong
+ * here rather than on the part every Wall screen shares.
  */
 export function WallScreen() {
   const wall = useWall()
@@ -253,19 +269,30 @@ export function WallScreen() {
 
   useEffect(() => {
     navigation.setOptions({
-      headerRight: canCompose
-        ? () => (
+      headerRight: () => (
+        <View className="mr-2 flex-row items-center gap-2">
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel="Saved posts"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            className="size-10 items-center justify-center rounded-full"
+            onPress={() => router.push(wallSavedHref())}
+          >
+            <Bookmark color={colors.ink} size={20} />
+          </TactilePressable>
+          {canCompose ? (
             <TactilePressable
               accessibilityRole="button"
               accessibilityLabel="New post"
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              className="mr-2 size-10 items-center justify-center rounded-full bg-primary-soft/80"
+              className="size-10 items-center justify-center rounded-full bg-primary-soft/80"
               onPress={() => setComposeOpen(true)}
             >
               <SquarePen color={colors.primary} size={20} />
             </TactilePressable>
-          )
-        : undefined,
+          ) : null}
+        </View>
+      ),
     })
   }, [navigation, canCompose])
 
