@@ -1,5 +1,5 @@
 import { isStaffConversation } from '@/lib/types'
-import type { Conversation, UserRole } from '@/lib/types'
+import type { Conversation, GroupWritePolicy, UserRole } from '@/lib/types'
 
 /**
  * Whether this person may write in this thread, and what to say when they may not.
@@ -49,6 +49,37 @@ function readOnly(reason: string, action?: ComposerAction): ComposerAccess {
 
 export type ComposerViewer = { id: string; role: UserRole }
 
+/**
+ * A Group's own wording for the write policy locking its composer, mirroring
+ * the web client's copy so the two products agree (messenger-app#58's
+ * `composerLockedNamed` / `composerLockedAdmins`). `everyone` never reaches
+ * this: the API's `canWrite` is already resolved against the policy, so a
+ * `false` under `everyone` cannot happen from a payload this client should
+ * trust, and the `admins` wording is the safer of the two if it somehow does.
+ */
+function groupPolicyReason(writePolicy: GroupWritePolicy | null | undefined): string {
+  return writePolicy === 'named'
+    ? 'Only the members chosen for this group can send messages here.'
+    : "Only this group's admins can send messages here."
+}
+
+/**
+ * A Group's read model, ahead of everything else this file decides for one:
+ * `canWrite` arrives already resolved against the write policy — an Admin, a
+ * participating Agent and a Community Moderator all bypass it (#46) — so this
+ * never derives who may send from role or membership on the device. `null`
+ * when the Group writes freely, leaving the caller to fall through to `OPEN`.
+ */
+function groupWriteAccess(conversation: {
+  canWrite?: boolean
+  writePolicy?: GroupWritePolicy | null
+}): ComposerAccess | null {
+  if (conversation.canWrite === false) {
+    return readOnly(groupPolicyReason(conversation.writePolicy))
+  }
+  return null
+}
+
 export function composerAccess(
   conversation: Conversation,
   viewer: ComposerViewer,
@@ -60,9 +91,13 @@ export function composerAccess(
    * announcement is something they receive rather than post in.
    */
   if (!isStaffConversation(conversation)) {
-    return conversation.type === 'community_announcement'
-      ? readOnly('Announcements are posted by the team.')
-      : OPEN
+    if (conversation.type === 'community_announcement') {
+      return readOnly('Announcements are posted by the team.')
+    }
+    if (conversation.type === 'group') {
+      return groupWriteAccess(conversation) ?? OPEN
+    }
+    return OPEN
   }
 
   if (conversation.type === 'community_announcement') {
@@ -73,7 +108,11 @@ export function composerAccess(
       : readOnly('Announcements are posted by the team.')
   }
 
-  // A staff DM and a group are writable by anyone the API sent them to.
+  if (conversation.type === 'group') {
+    return groupWriteAccess(conversation) ?? OPEN
+  }
+
+  // A staff DM is writable by anyone the API sent them to.
   if (conversation.type !== 'support_dm') return OPEN
 
   if (conversation.status === 'closed') {

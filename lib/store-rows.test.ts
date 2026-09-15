@@ -52,6 +52,12 @@ function staffConversation(overrides: Partial<StaffConversation> = {}): Conversa
     otherUser: null,
     members: [],
     labels: [{ id: 'label-1', name: 'Billing', color: 'amber', archived: false }],
+    // Null and `true` respectively: a support DM carries no write policy at
+    // all, and the API resolves `canWrite` to `true` outside a group. Present
+    // here because the round trip through `parseConversation` always supplies
+    // them, even where the payload it read did not.
+    writePolicy: null,
+    canWrite: true,
     lastMessageAt: '2026-08-13T08:00:00.000Z',
     lastMessagePreview: 'Hello',
     lastMessageMine: false,

@@ -65,6 +65,13 @@ export type ConversationType =
 /** Assignment state of a Support DM. Null on every other conversation type. */
 export type SupportStatus = 'unassigned' | 'engaged' | 'closed'
 
+/**
+ * Who may send into a Group (messenger-api#46): everyone in it, only the
+ * people who run it, or a chosen set of writers. Group-only; every other
+ * conversation type carries no policy at all.
+ */
+export type GroupWritePolicy = 'everyone' | 'admins' | 'named'
+
 export type MessageType = 'text' | 'media' | 'voice' | 'system'
 
 /** How far a message the viewer sent has got. Not a local send state. */
@@ -138,6 +145,15 @@ export type StaffConversation = ConversationBase & {
   otherUser: ConversationStaffPerson | null
   members: ConversationStaffPerson[]
   labels: Label[]
+  /**
+   * Group-only; `null` for every other type. Always resolves `true` for
+   * Staff on the API's own mapper — an Admin or a participating Agent bypasses
+   * the policy entirely — so nothing on this client's staff screens ever reads
+   * a group as locked. Optional because most fixtures in this codebase predate
+   * it and carry no group at all; a real payload always sends it.
+   */
+  writePolicy?: GroupWritePolicy | null
+  canWrite?: boolean
 }
 
 /** A Customer's own support thread. Carries no assignee-facing detail at all. */
@@ -151,6 +167,9 @@ export type CustomerGroupConversation = ConversationBase & {
   description: string | null
   avatarUrl: string | null
   members: ConversationStaffPerson[]
+  /** Whether this Customer may write here, resolved by the API against the policy below. */
+  writePolicy: GroupWritePolicy
+  canWrite: boolean
 }
 
 export type CustomerAnnouncementConversation = ConversationBase & {
@@ -531,6 +550,17 @@ export type WallPostReaction = {
 /** A push up or down on a Post — the Wall's ranking signal, never both at once. */
 export type WallVoteDirection = 'up' | 'down'
 
+/**
+ * How a Wall is read: newest first, or by what people responded to.
+ *
+ * `recent` is the default and is byte-identical to reading with no `sort` at
+ * all — see `lib/wall-api`'s `listWallPosts`. `popular` ranks within a rolling
+ * window the API owns and freezes its own paging order per reader per Wall
+ * scope, which is why switching between the two has to reset paging rather
+ * than reuse a cursor the other order minted.
+ */
+export type WallSort = 'recent' | 'popular'
+
 export type WallPost = {
   id: string
   author: WallPostAuthor
@@ -548,6 +578,14 @@ export type WallPost = {
   score: number
   /** The upvote total alone. */
   upvoteCount: number
+  /**
+   * How many distinct people have seen this Post, its author excluded and
+   * counted once per person ever — public and global, not per-organization
+   * or per-Wall (`docs/api/wall.md`'s `POST /wall/posts/:id/view`). Never
+   * present on a `post-created`/`post-updated` realtime payload, since
+   * recording a view raises no broadcast at all.
+   */
+  viewCount: number
   /**
    * Whether the asking person has bookmarked this Post. Private and
    * caller-specific — never a count, and never present in what the API

@@ -97,6 +97,35 @@ describe('parseConversation', () => {
     expect(conversation).toMatchObject({ title: 'Group' })
   })
 
+  test("reads a Customer group's write policy and the read model's answer", () => {
+    const conversation = parseConversation({
+      ...customerSupportRow(),
+      type: 'group',
+      title: 'Offers',
+      members: [],
+      writePolicy: 'named',
+      canWrite: false,
+    })
+    expect(conversation).toMatchObject({ writePolicy: 'named', canWrite: false })
+  })
+
+  test('defaults a Customer group missing the policy to open and writable', () => {
+    const conversation = parseConversation({
+      ...customerSupportRow(),
+      type: 'group',
+      title: 'Offers',
+      members: [],
+    })
+    expect(conversation).toMatchObject({ writePolicy: 'everyone', canWrite: true })
+  })
+
+  test('reads a staff group row carrying the same read model', () => {
+    const conversation = parseConversation(
+      staffRow({ type: 'group', title: 'Offers', writePolicy: 'admins', canWrite: true }),
+    )
+    expect(conversation).toMatchObject({ writePolicy: 'admins', canWrite: true })
+  })
+
   test.each([
     ['no id', { id: '' }],
     ['no organization', { organizationId: undefined }],
