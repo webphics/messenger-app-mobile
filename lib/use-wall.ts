@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { ApiFailure } from '@/lib/api-result'
+import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { listWallPosts, WALL_PAGE_LIMIT } from '@/lib/wall-api'
+import { parseWallPost } from '@/lib/wall-parse'
 import {
   applyFirstPage,
   applyOlderPage,
   canPageBack,
   emptyWall,
+  withLivePost,
+  withoutLivePost,
+  withUpdatedPost,
   type WallPages,
 } from '@/lib/wall-pages'
 import { wallNotice, type WallNotice } from '@/lib/wall-notice'
@@ -19,8 +24,16 @@ import type { WallPost } from '@/lib/types'
  * The decisions are all somewhere else — `lib/wall-pages` for what a page does
  * to what is drawn and when the Wall has ended, `lib/wall-notice` for which of
  * the four things a screen with no Posts on it says. What is left here is the
- * part that is neither: when to ask, and how to ignore an answer that arrived
- * for a read somebody has already replaced.
+ * part that is neither: when to ask, how to ignore an answer that arrived for
+ * a read somebody has already replaced, and — since #78 — what the socket says
+ * about a Post while this screen is open.
+ *
+ * A Post is not a Message, and its live path is deliberately a second one:
+ * `post.created`, `.updated` and `.removed` are their own events on the same
+ * connection, never the message-created emitter, so nothing here can leak into
+ * the message socket path, the In-app banner or anything that draws a
+ * notification — none of those listen for a `post-*` event, and this hook is
+ * the only thing that does.
  *
  * Nothing is persisted, and nothing is read before somebody asks for it. The
  * first page is fetched when this hook mounts, which is when the Wall tab is
@@ -143,6 +156,53 @@ export function useWall(): WallView {
   }, [loadFirst])
 
   const dismissFailure = useCallback(() => setFailure(null), [])
+
+  /**
+   * What the socket says, while the Wall is on screen.
+   *
+   * Room membership has already decided which sockets receive a Post at all —
+   * every organization the reader belongs to, or every organization for an
+   * Admin — so nothing here filters by organization; a live Post reaching this
+   * device is by construction one the default Wall shows. The three outcomes
+   * are `lib/wall-pages`'s: a creation goes to the top, an edit or a reaction
+   * replaces the Post in place without moving it, and a removal drops it — a
+   * Post that never made it onto this device's held pages folds into none of
+   * the three, which is correct rather than a gap: there is nothing on screen
+   * for it to change.
+   *
+   * `post` arrives unparsed — see `parsePostEnvelope` in `lib/realtime-events`
+   * for why the realtime layer cannot read it into a `WallPost` itself. This is
+   * the first point a Post payload is read at all, which is also the first
+   * point `lib/wall-parse` is reached: safe here, because this hook only runs
+   * once somebody has opened the Wall.
+   *
+   * A resync re-reads the first page exactly as a mount does — nothing was
+   * missed while the connection was down that a fresh page cannot repair, and
+   * silently: `loadFirst` sets neither `loading` nor `refreshing`, so nothing
+   * appears to have happened unless the Wall actually changed underneath it.
+   */
+  useRealtimeEvents((event: RealtimeEvent) => {
+    if (event.kind === 'resync') {
+      loadFirst()
+      return
+    }
+
+    if (event.kind === 'post-created') {
+      const post = parseWallPost(event.post)
+      if (post) setRead(current => withLivePost(current, post))
+      return
+    }
+
+    if (event.kind === 'post-updated') {
+      const post = parseWallPost(event.post)
+      if (post) setRead(current => withUpdatedPost(current, post))
+      return
+    }
+
+    if (event.kind === 'post-removed') {
+      setRead(current => withoutLivePost(current, event.postId))
+    }
+  })
 
   return {
     posts: read.posts,

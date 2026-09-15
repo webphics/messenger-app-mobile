@@ -3,6 +3,9 @@ import {
   applyOlderPage,
   canPageBack,
   emptyWall,
+  withLivePost,
+  withoutLivePost,
+  withUpdatedPost,
   type WallPages,
 } from '@/lib/wall-pages'
 import type { WallPost } from '@/lib/types'
@@ -94,5 +97,51 @@ describe('whether there is a page worth asking for', () => {
 
   it('there is not, once the Wall has answered short', () => {
     expect(canPageBack(applyFirstPage([post('c')], LIMIT))).toBe(false)
+  })
+})
+
+describe('a Post that arrives live', () => {
+  const read = applyFirstPage([post('c'), post('b'), post('a')], LIMIT)
+
+  it('goes on top', () => {
+    expect(ids(withLivePost(read, post('d')))).toEqual(['d', 'c', 'b', 'a'])
+  })
+
+  it('replaces a copy already held rather than duplicating it, but still moves to the top', () => {
+    expect(ids(withLivePost(read, post('b')))).toEqual(['b', 'c', 'a'])
+  })
+
+  it('leaves the cursor and reachedEnd alone — an arrival changes nothing about paging', () => {
+    const ended = { ...read, reachedEnd: true }
+    const next = withLivePost(ended, post('d'))
+    expect(next.cursor).toBe(ended.cursor)
+    expect(next.reachedEnd).toBe(true)
+  })
+})
+
+describe('an edit or a reaction, over the socket', () => {
+  const read = applyFirstPage([post('c'), post('b'), post('a')], LIMIT)
+
+  it('replaces the Post in place, without moving it', () => {
+    const edited: WallPost = { ...post('b'), body: 'edited', editedAt: '2026-09-14T11:00:00.000Z' }
+    const next = withUpdatedPost(read, edited)
+    expect(ids(next)).toEqual(['c', 'b', 'a'])
+    expect(next.posts[1]).toEqual(edited)
+  })
+
+  it('does nothing for a Post this device has not read', () => {
+    expect(withUpdatedPost(read, post('z'))).toBe(read)
+  })
+})
+
+describe('a Post removed live', () => {
+  const read = applyFirstPage([post('c'), post('b'), post('a')], LIMIT)
+
+  it('drops it', () => {
+    expect(ids(withoutLivePost(read, 'b'))).toEqual(['c', 'a'])
+  })
+
+  it('does nothing for a Post already absent', () => {
+    expect(withoutLivePost(read, 'z')).toBe(read)
   })
 })

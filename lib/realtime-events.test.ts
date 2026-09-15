@@ -4,6 +4,9 @@ import {
   parseConversationReassigned,
   parseConversationUpdated,
   parseMessageCreated,
+  parsePostCreated,
+  parsePostRemoved,
+  parsePostUpdated,
   REALTIME_EVENTS,
   REALTIME_NAMESPACE,
 } from '@/lib/realtime-events'
@@ -149,6 +152,9 @@ describe('the namespace and event names', () => {
       conversationReassigned: 'conversation.reassigned',
       conversationJoin: 'conversation.join',
       conversationLeave: 'conversation.leave',
+      postCreated: 'post.created',
+      postUpdated: 'post.updated',
+      postRemoved: 'post.removed',
     })
   })
 })
@@ -341,6 +347,64 @@ describe('parseConversationReassigned', () => {
         currentAssignee: { name: 'Admin' },
       }),
     ).toEqual({ conversationId: 'conv-1', reason: 'taken_over', assignee: null })
+  })
+})
+
+/**
+ * What `post.created` and `.updated` carry, per `docs/api/conversations.md` →
+ * "Realtime: Wall Posts": `{ organizationId, post }`, where `post` is the same
+ * shape `POST /wall/posts` answers in `data`.
+ */
+const POST_CREATED = {
+  organizationId: 'acb16271-ee14-4a52-8952-68113b7a11bc',
+  post: {
+    id: '2e2f0a2b-9e4a-4a3a-9a2e-9f6b3f9c1a10',
+    author: { id: '56e168f0-3b5a-49fb-b475-0063c78a2337', name: 'QA Agent' },
+    organizationId: 'acb16271-ee14-4a52-8952-68113b7a11bc',
+    body: 'fixture probe',
+    attachments: [],
+    link: null,
+    reactions: [],
+    editedAt: null,
+    createdAt: '2026-09-14T10:00:00.000Z',
+  },
+}
+
+describe('parsePostCreated / parsePostUpdated', () => {
+  it('reads the post envelope carries, unparsed', () => {
+    expect(parsePostCreated(POST_CREATED)).toEqual({ post: POST_CREATED.post })
+    expect(parsePostUpdated(POST_CREATED)).toEqual({ post: POST_CREATED.post })
+  })
+
+  const refused: [string, unknown][] = [
+    ['null', null],
+    ['a string', 'post.created'],
+    ['no post', { organizationId: 'org-1' }],
+    ['a post that is not an object', { organizationId: 'org-1', post: 'nope' }],
+  ]
+
+  it.each(refused)('answers null for %s', (_case, payload) => {
+    expect(parsePostCreated(payload)).toBeNull()
+    expect(parsePostUpdated(payload)).toBeNull()
+  })
+})
+
+describe('parsePostRemoved', () => {
+  it('reads the id', () => {
+    expect(parsePostRemoved({ organizationId: 'org-1', postId: 'post-1' })).toEqual({
+      postId: 'post-1',
+    })
+  })
+
+  const refused: [string, unknown][] = [
+    ['null', null],
+    ['an empty envelope', {}],
+    ['an empty id', { organizationId: 'org-1', postId: '' }],
+    ['a non-string id', { organizationId: 'org-1', postId: 7 }],
+  ]
+
+  it.each(refused)('answers null for %s', (_case, payload) => {
+    expect(parsePostRemoved(payload)).toBeNull()
   })
 })
 

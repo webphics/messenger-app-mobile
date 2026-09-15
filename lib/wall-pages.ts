@@ -105,3 +105,47 @@ export function applyOlderPage(read: WallPages, page: WallPost[], limit: number)
 export function canPageBack(read: WallPages): boolean {
   return read.cursor !== null && !read.reachedEnd
 }
+
+/**
+ * A Post that just arrived, placed above everything already drawn.
+ *
+ * Newest first is the Wall's whole order, and an arrival over the socket is by
+ * definition the newest thing the API knows about — so it goes on top rather
+ * than wherever `createdAt` would sort it, which is what keeps the list correct
+ * even when this device's clock disagrees with the server's. A copy already
+ * held — this device's own Post read back, or the same event delivered twice —
+ * is replaced in place rather than duplicated, but still moves to the top: a
+ * repeat of a live arrival is still the newest thing this device has been told
+ * about.
+ *
+ * Never touches the cursor. Cursor and `reachedEnd` describe how far back this
+ * device has paged, which a Post landing at the front changes nothing about.
+ */
+export function withLivePost(read: WallPages, post: WallPost): WallPages {
+  return { ...read, posts: [post, ...read.posts.filter(existing => existing.id !== post.id)] }
+}
+
+/**
+ * An edit or a reaction, folded into the Post already on screen.
+ *
+ * Replaces in place and never reorders — an edited Post staying exactly where
+ * it was is what lets `withLivePost` above be the only thing that moves a row,
+ * and what a Post's own card relies on to say "Edited" against a position the
+ * reader already knows.
+ *
+ * Never adds the Post: one this device has not read is not "on screen to
+ * update", and a page further back is not something an edit should reach into
+ * and pull forward.
+ */
+export function withUpdatedPost(read: WallPages, post: WallPost): WallPages {
+  if (!read.posts.some(existing => existing.id === post.id)) return read
+  return { ...read, posts: read.posts.map(existing => (existing.id === post.id ? post : existing)) }
+}
+
+/**
+ * A Post deleted or taken down. Simply absent, the way a Post never drawn is.
+ */
+export function withoutLivePost(read: WallPages, postId: string): WallPages {
+  if (!read.posts.some(existing => existing.id === postId)) return read
+  return { ...read, posts: read.posts.filter(existing => existing.id !== postId) }
+}
