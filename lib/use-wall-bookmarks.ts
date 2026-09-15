@@ -285,10 +285,16 @@ export function useWallBookmarks(): WallBodyView {
 
       void toggleWallPostBookmark(postId).then(result => {
         if (bookmarkAttempt.current.get(postId) !== attempt) return
-        // A success leaves it removed — the Saved view holds only what is
-        // still bookmarked, and the API just agreed this one no longer is.
-        if (result.ok) return
-        setRead(current => withRestoredPost(current, removed, index))
+        // Whether the tap came out as the API's add or its remove is read off
+        // its answer rather than off the tap, the way every other toggle in
+        // this app already is. A success is normally a removal and the row
+        // stays gone — but if this device's copy was stale and the toggle
+        // *added* the bookmark, the row belongs back, carrying what the API
+        // just said about it rather than the copy that was wrong.
+        if (result.ok && !result.value.isBookmarked) return
+        setRead(current =>
+          withRestoredPost(current, result.ok ? result.value : removed, index),
+        )
       })
     },
     [read],

@@ -61,7 +61,7 @@ function wallSources(): { path: string; source: string }[] {
   return WALL_SOURCES.flatMap(directory =>
     readdirSync(join(REPOSITORY, directory), { withFileTypes: true })
       .filter(entry => entry.isFile() && /\.tsx?$/.test(entry.name))
-      .filter(entry => directory !== 'lib' || /^(use-)?wall[-.]/.test(entry.name))
+      .filter(entry => directory !== 'lib' || /^(use-)?(wall|post-notifications|notification-api|read-notice)[-.]|^use-composable-wall-/.test(entry.name))
       .filter(entry => !entry.name.endsWith('.test.ts'))
       .filter(entry => !PERSISTS_BY_DESIGN.includes(`${directory}/${entry.name}`))
       .map(entry => ({
