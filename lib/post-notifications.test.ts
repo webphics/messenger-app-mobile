@@ -107,15 +107,18 @@ describe('postNotificationCaveat', () => {
       canAskAgain: false,
       askedBefore: true,
     })
-    expect(caveat).toMatch(/turned off for Enki/i)
+    expect(caveat).toMatch(/while notifications are off/i)
     expect(caveat).toMatch(/will not reach this phone/i)
     expect(caveat).toMatch(/still kept/i)
+    // The row beneath says notifications are turned off, in those words. Saying
+    // it again here printed one sentence twice on the emulator.
+    expect(caveat).not.toMatch(/turned off/i)
   })
 
   test('says the same to somebody who dismissed the one dialog they will get', () => {
     expect(
       postNotificationCaveat({ status: 'undetermined', canAskAgain: true, askedBefore: true }),
-    ).toMatch(/turned off for Enki/i)
+    ).toMatch(/while notifications are off/i)
   })
 
   test('every standing but granted says both halves', () => {
