@@ -1,4 +1,4 @@
-import type { WallPostAttachment, WallPostReaction } from '@/lib/types'
+import type { WallPost, WallPostAttachment, WallPostReaction } from '@/lib/types'
 
 /**
  * What a Post's card is made of, decided before anything is drawn.
@@ -133,6 +133,25 @@ export const WALL_BODY_LEAD_MAX = 140
  */
 export function wallBodyEmphasis(body: string, hasImages: boolean): 'lead' | 'body' {
   return !hasImages && body.trim().length <= WALL_BODY_LEAD_MAX ? 'lead' : 'body'
+}
+
+/**
+ * Whether this device should ask the API to record a view of this Post.
+ *
+ * Two of the three rules the API itself would apply anyway — the author's own
+ * view is never counted, and a second call from the same person changes
+ * nothing — are checked here first so a screen never spends a request on an
+ * answer it can already read locally. `recorded` is per-session state the
+ * caller owns (never persisted: a Wall keeps nothing of its own across a
+ * relaunch, see `lib/use-wall`'s module doc), so a Post scrolled past twice in
+ * one sitting is asked about once.
+ */
+export function shouldRecordWallPostView(
+  post: WallPost,
+  viewerId: string,
+  recorded: ReadonlySet<string>,
+): boolean {
+  return post.author.id !== viewerId && !recorded.has(post.id)
 }
 
 /** One emoji, gathered for the reaction row: how many hold it, and whether the viewer is one of them. */

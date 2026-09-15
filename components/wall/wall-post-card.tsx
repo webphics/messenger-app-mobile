@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Alert, Linking, View } from 'react-native'
 
-import { Bookmark, ExternalLink, MoreVertical } from '@/components/icons'
+import { Bookmark, ExternalLink, MoreVertical, Reply } from '@/components/icons'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
 import { Text } from '@/components/ui/text'
@@ -11,11 +11,17 @@ import { WallPostCollage } from '@/components/wall/wall-post-collage'
 import { WallPostEditSheet } from '@/components/wall/wall-post-edit-sheet'
 import { WallPostMedia } from '@/components/wall/wall-post-media'
 import { WallPostReactions } from '@/components/wall/wall-post-reactions'
+import { WallPostViewCount } from '@/components/wall/wall-post-view-count'
 import { WallPostVote } from '@/components/wall/wall-post-vote'
 import type { ApiResult } from '@/lib/api-result'
 import { formatRelativeTime, initials } from '@/lib/display'
 import { colors } from '@/lib/tokens'
-import { wallActionRefusal, wallPostActions, type WallPostViewer } from '@/lib/wall-actions'
+import {
+  canReplyToWallPost,
+  wallActionRefusal,
+  wallPostActions,
+  type WallPostViewer,
+} from '@/lib/wall-actions'
 import type { WallPostEditInput } from '@/lib/wall-api'
 import { groupWallAttachments, linkHost } from '@/lib/wall-card'
 import type { WallPost, WallVoteDirection } from '@/lib/types'
@@ -53,6 +59,12 @@ import type { WallPost, WallVoteDirection } from '@/lib/types'
  * which holds `useWall`): this card only decides what to offer
  * (`wallPostActions`) and when to ask for confirmation, never how a Post is
  * written back.
+ *
+ * Reply (#77) sits under the reaction row rather than joining bookmark, vote
+ * and react up top: it is not a judgement or an expression about the Post,
+ * it is a way off it — into the viewer's own support conversation, with a
+ * reference to the Post rather than a relation to it. `canReplyToWallPost`
+ * decides whether it is offered at all; this card only draws the tap.
  */
 
 type WallPostCardProps = {
@@ -70,6 +82,14 @@ type WallPostCardProps = {
   onToggleBookmark: (postId: string) => void
   onEdit: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
   onRemove: (postId: string) => Promise<ApiResult<{ id: string }>>
+  /**
+   * A tap on Reply. Absent for a viewer `canReplyToWallPost` refuses — this
+   * card asks nothing itself, so a prop left off is the same as one that would
+   * always say no.
+   */
+  onReply?: (post: WallPost) => void
+  /** True while this Post's own reply is opening its conversation. */
+  replying?: boolean
 }
 
 export function WallPostCard({
@@ -81,6 +101,8 @@ export function WallPostCard({
   onToggleBookmark,
   onEdit,
   onRemove,
+  onReply,
+  replying = false,
 }: WallPostCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
@@ -92,6 +114,7 @@ export function WallPostCard({
   const age = formatRelativeTime(post.createdAt)
   const actions = wallPostActions(post, viewer)
   const link = post.link
+  const canReply = onReply && canReplyToWallPost(viewer)
 
   function confirmRemove(mode: 'delete' | 'takedown') {
     const takedown = mode === 'takedown'
@@ -230,17 +253,37 @@ export function WallPostCard({
           </TactilePressable>
         ) : null}
 
-        <WallPostVote
-          score={post.score}
-          myVote={myVote}
-          onVote={(direction) => onVote(post.id, direction)}
-        />
+        <View className="flex-row items-center justify-between">
+          <WallPostVote
+            score={post.score}
+            myVote={myVote}
+            onVote={(direction) => onVote(post.id, direction)}
+          />
+
+          <WallPostViewCount count={post.viewCount} />
+        </View>
 
         <WallPostReactions
           reactions={post.reactions}
           viewerId={viewer.id}
           onToggle={(emoji) => onReact(post.id, emoji)}
         />
+
+        {canReply ? (
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel="Reply, opens your support conversation"
+            accessibilityState={{ busy: replying }}
+            disabled={replying}
+            onPress={() => onReply?.(post)}
+            className="min-h-11 flex-row items-center gap-1.5 self-start rounded-full px-1"
+          >
+            <Reply color={colors.muted} size={16} />
+            <Text variant="label" className="text-muted">
+              {replying ? 'Opening…' : 'Reply'}
+            </Text>
+          </TactilePressable>
+        ) : null}
       </View>
 
       <WallPostActionsSheet

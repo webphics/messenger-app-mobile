@@ -23,9 +23,8 @@ import type {
  * an author, an organization, a timestamp — and everything else falls back.
  *
  * The parts of the response this client does not render yet are deliberately not
- * parsed. A Post's viewer count belongs to a ticket of its own; carrying it
- * here would be a field nothing reads and no screen could be wrong about.
- * `score` and `upvoteCount` (#83) and `isBookmarked` (#84) are the exceptions.
+ * parsed. `score` and `upvoteCount` (#83), `isBookmarked` (#84), and
+ * `viewCount` (#85) are read because a screen now draws each of them.
  */
 
 const ATTACHMENT_KINDS: readonly WallAttachmentKind[] = ['image', 'video', 'document']
@@ -123,6 +122,7 @@ export function parseWallPost(data: unknown): WallPost | null {
     reactions: parseList(row.reactions, parseReaction),
     score: optionalNumber(row.score) ?? 0,
     upvoteCount: optionalNumber(row.upvoteCount) ?? 0,
+    viewCount: optionalNumber(row.viewCount) ?? 0,
     isBookmarked: flag(row.isBookmarked),
     editedAt: text(row.editedAt),
     createdAt,

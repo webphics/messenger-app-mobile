@@ -8,9 +8,11 @@ import {
   withVoteDelta,
   type WallPostViewer,
 } from '@/lib/wall-actions'
+import { shouldRecordWallPostView } from '@/lib/wall-card'
 import {
   listWallBookmarks,
   reactToWallPost,
+  recordWallPostView,
   removeWallPost,
   toggleWallPostBookmark,
   updateWallPost,
@@ -234,6 +236,28 @@ export function useWallBookmarks(): WallBodyView {
     return result
   }, [])
 
+  /**
+   * Which Posts this screen has already asked the API to record a view for,
+   * this session — see `lib/use-wall`'s own `viewedPosts` for why this is
+   * neither persisted nor shared with the default Wall's own set: a Post can
+   * be seen on one screen and then the other, and each asks once.
+   */
+  const viewedPosts = useRef(new Set<string>())
+
+  /** A Post that has actually been on screen, not merely fetched (#85) — see `lib/use-wall`'s own. */
+  const recordView = useCallback(
+    (post: WallPost) => {
+      const userId = viewer?.id
+      if (!userId || !shouldRecordWallPostView(post, userId, viewedPosts.current)) return
+      viewedPosts.current.add(post.id)
+
+      void recordWallPostView(post.id).then(result => {
+        if (result.ok) setRead(current => withUpdatedPost(current, result.value))
+      })
+    },
+    [viewer],
+  )
+
   /** Which attempt at un-bookmarking a Post is the newest — the same reasoning as the others above. */
   const bookmarkAttempt = useRef(new Map<string, number>())
 
@@ -282,6 +306,7 @@ export function useWallBookmarks(): WallBodyView {
     dismissFailure,
     viewer,
     react,
+    recordView,
     myVotes,
     vote,
     toggleBookmark,

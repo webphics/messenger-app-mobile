@@ -60,6 +60,16 @@ function useRouteId(): string | undefined {
 }
 
 /**
+ * The reference a Reply on a Post (#77) seeded the composer with, read once on
+ * arrival. A param rather than anything on the conversation itself — it
+ * belongs to this one visit, and a route param is naturally gone on the next.
+ */
+function useInitialDraft(): string | undefined {
+  const draft = useLocalSearchParams<{ draft?: string }>().draft;
+  return typeof draft === "string" && draft !== "" ? draft : undefined;
+}
+
+/**
  * One conversation, for whoever is reading it.
  *
  * Every role's thread is the same real thread now: the rows come from the one
@@ -71,10 +81,11 @@ function useRouteId(): string | undefined {
 export default function ChatScreen() {
   const id = useRouteId();
   const role = getSession().role;
+  const initialDraft = useInitialDraft();
 
   if (!id) return <Redirect href={ROLE_HREF[role]} />;
 
-  return <ConversationScreen routeId={id} role={role} />;
+  return <ConversationScreen routeId={id} role={role} initialDraft={initialDraft} />;
 }
 
 /**
@@ -124,7 +135,15 @@ function ChatNotice({
  * which shape the API sends and which messages it withholds, and everything
  * from there — paging, sending, reading — is the same code.
  */
-function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole }) {
+function ConversationScreen({
+  routeId,
+  role,
+  initialDraft,
+}: {
+  routeId: string;
+  role: UserRole;
+  initialDraft?: string;
+}) {
   const inbox = useConversationInbox();
   const user = getSessionUser();
 
@@ -288,6 +307,7 @@ function ConversationScreen({ routeId, role }: { routeId: string; role: UserRole
       conversation={conversation}
       messages={thread.messages}
       viewer={{ id: user.id, name: user.name, role: user.role }}
+      initialDraft={initialDraft}
       organizationNames={inbox.organizationNames}
       loading={thread.loading}
       failure={thread.failure}

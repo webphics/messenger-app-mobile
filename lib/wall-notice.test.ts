@@ -84,3 +84,33 @@ describe('wallNotice for a named Wall', () => {
     expect(wallNotice({ ...blank, named: true, loading: true })).toEqual({ kind: 'loading' })
   })
 })
+
+describe('wallNotice for a search result', () => {
+  it('names what did not match, rather than claiming nobody has posted', () => {
+    expect(wallNotice({ ...blank, searching: 'lift' })).toEqual({
+      kind: 'empty',
+      title: 'No posts matched',
+      hint: 'Nothing found for “lift”. Try a different word.',
+    })
+  })
+
+  it('titles a refusal for the search rather than for the Wall', () => {
+    expect(
+      wallNotice({ ...blank, searching: 'lift', failure: { kind: 'refused', message: 'Nope.' } }),
+    ).toEqual({
+      kind: 'failed',
+      title: 'Could not search the Wall',
+      hint: 'Nope.',
+    })
+  })
+
+  it('is a spinner while a search is still in flight', () => {
+    expect(wallNotice({ ...blank, searching: 'lift', loading: true })).toEqual({
+      kind: 'loading',
+    })
+  })
+
+  it('says nothing at all once results are drawn', () => {
+    expect(wallNotice({ ...blank, searching: 'lift', drawn: 2 })).toEqual({ kind: 'none' })
+  })
+})

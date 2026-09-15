@@ -67,6 +67,13 @@ type ThreadScreenProps = {
   messages: Message[]
   viewer: ThreadViewer
   organizationNames?: ReadonlyMap<string, string>
+  /**
+   * What the composer opens holding, read once on mount. Reply on a Post
+   * (#77) is the one caller today — a reference to the Post, seeded so the
+   * person can ask about it without typing it themselves, and editable like
+   * anything else in the box.
+   */
+  initialDraft?: string
   /** True only while the first page is out and there is nothing yet to draw. */
   loading?: boolean
   /**
@@ -335,6 +342,7 @@ export function ThreadScreen({
   messages,
   viewer,
   organizationNames,
+  initialDraft,
   loading = false,
   failure = null,
   onRetry,
@@ -358,7 +366,7 @@ export function ThreadScreen({
   const listRef = useRef<FlatList<ThreadRow>>(null)
   const reduceMotion = useReducedMotion()
   const stickToLatestRef = useRef(false)
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState(initialDraft ?? '')
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const [menu, setMenu] = useState<ReactionAnchor | null>(null)
   /**

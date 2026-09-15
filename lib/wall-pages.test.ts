@@ -24,6 +24,7 @@ function post(id: string): WallPost {
     reactions: [],
     score: 0,
     upvoteCount: 0,
+    viewCount: 0,
     isBookmarked: false,
     editedAt: null,
     createdAt: '2026-09-14T10:00:00.000Z',

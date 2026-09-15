@@ -46,6 +46,20 @@ describe('chatHref', () => {
       params: { id: 'conv-assigned' },
     })
   })
+
+  test('carries a draft to seed the composer, when there is one', () => {
+    expect(chatHref('conv-assigned', 'Re: “The lift is fixed.”')).toEqual({
+      pathname: '/chat/[id]',
+      params: { id: 'conv-assigned', draft: 'Re: “The lift is fixed.”' },
+    })
+  })
+
+  test('omits the param rather than carrying an empty draft', () => {
+    expect(chatHref('conv-assigned', '')).toEqual({
+      pathname: '/chat/[id]',
+      params: { id: 'conv-assigned' },
+    })
+  })
 })
 
 describe('chatMediaHref', () => {

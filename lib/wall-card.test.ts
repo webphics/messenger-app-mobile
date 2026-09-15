@@ -1,13 +1,14 @@
 import {
   groupWallAttachments,
   linkHost,
+  shouldRecordWallPostView,
   wallBodyEmphasis,
   wallCollage,
   wallReactionChips,
   WALL_BODY_LEAD_MAX,
   WALL_COLLAGE_MAX_CELLS,
 } from '@/lib/wall-card'
-import type { WallPostAttachment, WallPostReaction } from '@/lib/types'
+import type { WallPost, WallPostAttachment, WallPostReaction } from '@/lib/types'
 
 function image(url = 'a'): WallPostAttachment {
   return { kind: 'image', url, fileName: null, size: null }
@@ -121,5 +122,38 @@ describe('wallReactionChips', () => {
       'user-1',
     )
     expect(chips.map((chip) => chip.emoji)).toEqual(['🔥', '👍'])
+  })
+})
+
+function post(overrides: Partial<WallPost> = {}): WallPost {
+  return {
+    id: 'post-1',
+    author: { id: 'author-1', name: 'Ada Lovelace' },
+    organizationId: 'org-1',
+    body: 'The lift is fixed.',
+    attachments: [],
+    link: null,
+    reactions: [],
+    score: 0,
+    upvoteCount: 0,
+    viewCount: 0,
+    isBookmarked: false,
+    editedAt: null,
+    createdAt: '2026-09-14T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
+describe('shouldRecordWallPostView', () => {
+  it('records a reader seeing somebody else’s post for the first time', () => {
+    expect(shouldRecordWallPostView(post(), 'reader-1', new Set())).toBe(true)
+  })
+
+  it('never records the author’s own view', () => {
+    expect(shouldRecordWallPostView(post(), 'author-1', new Set())).toBe(false)
+  })
+
+  it('asks only once per post this session, however many times it scrolls back into view', () => {
+    expect(shouldRecordWallPostView(post(), 'reader-1', new Set(['post-1']))).toBe(false)
   })
 })
