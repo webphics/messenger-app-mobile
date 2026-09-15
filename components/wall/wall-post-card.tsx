@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Linking, View } from 'react-native'
+import { Alert, Linking, View } from 'react-native'
 
 import { ExternalLink, MoreVertical } from '@/components/icons'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -8,10 +8,14 @@ import { Text } from '@/components/ui/text'
 import { WallPostActionsSheet } from '@/components/wall/wall-post-actions'
 import { WallPostBody } from '@/components/wall/wall-post-body'
 import { WallPostCollage } from '@/components/wall/wall-post-collage'
+import { WallPostEditSheet } from '@/components/wall/wall-post-edit-sheet'
 import { WallPostMedia } from '@/components/wall/wall-post-media'
+import { WallPostReactions } from '@/components/wall/wall-post-reactions'
+import type { ApiResult } from '@/lib/api-result'
 import { formatRelativeTime, initials } from '@/lib/display'
 import { colors } from '@/lib/tokens'
-import { wallPostActions } from '@/lib/wall-actions'
+import { wallActionRefusal, wallPostActions, type WallPostViewer } from '@/lib/wall-actions'
+import type { WallPostEditInput } from '@/lib/wall-api'
 import { groupWallAttachments, linkHost } from '@/lib/wall-card'
 import type { WallPost } from '@/lib/types'
 
@@ -25,10 +29,9 @@ import type { WallPost } from '@/lib/types'
  * fills the top of the card is what the card is showing.
  *
  * Under it the byline, then the body, then whatever else the Post carries, then
- * a meta row. Nothing on it offers or implies commenting: a Post has no replies,
- * no reply count and no comment box, and the one thing a reader can say about
- * one is a reaction (which arrives with its own ticket). The counts here are
- * quiet for the same reason — they report, they do not invite.
+ * the reaction row. Nothing on it offers or implies commenting: a Post has no
+ * replies, no reply count and no comment box, and the one thing a reader can
+ * say about one is a reaction.
  *
  * Only the byline is grouped for a screen reader, and deliberately only that:
  * a name, a stamp and an edit mark read as three fragments apart and as one
@@ -36,17 +39,59 @@ import type { WallPost } from '@/lib/types'
  * and is the wrong one — an `accessible` container swallows its children, so
  * the overflow control, the link and every image would stop being reachable at
  * all. Everything else on the card already says what it is.
+ *
+ * Editing, deleting and taking down all go up to the caller (`WallScreen`,
+ * which holds `useWall`): this card only decides what to offer
+ * (`wallPostActions`) and when to ask for confirmation, never how a Post is
+ * written back.
  */
-export function WallPostCard({ post }: { post: WallPost }) {
+
+type WallPostCardProps = {
+  post: WallPost
+  viewer: WallPostViewer
+  onReact: (postId: string, emoji: string) => void
+  onEdit: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
+  onRemove: (postId: string) => Promise<ApiResult<{ id: string }>>
+}
+
+export function WallPostCard({ post, viewer, onReact, onEdit, onRemove }: WallPostCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const { images, videos, documents } = useMemo(
     () => groupWallAttachments(post.attachments),
     [post.attachments],
   )
 
   const age = formatRelativeTime(post.createdAt)
-  const actions = wallPostActions(post)
+  const actions = wallPostActions(post, viewer)
   const link = post.link
+
+  function confirmRemove(mode: 'delete' | 'takedown') {
+    const takedown = mode === 'takedown'
+    Alert.alert(
+      takedown ? 'Take this post down?' : 'Delete this post?',
+      takedown
+        ? 'It comes off the Wall for everyone. The record stays for the audit trail.'
+        : 'It comes off the Wall for everyone. This cannot be undone from here.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: takedown ? 'Take down' : 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void onRemove(post.id).then((result) => {
+              if (!result.ok) {
+                Alert.alert(
+                  takedown ? 'Could not take the post down' : 'Could not delete the post',
+                  wallActionRefusal(result.failure) ?? '',
+                )
+              }
+            })
+          },
+        },
+      ],
+    )
+  }
 
   return (
     <View className="overflow-hidden rounded-3xl border border-line/70 bg-surface shadow-md shadow-black/8">
@@ -95,8 +140,7 @@ export function WallPostCard({ post }: { post: WallPost }) {
 
           {/*
             Present when there is something behind it and absent when there is
-            not: a control that opens an empty sheet is a dead end, and what a
-            reader can do to somebody else's Post is still arriving.
+            not: a control that opens an empty sheet is a dead end.
           */}
           {actions.length > 0 ? (
             <TactilePressable
@@ -139,13 +183,11 @@ export function WallPostCard({ post }: { post: WallPost }) {
           </TactilePressable>
         ) : null}
 
-        {post.reactions.length > 0 ? (
-          <View className="flex-row items-center border-t border-line/60 pt-3">
-            <Text variant="meta" className="text-muted tabular-nums">
-              {post.reactions.length === 1 ? '1 reaction' : `${post.reactions.length} reactions`}
-            </Text>
-          </View>
-        ) : null}
+        <WallPostReactions
+          reactions={post.reactions}
+          viewerId={viewer.id}
+          onToggle={(emoji) => onReact(post.id, emoji)}
+        />
       </View>
 
       <WallPostActionsSheet
@@ -153,6 +195,15 @@ export function WallPostCard({ post }: { post: WallPost }) {
         onClose={() => setActionsOpen(false)}
         post={post}
         actions={actions}
+        onEdit={() => setEditOpen(true)}
+        onRemove={confirmRemove}
+      />
+
+      <WallPostEditSheet
+        visible={editOpen}
+        post={post}
+        onClose={() => setEditOpen(false)}
+        onSave={(input) => onEdit(post.id, input)}
       />
     </View>
   )

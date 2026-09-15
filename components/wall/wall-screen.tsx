@@ -138,11 +138,20 @@ function WallNothing({
 
 export function WallScreen() {
   const wall = useWall()
-  const { notice } = wall
+  const { notice, viewer } = wall
 
   const renderItem = useCallback(
-    ({ item }: { item: WallPost }) => <WallPostCard post={item} />,
-    [],
+    ({ item }: { item: WallPost }) =>
+      viewer ? (
+        <WallPostCard
+          post={item}
+          viewer={viewer}
+          onReact={wall.react}
+          onEdit={wall.editPost}
+          onRemove={wall.removePost}
+        />
+      ) : null,
+    [viewer, wall.react, wall.editPost, wall.removePost],
   )
 
   return (

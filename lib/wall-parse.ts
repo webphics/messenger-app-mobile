@@ -125,3 +125,12 @@ export function parseWallPosts(data: unknown): WallPost[] | null {
   if (!Array.isArray(data)) return null
   return parseList(data, parseWallPost)
 }
+
+/** A takedown or delete's answer: nothing about a soft-removed Post is worth reading but its id. */
+export function parseWallPostRemoval(data: unknown): { id: string } | null {
+  const row = asRecord(data)
+  if (!row) return null
+
+  const id = text(row.id)
+  return id ? { id } : null
+}

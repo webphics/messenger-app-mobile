@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { ApiFailure } from '@/lib/api-result'
+import type { ApiFailure, ApiResult } from '@/lib/api-result'
+import { useAuth } from '@/lib/auth-context'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
-import { listWallPosts, WALL_PAGE_LIMIT } from '@/lib/wall-api'
+import { toggleWallPostReaction, type WallPostViewer } from '@/lib/wall-actions'
+import { listWallPosts, reactToWallPost, removeWallPost, updateWallPost, WALL_PAGE_LIMIT, type WallPostEditInput } from '@/lib/wall-api'
 import { parseWallPost } from '@/lib/wall-parse'
 import {
   applyFirstPage,
@@ -50,6 +52,17 @@ import type { WallPost } from '@/lib/types'
  * There is no Wall table, nothing under the app's document directory, and no
  * fourth thing for `endSessionOnDevice` to have been taught about. The tripwires
  * are `lib/wall-persistence` and `lib/wall-launch-isolation`.
+ *
+ * `react`, `editPost` and `removePost` (#75) are the three things a person may
+ * do to a Post once it is drawn. Reacting is optimistic, the same three steps
+ * a Message reaction already takes: the Post changes first, the request
+ * follows, and a refusal or a dead network puts it back — folded through
+ * `withUpdatedPost`, the same reducer a live edit or reaction over the socket
+ * uses, since to this hook a settled tap and a live update are the same kind
+ * of thing happening to a Post it already holds. Editing and removing are not
+ * optimistic: both need a screen of their own open on the answer (an edit
+ * sheet, a confirmation) before there is anything to show, so they hand their
+ * `ApiResult` back rather than guessing.
  */
 
 export type WallView = {
@@ -78,9 +91,21 @@ export type WallView = {
    * screen, and there is nothing underneath for putting it away to reveal.
    */
   dismissFailure: () => void
+  /** Who is looking, for the actions a Post offers only some readers. Null for the instant between a Session end and the screen leaving. */
+  viewer: WallPostViewer | null
+  /** A tap on one exact emoji. Optimistic — see the module doc. */
+  react: (postId: string, emoji: string) => void
+  /** The author's own edit. Patches the Post on success; the caller decides what a refusal means on screen. */
+  editPost: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
+  /** The author's delete, or an Admin's takedown — the API tells them apart by who is asking, not by a different route. */
+  removePost: (postId: string) => Promise<ApiResult<{ id: string }>>
 }
 
 export function useWall(): WallView {
+  const { state } = useAuth()
+  const viewer: WallPostViewer | null =
+    state.status === 'signed-in' ? { id: state.user.id, role: state.user.role } : null
+
   const [read, setRead] = useState<WallPages>(emptyWall)
   const [loading, setLoading] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -158,6 +183,89 @@ export function useWall(): WallView {
   const dismissFailure = useCallback(() => setFailure(null), [])
 
   /**
+   * Which attempt at reacting to a Post is the newest.
+   *
+   * A second tap on the same Post before the first request answers is a
+   * change of mind, not a second reaction: its own answer is the one worth
+   * having, so a stale answer that lands after it must not roll back a tap it
+   * never refused. Per-Post rather than per-(Post, emoji) — mirrors
+   * `use-thread-messages`'s `reacting` ref — because two emoji tapped in quick
+   * succession on the same Post are still one conversation with the server
+   * about what this Post's reactions are.
+   */
+  const reactionAttempt = useRef(new Map<string, number>())
+
+  /**
+   * A tap on one exact emoji, on one exact Post.
+   *
+   * The three steps a Message reaction already takes: flip it locally, ask,
+   * put it back on a refusal. Never assumes add or remove — `toggleWallPostReaction`
+   * (`lib/wall-actions`) computes both the optimistic patch and, on the way
+   * back, the exact inverse of it, so the rollback is "toggle this pair again"
+   * rather than a second decision that could disagree with the first. There is
+   * only one request either way: the API's own route is a single toggle, not
+   * an add/remove pair.
+   */
+  const react = useCallback(
+    (postId: string, emoji: string) => {
+      const userId = viewer?.id
+      if (!userId) return
+
+      setRead(current => {
+        const before = current.posts.find(post => post.id === postId)
+        if (!before) return current
+        return withUpdatedPost(current, {
+          ...before,
+          reactions: toggleWallPostReaction(before.reactions, emoji, userId).reactions,
+        })
+      })
+
+      const attempt = (reactionAttempt.current.get(postId) ?? 0) + 1
+      reactionAttempt.current.set(postId, attempt)
+
+      void reactToWallPost(postId, emoji).then(result => {
+        // A later tap on the same Post already has its own answer coming, and
+        // rolling this one back would undo a reaction the person can see and
+        // this device has not been told was refused.
+        if (reactionAttempt.current.get(postId) !== attempt) return
+
+        setRead(current => {
+          if (result.ok) return withUpdatedPost(current, result.value)
+
+          const now = current.posts.find(post => post.id === postId)
+          if (!now) return current
+          // Onto the copy the Wall holds now rather than the one the tap read:
+          // a live edit or somebody else's reaction can have folded in while
+          // the request was out, and putting the whole older Post back would
+          // take that with it.
+          return withUpdatedPost(current, {
+            ...now,
+            reactions: toggleWallPostReaction(now.reactions, emoji, userId).reactions,
+          })
+        })
+      })
+    },
+    [viewer],
+  )
+
+  /** The author's own edit. Never optimistic — see the module doc. */
+  const editPost = useCallback(
+    async (postId: string, input: WallPostEditInput): Promise<ApiResult<WallPost>> => {
+      const result = await updateWallPost(postId, input)
+      if (result.ok) setRead(current => withUpdatedPost(current, result.value))
+      return result
+    },
+    [],
+  )
+
+  /** The author's delete, or an Admin's takedown. Never optimistic — see the module doc. */
+  const removePost = useCallback(async (postId: string): Promise<ApiResult<{ id: string }>> => {
+    const result = await removeWallPost(postId)
+    if (result.ok) setRead(current => withoutLivePost(current, result.value.id))
+    return result
+  }, [])
+
+  /**
    * What the socket says, while the Wall is on screen.
    *
    * Room membership has already decided which sockets receive a Post at all —
@@ -214,5 +322,9 @@ export function useWall(): WallView {
     refresh,
     retry,
     dismissFailure,
+    viewer,
+    react,
+    editPost,
+    removePost,
   }
 }
