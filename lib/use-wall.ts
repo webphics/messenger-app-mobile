@@ -3,8 +3,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
-import { toggleWallPostReaction, type WallPostViewer } from '@/lib/wall-actions'
-import { listWallPosts, reactToWallPost, removeWallPost, updateWallPost, WALL_PAGE_LIMIT, type WallPostEditInput } from '@/lib/wall-api'
+import { nextWallPostVote, toggleWallPostReaction, withVoteDelta, type WallPostViewer } from '@/lib/wall-actions'
+import {
+  createWallPost,
+  getNamedWall,
+  listWallPosts,
+  reactToWallPost,
+  removeWallPost,
+  updateWallPost,
+  voteOnWallPost,
+  WALL_PAGE_LIMIT,
+  type WallPostCreateInput,
+  type WallPostEditInput,
+} from '@/lib/wall-api'
 import { parseWallPost } from '@/lib/wall-parse'
 import {
   applyFirstPage,
@@ -17,7 +28,7 @@ import {
   type WallPages,
 } from '@/lib/wall-pages'
 import { wallNotice, type WallNotice } from '@/lib/wall-notice'
-import type { WallPost } from '@/lib/types'
+import type { WallPost, WallVoteDirection } from '@/lib/types'
 
 /**
  * The default Wall: a page at a time, and what to say when there is nothing to
@@ -53,16 +64,28 @@ import type { WallPost } from '@/lib/types'
  * fourth thing for `endSessionOnDevice` to have been taught about. The tripwires
  * are `lib/wall-persistence` and `lib/wall-launch-isolation`.
  *
- * `react`, `editPost` and `removePost` (#75) are the three things a person may
- * do to a Post once it is drawn. Reacting is optimistic, the same three steps
- * a Message reaction already takes: the Post changes first, the request
- * follows, and a refusal or a dead network puts it back — folded through
- * `withUpdatedPost`, the same reducer a live edit or reaction over the socket
- * uses, since to this hook a settled tap and a live update are the same kind
- * of thing happening to a Post it already holds. Editing and removing are not
- * optimistic: both need a screen of their own open on the answer (an edit
- * sheet, a confirmation) before there is anything to show, so they hand their
- * `ApiResult` back rather than guessing.
+ * `react`, `vote`, `editPost` and `removePost` (#75, `vote` #83) are the things
+ * a person may do to a Post once it is drawn. Reacting and voting are both
+ * optimistic, the same three steps a Message reaction already takes: the Post
+ * changes first, the request follows, and a refusal or a dead network puts it
+ * back — folded through `withUpdatedPost`, the same reducer a live edit or
+ * reaction over the socket uses, since to this hook a settled tap and a live
+ * update are the same kind of thing happening to a Post it already holds.
+ * Editing and removing are not optimistic: both need a screen of their own
+ * open on the answer (an edit sheet, a confirmation) before there is anything
+ * to show, so they hand their `ApiResult` back rather than guessing.
+ *
+ * "My vote" is not on the Post at all, unlike a reaction: `POST
+ * /wall/posts/:id/vote` never says which direction the caller now holds, only
+ * the resulting `score`/`upvoteCount` (`docs/api/wall.md` in the messenger-api
+ * repo), so nowhere does this app get to read it back from the server —
+ * `myVotes` is this hook's own state, kept apart from the Post it describes so
+ * that a live `post-updated` for the same Post — somebody else's reaction,
+ * somebody else's vote — can replace the whole Post without wiping out what
+ * this caller privately knows they voted. It lives no further than this hook:
+ * a relaunch of the Wall loses it exactly as it loses everything else the Wall
+ * holds, which is the same property `lib/wall-persistence.test.ts` already
+ * enforces for the Posts themselves.
  */
 
 export type WallView = {
@@ -95,13 +118,40 @@ export type WallView = {
   viewer: WallPostViewer | null
   /** A tap on one exact emoji. Optimistic — see the module doc. */
   react: (postId: string, emoji: string) => void
+  /**
+   * This viewer's own vote on each Post, by id. Absent means no vote — never
+   * read off the Post itself, since the API never says (see the module doc).
+   */
+  myVotes: Record<string, WallVoteDirection>
+  /** A push up or down on one Post. Optimistic — see the module doc. */
+  vote: (postId: string, direction: WallVoteDirection) => void
+  /**
+   * A Contributor's own new Post (#76). Never optimistic — Compose already
+   * needs the API's answer to know the upload and the create both went
+   * through, the same reasoning `editPost` and `removePost` stand on. Folded
+   * to the top of the default Wall on success; a named Wall's screen posts
+   * through the same request but never draws the result, the same guard the
+   * live socket path already applies for the reason given in the module doc.
+   */
+  createPost: (input: WallPostCreateInput) => Promise<ApiResult<WallPost>>
   /** The author's own edit. Patches the Post on success; the caller decides what a refusal means on screen. */
   editPost: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
   /** The author's delete, or an Admin's takedown — the API tells them apart by who is asking, not by a different route. */
   removePost: (postId: string) => Promise<ApiResult<{ id: string }>>
 }
 
-export function useWall(): WallView {
+/**
+ * The shared half of a default and a named Wall — everything `lib/wall-pages`
+ * and `lib/wall-notice` do not already decide: when to ask, how to ignore an
+ * answer superseded by a later one, and the three things a person may do to a
+ * Post once it is drawn.
+ *
+ * `wallId` is the one difference in what gets fetched — undefined reads the
+ * default Wall, an id reads that named one through `?wall=` — and it never
+ * changes for the life of one screen: a Wall is opened by its id, and nothing
+ * on either screen offers to switch which Wall this hook is reading.
+ */
+function useWallPages(wallId: string | undefined): WallView {
   const { state } = useAuth()
   const viewer: WallPostViewer | null =
     state.status === 'signed-in' ? { id: state.user.id, role: state.user.role } : null
@@ -123,7 +173,7 @@ export function useWall(): WallView {
   const loadFirst = useCallback(() => {
     const mine = (generation.current += 1)
 
-    void listWallPosts().then(result => {
+    void listWallPosts({ wall: wallId }).then(result => {
       if (generation.current !== mine) return
       setRefreshing(false)
       setLoading(false)
@@ -135,7 +185,7 @@ export function useWall(): WallView {
       setFailure(null)
       setRead(applyFirstPage(result.value, WALL_PAGE_LIMIT))
     })
-  }, [])
+  }, [wallId])
 
   useEffect(() => {
     loadFirst()
@@ -150,7 +200,7 @@ export function useWall(): WallView {
     const cursor = read.cursor ?? undefined
 
     setLoadingOlder(true)
-    void listWallPosts({ cursor }).then(result => {
+    void listWallPosts({ cursor, wall: wallId }).then(result => {
       // Cleared before the generation is checked, and that order is the whole
       // of it: a refresh that superseded this page leaves nothing else to turn
       // the footer spinner off, and a flag nobody clears is a spinner that
@@ -167,7 +217,7 @@ export function useWall(): WallView {
       setFailure(null)
       setRead(current => applyOlderPage(current, result.value, WALL_PAGE_LIMIT))
     })
-  }, [loadingOlder, read])
+  }, [loadingOlder, read, wallId])
 
   const refresh = useCallback(() => {
     setRefreshing(true)
@@ -248,6 +298,94 @@ export function useWall(): WallView {
     [viewer],
   )
 
+  /** This viewer's own vote on each Post, by id — never on the Post itself. See the module doc. */
+  const [myVotes, setMyVotes] = useState<Record<string, WallVoteDirection>>({})
+
+  /**
+   * Which attempt at voting on a Post is the newest — the same reasoning as
+   * `reactionAttempt`, and its own ref rather than a shared one: a vote and a
+   * reaction on the same Post are two independent conversations with the
+   * server, each free to be superseded by a second tap on itself without the
+   * other's answer having anything to say about it.
+   */
+  const voteAttempt = useRef(new Map<string, number>())
+
+  /**
+   * A push up or down on one Post.
+   *
+   * The same three steps `react` takes. What differs is what "on refusal, put
+   * it back" means: a reaction's inverse lives in the reactions array itself,
+   * but a vote's previous direction is not recoverable from the Post at all,
+   * so it is read from `myVotes` before the optimistic patch and closed over
+   * for the rollback — the one place this hook has to remember something
+   * `withVoteDelta` cannot derive back out of the Post it is given.
+   */
+  const vote = useCallback(
+    (postId: string, direction: WallVoteDirection) => {
+      const userId = viewer?.id
+      if (!userId) return
+
+      const previousVote = myVotes[postId] ?? null
+      const nextVote = nextWallPostVote(previousVote, direction)
+
+      setRead(current => {
+        const before = current.posts.find(post => post.id === postId)
+        if (!before) return current
+        return withUpdatedPost(current, withVoteDelta(before, previousVote, nextVote))
+      })
+      setMyVotes(current => {
+        const next = { ...current }
+        if (nextVote === null) delete next[postId]
+        else next[postId] = nextVote
+        return next
+      })
+
+      const attempt = (voteAttempt.current.get(postId) ?? 0) + 1
+      voteAttempt.current.set(postId, attempt)
+
+      void voteOnWallPost(postId, direction).then(result => {
+        // A later tap on the same Post already has its own answer coming, and
+        // rolling this one back would undo a vote the person can see and this
+        // device has not been told was refused.
+        if (voteAttempt.current.get(postId) !== attempt) return
+
+        if (result.ok) {
+          setRead(current => withUpdatedPost(current, result.value))
+          return
+        }
+
+        setRead(current => {
+          const now = current.posts.find(post => post.id === postId)
+          if (!now) return current
+          // Onto the copy the Wall holds now rather than the one the tap
+          // read: a live edit or somebody else's vote can have folded in
+          // while the request was out, and reapplying the stale delta onto
+          // an older Post would take that with it.
+          return withUpdatedPost(current, withVoteDelta(now, nextVote, previousVote))
+        })
+        setMyVotes(current => {
+          const next = { ...current }
+          if (previousVote === null) delete next[postId]
+          else next[postId] = previousVote
+          return next
+        })
+      })
+    },
+    [viewer, myVotes],
+  )
+
+  /** A Contributor's own new Post. Never optimistic — see the module doc. */
+  const createPost = useCallback(
+    async (input: WallPostCreateInput): Promise<ApiResult<WallPost>> => {
+      const result = await createWallPost(input)
+      if (result.ok && wallId === undefined) {
+        setRead(current => withLivePost(current, result.value))
+      }
+      return result
+    },
+    [wallId],
+  )
+
   /** The author's own edit. Never optimistic — see the module doc. */
   const editPost = useCallback(
     async (postId: string, input: WallPostEditInput): Promise<ApiResult<WallPost>> => {
@@ -288,8 +426,20 @@ export function useWall(): WallView {
    * missed while the connection was down that a fresh page cannot repair, and
    * silently: `loadFirst` sets neither `loading` nor `refreshing`, so nothing
    * appears to have happened unless the Wall actually changed underneath it.
+   *
+   * `wallId !== undefined` is guarded out entirely, for the default Wall and
+   * a named one alike. Realtime over a named Wall is a ticket of its own
+   * (`docs/api/wall.md`'s own Named Walls section says the same for the API
+   * side): a live Post's room membership answers for the default Wall's whole
+   * set, but not for a named Wall's narrower one, and folding one in here
+   * without first knowing which organizations this named Wall actually
+   * resolves to would risk drawing a Post from an organization it does not
+   * name. `useSharedWall` opens with a plain read instead, and a relaunch of
+   * the screen is how it catches up.
    */
   useRealtimeEvents((event: RealtimeEvent) => {
+    if (wallId !== undefined) return
+
     if (event.kind === 'resync') {
       loadFirst()
       return
@@ -314,7 +464,7 @@ export function useWall(): WallView {
 
   return {
     posts: read.posts,
-    notice: wallNotice({ drawn: read.posts.length, loading, failure }),
+    notice: wallNotice({ drawn: read.posts.length, loading, failure, named: wallId !== undefined }),
     loadingOlder,
     refreshing,
     canLoadOlder: canPageBack(read),
@@ -324,7 +474,59 @@ export function useWall(): WallView {
     dismissFailure,
     viewer,
     react,
+    myVotes,
+    vote,
+    createPost,
     editPost,
     removePost,
   }
+}
+
+/** The default Wall: every organization the signed-in person belongs to. */
+export function useWall(): WallView {
+  return useWallPages(undefined)
+}
+
+/** A shared, named Wall — see `lib/wall-route` and `components/wall/shared-wall-screen`. */
+export type SharedWallView = WallView & {
+  /**
+   * The Wall's own name, once its definition arrives. Null until then, and
+   * left null for good if that one read failed — the Posts underneath do not
+   * depend on it, so a screen falls back to a generic label rather than
+   * blocking on a second request.
+   */
+  wallName: string | null
+}
+
+/**
+ * One named Wall, read by its id.
+ *
+ * `wallId` never changes for the life of the screen it backs — a Wall is
+ * opened by the id a shared link carried, and nothing here offers to switch
+ * which Wall is open. The Posts come through `useWallPages`, exactly as the
+ * default Wall's do; the one thing added here is the Wall's own name, fetched
+ * once and separately, because `GET /wall/posts?wall=<id>` never carries it
+ * and a shared link has to be able to render *something* to identify the Wall
+ * even before its first Post arrives.
+ *
+ * A Wall that does not resolve at all — deleted, or never existed — is not
+ * told apart from any other refusal here: `listWallPosts` already reads
+ * `wall_not_found` back as an ordinary `refused` failure, and `wallNotice`
+ * puts it on screen the same way it would any other failed read.
+ */
+export function useSharedWall(wallId: string): SharedWallView {
+  const base = useWallPages(wallId)
+  const [wallName, setWallName] = useState<string | null>(null)
+
+  useEffect(() => {
+    let live = true
+    void getNamedWall(wallId).then(result => {
+      if (live && result.ok) setWallName(result.value.name)
+    })
+    return () => {
+      live = false
+    }
+  }, [wallId])
+
+  return { ...base, wallName }
 }

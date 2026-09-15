@@ -1,5 +1,5 @@
 import type { ApiFailure } from '@/lib/api-result'
-import type { UserRole, WallPost, WallPostReaction } from '@/lib/types'
+import type { UserRole, WallPost, WallPostReaction, WallVoteDirection } from '@/lib/types'
 
 /**
  * Everything a person can do to a Post, once it is already on the Wall.
@@ -79,6 +79,48 @@ export function toggleWallPostReaction(
       ? reactions.filter((reaction) => !(reaction.userId === userId && reaction.emoji === emoji))
       : [...reactions, { emoji, userId }],
     added: !hasSame,
+  }
+}
+
+/**
+ * The direction a tap on `direction` leaves the caller holding, given what they
+ * held before — mirrors `POST /wall/posts/:id/vote`'s own toggle: casting the
+ * direction already held clears it, the opposite direction replaces it. A
+ * caller never holds an up and a down at once.
+ */
+export function nextWallPostVote(
+  previousVote: WallVoteDirection | null,
+  direction: WallVoteDirection,
+): WallVoteDirection | null {
+  return previousVote === direction ? null : direction
+}
+
+/** `1` for an upvote, `-1` for a downvote, `0` for none — the arithmetic `score` and `upvoteCount` move by. */
+function voteValue(direction: WallVoteDirection | null): number {
+  if (direction === 'up') return 1
+  if (direction === 'down') return -1
+  return 0
+}
+
+/**
+ * Applies the same vote math the API applies server-side: `score` and
+ * `upvoteCount` move by the difference between what this caller held before
+ * and what they hold after. Symmetric in `previousVote`/`nextVote`, so the same
+ * function applies a vote optimistically and rolls one back — a rollback is
+ * just a call with the two arguments swapped.
+ *
+ * There is deliberately no way to derive a downvote count from this: `score`
+ * already carries it, and the API never offers one publicly either way.
+ */
+export function withVoteDelta(
+  post: WallPost,
+  previousVote: WallVoteDirection | null,
+  nextVote: WallVoteDirection | null,
+): WallPost {
+  return {
+    ...post,
+    score: post.score - voteValue(previousVote) + voteValue(nextVote),
+    upvoteCount: post.upvoteCount - (previousVote === 'up' ? 1 : 0) + (nextVote === 'up' ? 1 : 0),
   }
 }
 

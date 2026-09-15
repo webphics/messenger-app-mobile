@@ -60,3 +60,27 @@ describe('wallNotice', () => {
     ).toBe('stale')
   })
 })
+
+describe('wallNotice for a named Wall', () => {
+  it('says its emptiness may be membership rather than silence, never a refusal', () => {
+    expect(wallNotice({ ...blank, named: true })).toEqual({
+      kind: 'empty',
+      title: 'Nothing to show',
+      hint: 'Either nobody here has posted yet, or none of its organizations overlap with yours.',
+    })
+  })
+
+  it('titles a refusal for this Wall specifically', () => {
+    expect(
+      wallNotice({ ...blank, named: true, failure: { kind: 'refused', message: 'Wall not found' } }),
+    ).toEqual({
+      kind: 'failed',
+      title: 'Could not load this Wall',
+      hint: 'Wall not found',
+    })
+  })
+
+  it('is a spinner while loading like any other Wall', () => {
+    expect(wallNotice({ ...blank, named: true, loading: true })).toEqual({ kind: 'loading' })
+  })
+})
