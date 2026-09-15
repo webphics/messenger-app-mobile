@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Alert, Linking, View } from 'react-native'
 
 import { Bookmark, ExternalLink, MoreVertical, Reply } from '@/components/icons'
@@ -92,7 +92,7 @@ type WallPostCardProps = {
   replying?: boolean
 }
 
-export function WallPostCard({
+export const WallPostCard = memo(function WallPostCard({
   post,
   viewer,
   onReact,
@@ -303,4 +303,4 @@ export function WallPostCard({
       />
     </View>
   )
-}
+})

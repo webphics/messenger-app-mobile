@@ -143,6 +143,35 @@ export function withUpdatedPost(read: WallPages, post: WallPost): WallPages {
 }
 
 /**
+ * The same fold, for a Post that arrived over the socket rather than as an
+ * answer to something this reader asked for.
+ *
+ * Two fields on a Post are the reader's own and are not in what the API
+ * broadcasts to an organization's room: `isBookmarked`, which is private to
+ * whoever saved it, and `viewCount`, which no broadcast carries because
+ * recording a view raises none. `WallPost` says so on both. `parseWallPost`
+ * cannot leave them out — the type has no room for absent — so it reads them
+ * as `false` and `0`, which is the honest answer to "the payload did not say"
+ * and the wrong one to fold over a Post already on screen.
+ *
+ * So a broadcast updates what it actually knows and keeps what only this
+ * device does. Without it, somebody else reacting to a Post you had saved
+ * emptied the star and zeroed the count with no request having failed — and
+ * the tap that followed sent a toggle, which un-saved it for real. The same
+ * carve-out already exists for a vote, which is held outside the Post for
+ * exactly this reason.
+ */
+export function withBroadcastPost(read: WallPages, post: WallPost): WallPages {
+  const held = read.posts.find(existing => existing.id === post.id)
+  if (!held) return read
+  return withUpdatedPost(read, {
+    ...post,
+    isBookmarked: held.isBookmarked,
+    viewCount: held.viewCount,
+  })
+}
+
+/**
  * A Post deleted or taken down. Simply absent, the way a Post never drawn is.
  */
 export function withoutLivePost(read: WallPages, postId: string): WallPages {

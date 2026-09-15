@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
@@ -35,6 +35,7 @@ import {
   emptyWall,
   withLivePost,
   withoutLivePost,
+  withBroadcastPost,
   withUpdatedPost,
   type WallPages,
 } from '@/lib/wall-pages'
@@ -220,8 +221,19 @@ function useWallPages(
   searchTerm?: string,
 ): WallView {
   const { state } = useAuth()
-  const viewer: WallPostViewer | null =
-    state.status === 'signed-in' ? { id: state.user.id, role: state.user.role } : null
+  /**
+   * Memoized on the two fields it carries rather than rebuilt each render.
+   * It is a dependency of `react`, `recordView` and `vote`, so a fresh literal
+   * made all three new every render, and `renderItem` with them — which on a
+   * list whose own scrolling fires `recordView` per row is a re-render of every
+   * mounted card for every Post that comes into view.
+   */
+  const viewerId = state.status === 'signed-in' ? state.user.id : null
+  const viewerRole = state.status === 'signed-in' ? state.user.role : null
+  const viewer: WallPostViewer | null = useMemo(
+    () => (viewerId !== null && viewerRole !== null ? { id: viewerId, role: viewerRole } : null),
+    [viewerId, viewerRole],
+  )
   const searching = searchTerm !== undefined
 
   const [read, setRead] = useState<WallPages>(emptyWall)
@@ -553,16 +565,24 @@ function useWallPages(
     })
   }, [])
 
-  /** A Contributor's own new Post. Never optimistic — see the module doc. */
+  /**
+   * A Contributor's own new Post. Never optimistic — see the module doc.
+   *
+   * Placed at the front on the same terms the socket's `post-created` is, the
+   * `sort` among them: under Popular a Post's place is the ranking's to give,
+   * and the author's own has earned nothing yet. Writing it in anyway would
+   * pin it above the ranking and disagree with the copy every other reader of
+   * that Wall gets.
+   */
   const createPost = useCallback(
     async (input: WallPostCreateInput): Promise<ApiResult<WallPost>> => {
       const result = await createWallPost(input)
-      if (result.ok && wallId === undefined && !searching) {
+      if (result.ok && wallId === undefined && !searching && sort === 'recent') {
         setRead(current => withLivePost(current, result.value))
       }
       return result
     },
-    [wallId, searching],
+    [wallId, searching, sort],
   )
 
   /** The author's own edit. Never optimistic — see the module doc. */
@@ -644,7 +664,7 @@ function useWallPages(
 
     if (event.kind === 'post-updated') {
       const post = parseWallPost(event.post)
-      if (post) setRead(current => withUpdatedPost(current, post))
+      if (post) setRead(current => withBroadcastPost(current, post))
       return
     }
 

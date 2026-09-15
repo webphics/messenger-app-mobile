@@ -41,7 +41,7 @@ const LAUNCH_ENTRY_POINTS = [
 ]
 
 /** How a Wall module is named, in either of the two places they live. */
-const WALL = /^(lib\/(use-)?wall[-.]|components\/wall\/)/
+const WALL = /^(lib\/(use-)?wall[-.]|lib\/use-composable-wall-|components\/wall\/)/
 
 const EXTENSIONS = ['.ts', '.tsx']
 
