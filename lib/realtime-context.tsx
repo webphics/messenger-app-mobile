@@ -16,6 +16,7 @@ import {
   parseConversationDeleted,
   parseConversationReassigned,
   parseConversationUpdated,
+  parseGroupJoinRequestAnswered,
   parseMessageCreated,
   parsePostCreated,
   parsePostRemoved,
@@ -68,6 +69,15 @@ export type RealtimeEvent =
   | { kind: 'post-updated'; post: unknown }
   /** A Post deleted or taken down. Nothing is left to fetch for it. */
   | { kind: 'post-removed'; postId: string }
+  /**
+   * One of this viewer's own Group join requests was answered (#88).
+   *
+   * `groupId` is present on an approval and null on a decline — see
+   * `parseGroupJoinRequestAnswered`. A listener holding a feed that names this
+   * Group asks again; one that cannot tell asks anyway, since a decline gives
+   * it nothing to rule itself out with.
+   */
+  | { kind: 'group-join-answered'; groupId: string | null }
   /**
    * The connection came back after dropping. Whatever was emitted while it was
    * down was emitted to nobody, so what is held is unverifiable and has to be
@@ -231,6 +241,11 @@ function useRealtimeConnection(): RealtimeValue {
     socket.on(REALTIME_EVENTS.postRemoved, (payload: unknown) => {
       const event = parsePostRemoved(payload)
       if (event) emit({ kind: 'post-removed', postId: event.postId })
+    })
+
+    socket.on(REALTIME_EVENTS.notificationCreated, (payload: unknown) => {
+      const answered = parseGroupJoinRequestAnswered(payload)
+      if (answered) emit({ kind: 'group-join-answered', groupId: answered.groupId })
     })
 
     return () => {

@@ -3,6 +3,7 @@ import {
   parseConversationDeleted,
   parseConversationReassigned,
   parseConversationUpdated,
+  parseGroupJoinRequestAnswered,
   parseMessageCreated,
   parsePostCreated,
   parsePostRemoved,
@@ -155,6 +156,7 @@ describe('the namespace and event names', () => {
       postCreated: 'post.created',
       postUpdated: 'post.updated',
       postRemoved: 'post.removed',
+      notificationCreated: 'notification.created',
     })
   })
 })
@@ -405,6 +407,50 @@ describe('parsePostRemoved', () => {
 
   it.each(refused)('answers null for %s', (_case, payload) => {
     expect(parsePostRemoved(payload)).toBeNull()
+  })
+})
+
+describe('parseGroupJoinRequestAnswered', () => {
+  it('recognises an approval, and reads the Group it opened off conversationId', () => {
+    expect(
+      parseGroupJoinRequestAnswered({
+        notification: { kind: 'group_join_request_approved', conversationId: 'group-1' },
+        unreadCount: 1,
+      }),
+    ).toEqual({ groupId: 'group-1' })
+  })
+
+  it('recognises a decline, which names no Group to open', () => {
+    expect(
+      parseGroupJoinRequestAnswered({
+        notification: { kind: 'group_join_request_declined', conversationId: null },
+        unreadCount: 1,
+      }),
+    ).toEqual({ groupId: null })
+  })
+
+  it('ignores the kind meant for whoever may answer a request — that stays off the phone', () => {
+    expect(
+      parseGroupJoinRequestAnswered({ notification: { kind: 'group_join_requested' } }),
+    ).toBeNull()
+  })
+
+  it('ignores every other notification kind this app already learns about another way', () => {
+    expect(parseGroupJoinRequestAnswered({ notification: { kind: 'message' } })).toBeNull()
+  })
+
+  it('answers null for a payload with nothing to read', () => {
+    expect(parseGroupJoinRequestAnswered(null)).toBeNull()
+    expect(parseGroupJoinRequestAnswered({})).toBeNull()
+    expect(parseGroupJoinRequestAnswered({ notification: null })).toBeNull()
+  })
+
+  it('reads no Group id it cannot place as a string as none, rather than guessing', () => {
+    expect(
+      parseGroupJoinRequestAnswered({
+        notification: { kind: 'group_join_request_approved', conversationId: 7 },
+      }),
+    ).toEqual({ groupId: null })
   })
 })
 

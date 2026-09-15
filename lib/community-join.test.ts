@@ -1,4 +1,4 @@
-import { canRequestJoin, communityActionRefusal, joinButtonLabel } from '@/lib/community-join'
+import { communityActionRefusal, joinButtonLabel, joinRowAction } from '@/lib/community-join'
 import type { CommunityJoinableGroupRow } from '@/lib/types'
 
 function row(overrides: Partial<CommunityJoinableGroupRow> = {}): CommunityJoinableGroupRow {
@@ -25,19 +25,20 @@ describe('joinButtonLabel', () => {
     )
   })
 
-  it('says Requested for a pending ask, whatever the policy now reads', () => {
-    expect(joinButtonLabel(row({ joinPolicy: 'open', joinState: 'pending' }))).toBe('Requested')
-    expect(joinButtonLabel(row({ joinPolicy: 'request', joinState: 'pending' }))).toBe('Requested')
+  it('offers Withdraw for a pending ask, whatever the policy now reads (#88)', () => {
+    expect(joinButtonLabel(row({ joinPolicy: 'open', joinState: 'pending' }))).toBe('Withdraw')
+    expect(joinButtonLabel(row({ joinPolicy: 'request', joinState: 'pending' }))).toBe('Withdraw')
   })
 })
 
-describe('canRequestJoin', () => {
-  it('allows a tap when nothing is pending', () => {
-    expect(canRequestJoin(row({ joinState: 'may_request' }))).toBe(true)
+describe('joinRowAction', () => {
+  it('joins (or asks) when nothing is pending', () => {
+    expect(joinRowAction(row({ joinState: 'may_request' }))).toBe('join')
   })
 
-  it('offers nothing further once a request is pending', () => {
-    expect(canRequestJoin(row({ joinState: 'pending' }))).toBe(false)
+  it('offers to withdraw once a request is pending, whatever the policy now reads', () => {
+    expect(joinRowAction(row({ joinPolicy: 'open', joinState: 'pending' }))).toBe('withdraw')
+    expect(joinRowAction(row({ joinPolicy: 'request', joinState: 'pending' }))).toBe('withdraw')
   })
 })
 
