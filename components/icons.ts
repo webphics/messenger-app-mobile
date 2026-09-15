@@ -67,6 +67,7 @@ export { default as MoreVertical } from "lucide-react-native/icons/ellipsis-vert
 export { default as Newspaper } from "lucide-react-native/icons/newspaper";
 export { default as Pause } from "lucide-react-native/icons/pause";
 export { default as Pencil } from "lucide-react-native/icons/pencil";
+export { default as Pin } from "lucide-react-native/icons/pin";
 export { default as Play } from "lucide-react-native/icons/play";
 export { default as Plus } from "lucide-react-native/icons/plus";
 export { default as RefreshCw } from "lucide-react-native/icons/refresh-cw";

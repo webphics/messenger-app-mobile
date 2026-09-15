@@ -4,7 +4,25 @@ import {
   parseCommunity,
   parseCommunityFeed,
   parseCommunityFeedRow,
+  parseGroupJoinOutcome,
+  parseLeftCommunity,
 } from '@/lib/community-parse'
+
+/** A minimal row `parseConversation` can read — shape borrowed from `conversation-parse.test.ts`. */
+function conversationRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'group-1',
+    organizationId: 'org-1',
+    type: 'group',
+    lastMessageAt: null,
+    lastMessagePreview: null,
+    lastMessageMine: false,
+    lastMessageReceiptStatus: null,
+    lastMessageRead: false,
+    unreadCount: 0,
+    ...overrides,
+  }
+}
 
 const community = {
   id: 'community-1',
@@ -205,6 +223,41 @@ describe('parseCommunityFeed', () => {
 
   it('refuses a payload that is not a list at all', () => {
     expect(parseCommunityFeed(null)).toBeNull()
+  })
+})
+
+describe('parseGroupJoinOutcome', () => {
+  it('reads a join straight through, conversation and all', () => {
+    expect(parseGroupJoinOutcome({ outcome: 'joined', conversation: conversationRow() })).toEqual({
+      outcome: 'joined',
+      conversation: expect.objectContaining({ id: 'group-1', type: 'group' }),
+    })
+  })
+
+  it('reads a request as one with nothing further to carry', () => {
+    expect(parseGroupJoinOutcome({ outcome: 'requested', request: { id: 'req-1' } })).toEqual({
+      outcome: 'requested',
+    })
+  })
+
+  it('refuses a joined outcome whose conversation this build cannot read', () => {
+    expect(parseGroupJoinOutcome({ outcome: 'joined', conversation: {} })).toBeNull()
+  })
+
+  it('refuses a payload naming neither outcome', () => {
+    expect(parseGroupJoinOutcome({ outcome: 'declined' })).toBeNull()
+    expect(parseGroupJoinOutcome(null)).toBeNull()
+  })
+})
+
+describe('parseLeftCommunity', () => {
+  it('reads the id of the Community just left', () => {
+    expect(parseLeftCommunity({ id: 'community-1' })).toEqual({ id: 'community-1' })
+  })
+
+  it('refuses a payload with no id', () => {
+    expect(parseLeftCommunity({})).toBeNull()
+    expect(parseLeftCommunity(null)).toBeNull()
   })
 })
 

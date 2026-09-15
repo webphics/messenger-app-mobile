@@ -707,6 +707,19 @@ export type CommunityFeedRow =
   | CommunityMemberGroupRow
   | CommunityJoinableGroupRow
 
+/**
+ * What `POST /communities/:id/groups/:groupId/join` answers: whether the tap
+ * put the person straight in, or opened an ask a Moderator answers.
+ *
+ * `open` returns the joined Group's own conversation, because the next step is
+ * to open it. `request` returns nothing further — #73 draws the pending state
+ * from a re-read of the feed rather than from anything in this answer, and
+ * withdrawing an ask (or being told it was answered) is #88's.
+ */
+export type GroupJoinOutcome =
+  | { outcome: 'joined'; conversation: Conversation }
+  | { outcome: 'requested' }
+
 /** The rows a Community's feed opens a conversation from: everything but a Group nobody is in. */
 export type CommunityThreadRow = CommunityAnnouncementsRow | CommunityMemberGroupRow
 

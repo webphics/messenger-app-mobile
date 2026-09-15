@@ -1,7 +1,7 @@
 import { memo, useCallback } from "react";
 import { View } from "react-native";
 
-import { BellOff, Megaphone } from "@/components/icons";
+import { BellOff, Megaphone, Pin } from "@/components/icons";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
@@ -53,9 +53,13 @@ export const CommunityThreadRowView = memo(function CommunityThreadRowView({
   return (
     <TactilePressable
       accessibilityRole="button"
-      accessibilityLabel={
-        hasUnread ? `${row.title}, ${unreadCount} unread` : row.title
-      }
+      accessibilityLabel={[
+        row.title,
+        announcements ? "pinned" : null,
+        hasUnread ? `${unreadCount} unread` : null,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       onPress={handlePress}
       className={`mt-1.5 flex-row items-center gap-3 rounded-2xl border border-line/50 bg-surface/80 p-3 ${
         inset ? "ml-5" : ""
@@ -89,6 +93,9 @@ export const CommunityThreadRowView = memo(function CommunityThreadRowView({
                 size={13}
                 accessibilityLabel="Muted"
               />
+            ) : null}
+            {announcements ? (
+              <Pin color={colors.muted} size={12} accessibilityElementsHidden />
             ) : null}
           </View>
           {row.lastMessageAt ? (

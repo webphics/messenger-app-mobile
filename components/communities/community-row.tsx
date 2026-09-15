@@ -15,7 +15,7 @@ type CommunityRowProps = {
   onToggle: (communityId: string) => void;
 };
 
-function plural(count: number, one: string, many: string): string {
+export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 

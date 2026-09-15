@@ -1,7 +1,12 @@
 import { query, readOutcome, type ApiResult } from '@/lib/api-result'
 import { authenticatedRequest } from '@/lib/auth-service'
-import { parseCommunities, parseCommunityFeed } from '@/lib/community-parse'
-import type { Community, CommunityFeedRow } from '@/lib/types'
+import {
+  parseCommunities,
+  parseCommunityFeed,
+  parseGroupJoinOutcome,
+  parseLeftCommunity,
+} from '@/lib/community-parse'
+import type { Community, CommunityFeedRow, GroupJoinOutcome } from '@/lib/types'
 
 /**
  * The Community endpoints a member's phone reads, over the one transport this
@@ -13,9 +18,11 @@ import type { Community, CommunityFeedRow } from '@/lib/types'
  * a request that hangs ends as an ordinary transport failure on the same
  * deadline. This module adds paths, not a second way of talking to the API.
  *
- * Two reads and no writes. Creating, renaming, linking a Group, promoting a
- * Moderator and every other route on that controller stay on web — see
- * `docs/scope.md`. A phone gets the member's half.
+ * Two reads and, since #73, the two writes a member's own half of a Community
+ * needs: joining a linked Group, and leaving the Community itself. Creating,
+ * renaming, linking a Group, promoting a Moderator, answering a Join request
+ * and every other route on that controller stay on web — see `docs/scope.md`.
+ * A phone gets the member's half.
  */
 
 /**
@@ -57,4 +64,36 @@ export async function listCommunityGroups(
 ): Promise<ApiResult<CommunityFeedRow[]>> {
   const outcome = await authenticatedRequest(`/communities/${communityId}/groups`)
   return readOutcome(outcome, parseCommunityFeed)
+}
+
+/**
+ * A member entering a linked Group themselves, rather than waiting for a
+ * Moderator to add them.
+ *
+ * What the tap means is decided by the Group's own Join policy, not by this
+ * client: under `open` it joins immediately, under `request` — the default —
+ * it opens an ask a Moderator answers. One route either way; `GroupJoinOutcome`
+ * is how the caller tells which happened.
+ */
+export async function joinLinkedGroup(
+  communityId: string,
+  groupId: string,
+): Promise<ApiResult<GroupJoinOutcome>> {
+  const outcome = await authenticatedRequest(
+    `/communities/${communityId}/groups/${groupId}/join`,
+    { method: 'POST' },
+  )
+  return readOutcome(outcome, parseGroupJoinOutcome)
+}
+
+/**
+ * A member leaving the Community itself, from the overflow menu on its
+ * screen. Available to any member; there is nothing here for administering
+ * one, which stays on web.
+ */
+export async function leaveCommunity(communityId: string): Promise<ApiResult<{ id: string }>> {
+  const outcome = await authenticatedRequest(`/communities/${communityId}/members/me`, {
+    method: 'DELETE',
+  })
+  return readOutcome(outcome, parseLeftCommunity)
 }
