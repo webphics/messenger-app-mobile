@@ -32,6 +32,20 @@ export type WallNoticeInput = {
    * "organizations you belong to" would claim the opposite of what happened.
    */
   named?: boolean
+  /**
+   * The term somebody searched for, when this is a search result rather than
+   * the Wall itself (#80).
+   *
+   * Its own branch rather than a third boolean beside `named`: an empty
+   * search result and an empty Wall mean opposite things — one says nothing
+   * matched what was typed, the other says nobody has posted at all — and a
+   * screen with the term in hand is how #80's "distinguishable from no search
+   * having been run" is kept true. That distinction is also why this is never
+   * reached with an empty string: `lib/use-wall`'s search only runs once
+   * somebody has typed something, so an unsearched Wall reads through `named`
+   * (or neither) instead.
+   */
+  searching?: string
 }
 
 const COPY = {
@@ -47,6 +61,16 @@ const NAMED_COPY = {
     'Either nobody here has posted yet, or none of its organizations overlap with yours.',
 }
 
-export function wallNotice({ drawn, loading, failure, named }: WallNoticeInput): WallNotice {
-  return readNotice({ drawn, confirmed: drawn, loading, failure }, named ? NAMED_COPY : COPY)
+/** Built per search rather than a constant, since the hint quotes the term back. */
+function searchCopy(term: string): typeof COPY {
+  return {
+    refusedTitle: 'Could not search the Wall',
+    emptyTitle: 'No posts matched',
+    emptyHint: `Nothing found for “${term}”. Try a different word.`,
+  }
+}
+
+export function wallNotice({ drawn, loading, failure, named, searching }: WallNoticeInput): WallNotice {
+  const copy = searching !== undefined ? searchCopy(searching) : named ? NAMED_COPY : COPY
+  return readNotice({ drawn, confirmed: drawn, loading, failure }, copy)
 }

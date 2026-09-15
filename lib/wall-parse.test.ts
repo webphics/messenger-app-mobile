@@ -18,6 +18,7 @@ const post = {
   reactions: [{ emoji: '🎉', userId: 'user-2' }],
   score: 4,
   upvoteCount: 5,
+  viewCount: 12,
   isBookmarked: true,
   editedAt: null,
   createdAt: '2026-09-14T10:00:00.000Z',
@@ -35,6 +36,7 @@ describe('parseWallPost', () => {
       reactions: [{ emoji: '🎉', userId: 'user-2' }],
       score: 4,
       upvoteCount: 5,
+      viewCount: 12,
       isBookmarked: true,
       editedAt: null,
       createdAt: '2026-09-14T10:00:00.000Z',
@@ -74,6 +76,13 @@ describe('parseWallPost', () => {
       score: 0,
       upvoteCount: 0,
     })
+  })
+
+  it('reads the viewer count, and falls back to none seen when the API omits or malforms it', () => {
+    expect(parseWallPost({ ...post, viewCount: 12 })?.viewCount).toBe(12)
+    const { viewCount: _viewCount, ...rest } = post
+    expect(parseWallPost(rest)?.viewCount).toBe(0)
+    expect(parseWallPost({ ...post, viewCount: 'a lot' })?.viewCount).toBe(0)
   })
 
   it('is not a Message: nothing it reads is a Receipt or a Delivery state', () => {

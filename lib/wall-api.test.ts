@@ -7,7 +7,9 @@ import {
   listWallBookmarks,
   listWallPosts,
   reactToWallPost,
+  recordWallPostView,
   removeWallPost,
+  searchWallPosts,
   toggleWallPostBookmark,
   updateWallPost,
   uploadWallFile,
@@ -166,6 +168,37 @@ describe('reactToWallPost', () => {
     enqueue(csrfResponse(), envelope(POST_ROW))
     await reactToWallPost('post 1', '👍')
     expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post%201/reactions`)
+  })
+})
+
+describe('recordWallPostView', () => {
+  test('posts to the view path with no body, and the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope({ ...POST_ROW, viewCount: 1 }, 201))
+
+    const result = await recordWallPostView('post-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post-1/view`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(calls[1]?.init.body).toBeUndefined()
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ viewCount: 1 }) })
+  })
+
+  test('escapes the id rather than letting it shape the path', async () => {
+    enqueue(csrfResponse(), envelope(POST_ROW, 201))
+    await recordWallPostView('post 1')
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post%201/view`)
+  })
+
+  test('a refusal is read back as one, not thrown', async () => {
+    enqueue(csrfResponse(), response(404, { statusCode: 404, message: 'Post not found' }))
+
+    const result = await recordWallPostView('post-1')
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Post not found' } })
   })
 })
 
@@ -358,6 +391,66 @@ describe('listWallPosts', () => {
     const result = await listWallPosts({ wall: 'missing-wall' })
 
     expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Wall not found' } })
+  })
+
+  test('recent is left off the request entirely, byte-identical to no sort at all', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await listWallPosts({ sort: 'recent' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts?limit=20`)
+  })
+
+  test('popular is the one value that reaches the request', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await listWallPosts({ sort: 'popular' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts?sort=popular&limit=20`)
+  })
+
+  test('sort and a named Wall combine, sort read first', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await listWallPosts({ wall: 'wall-1', sort: 'popular', cursor: 'post-9' })
+
+    expect(calls[0]?.url).toBe(
+      `${API_BASE_URL}/wall/posts?wall=wall-1&sort=popular&cursor=post-9&limit=20`,
+    )
+  })
+})
+
+describe('searchWallPosts', () => {
+  test('reads the search route with the term, over the default Wall', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await searchWallPosts({ q: 'lift' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts/search?q=lift&limit=20`)
+  })
+
+  test('names a Wall to search within it instead', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await searchWallPosts({ q: 'lift', wall: 'wall-1' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts/search?q=lift&wall=wall-1&limit=20`)
+  })
+
+  test('pages a result exactly like a Wall, the cursor read last', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await searchWallPosts({ q: 'lift', cursor: 'post-9' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts/search?q=lift&cursor=post-9&limit=20`)
+  })
+
+  test('a term naming nothing this reader can see comes back as an empty page, not a refusal', async () => {
+    enqueue(envelope([]))
+
+    const result = await searchWallPosts({ q: 'nothing-like-this' })
+
+    expect(result).toEqual({ ok: true, value: [] })
   })
 })
 

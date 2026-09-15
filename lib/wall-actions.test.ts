@@ -1,8 +1,10 @@
 import {
+  canReplyToWallPost,
   flipWallPostBookmark,
   nextWallPostVote,
   toggleWallPostReaction,
   wallPostActions,
+  wallPostReplyDraft,
   withVoteDelta,
   type WallPostViewer,
 } from '@/lib/wall-actions'
@@ -19,6 +21,7 @@ function post(overrides: Partial<WallPost> = {}): WallPost {
     reactions: [],
     score: 0,
     upvoteCount: 0,
+    viewCount: 0,
     isBookmarked: false,
     editedAt: null,
     createdAt: '2026-09-14T10:00:00.000Z',
@@ -184,6 +187,45 @@ describe('what a vote does to a Post’s score and upvote count', () => {
     const applied = withVoteDelta(before, null, 'up')
     const rolledBack = withVoteDelta(applied, 'up', null)
     expect(rolledBack).toEqual(before)
+  })
+})
+
+describe('who may reply', () => {
+  it('offers it to a Customer, on anybody’s Post — even their own', () => {
+    expect(canReplyToWallPost(stranger)).toBe(true)
+    expect(canReplyToWallPost(author)).toBe(true)
+  })
+
+  it('never offers it to staff — there is no such thing as their own support conversation', () => {
+    expect(canReplyToWallPost(admin)).toBe(false)
+    expect(canReplyToWallPost({ id: 'user-4', role: 'agent' })).toBe(false)
+  })
+})
+
+describe('the reference a reply seeds the composer with', () => {
+  it('quotes a short body in full', () => {
+    expect(wallPostReplyDraft(post({ body: 'The lift is fixed.' }))).toBe(
+      'Re: “The lift is fixed.”\n\n',
+    )
+  })
+
+  it('cuts a long body off rather than quoting all of it', () => {
+    const body = 'x'.repeat(200)
+    const draft = wallPostReplyDraft(post({ body }))
+    expect(draft.startsWith('Re: “' + 'x'.repeat(119) + '…”')).toBe(true)
+    expect(draft.endsWith('\n\n')).toBe(true)
+  })
+
+  it('names the author instead, for a Post with no body', () => {
+    expect(wallPostReplyDraft(post({ body: null, author: { id: 'user-1', name: 'Ada' } }))).toBe(
+      'Re: Ada’s post\n\n',
+    )
+  })
+
+  it('does the same for a body that is only whitespace', () => {
+    expect(wallPostReplyDraft(post({ body: '   ', author: { id: 'user-1', name: 'Ada' } }))).toBe(
+      'Re: Ada’s post\n\n',
+    )
   })
 })
 

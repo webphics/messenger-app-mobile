@@ -1,20 +1,26 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { router, useNavigation } from 'expo-router'
-import { ActivityIndicator, FlatList, View } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, View, type ViewToken } from 'react-native'
 import Animated, { useReducedMotion } from 'react-native-reanimated'
 
 import { Bookmark, CloudOff, Newspaper, SquarePen, X } from '@/components/icons'
+import { SearchFieldWithClear } from '@/components/search-field-with-clear'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
 import { Text } from '@/components/ui/text'
 import { WallComposeSheet } from '@/components/wall/wall-compose-sheet'
 import { WallPostCard } from '@/components/wall/wall-post-card'
+import { chatHref } from '@/lib/chat-route-id'
+import { cn } from '@/lib/cn'
 import { settleEnter } from '@/lib/motion-enter'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
 import { colors } from '@/lib/tokens'
 import { useComposableWallOrganizations } from '@/lib/use-composable-wall-organizations'
-import { useWall, type WallBodyView } from '@/lib/use-wall'
+import { useWall, useWallSearch, type WallBodyView } from '@/lib/use-wall'
+import { useWallPostReply } from '@/lib/use-wall-post-reply'
+import { wallPostReplyDraft } from '@/lib/wall-actions'
 import { wallSavedHref } from '@/lib/wall-route'
-import type { WallPost } from '@/lib/types'
+import { WALL_SORT_OPTIONS } from '@/lib/wall-sort'
+import type { WallPost, WallSort } from '@/lib/types'
 
 /**
  * The default Wall: Posts from every organization this person belongs to,
@@ -155,8 +161,63 @@ function WallNothing({
  * (`WallBodyView`) omits it rather than the default Wall's own hook needing a
  * stub nobody calls.
  */
+/**
+ * How much of a card has to be on screen before it counts as seen: half,
+ * matching the web client's own `useInView` threshold — a sliver at the edge
+ * of the list is a card scrolling past, not one somebody looked at.
+ */
+const WALL_VIEW_THRESHOLD_PERCENT = 50
+
 export function WallBody({ wall }: { wall: WallBodyView }) {
   const { notice, viewer } = wall
+
+  /**
+   * Reply (#77): the viewer's own support conversation, opened with a
+   * reference to the tapped Post seeded into the composer. Lives here rather
+   * than on `WallScreen` because every Wall presentation this body draws —
+   * the default one, a shared named Wall, Saved — offers the same Reply on
+   * the same card.
+   */
+  const reply = useWallPostReply()
+  const onReply = useCallback(
+    (post: WallPost) => {
+      void reply.reply(post).then((id) => {
+        if (id) router.push(chatHref(id, wallPostReplyDraft(post)))
+      })
+    },
+    [reply.reply],
+  )
+  useEffect(() => {
+    if (!reply.error) return
+    Alert.alert('Could not open your conversation', reply.error)
+    reply.dismissError()
+  }, [reply.error, reply.dismissError])
+
+  /**
+   * A Post that has actually been on screen, not merely fetched (#85).
+   *
+   * `onViewableItemsChanged` may not change identity across renders — FlatList
+   * throws if it does — so the stable function `viewabilityConfigCallbackPairs`
+   * holds reads the latest `recordView` out of a ref, updated on every render,
+   * rather than closing over one that could go stale for the life of the list.
+   */
+  const recordViewRef = useRef(wall.recordView)
+  recordViewRef.current = wall.recordView
+
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken<WallPost>[] }) => {
+      for (const { item, isViewable } of viewableItems) {
+        if (isViewable) recordViewRef.current(item)
+      }
+    },
+  ).current
+
+  const viewabilityConfigCallbackPairs = useRef([
+    {
+      viewabilityConfig: { itemVisiblePercentThreshold: WALL_VIEW_THRESHOLD_PERCENT },
+      onViewableItemsChanged,
+    },
+  ]).current
 
   const renderItem = useCallback(
     ({ item }: { item: WallPost }) =>
@@ -170,6 +231,8 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
           onToggleBookmark={wall.toggleBookmark}
           onEdit={wall.editPost}
           onRemove={wall.removePost}
+          onReply={onReply}
+          replying={reply.pending === item.id}
         />
       ) : null,
     [
@@ -179,6 +242,8 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
       wall.vote,
       wall.toggleBookmark,
       wall.editPost,
+      onReply,
+      reply.pending,
       wall.removePost,
     ],
   )
@@ -221,6 +286,7 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
         contentContainerClassName="px-4 py-3"
         ItemSeparatorComponent={Separator}
         renderItem={renderItem}
+        viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs}
         onEndReachedThreshold={0.6}
         onEndReached={wall.loadOlder}
         ListEmptyComponent={
@@ -250,6 +316,57 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
   )
 }
 
+/** What each option in `WallSortControl` says. */
+const WALL_SORT_LABEL: Record<WallSort, string> = { recent: 'Recent', popular: 'Popular' }
+
+/**
+ * Recent or Popular (#86), at the top of the default Wall and nowhere else —
+ * a shared named Wall and the Saved view both read one fixed order and offer
+ * no control for it, so this sits on `WallScreen` rather than on `WallBody`,
+ * beside Saved and Compose.
+ *
+ * A tap that lands on the option already selected still calls `onChange`;
+ * `useWall`'s own `setSort` is what turns that into a no-op; from here it is
+ * just a chip a person tapped.
+ */
+function WallSortControl({ sort, onChange }: { sort: WallSort; onChange: (sort: WallSort) => void }) {
+  return (
+    <View
+      accessibilityRole="tablist"
+      className="flex-row gap-2 border-b border-line/60 bg-surface px-4 pb-3 pt-2"
+    >
+      {WALL_SORT_OPTIONS.map(option => {
+        const selected = option === sort
+        return (
+          <TactilePressable
+            key={option}
+            accessibilityRole="button"
+            accessibilityLabel={WALL_SORT_LABEL[option]}
+            accessibilityState={{ selected }}
+            onPress={() => onChange(option)}
+            className={cn(
+              'min-h-9 justify-center rounded-full border px-3.5',
+              selected
+                ? 'border-transparent bg-primary shadow-sm shadow-primary/25'
+                : 'border-line/80 bg-line/35',
+            )}
+          >
+            <Text
+              variant="label"
+              className={selected ? 'font-semibold text-primary-foreground' : 'text-ink-soft'}
+            >
+              {WALL_SORT_LABEL[option]}
+            </Text>
+          </TactilePressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** How long a keystroke waits before it becomes a request — the same figure `use-user-directory` debounces search on. */
+const WALL_SEARCH_DEBOUNCE_MS = 300
+
 /**
  * The default Wall's own screen, with Saved (#84) and Compose (#76) on the
  * header. Saved is every reader's own way back to what they bookmarked, so it
@@ -257,13 +374,35 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
  * entirely for anyone `assertCanPost` would refuse. Neither is on `WallBody`:
  * a shared, named Wall (`SharedWallScreen`) draws the same list underneath a
  * different header and offers a way into neither, so both controls belong
- * here rather than on the part every Wall screen shares.
+ * here rather than on the part every Wall screen shares. The sort control
+ * (#86) is the same story, one level down: `WallSortControl` above.
+ *
+ * Search (#80) is here too, for the same reason: it is a way of reading the
+ * default Wall, not something a shared or Saved screen offers.
+ * `useWallSearch` runs unconditionally — a hook cannot be reached only some
+ * renders — but `isSearching` is read off the raw input rather than the
+ * debounced term, so a keystroke swaps the list to the search result at once
+ * and the 300ms gap before its answer lands is `activeWall`'s own `loading`,
+ * never a flash back to the Wall underneath. That same flag is why the sort
+ * control disappears while searching instead of merely disabling: a search
+ * result pages its own way (`lib/use-wall`'s module doc) and has no order for
+ * Recent or Popular to choose between.
  */
 export function WallScreen() {
   const wall = useWall()
   const navigation = useNavigation()
   const { organizations } = useComposableWallOrganizations()
   const [composeOpen, setComposeOpen] = useState(false)
+
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchInput), WALL_SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+  const isSearching = searchInput.trim().length > 0
+  const searchResult = useWallSearch(debouncedSearch.trim())
+  const activeWall: WallBodyView = isSearching ? searchResult : wall
 
   const canCompose = organizations.length > 0
 
@@ -298,7 +437,18 @@ export function WallScreen() {
 
   return (
     <>
-      <WallBody wall={wall} />
+      <View className="flex-1 bg-bg">
+        <View className="border-b border-line/60 bg-surface px-4 pb-3 pt-2">
+          <SearchFieldWithClear
+            value={searchInput}
+            onChangeText={setSearchInput}
+            placeholder="Search posts and authors…"
+            accessibilityLabel="Search posts"
+          />
+        </View>
+        {isSearching ? null : <WallSortControl sort={wall.sort} onChange={wall.setSort} />}
+        <WallBody wall={activeWall} />
+      </View>
       <WallComposeSheet
         visible={composeOpen}
         onClose={() => setComposeOpen(false)}

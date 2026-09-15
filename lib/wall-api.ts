@@ -15,6 +15,7 @@ import type {
   WallPost,
   WallPostAttachment,
   WallPostLink,
+  WallSort,
   WallVoteDirection,
 } from '@/lib/types'
 
@@ -51,15 +52,59 @@ export const WALL_PAGE_LIMIT = 20
  * ordinary `refused` failure — a shared link that is simply broken.
  *
  * `cursor` is the id of the last Post on the previous page, never an offset.
+ *
+ * `sort` chooses the order: `recent` (the default) or `popular`. Left
+ * undefined for `recent` rather than sent explicitly, so a Recent read is the
+ * exact request this app has always made — the API says the two are
+ * byte-identical, but there is no reason to depend on that when omitting the
+ * parameter is free. A `popular` cursor is only ever valid against a
+ * `popular` read of the same Wall scope; nothing here enforces that, which is
+ * why `lib/use-wall` resets its held pages rather than reusing a cursor
+ * across a sort switch.
  */
 export async function listWallPosts(
-  params: { cursor?: string; limit?: number; wall?: string } = {},
+  params: { cursor?: string; limit?: number; sort?: WallSort; wall?: string } = {},
 ): Promise<ApiResult<WallPost[]>> {
   const outcome = await authenticatedRequest(
     `/wall/posts${query({
       wall: params.wall,
+      sort: params.sort === 'popular' ? 'popular' : undefined,
       cursor: params.cursor,
       limit: params.limit ?? WALL_PAGE_LIMIT,
+    })}`,
+  )
+  return readOutcome(outcome, parseWallPosts)
+}
+
+/**
+ * The most Posts one page of a search result may hold. Its own constant
+ * rather than reusing `WALL_PAGE_LIMIT`: search is a sibling endpoint with its
+ * own default and its own ceiling on the API side (`SearchWallPostsQuerySchema`),
+ * and nothing requires the two to move together if either changes.
+ */
+export const WALL_SEARCH_PAGE_LIMIT = 20
+
+/**
+ * A Post `q` could find — matched against a Post's body and its author's name
+ * — scoped exactly the way `listWallPosts` scopes a read: search is never a
+ * second way to see a Post the reader's own Wall could not otherwise show
+ * them. `wall` narrows to a named Wall's organizations the same way it does
+ * there; `cursor` pages a result the same way, the id of the last Post on the
+ * previous page.
+ *
+ * A blank `q` is refused by the API (`SearchWallPostsQuerySchema`, `min(1)`);
+ * this app never sends one — `lib/use-wall`'s search only runs once somebody
+ * has typed something.
+ */
+export async function searchWallPosts(
+  params: { q: string; wall?: string; cursor?: string; limit?: number },
+): Promise<ApiResult<WallPost[]>> {
+  const outcome = await authenticatedRequest(
+    `/wall/posts/search${query({
+      q: params.q,
+      wall: params.wall,
+      cursor: params.cursor,
+      limit: params.limit ?? WALL_SEARCH_PAGE_LIMIT,
     })}`,
   )
   return readOutcome(outcome, parseWallPosts)
@@ -103,6 +148,25 @@ export async function reactToWallPost(
     `/wall/posts/${encodeURIComponent(postId)}/reactions`,
     { method: 'POST', body: { emoji } },
   )
+  return readOutcome(outcome, parseWallPost)
+}
+
+/**
+ * Records the caller's own view of a Post — at most once per person, ever.
+ *
+ * No body, and idempotent by design (`docs/api/wall.md`): a repeat call from
+ * somebody who has already viewed this Post costs one indexed lookup and
+ * answers with the Post unchanged, so nothing here needs to track "have I
+ * already asked the API this" — only "have I already asked it *this
+ * session*" (`lib/wall-card`'s `shouldRecordWallPostView`), to avoid a
+ * request for every re-render rather than to avoid a wrong count. Never
+ * broadcast over realtime, so the only way this device's own `viewCount`
+ * moves is the response to its own call.
+ */
+export async function recordWallPostView(postId: string): Promise<ApiResult<WallPost>> {
+  const outcome = await authenticatedRequest(`/wall/posts/${encodeURIComponent(postId)}/view`, {
+    method: 'POST',
+  })
   return readOutcome(outcome, parseWallPost)
 }
 
