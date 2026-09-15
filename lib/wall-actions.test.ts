@@ -1,4 +1,10 @@
-import { toggleWallPostReaction, wallPostActions, type WallPostViewer } from '@/lib/wall-actions'
+import {
+  nextWallPostVote,
+  toggleWallPostReaction,
+  wallPostActions,
+  withVoteDelta,
+  type WallPostViewer,
+} from '@/lib/wall-actions'
 import type { WallPost } from '@/lib/types'
 
 function post(overrides: Partial<WallPost> = {}): WallPost {
@@ -10,6 +16,8 @@ function post(overrides: Partial<WallPost> = {}): WallPost {
     attachments: [],
     link: null,
     reactions: [],
+    score: 0,
+    upvoteCount: 0,
     editedAt: null,
     createdAt: '2026-09-14T10:00:00.000Z',
     ...overrides,
@@ -100,5 +108,79 @@ describe('toggling a reaction', () => {
         { emoji: '👍', userId: 'user-1' },
       ]),
     )
+  })
+})
+
+describe('what a tap on a vote direction leaves the caller holding', () => {
+  it('casts a vote nobody held before', () => {
+    expect(nextWallPostVote(null, 'up')).toBe('up')
+    expect(nextWallPostVote(null, 'down')).toBe('down')
+  })
+
+  it('clears a vote cast the same direction again', () => {
+    expect(nextWallPostVote('up', 'up')).toBeNull()
+    expect(nextWallPostVote('down', 'down')).toBeNull()
+  })
+
+  it('replaces a vote cast the opposite direction', () => {
+    expect(nextWallPostVote('up', 'down')).toBe('down')
+    expect(nextWallPostVote('down', 'up')).toBe('up')
+  })
+})
+
+describe('what a vote does to a Post’s score and upvote count', () => {
+  it('adds an upvote nobody held before', () => {
+    const result = withVoteDelta(post({ score: 3, upvoteCount: 3 }), null, 'up')
+    expect(result.score).toBe(4)
+    expect(result.upvoteCount).toBe(4)
+  })
+
+  it('adds a downvote nobody held before, which moves the score but never the upvote count', () => {
+    const result = withVoteDelta(post({ score: 3, upvoteCount: 3 }), null, 'down')
+    expect(result.score).toBe(2)
+    expect(result.upvoteCount).toBe(3)
+  })
+
+  it('clears a held upvote', () => {
+    const result = withVoteDelta(post({ score: 4, upvoteCount: 4 }), 'up', null)
+    expect(result.score).toBe(3)
+    expect(result.upvoteCount).toBe(3)
+  })
+
+  it('clears a held downvote, which never touched the upvote count either way', () => {
+    const result = withVoteDelta(post({ score: 2, upvoteCount: 3 }), 'down', null)
+    expect(result.score).toBe(3)
+    expect(result.upvoteCount).toBe(3)
+  })
+
+  it('replaces a held upvote with a downvote in one move — never both at once', () => {
+    const result = withVoteDelta(post({ score: 4, upvoteCount: 4 }), 'up', 'down')
+    expect(result.score).toBe(2)
+    expect(result.upvoteCount).toBe(3)
+  })
+
+  it('replaces a held downvote with an upvote in one move', () => {
+    const result = withVoteDelta(post({ score: 2, upvoteCount: 3 }), 'down', 'up')
+    expect(result.score).toBe(4)
+    expect(result.upvoteCount).toBe(4)
+  })
+
+  it('can go negative — a score is upvotes minus downvotes and may be', () => {
+    const result = withVoteDelta(post({ score: 0, upvoteCount: 0 }), null, 'down')
+    expect(result.score).toBe(-1)
+    expect(result.upvoteCount).toBe(0)
+  })
+
+  it('leaves everything else about the Post untouched', () => {
+    const before = post({ score: 1, upvoteCount: 1, body: 'Hi' })
+    const result = withVoteDelta(before, null, 'up')
+    expect(result).toEqual({ ...before, score: 2, upvoteCount: 2 })
+  })
+
+  it('is its own inverse — applying a delta and then swapping the arguments undoes it', () => {
+    const before = post({ score: 5, upvoteCount: 5 })
+    const applied = withVoteDelta(before, null, 'up')
+    const rolledBack = withVoteDelta(applied, 'up', null)
+    expect(rolledBack).toEqual(before)
   })
 })

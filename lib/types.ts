@@ -528,6 +528,9 @@ export type WallPostReaction = {
   userId: string
 }
 
+/** A push up or down on a Post — the Wall's ranking signal, never both at once. */
+export type WallVoteDirection = 'up' | 'down'
+
 export type WallPost = {
   id: string
   author: WallPostAuthor
@@ -537,9 +540,36 @@ export type WallPost = {
   attachments: WallPostAttachment[]
   link: WallPostLink | null
   reactions: WallPostReaction[]
+  /**
+   * Upvotes minus downvotes — may be negative. There is deliberately no
+   * downvote count anywhere, on this type or the API's: `score` already
+   * carries it, and a public downvote tally is not offered at all.
+   */
+  score: number
+  /** The upvote total alone. */
+  upvoteCount: number
   /** Null until somebody edits it, which is what lets a card say "Edited". */
   editedAt: string | null
   createdAt: string
+}
+
+/**
+ * A named Wall: a saved query over organizations, shared by handing its id
+ * around. It holds no Posts and no Post points back at one — see `CONTEXT.md`
+ * and the API's `docs/api/wall.md` — which is what lets anyone create one,
+ * share it, and read `GET /wall/posts?wall=<id>` through it.
+ *
+ * `organizationIds` is already narrowed to what the reader may see of it: the
+ * API intersects a Wall's saved organizations with the caller's live
+ * memberships before answering, an Admin excepted, so a stranger opening a
+ * shared link never learns which organization ids are real. This client never
+ * widens it further and never offers to rename, re-scope, or delete one —
+ * authoring a Wall stays on web.
+ */
+export type NamedWall = {
+  id: string
+  name: string
+  organizationIds: string[]
 }
 
 /**

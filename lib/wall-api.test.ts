@@ -1,6 +1,17 @@
 import { API_BASE_URL } from '@/lib/api-config'
 import { clearCsrfPair, setSessionCookie } from '@/lib/api-client'
-import { reactToWallPost, removeWallPost, updateWallPost } from '@/lib/wall-api'
+import {
+  createWallPost,
+  getNamedWall,
+  getWallContributorGrant,
+  listWallPosts,
+  reactToWallPost,
+  removeWallPost,
+  updateWallPost,
+  uploadWallFile,
+  voteOnWallPost,
+} from '@/lib/wall-api'
+import type { AttachmentView } from '@/lib/types'
 
 /**
  * The two boundaries this file cannot cross under Jest, mirroring
@@ -26,6 +37,45 @@ jest.mock('@/lib/keychain', () => ({
 
 jest.mock('@/lib/legacy-session', () => ({
   purgeMockSession: jest.fn(async () => undefined),
+}))
+
+/**
+ * The native uploader, exactly as `conversation-api.test.ts` mocks it —
+ * `uploadWallFile` goes through the same `sendFile` in `lib/api-client.ts`.
+ */
+type UploadCall = {
+  uri: string
+  url: string
+  options: { headers: Record<string, string>; [key: string]: unknown }
+}
+
+const mockUploads: UploadCall[] = []
+const mockUploadQueue: ({ status: number; body: string } | Error)[] = []
+const uploads = mockUploads
+
+function enqueueUpload(...answers: ({ status: number; body: string } | Error)[]): void {
+  mockUploadQueue.push(...answers)
+}
+
+function uploadEnvelope(data: unknown, status = 201): { status: number; body: string } {
+  return { status, body: JSON.stringify({ statusCode: status, message: 'File uploaded', data }) }
+}
+
+jest.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
+  File: class {
+    uri: string
+    constructor(uri: string) {
+      this.uri = uri
+    }
+    async upload(url: string, options: UploadCall['options']) {
+      mockUploads.push({ uri: this.uri, url, options })
+      const answer = mockUploadQueue.shift()
+      if (!answer) throw new Error('no upload answer was queued')
+      if (answer instanceof Error) throw answer
+      return { status: answer.status, body: answer.body, headers: {} }
+    }
+  },
 }))
 
 type FetchCall = { url: string; init: RequestInit }
@@ -72,6 +122,8 @@ const POST_ROW = {
   attachments: [],
   link: null,
   reactions: [{ emoji: '👍', userId: 'user-1' }],
+  score: 0,
+  upvoteCount: 0,
   editedAt: null,
   createdAt: '2026-09-14T10:00:00.000Z',
 }
@@ -79,6 +131,8 @@ const POST_ROW = {
 beforeEach(() => {
   calls.length = 0
   queue = []
+  mockUploads.length = 0
+  mockUploadQueue.length = 0
   setSessionCookie('better-auth.session_token=abc.def')
   clearCsrfPair()
   global.fetch = (async (url: string, init: RequestInit) => {
@@ -109,6 +163,43 @@ describe('reactToWallPost', () => {
     enqueue(csrfResponse(), envelope(POST_ROW))
     await reactToWallPost('post 1', '👍')
     expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post%201/reactions`)
+  })
+})
+
+describe('voteOnWallPost', () => {
+  test('posts the direction to the vote path, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope({ ...POST_ROW, score: 1, upvoteCount: 1 }))
+
+    const result = await voteOnWallPost('post-1', 'up')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post-1/vote`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(calls[1]?.init.body).toBe(JSON.stringify({ direction: 'up' }))
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({ score: 1, upvoteCount: 1 }),
+    })
+  })
+
+  test('escapes the id rather than letting it shape the path', async () => {
+    enqueue(csrfResponse(), envelope(POST_ROW))
+    await voteOnWallPost('post 1', 'down')
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post%201/vote`)
+  })
+
+  test('a refusal is read back as one, not thrown', async () => {
+    enqueue(csrfResponse(), response(404, { statusCode: 404, message: 'Post not found' }))
+
+    const result = await voteOnWallPost('post-1', 'up')
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Post not found' },
+    })
   })
 })
 
@@ -159,5 +250,216 @@ describe('removeWallPost', () => {
     expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post-1`)
     expect(calls[1]?.init.method).toBe('DELETE')
     expect(result).toEqual({ ok: true, value: { id: 'post-1' } })
+  })
+})
+
+describe('listWallPosts', () => {
+  test('reads the default Wall with no wall parameter at all', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await listWallPosts()
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts?limit=20`)
+  })
+
+  test('names a Wall to read through it instead', async () => {
+    enqueue(envelope([POST_ROW]))
+
+    await listWallPosts({ wall: 'wall-1' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts?wall=wall-1&limit=20`)
+  })
+
+  test('a Wall naming no organizations this reader is in comes back as an empty page, not a refusal', async () => {
+    enqueue(envelope([]))
+
+    const result = await listWallPosts({ wall: 'wall-1' })
+
+    expect(result).toEqual({ ok: true, value: [] })
+  })
+
+  test('a Wall that does not exist is a plain refusal', async () => {
+    enqueue(response(404, { statusCode: 404, code: 'wall_not_found', message: 'Wall not found' }))
+
+    const result = await listWallPosts({ wall: 'missing-wall' })
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Wall not found' } })
+  })
+})
+
+const WALL_ROW = {
+  id: 'wall-1',
+  name: 'Ops watch',
+  ownerId: 'user-1',
+  organizationIds: ['org-1'],
+  createdAt: '2026-09-12T06:28:38.122Z',
+  updatedAt: '2026-09-12T06:28:38.122Z',
+}
+
+describe('getNamedWall', () => {
+  test('reads one Wall by id', async () => {
+    enqueue(envelope(WALL_ROW))
+
+    const result = await getNamedWall('wall-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/walls/wall-1`)
+    expect(calls[0]?.init.method ?? 'GET').toBe('GET')
+    expect(result).toEqual({
+      ok: true,
+      value: { id: 'wall-1', name: 'Ops watch', organizationIds: ['org-1'] },
+    })
+  })
+
+  test('escapes the id rather than letting it shape the path', async () => {
+    enqueue(envelope(WALL_ROW))
+    await getNamedWall('wall 1')
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/walls/wall%201`)
+  })
+
+  test('a deleted or never-existing Wall is a plain refusal, not a thrown error', async () => {
+    enqueue(response(404, { statusCode: 404, code: 'wall_not_found', message: 'Wall not found' }))
+
+    const result = await getNamedWall('gone')
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Wall not found' } })
+  })
+})
+
+describe('createWallPost', () => {
+  test('posts the organization, body and link, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope(POST_ROW))
+
+    const result = await createWallPost({
+      organizationId: 'org-1',
+      body: 'The lift is fixed.',
+      link: { label: 'Read more', url: 'https://x.test' },
+    })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(JSON.parse(calls[1]?.init.body as string)).toEqual({
+      organizationId: 'org-1',
+      body: 'The lift is fixed.',
+      link: { label: 'Read more', url: 'https://x.test' },
+    })
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'post-1' }) })
+  })
+
+  test('sends every staged attachment, kind translated back to the wire field', async () => {
+    enqueue(csrfResponse(), envelope(POST_ROW))
+
+    await createWallPost({
+      organizationId: 'org-1',
+      attachments: [
+        { kind: 'image', url: '/uploads/wall/a.jpg', fileName: 'a.jpg', size: 900 },
+        { kind: 'video', url: '/uploads/wall/b.mp4', fileName: null, size: null },
+      ],
+    })
+
+    expect(JSON.parse(calls[1]?.init.body as string)).toEqual({
+      organizationId: 'org-1',
+      attachments: [
+        { type: 'image', url: '/uploads/wall/a.jpg', fileName: 'a.jpg', size: 900 },
+        { type: 'video', url: '/uploads/wall/b.mp4' },
+      ],
+    })
+  })
+
+  test('omits an empty body, link or attachment list rather than sending them empty', async () => {
+    enqueue(csrfResponse(), envelope(POST_ROW))
+
+    await createWallPost({ organizationId: 'org-1' })
+
+    expect(JSON.parse(calls[1]?.init.body as string)).toEqual({ organizationId: 'org-1' })
+  })
+
+  test('a missing-image refusal is read back as one, not thrown', async () => {
+    enqueue(
+      csrfResponse(),
+      response(422, { statusCode: 422, message: 'A post needs at least one image.' }),
+    )
+
+    const result = await createWallPost({ organizationId: 'org-1', body: 'Text only.' })
+
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'A post needs at least one image.' },
+    })
+  })
+})
+
+describe('uploadWallFile', () => {
+  const PHOTO: AttachmentView = {
+    kind: 'image',
+    uri: 'file:///data/user/0/cache/ImagePicker/9a2f.jpeg',
+    name: 'IMG_0001.jpg',
+    size: 204_800,
+  }
+
+  const STORED = {
+    type: 'image',
+    url: '/uploads/wall/9f1c-4a2b.jpg',
+    fileName: '9a2f.jpeg',
+    size: 204_800,
+  }
+
+  test('uploads to the organization the Post is going to, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload(uploadEnvelope(STORED))
+
+    const result = await uploadWallFile('org-1', PHOTO)
+
+    expect(uploads[0]?.url).toBe(`${API_BASE_URL}/wall/organizations/org-1/files`)
+    expect(uploads[0]?.uri).toBe('file:///data/user/0/cache/ImagePicker/9a2f.jpeg')
+    expect(uploads[0]?.options.headers['x-csrf-token']).toBe('csrf-token-value')
+    expect(result).toEqual({
+      ok: true,
+      value: { kind: 'image', url: '/uploads/wall/9f1c-4a2b.jpg', fileName: '9a2f.jpeg', size: 204_800 },
+    })
+  })
+
+  test('escapes the organization id rather than letting it shape the path', async () => {
+    enqueue(csrfResponse())
+    enqueueUpload(uploadEnvelope(STORED))
+    await uploadWallFile('org 1', PHOTO)
+    expect(uploads[0]?.url).toBe(`${API_BASE_URL}/wall/organizations/org%201/files`)
+  })
+
+  test('refuses a type the API does not take, without spending the upload', async () => {
+    const result = await uploadWallFile('org-1', {
+      kind: 'image',
+      uri: 'file:///logo.svg',
+      name: 'logo.svg',
+      size: 900,
+    })
+
+    expect(uploads).toHaveLength(0)
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: expect.stringContaining('not allowed') },
+    })
+  })
+})
+
+describe('getWallContributorGrant', () => {
+  test('reads back a grant for one organization and this caller', async () => {
+    enqueue(envelope({ userId: 'user-1', organizationId: 'org-1', isContributor: true }))
+
+    const result = await getWallContributorGrant('org-1', 'user-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall-contributors/org-1/user-1`)
+    expect(result).toEqual({
+      ok: true,
+      value: { userId: 'user-1', organizationId: 'org-1', isContributor: true },
+    })
+  })
+
+  test('an Admin-only refusal — asking about oneself — is read back as one, not thrown', async () => {
+    enqueue(response(403, { statusCode: 403, message: 'Admins only.' }))
+
+    const result = await getWallContributorGrant('org-1', 'user-1')
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Admins only.' } })
   })
 })

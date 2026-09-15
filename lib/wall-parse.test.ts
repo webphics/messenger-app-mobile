@@ -1,5 +1,7 @@
 import {
+  parseNamedWall,
   parseWallAttachment,
+  parseWallContributorGrant,
   parseWallLink,
   parseWallPost,
   parseWallPostRemoval,
@@ -14,6 +16,8 @@ const post = {
   attachments: [{ type: 'image', url: '/uploads/lift.png', fileName: 'lift.png', size: 2048 }],
   link: { label: 'Read the notice', url: 'https://example.com/notice' },
   reactions: [{ emoji: '🎉', userId: 'user-2' }],
+  score: 4,
+  upvoteCount: 5,
   editedAt: null,
   createdAt: '2026-09-14T10:00:00.000Z',
 }
@@ -28,6 +32,8 @@ describe('parseWallPost', () => {
       attachments: [{ kind: 'image', url: '/uploads/lift.png', fileName: 'lift.png', size: 2048 }],
       link: { label: 'Read the notice', url: 'https://example.com/notice' },
       reactions: [{ emoji: '🎉', userId: 'user-2' }],
+      score: 4,
+      upvoteCount: 5,
       editedAt: null,
       createdAt: '2026-09-14T10:00:00.000Z',
     })
@@ -51,6 +57,21 @@ describe('parseWallPost', () => {
   it('carries the edit stamp, so a card can say a Post was changed', () => {
     const edited = parseWallPost({ ...post, editedAt: '2026-09-14T11:00:00.000Z' })
     expect(edited?.editedAt).toBe('2026-09-14T11:00:00.000Z')
+  })
+
+  it('reads score and upvoteCount, which may be negative and zero respectively', () => {
+    const parsed = parseWallPost({ ...post, score: -3, upvoteCount: 0 })
+    expect(parsed?.score).toBe(-3)
+    expect(parsed?.upvoteCount).toBe(0)
+  })
+
+  it('falls back to no vote at all when the API omits or malforms score and upvoteCount', () => {
+    const { score: _score, upvoteCount: _upvoteCount, ...rest } = post
+    expect(parseWallPost(rest)).toMatchObject({ score: 0, upvoteCount: 0 })
+    expect(parseWallPost({ ...post, score: 'a lot', upvoteCount: null })).toMatchObject({
+      score: 0,
+      upvoteCount: 0,
+    })
   })
 
   it('is not a Message: nothing it reads is a Receipt or a Delivery state', () => {
@@ -108,5 +129,80 @@ describe('parseWallPostRemoval', () => {
   it('is null for anything with nothing to identify the Post by', () => {
     expect(parseWallPostRemoval({})).toBeNull()
     expect(parseWallPostRemoval(null)).toBeNull()
+  })
+})
+
+const namedWall = {
+  id: 'wall-1',
+  name: 'Ops watch',
+  ownerId: 'user-1',
+  organizationIds: ['org-1', 'org-2'],
+  createdAt: '2026-09-12T06:28:38.122Z',
+  updatedAt: '2026-09-12T06:28:38.122Z',
+}
+
+describe('parseNamedWall', () => {
+  it('reads a Wall by its id and name, and the organizations this reader may see', () => {
+    expect(parseNamedWall(namedWall)).toEqual({
+      id: 'wall-1',
+      name: 'Ops watch',
+      organizationIds: ['org-1', 'org-2'],
+    })
+  })
+
+  it('reads a Wall narrowed to no organizations at all, rather than refusing it', () => {
+    expect(parseNamedWall({ ...namedWall, organizationIds: [] })).toEqual({
+      id: 'wall-1',
+      name: 'Ops watch',
+      organizationIds: [],
+    })
+  })
+
+  it('falls back to no organizations when the field is missing entirely', () => {
+    const { organizationIds: _organizationIds, ...rest } = namedWall
+    expect(parseNamedWall(rest)?.organizationIds).toEqual([])
+  })
+
+  it.each(['id', 'name'])('refuses a Wall with no %s, because the alternative is inventing one', field => {
+    expect(parseNamedWall({ ...namedWall, [field]: undefined })).toBeNull()
+  })
+
+  it('does not read ownerId, createdAt, or updatedAt — nothing here offers to manage a Wall', () => {
+    const parsed = parseNamedWall(namedWall)
+    expect(parsed).not.toHaveProperty('ownerId')
+    expect(parsed).not.toHaveProperty('createdAt')
+    expect(parsed).not.toHaveProperty('updatedAt')
+  })
+
+  it('is null for anything that is not a record', () => {
+    expect(parseNamedWall(null)).toBeNull()
+    expect(parseNamedWall('wall-1')).toBeNull()
+  })
+})
+
+describe('parseWallContributorGrant', () => {
+  const grant = { userId: 'user-1', organizationId: 'org-1', isContributor: true }
+
+  it('reads a grant', () => {
+    expect(parseWallContributorGrant(grant)).toEqual(grant)
+  })
+
+  it('is false for anything but a literal true, rather than dropping the row', () => {
+    expect(parseWallContributorGrant({ ...grant, isContributor: 'true' })).toEqual({
+      ...grant,
+      isContributor: false,
+    })
+    expect(parseWallContributorGrant({ ...grant, isContributor: undefined })).toEqual({
+      ...grant,
+      isContributor: false,
+    })
+  })
+
+  it.each(['userId', 'organizationId'])('refuses a grant with no %s', field => {
+    expect(parseWallContributorGrant({ ...grant, [field]: undefined })).toBeNull()
+  })
+
+  it('is null for anything that is not a record', () => {
+    expect(parseWallContributorGrant(null)).toBeNull()
   })
 })

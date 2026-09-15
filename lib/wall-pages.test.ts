@@ -21,6 +21,8 @@ function post(id: string): WallPost {
     attachments: [],
     link: null,
     reactions: [],
+    score: 0,
+    upvoteCount: 0,
     editedAt: null,
     createdAt: '2026-09-14T10:00:00.000Z',
   }

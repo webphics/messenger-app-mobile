@@ -13,14 +13,17 @@ import type { WallPost } from '@/lib/types'
 /**
  * The author's own edit, over the one field this build lets them change.
  *
- * A Post's link and its attachments are left exactly as they were: there is
- * no picker wired into an edit yet — that arrives with Compose (#76), whose
- * upload plumbing this would otherwise have to invent early — and a Post's
- * link is small enough free text that fixing it is a delete-and-repost away
- * for now. `updateWallPost` never sends either field, so the API leaves both
- * untouched (`UpdateWallPostSchema`), and the one thing this form promises —
- * every reaction already on the Post survives — is true regardless: the API
- * never touches reactions on an edit at all.
+ * A Post's link and its attachments are left exactly as they were, even now
+ * that Compose (#76) has wired a picker in for a fresh Post: there is still
+ * no picker here, deliberately — a Post's link is small enough free text
+ * that fixing it is a delete-and-repost away, and an edit that could touch
+ * attachments would have to answer what removing the last image does, which
+ * `CreateWallPostSchema`'s own rule says cannot happen. `WallPostEditInput`
+ * has no `attachments` field at all, so this form cannot ask the API to
+ * remove one even by accident. `updateWallPost` never sends either field, so
+ * the API leaves both untouched (`UpdateWallPostSchema`), and the one thing
+ * this form promises — every reaction already on the Post survives — is true
+ * regardless: the API never touches reactions on an edit at all.
  */
 
 type WallPostEditSheetProps = {

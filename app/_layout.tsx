@@ -169,6 +169,16 @@ export default function RootLayout() {
                       contentStyle: { backgroundColor: colors.bg },
                     }}
                   />
+                  {/* A named Wall, opened from a link somebody else shared (#79). Beside
+                    the chat and community routes for the same reason those are — it is
+                    reached from outside whatever the Tab capsule was showing. */}
+                  <Stack.Screen
+                    name="wall/[id]"
+                    options={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  />
                   <Stack.Screen
                     name="(auth)"
                     options={{

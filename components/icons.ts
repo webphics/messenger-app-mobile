@@ -20,6 +20,8 @@ export type IconComponent = ComponentType<LucideProps>;
 
 export { default as AlertCircle } from "lucide-react-native/icons/circle-alert";
 export { default as Archive } from "lucide-react-native/icons/archive";
+export { default as ArrowBigDown } from "lucide-react-native/icons/arrow-big-down";
+export { default as ArrowBigUp } from "lucide-react-native/icons/arrow-big-up";
 export { default as ArrowLeftRight } from "lucide-react-native/icons/arrow-left-right";
 export { default as Ban } from "lucide-react-native/icons/ban";
 export { default as BellOff } from "lucide-react-native/icons/bell-off";

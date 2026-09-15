@@ -1,5 +1,6 @@
 import { asRecord } from '@/lib/api-envelope'
 import type {
+  NamedWall,
   WallAttachmentKind,
   WallPost,
   WallPostAttachment,
@@ -22,9 +23,10 @@ import type {
  * an author, an organization, a timestamp — and everything else falls back.
  *
  * The parts of the response this client does not render yet are deliberately not
- * parsed. A Post's vote score, its viewer count and whether the reader has
- * bookmarked it each belong to a ticket of their own; carrying them here would
- * be three fields nothing reads and no screen could be wrong about.
+ * parsed. A Post's viewer count and whether the reader has bookmarked it each
+ * belong to a ticket of their own; carrying them here would be two fields
+ * nothing reads and no screen could be wrong about. `score` and `upvoteCount`
+ * are the exception — #83 draws them.
  */
 
 const ATTACHMENT_KINDS: readonly WallAttachmentKind[] = ['image', 'video', 'document']
@@ -115,6 +117,8 @@ export function parseWallPost(data: unknown): WallPost | null {
     attachments: parseList(row.attachments, parseWallAttachment),
     link: parseWallLink(row.link),
     reactions: parseList(row.reactions, parseReaction),
+    score: optionalNumber(row.score) ?? 0,
+    upvoteCount: optionalNumber(row.upvoteCount) ?? 0,
     editedAt: text(row.editedAt),
     createdAt,
   }
@@ -133,4 +137,51 @@ export function parseWallPostRemoval(data: unknown): { id: string } | null {
 
   const id = text(row.id)
   return id ? { id } : null
+}
+
+/**
+ * One grant, read back from `GET /wall-contributors/:organizationId/:userId`.
+ *
+ * Used only against the viewer's own id, to decide whether the Compose
+ * control offers an organization at all — see
+ * `lib/use-composable-wall-organizations`. `isContributor` falls back to
+ * `false` rather than dropping the whole row: a malformed boolean is a
+ * Contributor question this device cannot answer yes to.
+ */
+export function parseWallContributorGrant(
+  data: unknown,
+): { userId: string; organizationId: string; isContributor: boolean } | null {
+  const row = asRecord(data)
+  if (!row) return null
+
+  const userId = text(row.userId)
+  const organizationId = text(row.organizationId)
+  if (!userId || !organizationId) return null
+
+  return { userId, organizationId, isContributor: row.isContributor === true }
+}
+
+/**
+ * A named Wall — the definition a shared link resolves through.
+ *
+ * `organizationIds` falls back to an empty list rather than failing the whole
+ * row: the API sends that same empty list for a reader in none of a Wall's
+ * organizations, and a name with nothing else to read is still enough for a
+ * shared link to render. `ownerId`, `createdAt` and `updatedAt` are
+ * deliberately not read — nothing on this device offers to rename, re-scope,
+ * or delete a Wall, so nothing here would ever use them.
+ */
+export function parseNamedWall(data: unknown): NamedWall | null {
+  const row = asRecord(data)
+  if (!row) return null
+
+  const id = text(row.id)
+  const name = text(row.name)
+  if (!id || !name) return null
+
+  const organizationIds = Array.isArray(row.organizationIds)
+    ? row.organizationIds.filter((value): value is string => typeof value === 'string')
+    : []
+
+  return { id, name, organizationIds }
 }

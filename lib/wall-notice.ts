@@ -21,6 +21,17 @@ export type WallNoticeInput = {
   /** The first page, only: paging back and pulling to refresh report themselves. */
   loading: boolean
   failure: ApiFailure | null
+  /**
+   * Whether this is a shared, named Wall rather than the default one.
+   *
+   * The empty copy is the one thing that has to differ: a default Wall with
+   * nothing on it means nobody in your organizations has posted, but a named
+   * Wall reading empty most often means its organizations are not yours — the
+   * one acceptance criterion #79 has for this screen is that this reads as a
+   * view with nothing in it rather than as a refusal, and the default copy's
+   * "organizations you belong to" would claim the opposite of what happened.
+   */
+  named?: boolean
 }
 
 const COPY = {
@@ -29,6 +40,13 @@ const COPY = {
   emptyHint: 'Posts from the organizations you belong to will appear here.',
 }
 
-export function wallNotice({ drawn, loading, failure }: WallNoticeInput): WallNotice {
-  return readNotice({ drawn, confirmed: drawn, loading, failure }, COPY)
+const NAMED_COPY = {
+  refusedTitle: 'Could not load this Wall',
+  emptyTitle: 'Nothing to show',
+  emptyHint:
+    'Either nobody here has posted yet, or none of its organizations overlap with yours.',
+}
+
+export function wallNotice({ drawn, loading, failure, named }: WallNoticeInput): WallNotice {
+  return readNotice({ drawn, confirmed: drawn, loading, failure }, named ? NAMED_COPY : COPY)
 }

@@ -11,13 +11,14 @@ import { WallPostCollage } from '@/components/wall/wall-post-collage'
 import { WallPostEditSheet } from '@/components/wall/wall-post-edit-sheet'
 import { WallPostMedia } from '@/components/wall/wall-post-media'
 import { WallPostReactions } from '@/components/wall/wall-post-reactions'
+import { WallPostVote } from '@/components/wall/wall-post-vote'
 import type { ApiResult } from '@/lib/api-result'
 import { formatRelativeTime, initials } from '@/lib/display'
 import { colors } from '@/lib/tokens'
 import { wallActionRefusal, wallPostActions, type WallPostViewer } from '@/lib/wall-actions'
 import type { WallPostEditInput } from '@/lib/wall-api'
 import { groupWallAttachments, linkHost } from '@/lib/wall-card'
-import type { WallPost } from '@/lib/types'
+import type { WallPost, WallVoteDirection } from '@/lib/types'
 
 /**
  * One Post, as a card rather than as a row.
@@ -29,9 +30,11 @@ import type { WallPost } from '@/lib/types'
  * fills the top of the card is what the card is showing.
  *
  * Under it the byline, then the body, then whatever else the Post carries, then
- * the reaction row. Nothing on it offers or implies commenting: a Post has no
- * replies, no reply count and no comment box, and the one thing a reader can
- * say about one is a reaction.
+ * the vote pill and the reaction row — a judgement and an expression, drawn as
+ * two visibly different controls rather than one row that could be mistaken
+ * for the other. Nothing on it offers or implies commenting: a Post has no
+ * replies, no reply count and no comment box, and the two things a reader can
+ * do about one are vote and react.
  *
  * Only the byline is grouped for a screen reader, and deliberately only that:
  * a name, a stamp and an edit mark read as three fragments apart and as one
@@ -50,11 +53,21 @@ type WallPostCardProps = {
   post: WallPost
   viewer: WallPostViewer
   onReact: (postId: string, emoji: string) => void
+  myVote: WallVoteDirection | null
+  onVote: (postId: string, direction: WallVoteDirection) => void
   onEdit: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
   onRemove: (postId: string) => Promise<ApiResult<{ id: string }>>
 }
 
-export function WallPostCard({ post, viewer, onReact, onEdit, onRemove }: WallPostCardProps) {
+export function WallPostCard({
+  post,
+  viewer,
+  onReact,
+  myVote,
+  onVote,
+  onEdit,
+  onRemove,
+}: WallPostCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const { images, videos, documents } = useMemo(
@@ -182,6 +195,12 @@ export function WallPostCard({ post, viewer, onReact, onEdit, onRemove }: WallPo
             <ExternalLink color={colors.muted} size={18} />
           </TactilePressable>
         ) : null}
+
+        <WallPostVote
+          score={post.score}
+          myVote={myVote}
+          onVote={(direction) => onVote(post.id, direction)}
+        />
 
         <WallPostReactions
           reactions={post.reactions}
