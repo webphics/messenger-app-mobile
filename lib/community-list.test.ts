@@ -1,16 +1,22 @@
 import {
+  communityScreenRows,
+  communitySections,
   communityTabRows,
   communityThreads,
   feedAfterRead,
+  JOINABLE_SECTION_TITLE,
+  JOINED_SECTION_TITLE,
   MAX_INLINE_GROUPS,
   myCommunities,
   sortCommunities,
+  withLiveSections,
   withLiveThread,
   type CommunityFeed,
 } from '@/lib/community-list'
 import type {
   Community,
   CommunityFeedRow,
+  CommunityJoinableGroupRow,
   CommunityMemberGroupRow,
   Conversation,
 } from '@/lib/types'
@@ -53,15 +59,20 @@ const announcements: CommunityFeedRow = {
   unreadCount: 0,
 }
 
-const joinable: CommunityFeedRow = {
-  kind: 'joinable_group',
-  id: 'group-9',
-  title: 'Support',
-  avatarUrl: null,
-  memberCount: 4,
-  joinPolicy: 'open',
-  joinState: 'may_request',
+function joinableGroup(overrides: Partial<CommunityJoinableGroupRow> = {}): CommunityJoinableGroupRow {
+  return {
+    kind: 'joinable_group',
+    id: 'group-9',
+    title: 'Support',
+    avatarUrl: null,
+    memberCount: 4,
+    joinPolicy: 'open',
+    joinState: 'may_request',
+    ...overrides,
+  }
 }
+
+const joinable: CommunityFeedRow = joinableGroup()
 
 function conversation(overrides: Partial<Conversation> = {}): Conversation {
   return {
@@ -345,6 +356,85 @@ describe('communityTabRows', () => {
       conversations: [],
     })
 
+    expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length)
+  })
+})
+
+describe('communitySections', () => {
+  it('splits a feed into the pinned thread and the two named sections', () => {
+    const sections = communitySections([announcements, group(), joinable])
+
+    expect(sections.announcements?.id).toBe('announcements-1')
+    expect(sections.joined.map((row) => row.id)).toEqual(['group-1'])
+    expect(sections.joinable.map((row) => row.id)).toEqual(['group-9'])
+  })
+
+  it('orders the Groups somebody may join alphabetically, since none of them have activity to rank by', () => {
+    const b = joinableGroup({ id: 'b', title: 'Beta' })
+    const a = joinableGroup({ id: 'a', title: 'Alpha' })
+
+    expect(communitySections([b, a]).joinable.map((row) => row.id)).toEqual(['a', 'b'])
+  })
+
+  it('has nothing joinable in a Community the viewer is already everywhere in', () => {
+    expect(communitySections([announcements, group()]).joinable).toEqual([])
+  })
+})
+
+describe('withLiveSections', () => {
+  it('overlays the live Conversation onto the pinned thread and every joined Group', () => {
+    const sections = communitySections([announcements, group()])
+    const live = conversation({ unreadCount: 5, lastMessagePreview: 'Live' })
+
+    const next = withLiveSections(sections, [live])
+    expect(next.joined[0]).toMatchObject({ unreadCount: 5, lastMessagePreview: 'Live' })
+  })
+
+  it('leaves the Groups somebody may join untouched — there is no thread to overlay', () => {
+    const sections = communitySections([joinable])
+    expect(withLiveSections(sections, [conversation()]).joinable).toEqual(sections.joinable)
+  })
+})
+
+describe('communityScreenRows', () => {
+  it('draws the pinned thread first, then both sections in order', () => {
+    const rows = communityScreenRows(communitySections([announcements, group(), joinable]))
+
+    expect(rows.map((row) => row.kind)).toEqual([
+      'announcements',
+      'section',
+      'thread',
+      'section',
+      'joinable',
+    ])
+  })
+
+  it('names both sections even when neither is empty', () => {
+    const rows = communityScreenRows(communitySections([group(), joinable]))
+    const titles = rows.filter((row) => row.kind === 'section').map((row) => row.title)
+
+    expect(titles).toEqual([JOINED_SECTION_TITLE, JOINABLE_SECTION_TITLE])
+  })
+
+  it('says a section is empty rather than collapsing it away', () => {
+    const rows = communityScreenRows(communitySections([joinable]))
+
+    expect(rows.map((row) => row.kind)).toEqual(['section', 'joined-empty', 'section', 'joinable'])
+  })
+
+  it('says both sections are empty for a Community with no Groups at all', () => {
+    const rows = communityScreenRows(communitySections([]))
+
+    expect(rows.map((row) => row.kind)).toEqual([
+      'section',
+      'joined-empty',
+      'section',
+      'joinable-empty',
+    ])
+  })
+
+  it('keys every row uniquely', () => {
+    const rows = communityScreenRows(communitySections([announcements, group(), joinable]))
     expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length)
   })
 })

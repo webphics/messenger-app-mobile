@@ -4,7 +4,10 @@ import { isCommunityThreadRow } from '@/lib/community-parse'
 import { failureNotice } from '@/lib/conversation-failure'
 import type {
   Community,
+  CommunityAnnouncementsRow,
   CommunityFeedRow,
+  CommunityJoinableGroupRow,
+  CommunityMemberGroupRow,
   CommunityThreadRow,
   Conversation,
 } from '@/lib/types'
@@ -92,19 +95,101 @@ function rowActivityAt(row: CommunityThreadRow): number {
  * the head of it.
  */
 export function communityThreads(rows: readonly CommunityFeedRow[]): {
-  announcements: CommunityThreadRow | null
-  groups: CommunityThreadRow[]
+  announcements: CommunityAnnouncementsRow | null
+  groups: CommunityMemberGroupRow[]
 } {
   const threads = rows.filter(isCommunityThreadRow)
-  const announcements = threads.find((row) => row.kind === 'announcements') ?? null
+  const announcements =
+    threads.find((row): row is CommunityAnnouncementsRow => row.kind === 'announcements') ?? null
   const groups = threads
-    .filter((row) => row.kind === 'member_group')
+    .filter((row): row is CommunityMemberGroupRow => row.kind === 'member_group')
     .sort((a, b) => {
       const difference = rowActivityAt(b) - rowActivityAt(a)
       return difference !== 0 ? difference : a.title.localeCompare(b.title)
     })
 
   return { announcements, groups }
+}
+
+/** The Community screen's three parts: its pinned thread, and the two named sections beneath it. */
+export type CommunitySections = {
+  announcements: CommunityAnnouncementsRow | null
+  /** `Groups you're in` — a conversation row apiece, newest activity first. */
+  joined: CommunityMemberGroupRow[]
+  /** `Groups you can join` — nothing to open yet, so alphabetical is the only order there is. */
+  joinable: CommunityJoinableGroupRow[]
+}
+
+/**
+ * A Community's whole feed, split into the sections the Community screen draws
+ * (#73): the pinned Announcements thread, the Groups the viewer is already in,
+ * and the Groups they may join or have asked to.
+ *
+ * Reuses `communityThreads` for the first two rather than filtering the feed a
+ * second time, so the one ordering rule for a joined Group lives in one place.
+ */
+export function communitySections(rows: readonly CommunityFeedRow[]): CommunitySections {
+  const { announcements, groups } = communityThreads(rows)
+  const joinable = rows
+    .filter((row): row is CommunityJoinableGroupRow => row.kind === 'joinable_group')
+    .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
+
+  return { announcements, joined: groups, joinable }
+}
+
+/**
+ * One row of the Community screen's own flat list.
+ *
+ * The same idiom `communityTabRows` uses for the tab, for the same reason: two
+ * named sections that can each be empty are simpler as rows a virtualised list
+ * already knows how to draw than as a `SectionList` with its own header and
+ * empty-section plumbing to keep in sync with this module's decisions.
+ */
+export type CommunityScreenRow =
+  | { kind: 'announcements'; key: string; row: CommunityAnnouncementsRow }
+  | { kind: 'section'; key: string; title: string }
+  | { kind: 'thread'; key: string; row: CommunityMemberGroupRow }
+  | { kind: 'joined-empty'; key: string }
+  | { kind: 'joinable'; key: string; row: CommunityJoinableGroupRow }
+  | { kind: 'joinable-empty'; key: string }
+
+export const JOINED_SECTION_TITLE = "Groups you're in"
+export const JOINABLE_SECTION_TITLE = 'Groups you can join'
+
+/**
+ * The Community screen, flattened: the pinned thread, then `Groups you're in`,
+ * then `Groups you can join` — always both headers, so a Community with
+ * nothing in one of them reads as *that section has nothing* rather than as
+ * a list that quietly dropped a heading.
+ */
+export function communityScreenRows(sections: CommunitySections): CommunityScreenRow[] {
+  const rows: CommunityScreenRow[] = []
+
+  if (sections.announcements) {
+    rows.push({
+      kind: 'announcements',
+      key: `announcements:${sections.announcements.id}`,
+      row: sections.announcements,
+    })
+  }
+
+  rows.push({ kind: 'section', key: 'section:joined', title: JOINED_SECTION_TITLE })
+  if (sections.joined.length === 0) {
+    rows.push({ kind: 'joined-empty', key: 'empty:joined' })
+  } else {
+    for (const row of sections.joined) rows.push({ kind: 'thread', key: `thread:${row.id}`, row })
+  }
+
+  rows.push({ kind: 'section', key: 'section:joinable', title: JOINABLE_SECTION_TITLE })
+  if (sections.joinable.length === 0) {
+    rows.push({ kind: 'joinable-empty', key: 'empty:joinable' })
+  } else {
+    for (const row of sections.joinable) {
+      rows.push({ kind: 'joinable', key: `joinable:${row.id}`, row })
+    }
+  }
+
+  return rows
 }
 
 /**
@@ -124,10 +209,10 @@ export function communityThreads(rows: readonly CommunityFeedRow[]): {
  * conversation row does not carry it — so that stays the feed's, which is the
  * only place it is said.
  */
-export function withLiveThread(
-  row: CommunityThreadRow,
+export function withLiveThread<T extends CommunityThreadRow>(
+  row: T,
   conversations: readonly Conversation[],
-): CommunityThreadRow {
+): T {
   const live = conversations.find((conversation) => conversation.id === row.id)
   if (!live) return row
 
@@ -148,6 +233,26 @@ export function withLiveThread(
     next.unreadCount === row.unreadCount
     ? row
     : next
+}
+
+/**
+ * A Community's sections, with the pinned thread and every joined Group told
+ * what the Conversation list already knows about it.
+ *
+ * The Groups somebody may join carry no thread — nothing to overlay — so they
+ * pass through untouched.
+ */
+export function withLiveSections(
+  sections: CommunitySections,
+  conversations: readonly Conversation[],
+): CommunitySections {
+  return {
+    announcements: sections.announcements
+      ? withLiveThread(sections.announcements, conversations)
+      : null,
+    joined: sections.joined.map((row) => withLiveThread(row, conversations)),
+    joinable: sections.joinable,
+  }
 }
 
 /** What a Community's feed is doing, as the tab and the Community screen both read it. */

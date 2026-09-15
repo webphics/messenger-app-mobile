@@ -47,15 +47,12 @@ export function communityNotice({
 export const COMMUNITY_FEED_REFUSED_TITLE = 'Could not load groups'
 
 /**
- * What the Community screen says when the feed arrived and held nothing the
- * viewer can open.
- *
- * Here rather than in the screen, because this is where the words a Communities
- * surface says live — and because it has to stay distinguishable from the
- * failure above it: a Community with no rooms for this person and one this
- * device could not reach are opposite facts.
+ * What each named section on the Community screen (#73) says when it has
+ * nothing — one line under its header rather than a full notice card, so the
+ * two read as different, settled facts about this person rather than as two
+ * copies of the same empty state. There is no single unified "no groups"
+ * notice beside these: the two sections are always drawn, so a Community
+ * with nothing in either is exactly these two lines rather than a third copy.
  */
-export const COMMUNITY_EMPTY = {
-  title: 'No groups yet',
-  hint: 'Groups you are in appear here, with the community’s announcements.',
-}
+export const COMMUNITY_JOINED_EMPTY = 'You haven’t joined any groups here yet.'
+export const COMMUNITY_JOINABLE_EMPTY = 'No groups to join right now.'

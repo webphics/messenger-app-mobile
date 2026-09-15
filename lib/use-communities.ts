@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ApiFailure } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
-import { listCommunities, listCommunityGroups } from '@/lib/community-api'
+import { joinLinkedGroup, listCommunities, listCommunityGroups } from '@/lib/community-api'
+import { communityActionRefusal } from '@/lib/community-join'
 import {
   communityTabRows,
   feedAfterRead,
@@ -18,7 +19,7 @@ import {
   saveCommunityFeed,
 } from '@/lib/conversation-store'
 import { useConversationInbox } from '@/lib/conversation-inbox'
-import type { Community, Conversation } from '@/lib/types'
+import type { Community, CommunityJoinableGroupRow, Conversation } from '@/lib/types'
 
 /**
  * The Communities tab: what this phone already holds, and then what the API
@@ -336,6 +337,8 @@ export function useCommunityFeed(communityId: string | null): {
   feed: CommunityFeed
   refresh: () => void
   refreshing: boolean
+  /** Ask again without the pull-to-refresh spinner — what a successful join re-reads with. */
+  reload: () => void
 } {
   const { state } = useAuth()
   const viewerId = state.status === 'signed-in' ? state.user.id : null
@@ -372,5 +375,89 @@ export function useCommunityFeed(communityId: string | null): {
     load()
   }, [load])
 
-  return { feed, refresh, refreshing }
+  return { feed, refresh, refreshing, reload: load }
+}
+
+export type JoinGroupView = {
+  /** Which joinable Group has a request out, if any. */
+  busyId: string | null
+  /** One line for a join the API refused, over the section rather than the row. */
+  error: string | null
+  join: (row: CommunityJoinableGroupRow) => void
+}
+
+/**
+ * A member entering a linked Group from the Community screen (#73).
+ *
+ * There is nothing to roll back: nothing here moves a row before the API
+ * answers, so a refusal leaves the feed exactly as it was and only needs to
+ * say so. A success re-reads the feed instead of reconstructing one row's new
+ * shape from a differently-shaped answer — the same reason `useCommunityFeed`
+ * reads the Store rather than trusting a write to describe itself — so
+ * `onSettled` is called only once the join's own request has actually landed,
+ * never at the tap, which is what makes the re-read see the join rather than
+ * race it. `onJoined` is the caller's chance to fold a newly-joined Group's
+ * conversation into the Conversation list before that re-read runs.
+ */
+export function useJoinGroup(
+  communityId: string | null,
+  onJoined: (conversation: Conversation) => void,
+  onSettled: () => void,
+): JoinGroupView {
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const join = useCallback(
+    (row: CommunityJoinableGroupRow) => {
+      if (!communityId || busyId) return
+      setBusyId(row.id)
+      setError(null)
+
+      void joinLinkedGroup(communityId, row.id).then((result) => {
+        setBusyId(null)
+
+        if (!result.ok) {
+          setError(communityActionRefusal(result.failure))
+          return
+        }
+        if (result.value.outcome === 'joined') onJoined(result.value.conversation)
+        onSettled()
+      })
+    },
+    [communityId, busyId, onJoined, onSettled],
+  )
+
+  return { busyId, error, join }
+}
+
+/**
+ * A Community this device no longer holds the person's membership of, taken
+ * off the Store (#73).
+ *
+ * Only the tab's own read writes Communities, and leaving happens from a
+ * screen that is not that hook — so this reads the same rows back, drops the
+ * one just left, and writes the rest through the same `saveCommunities` the
+ * tab already queues its own writes on. A relaunch, or the tab's next fetch,
+ * would settle on the same answer either way; this is only what makes a
+ * screen the person just backed out of not show it a moment longer than it
+ * has to.
+ *
+ * Not the last word if the tab is still mounted underneath: its own effect
+ * writes whatever it is still holding whenever *its* state next changes, stale
+ * membership included, and could overwrite this. Narrow and self-correcting —
+ * the tab's own next fetch reads the API, which has already forgotten the
+ * same membership — so it is left rather than building the two hooks a shared
+ * writer to close it, which is more machinery than a moment of staleness
+ * needs.
+ */
+export function forgetCommunity(viewerId: string, communityId: string): void {
+  const { communities, expanded } = restoreCommunities(viewerId)
+  if (!communities.some((community) => community.id === communityId)) return
+
+  const nextExpanded = new Set(expanded)
+  nextExpanded.delete(communityId)
+  void saveCommunities(viewerId, {
+    communities: communities.filter((community) => community.id !== communityId),
+    expanded: nextExpanded,
+  })
 }

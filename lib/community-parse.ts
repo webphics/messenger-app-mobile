@@ -1,8 +1,10 @@
 import { asRecord } from '@/lib/api-envelope'
+import { parseConversation } from '@/lib/conversation-parse'
 import type {
   Community,
   CommunityFeedRow,
   CommunityThreadRow,
+  GroupJoinOutcome,
   GroupJoinPolicy,
 } from '@/lib/types'
 
@@ -178,4 +180,29 @@ export function parseCommunityFeed(data: unknown): CommunityFeedRow[] | null {
 /** Whether a feed row is one a tap can open. A Group nobody is in has no thread to open. */
 export function isCommunityThreadRow(row: CommunityFeedRow): row is CommunityThreadRow {
   return row.kind !== 'joinable_group'
+}
+
+/**
+ * What `POST /communities/:id/groups/:groupId/join` answered.
+ *
+ * Only the discriminator and, for `joined`, the conversation beside it are
+ * read — a payload naming neither outcome is one this build cannot read, the
+ * same rule every parser here follows.
+ */
+export function parseGroupJoinOutcome(data: unknown): GroupJoinOutcome | null {
+  const row = asRecord(data)
+  if (!row) return null
+
+  if (row.outcome === 'joined') {
+    const conversation = parseConversation(row.conversation)
+    return conversation ? { outcome: 'joined', conversation } : null
+  }
+
+  return row.outcome === 'requested' ? { outcome: 'requested' } : null
+}
+
+/** What `DELETE /communities/:id/members/me` answers: the Community just left, and nothing else. */
+export function parseLeftCommunity(data: unknown): { id: string } | null {
+  const id = asRecord(data)?.id
+  return typeof id === 'string' && id !== '' ? { id } : null
 }
