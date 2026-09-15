@@ -633,3 +633,21 @@ export type CommunityFeedRow =
 
 /** The rows a Community's feed opens a conversation from: everything but a Group nobody is in. */
 export type CommunityThreadRow = CommunityAnnouncementsRow | CommunityMemberGroupRow
+
+/**
+ * What `GET /notifications/settings` answers, and what every write to it answers
+ * with: one document per person, holding the three standing answers the API keeps
+ * about who may notify them.
+ *
+ * `postOrganizationIds` is the one this client writes, and it is opt-*in*: an
+ * organization is in the list only because somebody put it there, and a Post
+ * notifies nobody who has not. The other two are the opposite direction — a
+ * Broadcast reaches everyone who has not opted out, a thread notifies until it
+ * is muted — and are parsed rather than used, because they are what the document
+ * is and a write answers with all three.
+ */
+export type NotificationSettings = {
+  broadcastOptOut: boolean
+  mutedConversationIds: string[]
+  postOrganizationIds: string[]
+}

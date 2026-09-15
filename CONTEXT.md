@@ -646,6 +646,22 @@ platform's own settings, which is by then the only place the answer can change.
 _Avoid_: Notification setting (that is the platform's screen), opt-in, subscribing (that is the
 browser's), turning notifications on (say whose — the OS's or a Mute)
 
+**Post notification opt-in**:
+Which Organizations may notify somebody about a Post — a switch each, kept by the API on the
+notification settings document and empty until somebody fills it. The opposite direction from
+everything else here, which is the whole of it: a Broadcast reaches whoever has not opted out and an
+essential one reaches past even that, a thread notifies until it is Muted, and a Post notifies nobody
+who has not named its Organization. There is no kind of Post that overrides it, so there is nowhere
+an override could be read from — the switch is on because its Organization is in the list, and the
+list is the only thing consulted. It is not a Notification permission and cannot grant one: a phone
+whose notifications are not on is told so under the switches rather than asked, because both moments
+that ask are elsewhere and each asks once — and told in the words the standing warrants, since a
+phone nobody has asked is not a phone that said no. Decided in `lib/post-notifications`, drawn on
+Settings beside the route into the platform's own settings, which is offered on exactly the standing
+the harder sentence is.
+_Avoid_: Subscribing, following, Mute (the other direction, and over a Conversation), Notification
+permission (the operating system's answer, not the API's)
+
 **Push audience**:
 Which of a Notification row's recipients this phone is also woken for. Nearly all of them: a Message
 in any conversation the person is a recipient of, which reaches the Unassigned pool without a rule of
