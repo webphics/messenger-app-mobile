@@ -3,6 +3,7 @@ import { ScrollView, View } from "react-native";
 
 import { InvitationsCard } from "@/components/settings/invitations-card";
 import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
+import { PostNotificationsCard } from "@/components/settings/post-notifications-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -102,11 +103,15 @@ export function SettingsScreen() {
         </Button>
       </View>
 
-      {/* Last, and absent unless the operating system's own settings are the
-          only place notifications can still be turned on. Below Sign out
-          because whether it appears at all is settled a frame or two after this
-          screen draws, and nothing that arrives late belongs above a
-          destructive control somebody is already reaching for. */}
+      {/* The two notification settings, together and last. Below Sign out
+          because the second of them is settled a frame or two after this screen
+          draws and nothing that arrives late belongs above a destructive
+          control somebody is already reaching for — and the first is here too
+          rather than further up because they are one subject: the sentence
+          under the switches that says notifications are off is the sentence the
+          row beneath offers the way out of. Nothing under them moves when the
+          row appears. */}
+      <PostNotificationsCard />
       <NotificationPermissionRow />
     </ScrollView>
   );

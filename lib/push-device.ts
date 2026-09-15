@@ -9,6 +9,7 @@ import {
   notificationIdsForConversation,
   shouldAskForPermission,
   shouldOfferSystemSettings,
+  type PermissionStanding,
   type PermissionTrigger,
   type PushPermission,
 } from '@/lib/push-rules'
@@ -177,6 +178,25 @@ export async function ensurePushPermission(
 
   rememberAsked()
   return answered
+}
+
+/**
+ * Where the platform stands, for a screen that has to say something true about
+ * what will actually arrive.
+ *
+ * The whole standing rather than the status, because the status alone cannot
+ * tell a refusal from a phone nobody has asked — see `lib/push-rules`, which is
+ * where every question about it is answered. Nothing acts on this: the card in
+ * `components/settings/post-notifications-card` puts a sentence under its
+ * switches, and which sentence is `postNotificationCaveat`'s reading of exactly
+ * the standing the ask is guarded on, so the two cannot drift apart.
+ *
+ * A platform that cannot be read says nothing has been decided and nothing has
+ * been closed, the same value every other read here is taken under.
+ */
+export async function readNotificationStanding(): Promise<PermissionStanding> {
+  const { status, canAskAgain } = await readPermission()
+  return { status, canAskAgain, askedBefore: hasAsked() }
 }
 
 /**
