@@ -1,4 +1,4 @@
-import type { WallPostAttachment } from '@/lib/types'
+import type { WallPostAttachment, WallPostReaction } from '@/lib/types'
 
 /**
  * What a Post's card is made of, decided before anything is drawn.
@@ -133,4 +133,35 @@ export const WALL_BODY_LEAD_MAX = 140
  */
 export function wallBodyEmphasis(body: string, hasImages: boolean): 'lead' | 'body' {
   return !hasImages && body.trim().length <= WALL_BODY_LEAD_MAX ? 'lead' : 'body'
+}
+
+/** One emoji, gathered for the reaction row: how many hold it, and whether the viewer is one of them. */
+export type WallReactionChip = { emoji: string; count: number; mine: boolean }
+
+/**
+ * A Post's reactions, gathered per emoji for the chip row.
+ *
+ * The API sends them one per person per emoji — `{ emoji, userId }` — the same
+ * shape a Message's reactions arrive in, so the grouping happens here for the
+ * same reason `groupReactions` (`lib/message-react`) exists: a card draws one
+ * chip per emoji with a count, not one row per person who reacted.
+ *
+ * Order is first-appearance, which is what keeps the row from reshuffling as
+ * reactions arrive — the same property `groupReactions` keeps for a Message.
+ */
+export function wallReactionChips(
+  reactions: WallPostReaction[],
+  viewerId: string,
+): WallReactionChip[] {
+  const order: string[] = []
+  const counts = new Map<string, number>()
+  const mine = new Set<string>()
+
+  for (const reaction of reactions) {
+    if (!counts.has(reaction.emoji)) order.push(reaction.emoji)
+    counts.set(reaction.emoji, (counts.get(reaction.emoji) ?? 0) + 1)
+    if (reaction.userId === viewerId) mine.add(reaction.emoji)
+  }
+
+  return order.map((emoji) => ({ emoji, count: counts.get(emoji) ?? 0, mine: mine.has(emoji) }))
 }

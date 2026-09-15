@@ -1,4 +1,10 @@
-import { parseWallAttachment, parseWallLink, parseWallPost, parseWallPosts } from '@/lib/wall-parse'
+import {
+  parseWallAttachment,
+  parseWallLink,
+  parseWallPost,
+  parseWallPostRemoval,
+  parseWallPosts,
+} from '@/lib/wall-parse'
 
 const post = {
   id: 'post-1',
@@ -91,5 +97,16 @@ describe('parseWallPosts', () => {
 
   it('is malformed when the payload is not a list at all', () => {
     expect(parseWallPosts({ posts: [] })).toBeNull()
+  })
+})
+
+describe('parseWallPostRemoval', () => {
+  it('reads the id, which is all a soft-removed Post answers with', () => {
+    expect(parseWallPostRemoval({ id: 'post-1' })).toEqual({ id: 'post-1' })
+  })
+
+  it('is null for anything with nothing to identify the Post by', () => {
+    expect(parseWallPostRemoval({})).toBeNull()
+    expect(parseWallPostRemoval(null)).toBeNull()
   })
 })

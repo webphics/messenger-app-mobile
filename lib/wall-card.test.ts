@@ -3,10 +3,11 @@ import {
   linkHost,
   wallBodyEmphasis,
   wallCollage,
+  wallReactionChips,
   WALL_BODY_LEAD_MAX,
   WALL_COLLAGE_MAX_CELLS,
 } from '@/lib/wall-card'
-import type { WallPostAttachment } from '@/lib/types'
+import type { WallPostAttachment, WallPostReaction } from '@/lib/types'
 
 function image(url = 'a'): WallPostAttachment {
   return { kind: 'image', url, fileName: null, size: null }
@@ -86,5 +87,39 @@ describe('how a body is set', () => {
 
   it('does not lead once it is a paragraph rather than a statement', () => {
     expect(wallBodyEmphasis('x'.repeat(WALL_BODY_LEAD_MAX + 1), false)).toBe('body')
+  })
+})
+
+function reaction(emoji: string, userId: string): WallPostReaction {
+  return { emoji, userId }
+}
+
+describe('wallReactionChips', () => {
+  it('draws nothing for a Post nobody has reacted to', () => {
+    expect(wallReactionChips([], 'user-1')).toEqual([])
+  })
+
+  it('counts everybody who reacted with the same emoji as one chip', () => {
+    const chips = wallReactionChips(
+      [reaction('👍', 'user-1'), reaction('👍', 'user-2'), reaction('👍', 'user-3')],
+      'user-4',
+    )
+    expect(chips).toEqual([{ emoji: '👍', count: 3, mine: false }])
+  })
+
+  it('says which chip is the viewer’s own', () => {
+    const chips = wallReactionChips([reaction('👍', 'user-1'), reaction('🔥', 'user-2')], 'user-2')
+    expect(chips).toEqual([
+      { emoji: '👍', count: 1, mine: false },
+      { emoji: '🔥', count: 1, mine: true },
+    ])
+  })
+
+  it('orders chips by the emoji’s first appearance, so the row does not reshuffle', () => {
+    const chips = wallReactionChips(
+      [reaction('🔥', 'user-1'), reaction('👍', 'user-2'), reaction('🔥', 'user-3')],
+      'user-1',
+    )
+    expect(chips.map((chip) => chip.emoji)).toEqual(['🔥', '👍'])
   })
 })

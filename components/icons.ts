@@ -75,6 +75,7 @@ export { default as Send } from "lucide-react-native/icons/send";
 export { default as Settings } from "lucide-react-native/icons/settings";
 export { default as Shield } from "lucide-react-native/icons/shield";
 export { default as ShieldCheck } from "lucide-react-native/icons/shield-check";
+export { default as SmilePlus } from "lucide-react-native/icons/face-slightly-smiling-plus";
 export { default as Sparkles } from "lucide-react-native/icons/sparkles";
 export { default as Square } from "lucide-react-native/icons/square";
 export { default as SquarePen } from "lucide-react-native/icons/square-pen";
