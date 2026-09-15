@@ -22,13 +22,21 @@ import type { WallPost } from '@/lib/types'
  * part that is neither: when to ask, and how to ignore an answer that arrived
  * for a read somebody has already replaced.
  *
- * Nothing is persisted. A Wall is re-read from the API every time it is opened,
- * which is why a Session end has nothing of its own to destroy: the Posts live
- * in this state and go when the signed-in screens do, and the one thing that
- * does touch the disk — a document opened out of a Post — is downloaded by
+ * Nothing is persisted, and nothing is read before somebody asks for it. The
+ * first page is fetched when this hook mounts, which is when the Wall tab is
+ * first opened — a tab is mounted on the tap that focuses it, so a launch pays
+ * nothing for the Wall existing and the Launch gate has no input from here. A
+ * pull and the retry on a failed Wall are the two ways to ask again; a later
+ * return to the tab draws what is already there rather than emptying the list
+ * to re-read it under somebody who had paged back through it.
+ *
+ * Which is also why a Session end has nothing of its own to destroy: the Posts
+ * live in this state and go when the signed-in screens do, and the one thing
+ * that does touch the disk — a document opened out of a Post — is downloaded by
  * `lib/attachment-cache` into the directory `session-wipe` already clears.
  * There is no Wall table, nothing under the app's document directory, and no
- * fourth thing for `endSessionOnDevice` to have been taught about.
+ * fourth thing for `endSessionOnDevice` to have been taught about. The tripwires
+ * are `lib/wall-persistence` and `lib/wall-launch-isolation`.
  */
 
 export type WallView = {
