@@ -2,6 +2,7 @@ import { composerAccess } from '@/lib/composer-access'
 import type {
   Conversation,
   ConversationStaffPerson,
+  GroupWritePolicy,
   StaffConversation,
   SupportStatus,
 } from '@/lib/types'
@@ -52,8 +53,14 @@ function customerRow(type: 'support_dm' | 'group' | 'community_announcement'): C
   // is not assignable to either member of the discriminated union.
   const shared = { ...base, description: null, avatarUrl: null, members: [] }
   return type === 'group'
-    ? { ...shared, type, title: 'QA Group' }
+    ? { ...shared, type, title: 'QA Group', writePolicy: 'everyone', canWrite: true }
     : { ...shared, type, title: 'Announcements' }
+}
+
+/** A Customer's group row, locked by its write policy. */
+function customerGroupRow(writePolicy: GroupWritePolicy): Conversation {
+  const group = customerRow('group')
+  return { ...group, writePolicy, canWrite: false } as Conversation
 }
 
 describe('composerAccess, on a Support DM', () => {
@@ -162,5 +169,46 @@ describe('composerAccess, on the other conversation types', () => {
       kind: 'read-only',
       reason: 'Announcements are posted by the team.',
     })
+  })
+})
+
+describe("composerAccess, on a Group the viewer's own read model locks", () => {
+  test('an admins-only Group says so, in its own words', () => {
+    expect(composerAccess(customerGroupRow('admins'), CUSTOMER)).toEqual({
+      kind: 'read-only',
+      reason: "Only this group's admins can send messages here.",
+    })
+  })
+
+  test('a named-writers Group the viewer is not one of says so, in its own words', () => {
+    expect(composerAccess(customerGroupRow('named'), CUSTOMER)).toEqual({
+      kind: 'read-only',
+      reason: 'Only the members chosen for this group can send messages here.',
+    })
+  })
+
+  test('an everyone-writes Group the read model still refuses stays admins-worded', () => {
+    // Should not happen from a real payload -- the API resolves `canWrite` against
+    // `everyone` as always true -- but a `false` reaching here picks the safer of
+    // the two wordings rather than guessing.
+    expect(composerAccess(customerGroupRow('everyone'), CUSTOMER)).toEqual({
+      kind: 'read-only',
+      reason: "Only this group's admins can send messages here.",
+    })
+  })
+
+  test('a Group the viewer may write in is unchanged', () => {
+    expect(composerAccess(customerRow('group'), CUSTOMER)).toEqual({ kind: 'open' })
+  })
+
+  /*
+   * Staff always writes to a Group whatever its policy -- the API's `canWrite`
+   * resolves `true` for an Admin or a participating Agent before the policy is
+   * even consulted (#46) -- so this reads the read model exactly as the
+   * Customer branch does and never derives access from `viewer.role`.
+   */
+  test('staff writes through a policy that locks a Customer, because the read model says so', () => {
+    const locked = staffRow({ type: 'group', status: null, writePolicy: 'admins', canWrite: true })
+    expect(composerAccess(locked, ME)).toEqual({ kind: 'open' })
   })
 })

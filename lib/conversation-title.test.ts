@@ -44,6 +44,8 @@ const customerGroup: CustomerConversation = {
   description: null,
   avatarUrl: null,
   members: [],
+  writePolicy: 'everyone',
+  canWrite: true,
   ...LAST_MESSAGE,
 }
 

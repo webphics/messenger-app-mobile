@@ -8,6 +8,7 @@ import type {
   ConversationPerson,
   ConversationStaffPerson,
   ConversationType,
+  GroupWritePolicy,
   Label,
   LabelColor,
   Message,
@@ -48,6 +49,7 @@ const CONVERSATION_TYPES: readonly ConversationType[] = [
 ]
 
 const SUPPORT_STATUSES: readonly SupportStatus[] = ['unassigned', 'engaged', 'closed']
+const WRITE_POLICIES: readonly GroupWritePolicy[] = ['everyone', 'admins', 'named']
 const MESSAGE_TYPES: readonly MessageType[] = ['text', 'media', 'voice', 'system']
 const RECEIPT_STATUSES: readonly ReceiptStatus[] = ['sent', 'delivered', 'read']
 const ROLES: readonly UserRole[] = ['admin', 'agent', 'customer']
@@ -213,6 +215,12 @@ export function parseConversation(value: unknown): Conversation | null {
       otherUser: staffPerson(record.otherUser),
       members: staffPeople(record.members),
       labels: labels(record.labels),
+      writePolicy: oneOf(record.writePolicy, WRITE_POLICIES),
+      // Defaults `true` on a missing or unreadable field, the same way
+      // `lastMessageRead` does below: a group this client cannot read the
+      // policy for is not grounds for locking a composer it cannot explain.
+      // Staff's own value from the API is always `true` regardless of policy.
+      canWrite: record.canWrite !== false,
     }
   }
 
@@ -226,7 +234,13 @@ export function parseConversation(value: unknown): Conversation | null {
     // Written as two returns rather than one with a computed `type`: a union of
     // both literals is not assignable to either member of the discriminated union.
     return type === 'group'
-      ? { ...shared, type, title: text(record.title) ?? 'Group' }
+      ? {
+          ...shared,
+          type,
+          title: text(record.title) ?? 'Group',
+          writePolicy: oneOf(record.writePolicy, WRITE_POLICIES) ?? 'everyone',
+          canWrite: record.canWrite !== false,
+        }
       : { ...shared, type, title: text(record.title) ?? 'Announcements' }
   }
 

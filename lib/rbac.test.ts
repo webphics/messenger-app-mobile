@@ -56,6 +56,8 @@ function customerGroup(memberIds: string[]): CustomerConversation {
     description: null,
     avatarUrl: null,
     members: memberIds.map((id) => ({ id, name: id, role: 'customer' as const })),
+    writePolicy: 'everyone',
+    canWrite: true,
     ...LAST_MESSAGE,
   }
 }
