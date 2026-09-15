@@ -4,9 +4,11 @@ import {
   createWallPost,
   getNamedWall,
   getWallContributorGrant,
+  listWallBookmarks,
   listWallPosts,
   reactToWallPost,
   removeWallPost,
+  toggleWallPostBookmark,
   updateWallPost,
   uploadWallFile,
   voteOnWallPost,
@@ -124,6 +126,7 @@ const POST_ROW = {
   reactions: [{ emoji: '👍', userId: 'user-1' }],
   score: 0,
   upvoteCount: 0,
+  isBookmarked: false,
   editedAt: null,
   createdAt: '2026-09-14T10:00:00.000Z',
 }
@@ -163,6 +166,77 @@ describe('reactToWallPost', () => {
     enqueue(csrfResponse(), envelope(POST_ROW))
     await reactToWallPost('post 1', '👍')
     expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post%201/reactions`)
+  })
+})
+
+describe('toggleWallPostBookmark', () => {
+  test('posts to the bookmark path, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope({ ...POST_ROW, isBookmarked: true }))
+
+    const result = await toggleWallPostBookmark('post-1')
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post-1/bookmark`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({ id: 'post-1', isBookmarked: true }),
+    })
+  })
+
+  test('escapes the id rather than letting it shape the path', async () => {
+    enqueue(csrfResponse(), envelope(POST_ROW))
+    await toggleWallPostBookmark('post 1')
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/wall/posts/post%201/bookmark`)
+  })
+
+  test('a refusal is read back as one, not thrown', async () => {
+    enqueue(csrfResponse(), response(404, { statusCode: 404, message: 'Post not found' }))
+
+    const result = await toggleWallPostBookmark('post-1')
+
+    expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Post not found' } })
+  })
+})
+
+describe('listWallBookmarks', () => {
+  test('reads the Saved view with no cursor at all on the first page', async () => {
+    enqueue(envelope([{ ...POST_ROW, isBookmarked: true }]))
+
+    await listWallBookmarks()
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts/bookmarks?limit=20`)
+    expect(calls[0]?.init.method ?? 'GET').toBe('GET')
+  })
+
+  test('carries the cursor for a page further back', async () => {
+    enqueue(envelope([]))
+
+    await listWallBookmarks({ cursor: 'post-9' })
+
+    expect(calls[0]?.url).toBe(`${API_BASE_URL}/wall/posts/bookmarks?cursor=post-9&limit=20`)
+  })
+
+  test('every Post it reads back is bookmarked, by construction of the endpoint', async () => {
+    enqueue(envelope([{ ...POST_ROW, isBookmarked: true }]))
+
+    const result = await listWallBookmarks()
+
+    expect(result).toEqual({
+      ok: true,
+      value: [expect.objectContaining({ isBookmarked: true })],
+    })
+  })
+
+  test('an empty Saved view is an empty page, not a refusal', async () => {
+    enqueue(envelope([]))
+
+    const result = await listWallBookmarks()
+
+    expect(result).toEqual({ ok: true, value: [] })
   })
 })
 

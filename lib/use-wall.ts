@@ -3,13 +3,20 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
-import { nextWallPostVote, toggleWallPostReaction, withVoteDelta, type WallPostViewer } from '@/lib/wall-actions'
+import {
+  flipWallPostBookmark,
+  nextWallPostVote,
+  toggleWallPostReaction,
+  withVoteDelta,
+  type WallPostViewer,
+} from '@/lib/wall-actions'
 import {
   createWallPost,
   getNamedWall,
   listWallPosts,
   reactToWallPost,
   removeWallPost,
+  toggleWallPostBookmark,
   updateWallPost,
   voteOnWallPost,
   WALL_PAGE_LIMIT,
@@ -64,16 +71,22 @@ import type { WallPost, WallVoteDirection } from '@/lib/types'
  * fourth thing for `endSessionOnDevice` to have been taught about. The tripwires
  * are `lib/wall-persistence` and `lib/wall-launch-isolation`.
  *
- * `react`, `vote`, `editPost` and `removePost` (#75, `vote` #83) are the things
- * a person may do to a Post once it is drawn. Reacting and voting are both
- * optimistic, the same three steps a Message reaction already takes: the Post
- * changes first, the request follows, and a refusal or a dead network puts it
- * back — folded through `withUpdatedPost`, the same reducer a live edit or
- * reaction over the socket uses, since to this hook a settled tap and a live
- * update are the same kind of thing happening to a Post it already holds.
- * Editing and removing are not optimistic: both need a screen of their own
- * open on the answer (an edit sheet, a confirmation) before there is anything
- * to show, so they hand their `ApiResult` back rather than guessing.
+ * `react`, `vote`, `toggleBookmark`, `editPost` and `removePost` (#75, `vote`
+ * #83, `toggleBookmark` #84) are the things a person may do to a Post once it
+ * is drawn. Reacting, voting and bookmarking are all optimistic, the same
+ * three steps a Message reaction already takes: the Post changes first, the
+ * request follows, and a refusal or a dead network puts it back — folded
+ * through `withUpdatedPost`, the same reducer a live edit or reaction over the
+ * socket uses, since to this hook a settled tap and a live update are the same
+ * kind of thing happening to a Post it already holds. Editing and removing are
+ * not optimistic: both need a screen of their own open on the answer (an edit
+ * sheet, a confirmation) before there is anything to show, so they hand their
+ * `ApiResult` back rather than guessing.
+ *
+ * `toggleBookmark` here always flips the Post in place, whatever screen holds
+ * it — the default Wall, a named one. The Saved view (`lib/use-wall-bookmarks`)
+ * is the one place a tap on the same control means something else: there the
+ * Post's presence in the list *is* the bookmark, so a tap removes the row.
  *
  * "My vote" is not on the Post at all, unlike a reaction: `POST
  * /wall/posts/:id/vote` never says which direction the caller now holds, only
@@ -125,6 +138,12 @@ export type WallView = {
   myVotes: Record<string, WallVoteDirection>
   /** A push up or down on one Post. Optimistic — see the module doc. */
   vote: (postId: string, direction: WallVoteDirection) => void
+  /**
+   * A tap on the bookmark control. Optimistic, flipping `isBookmarked` in
+   * place — the Post stays on screen either way, unlike the Saved view's own
+   * toggle (`lib/use-wall-bookmarks`), where a tap removes the row instead.
+   */
+  toggleBookmark: (postId: string) => void
   /**
    * A Contributor's own new Post (#76). Never optimistic — Compose already
    * needs the API's answer to know the upload and the create both went
@@ -374,6 +393,44 @@ function useWallPages(wallId: string | undefined): WallView {
     [viewer, myVotes],
   )
 
+  /**
+   * Which attempt at bookmarking a Post is the newest — the same reasoning as
+   * `reactionAttempt` and `voteAttempt`, and its own ref because a bookmark is
+   * its own conversation with the server, independent of whatever else this
+   * caller is doing to the same Post at the same time.
+   */
+  const bookmarkAttempt = useRef(new Map<string, number>())
+
+  /**
+   * A tap on the bookmark control.
+   *
+   * The same three steps `react` and `vote` take: flip it, ask, and on a
+   * refusal put back whatever the Wall now holds — never the stale copy the
+   * tap read, since a live edit or somebody else's reaction can have folded
+   * in while the request was out.
+   */
+  const toggleBookmark = useCallback((postId: string) => {
+    setRead(current => {
+      const before = current.posts.find(post => post.id === postId)
+      if (!before) return current
+      return withUpdatedPost(current, flipWallPostBookmark(before))
+    })
+
+    const attempt = (bookmarkAttempt.current.get(postId) ?? 0) + 1
+    bookmarkAttempt.current.set(postId, attempt)
+
+    void toggleWallPostBookmark(postId).then(result => {
+      if (bookmarkAttempt.current.get(postId) !== attempt) return
+
+      setRead(current => {
+        if (result.ok) return withUpdatedPost(current, result.value)
+        const now = current.posts.find(post => post.id === postId)
+        if (!now) return current
+        return withUpdatedPost(current, flipWallPostBookmark(now))
+      })
+    })
+  }, [])
+
   /** A Contributor's own new Post. Never optimistic — see the module doc. */
   const createPost = useCallback(
     async (input: WallPostCreateInput): Promise<ApiResult<WallPost>> => {
@@ -476,11 +533,22 @@ function useWallPages(wallId: string | undefined): WallView {
     react,
     myVotes,
     vote,
+    toggleBookmark,
     createPost,
     editPost,
     removePost,
   }
 }
+
+/**
+ * What `WallBody` draws: every field `WallView` answers with except
+ * `createPost`, which only the default Wall's own screen offers a way to
+ * reach (Compose, #76). `useWallBookmarks` (#84) is the other producer of
+ * this shape — the Saved view is a second reader of the same Posts, over a
+ * different endpoint and with its own meaning for `toggleBookmark`, but it
+ * draws through the exact same list.
+ */
+export type WallBodyView = Omit<WallView, 'createPost'>
 
 /** The default Wall: every organization the signed-in person belongs to. */
 export function useWall(): WallView {

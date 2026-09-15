@@ -107,6 +107,51 @@ export async function reactToWallPost(
 }
 
 /**
+ * The most bookmarked Posts one page of the Saved view may hold. Its own
+ * constant rather than reusing `WALL_PAGE_LIMIT`: the Saved view is an
+ * unrelated feed through a sibling endpoint, and nothing requires the two to
+ * move together if either changes.
+ */
+export const WALL_BOOKMARKS_PAGE_LIMIT = 20
+
+/**
+ * This caller's own bookmarked Posts, newest saved first. Private —
+ * `GET /wall/posts/bookmarks` answers for nobody but the person asking, and
+ * this app never reads anybody else's.
+ *
+ * `cursor` is the id of the last Post on the previous page, exactly like
+ * `listWallPosts`'s: the API pages a bookmark list on the *Post's* id it
+ * resolved to, not the bookmark record's own, so every pure function in
+ * `lib/wall-pages` that already pages a Wall applies here unchanged.
+ */
+export async function listWallBookmarks(
+  params: { cursor?: string; limit?: number } = {},
+): Promise<ApiResult<WallPost[]>> {
+  const outcome = await authenticatedRequest(
+    `/wall/posts/bookmarks${query({
+      cursor: params.cursor,
+      limit: params.limit ?? WALL_BOOKMARKS_PAGE_LIMIT,
+    })}`,
+  )
+  return readOutcome(outcome, parseWallPosts)
+}
+
+/**
+ * Toggles the caller's own bookmark on a Post. Gated like a single-Post read
+ * (`WallPolicy.assertCanRead`), not like posting — the same rule
+ * `reactToWallPost` and `voteOnWallPost` stand on, so a Contributor grant is
+ * not needed to bookmark either. Private: never broadcast over realtime, and
+ * nothing on a Post ever says how many people bookmarked it or who.
+ */
+export async function toggleWallPostBookmark(postId: string): Promise<ApiResult<WallPost>> {
+  const outcome = await authenticatedRequest(
+    `/wall/posts/${encodeURIComponent(postId)}/bookmark`,
+    { method: 'POST' },
+  )
+  return readOutcome(outcome, parseWallPost)
+}
+
+/**
  * Casts or clears the caller's own vote on a Post. One route, not an
  * up/down/clear trio — the same toggle shape as `reactToWallPost`, gated the
  * same way, so a Contributor grant is not required to vote either.

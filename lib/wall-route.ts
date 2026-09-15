@@ -15,6 +15,18 @@ export function sharedWallHref(id: string): Href {
 }
 
 /**
+ * The Saved view: this person's own bookmarked Posts (#84). A sibling of the
+ * shared-Wall route rather than a segment under it — `/wall/saved` is a
+ * static path Expo Router resolves ahead of the dynamic `/wall/:id` beside
+ * it, the same way `chat/details/:id` sits beside `chat/:id` rather than
+ * under it — and it carries no id: there is exactly one Saved view, this
+ * caller's own.
+ */
+export function wallSavedHref(): Href {
+  return '/wall/saved'
+}
+
+/**
  * Resolve `/wall/:id` from search params or the pathname.
  *
  * The same reader every other dynamic route in this app has, and for the same

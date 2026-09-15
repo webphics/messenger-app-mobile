@@ -1,4 +1,4 @@
-import { sharedWallHref, sharedWallIdFromRoute } from '@/lib/wall-route'
+import { sharedWallHref, sharedWallIdFromRoute, wallSavedHref } from '@/lib/wall-route'
 
 describe('sharedWallHref', () => {
   it('carries the id in params, which native Expo Router needs', () => {
@@ -6,6 +6,12 @@ describe('sharedWallHref', () => {
       pathname: '/wall/[id]',
       params: { id: 'wall-1' },
     })
+  })
+})
+
+describe('wallSavedHref', () => {
+  it('names the one Saved view, which carries no id of its own', () => {
+    expect(wallSavedHref()).toBe('/wall/saved')
   })
 })
 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Alert, Linking, View } from 'react-native'
 
-import { ExternalLink, MoreVertical } from '@/components/icons'
+import { Bookmark, ExternalLink, MoreVertical } from '@/components/icons'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
 import { Text } from '@/components/ui/text'
@@ -29,12 +29,18 @@ import type { WallPost, WallVoteDirection } from '@/lib/types'
  * the padding under a line of grey metadata is an attachment to a form; one that
  * fills the top of the card is what the card is showing.
  *
- * Under it the byline, then the body, then whatever else the Post carries, then
+ * The bookmark control sits in the header, beside the overflow control rather
+ * than down with vote and react: saving a Post is a private decision about
+ * whether to come back to it, not a public judgement or expression, and it
+ * needs no `viewer` role check the way the overflow control does — any reader
+ * may bookmark, the same standing a reaction needs.
+ *
+ * Under the byline, the body, then whatever else the Post carries, then
  * the vote pill and the reaction row — a judgement and an expression, drawn as
  * two visibly different controls rather than one row that could be mistaken
  * for the other. Nothing on it offers or implies commenting: a Post has no
- * replies, no reply count and no comment box, and the two things a reader can
- * do about one are vote and react.
+ * replies, no reply count and no comment box, and the three things a reader
+ * can do about one are bookmark, vote and react.
  *
  * Only the byline is grouped for a screen reader, and deliberately only that:
  * a name, a stamp and an edit mark read as three fragments apart and as one
@@ -55,6 +61,13 @@ type WallPostCardProps = {
   onReact: (postId: string, emoji: string) => void
   myVote: WallVoteDirection | null
   onVote: (postId: string, direction: WallVoteDirection) => void
+  /**
+   * A tap on the bookmark control. What it does to the Post on screen is the
+   * caller's call, not this card's — the default Wall flips the flag in
+   * place, the Saved view removes the row — so this only ever reads
+   * `post.isBookmarked` to say which state is showing.
+   */
+  onToggleBookmark: (postId: string) => void
   onEdit: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
   onRemove: (postId: string) => Promise<ApiResult<{ id: string }>>
 }
@@ -65,6 +78,7 @@ export function WallPostCard({
   onReact,
   myVote,
   onVote,
+  onToggleBookmark,
   onEdit,
   onRemove,
 }: WallPostCardProps) {
@@ -150,6 +164,26 @@ export function WallPostCard({
               ) : null}
             </View>
           </View>
+
+          {/*
+            Any reader may bookmark, the same standing a reaction needs — so
+            unlike the overflow control this is always here, and only its
+            fill and label say which of the two states is showing.
+          */}
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel={post.isBookmarked ? 'Remove from Saved' : 'Save this post'}
+            accessibilityState={{ selected: post.isBookmarked }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => onToggleBookmark(post.id)}
+            className="size-10 items-center justify-center rounded-full"
+          >
+            <Bookmark
+              color={post.isBookmarked ? colors.primary : colors.muted}
+              fill={post.isBookmarked ? colors.primary : 'transparent'}
+              size={20}
+            />
+          </TactilePressable>
 
           {/*
             Present when there is something behind it and absent when there is

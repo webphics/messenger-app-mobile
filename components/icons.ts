@@ -25,6 +25,7 @@ export { default as ArrowBigUp } from "lucide-react-native/icons/arrow-big-up";
 export { default as ArrowLeftRight } from "lucide-react-native/icons/arrow-left-right";
 export { default as Ban } from "lucide-react-native/icons/ban";
 export { default as BellOff } from "lucide-react-native/icons/bell-off";
+export { default as Bookmark } from "lucide-react-native/icons/bookmark";
 export { default as BookOpen } from "lucide-react-native/icons/book-open";
 export { default as Building } from "lucide-react-native/icons/building";
 export { default as Building2 } from "lucide-react-native/icons/building-2";

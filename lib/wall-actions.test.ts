@@ -1,4 +1,5 @@
 import {
+  flipWallPostBookmark,
   nextWallPostVote,
   toggleWallPostReaction,
   wallPostActions,
@@ -18,6 +19,7 @@ function post(overrides: Partial<WallPost> = {}): WallPost {
     reactions: [],
     score: 0,
     upvoteCount: 0,
+    isBookmarked: false,
     editedAt: null,
     createdAt: '2026-09-14T10:00:00.000Z',
     ...overrides,
@@ -182,5 +184,25 @@ describe('what a vote does to a Post’s score and upvote count', () => {
     const applied = withVoteDelta(before, null, 'up')
     const rolledBack = withVoteDelta(applied, 'up', null)
     expect(rolledBack).toEqual(before)
+  })
+})
+
+describe('flipping a bookmark', () => {
+  it('bookmarks a Post that was not', () => {
+    expect(flipWallPostBookmark(post({ isBookmarked: false })).isBookmarked).toBe(true)
+  })
+
+  it('un-bookmarks one that was', () => {
+    expect(flipWallPostBookmark(post({ isBookmarked: true })).isBookmarked).toBe(false)
+  })
+
+  it('leaves everything else about the Post untouched', () => {
+    const before = post({ isBookmarked: false, body: 'Hi' })
+    expect(flipWallPostBookmark(before)).toEqual({ ...before, isBookmarked: true })
+  })
+
+  it('is its own inverse — flipping twice is the Post it started as', () => {
+    const before = post({ isBookmarked: false })
+    expect(flipWallPostBookmark(flipWallPostBookmark(before))).toEqual(before)
   })
 })
