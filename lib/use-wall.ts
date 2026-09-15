@@ -284,8 +284,20 @@ function useWallPages(
     // bump that cancels whatever was still in flight is the cleanup below,
     // left over from the run this one replaced — it already runs before this
     // body does, on a sort or wallId change, so nothing here repeats it.
+    //
+    // `loadingOlder` and `refreshing` are reset here too, and not only
+    // `read`/`loading`/`failure`: a switch can land mid-flight of an older
+    // page or a pull-to-refresh the previous sort started, and the request
+    // that flag was waiting on is exactly the one the generation bump just
+    // cancelled the *result* of — its `.then` still runs and still clears
+    // the flag eventually, but not until that abandoned request settles.
+    // Left alone, a `loadOlder` fired the instant the new sort's first page
+    // lands would find `loadingOlder` still true from a request nobody is
+    // waiting on any more, and silently do nothing.
     setRead(emptyWall)
     setLoading(true)
+    setLoadingOlder(false)
+    setRefreshing(false)
     setFailure(null)
     loadFirst()
     return () => {

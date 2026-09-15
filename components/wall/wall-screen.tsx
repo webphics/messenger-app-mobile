@@ -340,12 +340,12 @@ function WallSortControl({ sort, onChange }: { sort: WallSort; onChange: (sort: 
         return (
           <TactilePressable
             key={option}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel={WALL_SORT_LABEL[option]}
             accessibilityState={{ selected }}
             onPress={() => onChange(option)}
             className={cn(
-              'min-h-9 justify-center rounded-full border px-3.5',
+              'min-h-11 justify-center rounded-full border px-3.5',
               selected
                 ? 'border-transparent bg-primary shadow-sm shadow-primary/25'
                 : 'border-line/80 bg-line/35',
