@@ -178,46 +178,58 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
    * the default one, a shared named Wall, Saved — offers the same Reply on
    * the same card.
    */
-  const reply = useWallPostReply()
+  const { reply: replyToPost, error: replyError, pending: replyPending, dismissError } =
+    useWallPostReply()
   const onReply = useCallback(
     (post: WallPost) => {
-      void reply.reply(post).then((id) => {
+      void replyToPost(post).then((id) => {
         if (id) router.push(chatHref(id, wallPostReplyDraft(post)))
       })
     },
-    [reply.reply],
+    [replyToPost],
   )
   useEffect(() => {
-    if (!reply.error) return
-    Alert.alert('Could not open your conversation', reply.error)
-    reply.dismissError()
-  }, [reply.error, reply.dismissError])
+    if (!replyError) return
+    Alert.alert('Could not open your conversation', replyError)
+    dismissError()
+  }, [replyError, dismissError])
 
   /**
    * A Post that has actually been on screen, not merely fetched (#85).
    *
    * `onViewableItemsChanged` may not change identity across renders — FlatList
    * throws if it does — so the stable function `viewabilityConfigCallbackPairs`
-   * holds reads the latest `recordView` out of a ref, updated on every render,
-   * rather than closing over one that could go stale for the life of the list.
+   * holds reads the latest `recordView` out of a ref rather than closing over
+   * one that could go stale for the life of the list.
+   *
+   * The ref is written in an effect and both stable values come from a lazy
+   * `useState` initialiser, because a render must not write to a ref or read
+   * one: the value it would read is whatever the last commit happened to leave
+   * behind, which is only reliably the current one by accident. `useState`
+   * gives the same once-only guarantee `useRef` was being used for here, and
+   * the callback only ever runs after layout, by which point the effect has
+   * run.
    */
   const recordViewRef = useRef(wall.recordView)
-  recordViewRef.current = wall.recordView
+  useEffect(() => {
+    recordViewRef.current = wall.recordView
+  }, [wall.recordView])
 
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken<WallPost>[] }) => {
-      for (const { item, isViewable } of viewableItems) {
-        if (isViewable) recordViewRef.current(item)
-      }
-    },
-  ).current
+  const [onViewableItemsChanged] = useState(
+    () =>
+      ({ viewableItems }: { viewableItems: ViewToken<WallPost>[] }) => {
+        for (const { item, isViewable } of viewableItems) {
+          if (isViewable) recordViewRef.current(item)
+        }
+      },
+  )
 
-  const viewabilityConfigCallbackPairs = useRef([
+  const [viewabilityConfigCallbackPairs] = useState(() => [
     {
       viewabilityConfig: { itemVisiblePercentThreshold: WALL_VIEW_THRESHOLD_PERCENT },
       onViewableItemsChanged,
     },
-  ]).current
+  ])
 
   const renderItem = useCallback(
     ({ item }: { item: WallPost }) =>
@@ -232,7 +244,7 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
           onEdit={wall.editPost}
           onRemove={wall.removePost}
           onReply={onReply}
-          replying={reply.pending === item.id}
+          replying={replyPending === item.id}
         />
       ) : null,
     [
@@ -243,7 +255,7 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
       wall.toggleBookmark,
       wall.editPost,
       onReply,
-      reply.pending,
+      replyPending,
       wall.removePost,
     ],
   )
