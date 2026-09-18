@@ -8,7 +8,10 @@ export default function CustomerHomeLayout() {
   return (
     <Stack screenOptions={chrome}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="faq" options={{ title: "FAQ" }} />
+      {/* FAQ and Knowledge are hidden for now. These lines only set a
+          screen's title; the route files stay where they are, so uncommenting
+          is the whole of putting them back. */}
+      {/* <Stack.Screen name="faq" options={{ title: "FAQ" }} /> */}
       <Stack.Screen name="search" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: "Settings" }} />
     </Stack>

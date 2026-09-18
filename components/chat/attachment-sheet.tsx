@@ -2,7 +2,7 @@ import {
   Camera,
   FileText,
   Image as ImageIcon,
-  Sparkles,
+  // Sparkles, // hidden with Quick Response
   X,
 } from '@/components/icons'
 import type { ReactNode } from 'react'
@@ -101,13 +101,17 @@ const ATTACHMENT_OPTIONS: AttachmentOption[] = [
     icon: FileText,
     pick: pickDocument,
   },
-  {
-    id: 'quick-reply',
-    title: 'Quick Response',
-    subtitle: 'Insert standard support greeting',
-    icon: Sparkles,
-    insertText: 'Hi there! Thanks for reaching out. How can I assist you today?',
-  },
+  // Quick Response is hidden for now. It is the only `insert` option in the
+  // sheet, so the union above and `onInsertText` are deliberately left in place
+  // rather than narrowed to the `pick` half — narrowing them is a rewrite to
+  // undo. Restore by uncommenting.
+  // {
+  //   id: 'quick-reply',
+  //   title: 'Quick Response',
+  //   subtitle: 'Insert standard support greeting',
+  //   icon: Sparkles,
+  //   insertText: 'Hi there! Thanks for reaching out. How can I assist you today?',
+  // },
 ]
 
 const DENIED_COPY = {

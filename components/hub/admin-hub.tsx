@@ -2,7 +2,7 @@ import { router, type Href } from "expo-router";
 import { View } from "react-native";
 
 import {
-  BookOpen,
+  // BookOpen, // hidden with Knowledge
   Building2,
   MessageCircle,
   Plus,
@@ -22,7 +22,7 @@ import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
-import { knowledgeListHref } from "@/lib/hub-routes";
+// import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
 import { getSessionUser } from "@/lib/session";
 import { colors } from "@/lib/tokens";
 
@@ -103,14 +103,17 @@ export function AdminHub() {
             tone="neutral"
             onPress={() => router.navigate("/(admin)/conversations" as Href)}
           />
-          <ActionTile
+          {/* Knowledge is hidden for now. Messages takes the row on its own;
+              the tile is `flex-1`, so it fills the width rather than leaving a
+              gap where this one was. Restore by uncommenting. */}
+          {/* <ActionTile
             icon={BookOpen}
             title="Knowledge"
             hint="Manage articles"
             tone="neutral"
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("admin"))}
-          />
+          /> */}
         </View>
 
         {recent ? (

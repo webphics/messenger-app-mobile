@@ -2,22 +2,22 @@ import { router, type Href } from "expo-router";
 import { View } from "react-native";
 
 import {
-  BookOpen,
-  Headphones,
+  // BookOpen, // hidden with Knowledge
+  // Headphones, // hidden with FAQ
   Inbox,
   MessageCircle,
-  Search,
-  Sparkles,
+  // Search, // hidden with Knowledge search
+  // Sparkles, // hidden with Knowledge search
 } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
 import { ActionTile, StatTile } from "@/components/hub/action-tile";
 import { HubHeader } from "@/components/hub/hub-header";
 import { HubScroll } from "@/components/hub/hub-scroll";
-import { IconChip } from "@/components/hub/icon-chip";
+// import { IconChip } from "@/components/hub/icon-chip"; // hidden with Knowledge search
 import { Pill } from "@/components/hub/pill";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { PresenceDot } from "@/components/ui/presence-dot";
-import { TactilePressable } from "@/components/ui/tactile-pressable";
+// import { TactilePressable } from "@/components/ui/tactile-pressable"; // hidden with Knowledge search
 import { Text } from "@/components/ui/text";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
@@ -27,9 +27,9 @@ import {
   listAssignedConversations,
   listUnassignedConversations,
 } from "@/lib/inbox-filter";
-import { knowledgeListHref } from "@/lib/hub-routes";
+// import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
 import { getSessionUser } from "@/lib/session";
-import { colors } from "@/lib/tokens";
+// import { colors } from "@/lib/tokens"; // hidden with Knowledge search
 
 /** Stands in for a count the list has not answered with yet. An em dash, not a zero. */
 const PENDING_COUNT = "—";
@@ -106,14 +106,17 @@ export function AgentHub() {
             tone="neutral"
             onPress={() => router.navigate("/(agent)/conversations" as Href)}
           />
-          <ActionTile
+          {/* Knowledge is hidden for now. Messages takes the row on its own;
+              the tile is `flex-1`, so it fills the width rather than leaving a
+              gap where this one was. Restore by uncommenting. */}
+          {/* <ActionTile
             icon={BookOpen}
             title="Knowledge"
             hint="Guides & answers"
             tone="neutral"
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("agent"))}
-          />
+          /> */}
         </View>
 
         {recent ? (
@@ -125,8 +128,9 @@ export function AgentHub() {
           </View>
         ) : null}
 
-        {/* Search Knowledge Trigger */}
-        <View>
+        {/* Search Knowledge Trigger — hidden for now, along with Knowledge itself.
+            Restore by uncommenting. */}
+        {/* <View>
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Search knowledge"
@@ -139,7 +143,7 @@ export function AgentHub() {
             </Text>
             <Sparkles color={colors.muted} size={16} />
           </TactilePressable>
-        </View>
+        </View> */}
 
         {/* Unassigned Pool Row Card */}
         <ActionRow
@@ -162,8 +166,8 @@ export function AgentHub() {
         />
       </View>
 
-      {/* FAQ Row */}
-      <View className="mt-4 px-4">
+      {/* FAQ Row — hidden for now. Restore by uncommenting. */}
+      {/* <View className="mt-4 px-4">
         <ActionRow
           icon={Headphones}
           tone="neutral"
@@ -173,7 +177,7 @@ export function AgentHub() {
           accessibilityLabel="Frequently asked questions"
           onPress={() => router.push("/(agent)/faq" as Href)}
         />
-      </View>
+      </View> */}
     </HubScroll>
   );
 }

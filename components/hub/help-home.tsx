@@ -4,9 +4,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   Clock,
-  HelpCircle,
+  // HelpCircle, // hidden with FAQ
   MessageCircle,
-  Search,
+  // Search, // hidden with FAQ search
   type IconComponent,
 } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
@@ -39,22 +39,26 @@ const LINKS: {
     Icon: MessageCircle,
     nav: "navigate",
   },
-  {
-    href: CUSTOMER_HREF.search,
-    label: "Search for Help",
-    hint: "Instant answers and troubleshooting guides",
-    a11y: "Search for help",
-    Icon: Search,
-    nav: "push",
-  },
-  {
-    href: CUSTOMER_HREF.faq,
-    label: "Frequently Asked Questions",
-    hint: "Common queries on passwords, billing, and access",
-    a11y: "Frequently asked questions",
-    Icon: HelpCircle,
-    nav: "push",
-  },
+  // Search and FAQ are hidden for now. Search is the FAQ section's own search --
+  // `HelpSearchScreen` filters `listFaqs()` and nothing else -- so it goes with
+  // it rather than staying behind as a search over nothing. Restore by
+  // uncommenting both.
+  // {
+  //   href: CUSTOMER_HREF.search,
+  //   label: "Search for Help",
+  //   hint: "Instant answers and troubleshooting guides",
+  //   a11y: "Search for help",
+  //   Icon: Search,
+  //   nav: "push",
+  // },
+  // {
+  //   href: CUSTOMER_HREF.faq,
+  //   label: "Frequently Asked Questions",
+  //   hint: "Common queries on passwords, billing, and access",
+  //   a11y: "Frequently asked questions",
+  //   Icon: HelpCircle,
+  //   nav: "push",
+  // },
 ];
 
 export function HelpHome() {

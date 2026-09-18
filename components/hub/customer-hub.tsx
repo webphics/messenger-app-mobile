@@ -1,15 +1,15 @@
 import { router } from "expo-router";
 import { View } from "react-native";
 
-import { HelpCircle, MessageCircle, Search } from "@/components/icons";
-import { ActionRow } from "@/components/hub/action-row";
+import { HelpCircle, MessageCircle } from "@/components/icons"; // Search hidden with FAQ search
+// import { ActionRow } from "@/components/hub/action-row"; // hidden with FAQ
 import { ActionTile } from "@/components/hub/action-tile";
 import { HubHeader } from "@/components/hub/hub-header";
 import { HubScroll } from "@/components/hub/hub-scroll";
-import { IconChip } from "@/components/hub/icon-chip";
+// import { IconChip } from "@/components/hub/icon-chip"; // hidden with FAQ search
 import { OffersCarousel } from "@/components/hub/offers-carousel";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
-import { TactilePressable } from "@/components/ui/tactile-pressable";
+// import { TactilePressable } from "@/components/ui/tactile-pressable"; // hidden with FAQ search
 import { Text } from "@/components/ui/text";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { firstName } from "@/lib/display";
@@ -72,7 +72,10 @@ export function CustomerHub() {
           </View>
         ) : null}
 
-        <View>
+        {/* Search for help is hidden with FAQ: it searches `listFaqs()` and
+            nothing else, so on its own it would be a search over nothing.
+            Restore by uncommenting. */}
+        {/* <View>
           <TactilePressable
             accessibilityRole="button"
             accessibilityLabel="Search for help"
@@ -84,19 +87,22 @@ export function CustomerHub() {
               Search for help & answers…
             </Text>
           </TactilePressable>
-        </View>
+        </View> */}
       </View>
 
       <OffersCarousel />
 
-      <View className="mt-4 px-4">
+      {/* FAQ is hidden for now. The screen and its route are untouched; this is
+          the only way into it from the Customer Hub, so commenting it out is
+          what takes it off the phone. Restore by uncommenting. */}
+      {/* <View className="mt-4 px-4">
         <ActionRow
           title="Frequently Asked Questions"
           hint="Common questions — passwords, billing, access…"
           accessibilityLabel="Frequently asked questions"
           onPress={() => router.push(CUSTOMER_HREF.faq)}
         />
-      </View>
+      </View> */}
     </HubScroll>
   );
 }
