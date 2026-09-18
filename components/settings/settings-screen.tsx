@@ -85,7 +85,7 @@ export function SettingsScreen() {
             Application
           </Text>
           <Text variant="label" className="font-medium text-ink-soft">
-            Enki v1.0.0
+            JoyChat v1.0.0
           </Text>
         </View>
 

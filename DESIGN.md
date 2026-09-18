@@ -1,20 +1,20 @@
 ---
-name: Enki
-description: Light internal support messenger — Clear Desk chrome with Ember accents
+name: JoyChat
+description: Light internal support messenger — Clear Desk chrome with JoyChat lavender accents
 colors:
-  enki-ember: "#B83E0B"
-  ember-mist: "#FEEBDC"
-  graphite: "#1A1714"
-  ink-soft: "#453F39"
-  muted: "#6E6862"
-  line: "#EAE6E2"
-  bg: "#FFFFFF"
+  joy-lavender: "#6253A3"
+  lavender-mist: "#EEEAF8"
+  graphite: "#29272D"
+  ink-soft: "#3E3D44"
+  muted: "#646066"
+  line: "#E7E4E2"
+  bg: "#F1F0ED"
   surface: "#FFFFFF"
   bubble-in: "#FFFFFF"
   on-primary: "#FFFFFF"
-  success: "#1F9D6C"
-  danger: "#B3261E"
-  amber: "#A16207"
+  success: "#3F724F"
+  danger: "#B12C30"
+  amber: "#D09033"
 typography:
   display:
     fontFamily: "Manrope-ExtraBold, Manrope, system-ui, sans-serif"
@@ -77,15 +77,15 @@ spacing:
   screen-top-extra: "12px"
 components:
   button-primary:
-    backgroundColor: "{colors.enki-ember}"
+    backgroundColor: "{colors.joy-lavender}"
     textColor: "{colors.on-primary}"
     typography: "{typography.title}"
     rounded: "{rounded.md}"
     padding: "10px 20px"
     height: "48px"
   button-secondary:
-    backgroundColor: "{colors.ember-mist}"
-    textColor: "{colors.enki-ember}"
+    backgroundColor: "{colors.lavender-mist}"
+    textColor: "{colors.joy-lavender}"
     typography: "{typography.title}"
     rounded: "{rounded.md}"
     padding: "10px 20px"
@@ -111,7 +111,7 @@ components:
     padding: "12px"
     height: "48px"
   chip-selected:
-    backgroundColor: "{colors.enki-ember}"
+    backgroundColor: "{colors.joy-lavender}"
     textColor: "{colors.on-primary}"
     typography: "{typography.label}"
     rounded: "{rounded.full}"
@@ -128,7 +128,7 @@ components:
     rounded: "{rounded.xl}"
     padding: "16px"
   bubble-outgoing:
-    backgroundColor: "{colors.enki-ember}"
+    backgroundColor: "{colors.joy-lavender}"
     textColor: "{colors.on-primary}"
     typography: "{typography.body}"
     rounded: "{rounded.bubble}"
@@ -141,51 +141,51 @@ components:
     padding: "10px 12px"
 ---
 
-# Design System: Enki
+# Design System: JoyChat
 
 ## Overview
 
-**Creative North Star: "The Clear Desk" (with Support Ember accents)**
+**Creative North Star: "The Clear Desk" (with Support Lavender accents)**
 
-Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Customers, Agents, and Admins can finish a job without chrome noise. Enki Ember appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Ember Mist). Ember Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.
+JoyChat is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Customers, Agents, and Admins can finish a job without chrome noise. JoyChat Lavender appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Lavender Mist). Lavender Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.
 
 Personality is **friendly and direct**: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is **hybrid** — hairline `line` borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). This phase locks **light chrome only** (`Uniwind.setTheme('light')`); dark tokens exist in CSS for later but must not drive UI now.
 
 **Key Characteristics:**
-- White Clear Desk surfaces; Graphite type; Enki Ember as the sparse action/help signal
+- White Clear Desk surfaces; Graphite type; JoyChat Lavender as the sparse action/help signal
 - Manrope for UI; JetBrains Mono for code-like fragments only
 - Soft rounded cards (~24px) and chat bubbles (~22px); pills are fully round
 - Hybrid elevation: border-first, soft card lift, stronger shadow only on overlays (composer is border-only at rest)
 - Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes
-- Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Ember Mist for secondary CTAs
+- Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Lavender Mist for secondary CTAs
 
 ## Colors
 
-A warm light ops palette: white field, Graphite ink, one Enki Ember accent with Ember Mist wash, plus status greens/ambers/reds.
+A warm light ops palette: white field, Graphite ink, one JoyChat Lavender accent with Lavender Mist wash, plus status greens/ambers/reds.
 
 ### Primary
-- **Enki Ember** (`#B83E0B`): Primary actions, selected filter chips, outgoing bubbles, unread count badge (alone), focus ring, tab active tint, read receipts when read. Keep rare on any given screen so the Clear Desk stays calm.
-- **Ember Mist** (`#FEEBDC`): Soft selected/active wash, avatar fallbacks (including Offers megaphone), secondary buttons, soft chips, admin “Create Offer” row icon. The Support Ember accent — help is present without flooding the desk.
+- **JoyChat Lavender** (`#6253A3`): Primary actions, selected filter chips, outgoing bubbles, unread count badge (alone), focus ring, tab active tint, read receipts when read. Keep rare on any given screen so the Clear Desk stays calm.
+- **Lavender Mist** (`#EEEAF8`): Soft selected/active wash, avatar fallbacks (including Offers megaphone), secondary buttons, soft chips, admin “Create Offer” row icon. The Support Lavender accent — help is present without flooding the desk.
 
 ### Secondary
 Omit as a second brand accent. Status colors below are functional, not brand.
 
 ### Neutral
-- **Graphite** (`#1A1714`): Primary text, wordmarks, headers.
-- **Ink Soft** (`#453F39`): Secondary body / idle chip text.
-- **Muted** (`#6E6862`): Timestamps, hints, inactive tab tint.
-- **Line** (`#EAE6E2`): Borders, dividers, outline control strokes.
+- **Graphite** (`#29272D`): Primary text, wordmarks, headers.
+- **Ink Soft** (`#3E3D44`): Secondary body / idle chip text.
+- **Muted** (`#646066`): Timestamps, hints, inactive tab tint.
+- **Line** (`#E7E4E2`): Borders, dividers, outline control strokes.
 - **Bg / Surface** (`#FFFFFF`): Screen and card fields (same hex this phase).
 - **Bubble In** (`#FFFFFF`): Incoming bubbles on light (paired with `border-line`).
-- **On Primary** (`#FFFFFF`): Text/icons on Enki Ember fills.
+- **On Primary** (`#FFFFFF`): Text/icons on JoyChat Lavender fills.
 
 ### Functional
-- **Success** (`#1F9D6C`): Online dots, positive pills.
-- **Danger** (`#B3261E`): Errors, destructive actions.
-- **Amber** (`#A16207`): Warning / attention pills.
+- **Success** (`#3F724F`): Online dots, positive pills.
+- **Danger** (`#B12C30`): Errors, destructive actions.
+- **Amber** (`#D09033`): Warning / attention pills.
 
 ### Named Rules
-**The One Signal Rule.** Enki Ember occupies a small share of any screen. If ember is everywhere, the Clear Desk failed.
+**The One Signal Rule.** JoyChat Lavender occupies a small share of any screen. If lavender is everywhere, the Clear Desk failed.
 
 **The Light Chrome Rule.** Ship light appearance only this phase. Do not follow system dark mode for app chrome.
 
@@ -202,7 +202,7 @@ Omit as a second brand accent. Status colors below are functional, not brand.
 **API:** `Text` variants in `components/ui/text.tsx` — `display` | `headline` | `title` | `body` | `meta` | `label` | `mono`. Color stays on `className`.
 
 ### Hierarchy
-- **Display** (`variant="display"`, ExtraBold face, `text-2xl` ~24px): Auth and hub brand moments (“Enki”, large greetings), primary metrics.
+- **Display** (`variant="display"`, ExtraBold face, `text-2xl` ~24px): Auth and hub brand moments (“JoyChat”, large greetings), primary metrics.
 - **Headline** (`variant="headline"`, ExtraBold, `text-xl` ~20px): Screen titles, offer card titles, settings display name.
 - **Title** (`variant="title"`, semibold, `text-base` ~16px): Card/row titles, primary button labels, section headers.
 - **Body** (`variant="body"`, regular, `text-base` ~16px): Message text, supporting prose, thread titles. Text inputs also use `text-base` (≥16px iOS floor).
@@ -215,7 +215,7 @@ Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2
 ### Named Rules
 **The Weight Face Rule.** Use `font-medium` / `font-semibold` / `font-bold` / `font-extrabold` utilities so Manrope faces resolve correctly on native. Prefer `Text` role variants over hand-rolled size+weight stacks.
 
-**The Role Eyebrow Rule.** Role labels are uppercase `label` variants in the greeting block (and settings active-role pill via `hubEyebrow`), never competing with the Enki header wordmark.
+**The Role Eyebrow Rule.** Role labels are uppercase `label` variants in the greeting block (and settings active-role pill via `hubEyebrow`), never competing with the JoyChat header wordmark.
 
 ## Layout
 
@@ -226,7 +226,7 @@ Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px).
 
 ## Elevation & Depth
 
-**5-Tier Structured Elevation.** Depth across Enki is defined by a clean, physical lighting hierarchy that balances sunken negative space (divits) with crisp positive lift (cards, buttons, floating bars) without adding new palette colors:
+**5-Tier Structured Elevation.** Depth across JoyChat is defined by a clean, physical lighting hierarchy that balances sunken negative space (divits) with crisp positive lift (cards, buttons, floating bars) without adding new palette colors:
 
 ```
 Level 3: Overlays & Floating Capsule  [▲ +16px lift, shadow-xl / shadow-2xl + rim border]
@@ -261,16 +261,16 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 
 ### Buttons
 - **Shape:** 12px radius default (`rounded-xl`); large ~16px; icon buttons fully round (44px).
-- **Primary:** Enki Ember fill, white label, height 48px, semibold — main CTAs (auth submit, Join Offers).
-- **Secondary:** Ember Mist fill, Enki Ember text.
+- **Primary:** JoyChat Lavender fill, white label, height 48px, semibold — main CTAs (auth submit, Join Offers).
+- **Secondary:** Lavender Mist fill, JoyChat Lavender text.
 - **Outline:** Surface + `line` border, Graphite text.
-- **Ghost / Link:** No fill; ghost tints Ember Mist on press; link uses Enki Ember.
-- **Hover / Focus / Active:** Slightly darker primary on press; web focus ring uses Enki Ember; disabled at 50% opacity.
+- **Ghost / Link:** No fill; ghost tints Lavender Mist on press; link uses JoyChat Lavender.
+- **Hover / Focus / Active:** Slightly darker primary on press; web focus ring uses JoyChat Lavender; disabled at 50% opacity.
 
 ### Chips
-- **Selected:** Enki Ember fill, white semibold label (or Ember Mist + primary text on some hub filters — prefer one pattern per screen).
+- **Selected:** JoyChat Lavender fill, white semibold label (or Lavender Mist + primary text on some hub filters — prefer one pattern per screen).
 - **Idle:** Surface or light border, Ink Soft text.
-- **Pills:** Ember Mist / success / amber soft washes with matching text; optional status dot.
+- **Pills:** Lavender Mist / success / amber soft washes with matching text; optional status dot.
 
 ### Cards / Containers
 - **Corner Style:** ~24px for conversation/auth cards; ~16–24px for hub tiles.
@@ -281,33 +281,33 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 
 ### Inputs / Fields
 - **Style:** Bg field, `line` border, ~16px radius on auth/search (`rounded-2xl`), 48px height common; base Input primitive is shorter/md radius — screens often override to match friendly auth chrome.
-- **Focus:** Ring / border shift to Enki Ember (web); native relies on system caret + border tokens.
+- **Focus:** Ring / border shift to JoyChat Lavender (web); native relies on system caret + border tokens.
 - **Error:** Danger text and border cues; no scary full-bleed red panels.
 
 ### Navigation
-- **Hub header:** Enki logo + extrabold “Enki” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Customer header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
-- **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Icon-only — no visible text label. Active item = Ember Mist inner pill behind the Enki Ember icon; idle = Muted icon, no pill. Unassigned / Conversations may show Enki Ember count badges. Destination names live in the accessible name (`aria-label`/`accessibilityLabel`) only, not as rendered text — the stack header title (e.g. **Messages**) is independent of that accessible name. Host tab bar chrome is transparent — the capsule is the only visible nav.
+- **Hub header:** JoyChat logo + extrabold “JoyChat” wordmark; settings gear. Agent avatar stack is **Agent/Admin only** — Customer header is brand + settings (Clear Desk). Role eyebrow lives in the greeting, not the header.
+- **Tabs (Agent/Admin):** Floating Clear Desk capsule (inset from sides + home indicator), surface fill, `line` hairline, soft lift shadow. Icon-only — no visible text label. Active item = Lavender Mist inner pill behind the JoyChat Lavender icon; idle = Muted icon, no pill. Unassigned / Conversations may show JoyChat Lavender count badges. Destination names live in the accessible name (`aria-label`/`accessibilityLabel`) only, not as rendered text — the stack header title (e.g. **Messages**) is independent of that accessible name. Host tab bar chrome is transparent — the capsule is the only visible nav.
 - **Stacks:** Flat header (no shadow), Graphite title in Manrope-SemiBold, surface background.
 - **Customer:** Same floating capsule as Agent/Admin — tabs Home | Messages | Help | Wall.
 - **Wall:** A destination on the capsule for every role, last in the row and a peer of Messages rather than something inside it. Newspaper icon, no badge — a Post is published rather than addressed to anybody, so there is no unread count to carry.
 
 ### Hub ops (Agent / Admin)
-- Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not Enki Ember value tint.
-- Quick **ActionTile** / secondary **ActionRow** icon chips prefer `neutral` (or amber for unassigned); primaryFilled Enki Ember chips are reserved for rare filled signals, not default hub chrome.
-- Admin “Create New Offer” uses Ember Mist (`tone="primary"`), not filled ember.
+- Overview **StatTile** values stay Graphite; unassigned attention uses amber alert dot, not JoyChat Lavender value tint.
+- Quick **ActionTile** / secondary **ActionRow** icon chips prefer `neutral` (or amber for unassigned); primaryFilled JoyChat Lavender chips are reserved for rare filled signals, not default hub chrome.
+- Admin “Create New Offer” uses Lavender Mist (`tone="primary"`), not filled lavender.
 
 ### Conversation rows
-- Soft card lift; Offers avatar = Ember Mist + Enki Ember megaphone (not filled ember).
-- Unread: bold Graphite title; timestamp Ink Soft; **one** Enki Ember count badge as the unread signal.
+- Soft card lift; Offers avatar = Lavender Mist + JoyChat Lavender megaphone (not filled lavender).
+- Unread: bold Graphite title; timestamp Ink Soft; **one** JoyChat Lavender count badge as the unread signal.
 
 ### Composer
 - Resting: surface + top `line` border; no resting shadow.
-- Reply banner may use Ember Mist wash + Enki Ember accent bar.
+- Reply banner may use Lavender Mist wash + JoyChat Lavender accent bar.
 
 ### Message bubbles (signature)
-- **Outgoing:** Enki Ember fill, white text, ~22px radius, tighter bottom-right.
+- **Outgoing:** JoyChat Lavender fill, white text, ~22px radius, tighter bottom-right.
 - **Incoming:** White / bubble-in + `line` border, Graphite text, tighter bottom-left.
-- **Receipts:** Tick icons only; read tint Enki Ember.
+- **Receipts:** Tick icons only; read tint JoyChat Lavender.
 - **Reactions / reply:** Same-window overlay tray (not Modal-as-cell); honor reduced motion.
 
 ### Offers carousel (signature)
@@ -328,9 +328,9 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep the Clear Desk: white Bg/Surface, Graphite type, Enki Ember as sparse signal.
-- **Do** use Ember Mist for soft selected/avatar/secondary moments.
-- **Do** put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as Enki only.
+- **Do** keep the Clear Desk: white Bg/Surface, Graphite type, JoyChat Lavender as sparse signal.
+- **Do** use Lavender Mist for soft selected/avatar/secondary moments.
+- **Do** put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as JoyChat only.
 - **Do** use hybrid elevation — `line` at rest (including composer), stronger shadow on overlays only.
 - **Do** keep Agent/Admin hub stats and tiles quiet (Graphite / neutral / amber attention).
 - **Do** honor reduced-motion paths for animated transitions.
@@ -343,7 +343,7 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Don't** build stories, case-status steppers, or Casewire branding.
 - **Don't** put role labels in the header wordmark or theme whole hubs per role color.
 - **Don't** show the agent avatar stack on the Customer hub.
-- **Don't** stack Enki Ember on unread time + badge + Offers avatar in the same row.
+- **Don't** stack JoyChat Lavender on unread time + badge + Offers avatar in the same row.
 - **Don't** put overlay-weight shadow on the resting composer.
 - **Don't** enable system dark mode for app chrome this phase.
 - **Don't** treat Offers as an ad SDK, checkout, or Instagram stories surface.

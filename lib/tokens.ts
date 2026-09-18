@@ -14,17 +14,17 @@ export function screenBottomPad(insetBottom: number, extra = 0) {
 
 /** Hex copies of `global.css` @theme. Native headers/tabs cannot use className. */
 export const colors = {
-  bg: "#FFFFFF",
+  bg: "#F1F0ED",
   surface: "#FFFFFF",
-  ink: "#1A1714",
-  inkSoft: "#453F39",
-  muted: "#6E6862",
-  line: "#EAE6E2",
-  primary: "#B83E0B",
+  ink: "#29272D",
+  inkSoft: "#3E3D44",
+  muted: "#646066",
+  line: "#E7E4E2",
+  primary: "#6253A3",
   primaryForeground: "#FFFFFF",
-  success: "#1F9D6C",
-  danger: "#B3261E",
-  amber: "#A16207",
+  success: "#3F724F",
+  danger: "#B12C30",
+  amber: "#D09033",
 } as const;
 
 const headerChrome = {

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Enki",
+    "name": "JoyChat",
     "slug": "enki",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +17,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FFA034",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -87,7 +87,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification-icon.png",
-          "color": "#B83E0B",
+          "color": "#6253A3",
           "defaultChannel": "default"
         }
       ]

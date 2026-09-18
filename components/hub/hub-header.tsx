@@ -26,12 +26,12 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
       <View className="flex-row items-center gap-2">
         <Image
           source={require("../../assets/images/logo.png")}
-          accessibilityLabel="Enki Logo"
+          accessibilityLabel="JoyChat Logo"
           className="h-8 w-12"
           resizeMode="contain"
         />
         <Text variant="headline" className="text-ink">
-          Enki
+          JoyChat
         </Text>
       </View>
 
