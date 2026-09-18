@@ -10,7 +10,7 @@ import {
   // Sparkles, // hidden with Knowledge search
 } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
-import { ActionTile, StatTile } from "@/components/hub/action-tile";
+import { StatTile } from "@/components/hub/action-tile"; // ActionTile hidden with the Knowledge pair
 import { HubHeader } from "@/components/hub/hub-header";
 import { HubScroll } from "@/components/hub/hub-scroll";
 // import { IconChip } from "@/components/hub/icon-chip"; // hidden with Knowledge search
@@ -95,10 +95,26 @@ export function AgentHub() {
           </View>
         </View>
 
-        {/* Quick Actions */}
-        <View
-          className="mt-4 flex-row gap-3"
-        >
+        {/* Quick Actions.
+
+            A row rather than the tile pair this was, because there is one of
+            them now: `ActionTile` is built to sit beside a sibling and split the
+            width, so alone it stretched to full width while its icon, title and
+            hint stayed hugging the left corner of it. `ActionRow` is the
+            full-width counterpart — icon, title and hint on one line, chevron at
+            the end — and it is what Unassigned Pool below already uses.
+
+            Put Knowledge back and this goes back to the pair: uncomment both
+            tiles and drop the row. */}
+        <ActionRow
+          className="mt-4"
+          icon={MessageCircle}
+          tone="neutral"
+          title="Messages"
+          hint="Active chats"
+          onPress={() => router.navigate("/(agent)/conversations" as Href)}
+        />
+        {/* <View className="mt-4 flex-row gap-3">
           <ActionTile
             icon={MessageCircle}
             title="Messages"
@@ -106,18 +122,15 @@ export function AgentHub() {
             tone="neutral"
             onPress={() => router.navigate("/(agent)/conversations" as Href)}
           />
-          {/* Knowledge is hidden for now. Messages takes the row on its own;
-              the tile is `flex-1`, so it fills the width rather than leaving a
-              gap where this one was. Restore by uncommenting. */}
-          {/* <ActionTile
+          <ActionTile
             icon={BookOpen}
             title="Knowledge"
             hint="Guides & answers"
             tone="neutral"
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("agent"))}
-          /> */}
-        </View>
+          />
+        </View> */}
 
         {recent ? (
           <View className="mt-4">
