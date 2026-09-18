@@ -15,11 +15,23 @@ import { easing } from "@/lib/motion-easing";
 import { colors } from "@/lib/tokens";
 
 /**
- * Animated WebP rather than video: it is the only format that renders a real
- * alpha channel on both iOS and Android. `expo-video` composites onto an
- * opaque surface, and AVFoundation cannot demux WebM at all.
+ * The JoyChat mark, still, in the same 720x406 box the WebP occupied — so
+ * `lib/launch-animation.ts` and its sizing are unchanged.
+ *
+ * It replaced an animated WebP of the retired brand's character, and it is a
+ * PNG because there is no animated JoyChat art to put here yet: shipping the
+ * old character recoloured would be the wrong mascot in the right palette.
+ * Everything around it still works — `expo-image` treats a still as a
+ * one-frame image, `autoplay` is a no-op on it, `onLoad` still fires, and the
+ * screen still holds the native splash until it has decoded and still fades
+ * out on `isFinishing`.
+ *
+ * When there is JoyChat motion to use, it goes back to an animated WebP rather
+ * than a video: WebP is the only format that renders a real alpha channel on
+ * both platforms. `expo-video` composites onto an opaque surface, and
+ * AVFoundation cannot demux WebM at all.
  */
-const LAUNCH_ANIMATION = require("@/assets/images/launch-animation.webp");
+const LAUNCH_ANIMATION = require("@/assets/images/launch-animation.png");
 
 /** Hide native splash if WebP onLoad never fires (slow tunnel / decode stall). */
 const SPLASH_FALLBACK_MS = 2500;

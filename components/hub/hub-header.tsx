@@ -2,12 +2,12 @@ import { router, type Href } from "expo-router";
 import { Settings } from "@/components/icons";
 import { Image, View } from "react-native";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+// import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // hidden with the agent stack
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { initials } from "@/lib/display";
-import { getSession } from "@/lib/session";
-import { PEOPLE } from "@/lib/mock-data";
+// import { initials } from "@/lib/display"; // hidden with the agent stack
+// import { getSession } from "@/lib/session"; // hidden with the agent stack
+// import { PEOPLE } from "@/lib/mock-data"; // hidden with the agent stack
 import { colors } from "@/lib/tokens";
 
 type HubHeaderProps = {
@@ -15,10 +15,11 @@ type HubHeaderProps = {
 };
 
 export function HubHeader({ settingsHref }: HubHeaderProps) {
-  const showAgentStack = getSession().role !== "customer";
-  const agents = showAgentStack
-    ? PEOPLE.filter((p) => p.role === "agent")
-    : [];
+  // Hidden with the agent stack below — it read `PEOPLE` from `lib/mock-data`.
+  // const showAgentStack = getSession().role !== "customer";
+  // const agents = showAgentStack
+  //   ? PEOPLE.filter((p) => p.role === "agent")
+  //   : [];
 
   return (
     <View className="flex-row items-center justify-between">
@@ -35,9 +36,13 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
         </Text>
       </View>
 
-      {/* Right Actions: Agents online stack (ops roles) & Settings */}
+      {/* Right Actions: Settings */}
       <View className="flex-row items-center gap-3">
-        {agents.length > 0 ? (
+        {/* The "agents online" avatar stack is hidden for now. It was drawn from
+            `PEOPLE` in `lib/mock-data` rather than from anything the API knows,
+            so it showed three invented names and claimed a presence feature this
+            app does not have. Restore by uncommenting. */}
+        {/* {agents.length > 0 ? (
           <View className="flex-row">
             {agents.map((agent, i) => (
               <Avatar
@@ -54,7 +59,7 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
               </Avatar>
             ))}
           </View>
-        ) : null}
+        ) : null} */}
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Settings"

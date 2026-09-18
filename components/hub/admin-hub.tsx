@@ -11,7 +11,7 @@ import {
   Users,
 } from "@/components/icons";
 import { ActionRow } from "@/components/hub/action-row";
-import { ActionTile, StatTile } from "@/components/hub/action-tile";
+import { StatTile } from "@/components/hub/action-tile"; // ActionTile hidden with the Knowledge pair
 import { ChartsSection } from "@/components/hub/charts-section";
 import { HubHeader } from "@/components/hub/hub-header";
 import { HubScroll } from "@/components/hub/hub-scroll";
@@ -92,10 +92,26 @@ export function AdminHub() {
           </View>
         </View>
 
-        {/* Admin Navigation Quick Grid */}
-        <View
-          className="mt-4 flex-row gap-3"
-        >
+        {/* Admin Navigation.
+
+            A row rather than the tile pair this was, because there is one of
+            them now: `ActionTile` is built to sit beside a sibling and split the
+            width, so alone it stretched to full width while its icon, title and
+            hint stayed hugging the left corner of it. `ActionRow` is the
+            full-width counterpart, and it is what the Administration rows below
+            already use.
+
+            Put Knowledge back and this goes back to the pair: uncomment both
+            tiles and drop the row. */}
+        <ActionRow
+          className="mt-4"
+          icon={MessageCircle}
+          tone="neutral"
+          title="Messages"
+          hint="All threads"
+          onPress={() => router.navigate("/(admin)/conversations" as Href)}
+        />
+        {/* <View className="mt-4 flex-row gap-3">
           <ActionTile
             icon={MessageCircle}
             title="Messages"
@@ -103,18 +119,15 @@ export function AdminHub() {
             tone="neutral"
             onPress={() => router.navigate("/(admin)/conversations" as Href)}
           />
-          {/* Knowledge is hidden for now. Messages takes the row on its own;
-              the tile is `flex-1`, so it fills the width rather than leaving a
-              gap where this one was. Restore by uncommenting. */}
-          {/* <ActionTile
+          <ActionTile
             icon={BookOpen}
             title="Knowledge"
             hint="Manage articles"
             tone="neutral"
             accessibilityLabel="Knowledge base"
             onPress={() => router.push(knowledgeListHref("admin"))}
-          /> */}
-        </View>
+          />
+        </View> */}
 
         {recent ? (
           <View className="mt-4">
