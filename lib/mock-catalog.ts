@@ -1,5 +1,5 @@
-import { CHART_METRICS, FAQ_ITEMS, KNOWLEDGE, OFFERS } from '@/lib/mock-data'
-import type { ChartMetric, FaqItem, KnowledgeArticle, Offer } from '@/lib/types'
+import { FAQ_ITEMS, KNOWLEDGE, OFFERS } from '@/lib/mock-data'
+import type { FaqItem, KnowledgeArticle, Offer } from '@/lib/types'
 
 let extraFaqs: FaqItem[] = []
 let extraKnowledge: KnowledgeArticle[] = []
@@ -71,12 +71,4 @@ export function addOffer(input: {
   }
   extraOffers = [...extraOffers, item]
   return item
-}
-
-export function listCharts(): ChartMetric[] {
-  return CHART_METRICS
-}
-
-export function getChart(id: string): ChartMetric | undefined {
-  return CHART_METRICS.find((item) => item.id === id)
 }

@@ -7,7 +7,9 @@ import { cn } from "@/lib/cn";
 import type { ChartMetric } from "@/lib/types";
 
 const PLOT_HEIGHT = 64;
-const CHART_CARD_MIN_HEIGHT = 152;
+
+/** Exported so a placeholder in the carousel holds exactly this card's height. */
+export const CHART_CARD_MIN_HEIGHT = 152;
 
 type ChartCardProps = {
   chart: ChartMetric;

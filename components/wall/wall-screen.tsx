@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { router, useNavigation } from 'expo-router'
-import { ActivityIndicator, Alert, FlatList, View, type ViewToken } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, ScrollView, View, type ViewToken } from 'react-native'
 import Animated, { useReducedMotion } from 'react-native-reanimated'
 
 import { Bookmark, CloudOff, Newspaper, SquarePen, X } from '@/components/icons'
@@ -19,8 +19,9 @@ import { useWall, useWallSearch, type WallBodyView } from '@/lib/use-wall'
 import { useWallPostReply } from '@/lib/use-wall-post-reply'
 import { wallPostReplyDraft } from '@/lib/wall-actions'
 import { wallSavedHref } from '@/lib/wall-route'
+import { wallKindColor, wallKindLabel } from '@/lib/wall-kind'
 import { WALL_SORT_OPTIONS } from '@/lib/wall-sort'
-import type { WallPost, WallSort } from '@/lib/types'
+import { wallPostKinds, type WallPost, type WallPostKind, type WallSort } from '@/lib/types'
 
 /**
  * The default Wall: Posts from every organization this person belongs to,
@@ -331,48 +332,121 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
 /** What each option in `WallSortControl` says. */
 const WALL_SORT_LABEL: Record<WallSort, string> = { recent: 'Recent', popular: 'Popular' }
 
-/**
- * Recent or Popular (#86), at the top of the default Wall and nowhere else —
- * a shared named Wall and the Saved view both read one fixed order and offer
- * no control for it, so this sits on `WallScreen` rather than on `WallBody`,
- * beside Saved and Compose.
- *
- * A tap that lands on the option already selected still calls `onChange`;
- * `useWall`'s own `setSort` is what turns that into a no-op; from here it is
- * just a chip a person tapped.
- */
-function WallSortControl({ sort, onChange }: { sort: WallSort; onChange: (sort: WallSort) => void }) {
+/** One chip, shared by the sort control and the kind filter so the two cannot drift apart. */
+function FilterChip({
+  label,
+  selected,
+  accessibilityLabel,
+  dotColor,
+  onPress,
+}: {
+  label: string
+  selected: boolean
+  accessibilityLabel: string
+  dotColor?: string
+  onPress: () => void
+}) {
   return (
-    <View
-      accessibilityRole="tablist"
-      className="flex-row gap-2 border-b border-line/60 bg-surface px-4 pb-3 pt-2"
+    <TactilePressable
+      accessibilityRole="tab"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      className={cn(
+        'h-9 flex-row items-center justify-center gap-1.5 rounded-full border px-3',
+        selected ? 'border-transparent bg-primary' : 'border-line/70 bg-line/30',
+      )}
     >
-      {WALL_SORT_OPTIONS.map(option => {
-        const selected = option === sort
-        return (
-          <TactilePressable
-            key={option}
-            accessibilityRole="tab"
-            accessibilityLabel={WALL_SORT_LABEL[option]}
-            accessibilityState={{ selected }}
-            onPress={() => onChange(option)}
-            className={cn(
-              'min-h-11 justify-center rounded-full border px-3.5',
-              selected
-                ? 'border-transparent bg-primary shadow-sm shadow-primary/25'
-                : 'border-line/80 bg-line/35',
-            )}
-          >
-            <Text
-              variant="label"
-              className={selected ? 'font-semibold text-primary-foreground' : 'text-ink-soft'}
-            >
-              {WALL_SORT_LABEL[option]}
-            </Text>
-          </TactilePressable>
-        )
-      })}
-    </View>
+      {dotColor ? (
+        <View
+          aria-hidden
+          className="size-1.5 rounded-full"
+          style={{ backgroundColor: selected ? colors.primaryForeground : dotColor }}
+        />
+      ) : null}
+      <Text
+        variant="label"
+        className={selected ? 'font-semibold text-primary-foreground' : 'text-ink-soft'}
+      >
+        {label}
+      </Text>
+    </TactilePressable>
+  )
+}
+
+/**
+ * How the Wall is ordered and which kinds it shows, in one scrolling row.
+ *
+ * Two rows of chips above a feed is most of a phone screen spent on controls
+ * before a single Post is drawn, so they share a line — with a hairline between
+ * them, because they are not alternatives to one another: Recent and Popular
+ * order the same set, and a kind decides which set that is. The rule is only
+ * that "Popular" and "Giveaway" must never read as two options in one list.
+ *
+ * Sort leads because it is always two chips and never scrolls out of reach;
+ * the kinds run off the right edge, where there is somewhere to scroll to.
+ * `All` leads them and is the default — a Wall opens showing everything, so
+ * the way back to that has to be as reachable as the way out of it.
+ *
+ * `alignItems: 'center'` on the content container is load-bearing rather than
+ * cosmetic: a horizontal ScrollView stretches its children on the cross axis by
+ * default, so a chip with only a minimum height grows to the full height of the
+ * row.
+ */
+function WallFilterBar({
+  sort,
+  onSortChange,
+  kind,
+  onKindChange,
+}: {
+  sort: WallSort
+  onSortChange: (sort: WallSort) => void
+  kind: WallPostKind | null
+  onKindChange: (kind: WallPostKind | null) => void
+}) {
+  return (
+    <ScrollView
+      horizontal
+      accessibilityRole="tablist"
+      showsHorizontalScrollIndicator={false}
+      className="border-b border-line/60 bg-surface"
+      /*
+       * `flexGrow: 0` is the second half of keeping this a row rather than a
+       * region. A ScrollView is a flex child that grows, so in the column this
+       * sits in it takes every pixel the list below it has not claimed — a bar
+       * of chips floating in the middle of an empty half-screen.
+       */
+      style={{ flexGrow: 0, flexShrink: 0 }}
+      contentContainerStyle={{
+        alignItems: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        gap: 6,
+      }}
+    >
+      {WALL_SORT_OPTIONS.map(option => (
+        <FilterChip
+          key={option}
+          label={WALL_SORT_LABEL[option]}
+          accessibilityLabel={`Sort by ${WALL_SORT_LABEL[option]}`}
+          selected={option === sort}
+          onPress={() => onSortChange(option)}
+        />
+      ))}
+
+      <View aria-hidden className="mx-1 h-5 w-px bg-line" />
+
+      {[null, ...wallPostKinds].map(option => (
+        <FilterChip
+          key={option ?? 'all'}
+          label={option === null ? 'All' : wallKindLabel(option)}
+          accessibilityLabel={option === null ? 'All posts' : `${wallKindLabel(option)} posts`}
+          selected={option === kind}
+          dotColor={option === null ? undefined : wallKindColor(option)}
+          onPress={() => onKindChange(option)}
+        />
+      ))}
+    </ScrollView>
   )
 }
 
@@ -458,7 +532,14 @@ export function WallScreen() {
             accessibilityLabel="Search posts"
           />
         </View>
-        {isSearching ? null : <WallSortControl sort={wall.sort} onChange={wall.setSort} />}
+        {isSearching ? null : (
+          <WallFilterBar
+            sort={wall.sort}
+            onSortChange={wall.setSort}
+            kind={wall.kind}
+            onKindChange={wall.setKind}
+          />
+        )}
         <WallBody wall={activeWall} />
       </View>
       <WallComposeSheet

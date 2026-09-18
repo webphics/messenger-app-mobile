@@ -7,8 +7,8 @@ import { ActionTile } from "@/components/hub/action-tile";
 import { HubHeader } from "@/components/hub/hub-header";
 import { HubScroll } from "@/components/hub/hub-scroll";
 // import { IconChip } from "@/components/hub/icon-chip"; // hidden with FAQ search
-import { OffersCarousel } from "@/components/hub/offers-carousel";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
+import { WallHighlights } from "@/components/hub/wall-highlights";
 // import { TactilePressable } from "@/components/ui/tactile-pressable"; // hidden with FAQ search
 import { Text } from "@/components/ui/text";
 import { useConversationInbox } from "@/lib/conversation-inbox";
@@ -90,7 +90,7 @@ export function CustomerHub() {
         </View> */}
       </View>
 
-      <OffersCarousel />
+      <WallHighlights />
 
       {/* FAQ is hidden for now. The screen and its route are untouched; this is
           the only way into it from the Customer Hub, so commenting it out is

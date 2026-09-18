@@ -14,6 +14,7 @@ import type {
   NamedWall,
   WallPost,
   WallPostAttachment,
+  WallPostKind,
   WallPostLink,
   WallSort,
   WallVoteDirection,
@@ -63,12 +64,24 @@ export const WALL_PAGE_LIMIT = 20
  * across a sort switch.
  */
 export async function listWallPosts(
-  params: { cursor?: string; limit?: number; sort?: WallSort; wall?: string } = {},
+  params: {
+    cursor?: string
+    limit?: number
+    sort?: WallSort
+    wall?: string
+    /**
+     * Narrow the Wall to one kind. Absent is every kind, which is what this
+     * client sent before it knew kinds existed — so the unfiltered read is
+     * byte-identical to what it always was.
+     */
+    kind?: WallPostKind
+  } = {},
 ): Promise<ApiResult<WallPost[]>> {
   const outcome = await authenticatedRequest(
     `/wall/posts${query({
       wall: params.wall,
       sort: params.sort === 'popular' ? 'popular' : undefined,
+      kind: params.kind,
       cursor: params.cursor,
       limit: params.limit ?? WALL_PAGE_LIMIT,
     })}`,
@@ -108,6 +121,20 @@ export async function searchWallPosts(
     })}`,
   )
   return readOutcome(outcome, parseWallPosts)
+}
+
+/**
+ * One Post by id — what a permalink resolves through.
+ *
+ * Scoped server-side exactly as a page of the Wall is: a Post in an
+ * organization this reader is not in answers `refused` rather than arriving,
+ * so nothing here is a second way to see a Post the Wall itself would not
+ * show. A Post that has been taken down is gone rather than empty, which is
+ * why the screen that reads this tells the two apart.
+ */
+export async function getWallPost(postId: string): Promise<ApiResult<WallPost>> {
+  const outcome = await authenticatedRequest(`/wall/posts/${encodeURIComponent(postId)}`)
+  return readOutcome(outcome, parseWallPost)
 }
 
 /**
@@ -240,9 +267,18 @@ export async function voteOnWallPost(
 /** What Compose sends: an audience, and everything a Post may carry. */
 export type WallPostCreateInput = {
   organizationId: string
+  /**
+   * What the Post is for. Absent is `community` — the API's own default, and
+   * what this client sent before it knew kinds existed.
+   */
+  kind?: WallPostKind
+  /** Required server-side for every kind but `community`. */
+  title?: string
   body?: string
   attachments?: WallPostAttachment[]
   link?: WallPostLink
+  /** ISO 8601. Accepted only on `promotion` and `giveaway`, and only in the future. */
+  endsAt?: string
 }
 
 /** The wire shape `CreateWallPostSchema` and `UpdateWallPostSchema` both take — `kind` back to `type`. */
@@ -270,6 +306,12 @@ export async function createWallPost(input: WallPostCreateInput): Promise<ApiRes
     method: 'POST',
     body: {
       organizationId: input.organizationId,
+      // Each omitted when absent rather than sent as null: `CreateWallPostSchema`
+      // is `.strict()` and every one of these is `.optional()`, so an explicit
+      // null is a refusal where an absent key is the default.
+      ...(input.kind ? { kind: input.kind } : {}),
+      ...(input.title ? { title: input.title } : {}),
+      ...(input.endsAt ? { endsAt: input.endsAt } : {}),
       ...(input.body ? { body: input.body } : {}),
       ...(input.attachments && input.attachments.length > 0
         ? { attachments: input.attachments.map(sendableWallAttachment) }

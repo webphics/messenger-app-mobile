@@ -15,6 +15,12 @@ import { WallPostViewCount } from '@/components/wall/wall-post-view-count'
 import { WallPostVote } from '@/components/wall/wall-post-vote'
 import type { ApiResult } from '@/lib/api-result'
 import { formatRelativeTime, initials } from '@/lib/display'
+import {
+  wallDeadline,
+  wallKindColor,
+  wallKindIsNamed,
+  wallKindLabel,
+} from '@/lib/wall-kind'
 import { colors } from '@/lib/tokens'
 import {
   canReplyToWallPost,
@@ -112,6 +118,14 @@ export const WallPostCard = memo(function WallPostCard({
   )
 
   const age = formatRelativeTime(post.createdAt)
+  /*
+   * Read once per render rather than on a ticking clock: a countdown that
+   * reticked every second would re-render every mounted card in a virtualised
+   * list, on the one surface a thumb is already flinging. A Wall is re-read on a
+   * pull, a focus and a socket event, and the deadline recomputes with each.
+   */
+  const deadline = wallDeadline(post, Date.now())
+  const named = wallKindIsNamed(post.kind)
   const actions = wallPostActions(post, viewer)
   const link = post.link
   const canReply = onReply && canReplyToWallPost(viewer)
@@ -148,6 +162,62 @@ export const WallPostCard = memo(function WallPostCard({
       <WallPostCollage images={images} />
 
       <View className="gap-3 p-4">
+        {/*
+          What the Post is, and how long it has left, above the byline: both are
+          facts about the Post rather than about its author, and a reader
+          scanning a Wall decides on them before they decide on a name. Absent
+          entirely for a community Post with no deadline, which is most of them —
+          a chip on every card marks nothing.
+        */}
+        {named || deadline.state !== 'none' ? (
+          <View className="flex-row items-center justify-between gap-2">
+            {named ? (
+              <View className="min-w-0 flex-row items-center gap-1.5">
+                <View
+                  aria-hidden
+                  className="size-1.5 rounded-full"
+                  style={{ backgroundColor: wallKindColor(post.kind) }}
+                />
+                <Text
+                  variant="label"
+                  numberOfLines={1}
+                  className="uppercase tracking-wider"
+                  style={{ color: wallKindColor(post.kind) }}
+                >
+                  {wallKindLabel(post.kind)}
+                </Text>
+              </View>
+            ) : (
+              <View className="flex-1" />
+            )}
+
+            {/*
+              An ended offer is drawn as ended rather than hidden: an expired
+              promotion is still a record of what was offered.
+            */}
+            {deadline.state !== 'none' ? (
+              <View
+                className={
+                  deadline.state === 'ended'
+                    ? 'rounded-full bg-line/80 px-2.5 py-1'
+                    : 'rounded-full bg-primary-soft px-2.5 py-1'
+                }
+              >
+                <Text
+                  variant="label"
+                  className={
+                    deadline.state === 'ended'
+                      ? 'uppercase tracking-wide text-muted'
+                      : 'uppercase tracking-wide text-primary tabular-nums'
+                  }
+                >
+                  {deadline.state === 'ended' ? 'Ended' : deadline.label}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         <View className="flex-row items-center gap-3">
           <Avatar alt="" className="size-11">
             <AvatarFallback className="bg-primary-soft">
@@ -159,7 +229,7 @@ export const WallPostCard = memo(function WallPostCard({
 
           <View
             accessible
-            accessibilityLabel={`${post.author.name}, ${age}${post.editedAt ? ', edited' : ''}`}
+            accessibilityLabel={`${named ? `${wallKindLabel(post.kind)}, ` : ''}${post.author.name}, ${age}${post.editedAt ? ', edited' : ''}`}
             className="min-w-0 flex-1"
           >
             <Text variant="title" numberOfLines={1} className="text-ink">
@@ -224,6 +294,17 @@ export const WallPostCard = memo(function WallPostCard({
             </TactilePressable>
           ) : null}
         </View>
+
+        {/*
+          The headline, which this card used to throw away entirely: every kind
+          but `community` is required to carry one server-side, so a promotion
+          drew its supporting sentence and nothing else.
+        */}
+        {post.title ? (
+          <Text variant="headline" className="text-ink">
+            {post.title}
+          </Text>
+        ) : null}
 
         {post.body ? <WallPostBody body={post.body} hasImages={images.length > 0} /> : null}
 

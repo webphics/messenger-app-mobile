@@ -1,7 +1,6 @@
 import { Image } from "react-native";
 
 import type {
-  ChartMetric,
   FaqItem,
   InternalNote,
   KnowledgeArticle,
@@ -446,68 +445,3 @@ export const KNOWLEDGE: KnowledgeArticle[] = [
   },
 ];
 
-export const CHART_METRICS: ChartMetric[] = [
-  {
-    id: "open-threads",
-    title: "Open threads",
-    hint: "Assigned + unassigned, last 7 days",
-    value: "12",
-    deltaLabel: "+3 vs last week",
-    kind: "bar",
-    series: [6, 8, 7, 9, 11, 10, 12],
-  },
-  {
-    id: "unassigned",
-    title: "Unassigned",
-    hint: "Pool size by day",
-    value: "1",
-    deltaLabel: "−2 vs last week",
-    kind: "line",
-    series: [4, 3, 5, 3, 2, 2, 1],
-  },
-  {
-    id: "messages",
-    title: "Messages",
-    hint: "Sent + received, last 7 days",
-    value: "84",
-    deltaLabel: "+12 vs last week",
-    kind: "line",
-    series: [48, 52, 61, 55, 70, 76, 84],
-  },
-  {
-    id: "offers-taps",
-    title: "Offer taps",
-    hint: "Promo card opens, last 7 days",
-    value: "31",
-    deltaLabel: "+5 vs last week",
-    kind: "bar",
-    series: [18, 20, 22, 19, 24, 28, 31],
-  },
-  {
-    id: "thread-mix",
-    title: "Thread mix",
-    hint: "Open threads by kind",
-    value: "4",
-    deltaLabel: "Direct · group · offers",
-    kind: "pie",
-    series: [2, 1, 1],
-    slices: [
-      { label: "Direct", value: 2 },
-      { label: "Group", value: 1 },
-      { label: "Offers", value: 1 },
-    ],
-  },
-  {
-    id: "desk-load",
-    title: "Desk load",
-    hint: "Who is carrying open work",
-    value: "100%",
-    deltaLabel: "Assigned vs pool",
-    kind: "donut",
-    series: [3, 1],
-    slices: [
-      { label: "Assigned", value: 3 },
-      { label: "Unassigned", value: 1 },
-    ],
-  },
-];

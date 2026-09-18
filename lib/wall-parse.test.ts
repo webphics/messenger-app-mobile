@@ -30,6 +30,10 @@ describe('parseWallPost', () => {
       id: 'post-1',
       author: { id: 'user-1', name: 'Ada Lovelace' },
       organizationId: 'org-1',
+      kind: 'community',
+      title: null,
+      endsAt: null,
+      pinnedAt: null,
       body: 'The lift is fixed.',
       attachments: [{ kind: 'image', url: '/uploads/lift.png', fileName: 'lift.png', size: 2048 }],
       link: { label: 'Read the notice', url: 'https://example.com/notice' },
@@ -226,5 +230,36 @@ describe('parseWallContributorGrant', () => {
 
   it('is null for anything that is not a record', () => {
     expect(parseWallContributorGrant(null)).toBeNull()
+  })
+})
+
+describe('a Post that says what it is', () => {
+  it('reads the four fields the API sends about a kind', () => {
+    const parsed = parseWallPost({
+      ...post,
+      kind: 'promotion',
+      title: 'Half price this week',
+      endsAt: '2026-09-26T10:00:00.000Z',
+      pinnedAt: '2026-09-19T08:00:00.000Z',
+    })
+    expect(parsed).toMatchObject({
+      kind: 'promotion',
+      title: 'Half price this week',
+      endsAt: '2026-09-26T10:00:00.000Z',
+      pinnedAt: '2026-09-19T08:00:00.000Z',
+    })
+  })
+
+  /**
+   * The API defaults an unclassified Post to `community` on both write and read,
+   * so this client must never produce a sixth, nameless bucket — and must never
+   * drop a Post for carrying a kind a later build added.
+   */
+  it.each([undefined, null, 'townhall', 42])('reads %p as community rather than refusing', value => {
+    expect(parseWallPost({ ...post, kind: value })?.kind).toBe('community')
+  })
+
+  it('leaves the three optional fields null when the API sends none', () => {
+    expect(parseWallPost(post)).toMatchObject({ title: null, endsAt: null, pinnedAt: null })
   })
 })

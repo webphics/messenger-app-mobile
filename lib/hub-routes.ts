@@ -23,6 +23,7 @@ export const ROLE_HREF: Record<UserRole, Href> = {
 export const CUSTOMER_HREF = {
   messages: "/(customer)/messages" as Href,
   help: "/(customer)/help" as Href,
+  wall: "/(customer)/wall" as Href,
   settings: "/(customer)/(home)/settings" as Href,
   search: "/(customer)/(home)/search" as Href,
   faq: "/(customer)/(home)/faq" as Href,

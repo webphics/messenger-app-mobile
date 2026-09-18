@@ -29,14 +29,21 @@ import { cn } from '@/lib/cn'
 import { colors, screenBottomPad } from '@/lib/tokens'
 import { wallActionRefusal, WALL_POST_BODY_MAX } from '@/lib/wall-actions'
 import {
+  hasWallComposeError,
   wallComposeDefaultOrganization,
   wallComposeErrors,
   wallComposeNeedsOrganizationChoice,
+  wallKindAllowsDeadline,
+  wallKindNeedsTitle,
+  MINUTE_MS,
+  WALL_DEADLINE_CHOICES,
   WALL_POST_ATTACHMENT_MAX,
   WALL_POST_LINK_LABEL_MAX,
+  WALL_POST_TITLE_MAX,
 } from '@/lib/wall-compose'
+import { wallKindColor, wallKindLabel } from '@/lib/wall-kind'
 import { uploadWallFile, type WallPostCreateInput } from '@/lib/wall-api'
-import type { Organization, WallPost, WallPostAttachment } from '@/lib/types'
+import { wallPostKinds, type Organization, type WallPost, type WallPostAttachment, type WallPostKind } from '@/lib/types'
 
 /**
  * A Contributor's own new Post (#76).
@@ -127,6 +134,15 @@ function ComposeSheet({
   const [organizationId, setOrganizationId] = useState<string | null>(
     wallComposeDefaultOrganization(organizations),
   )
+  /*
+   * `pickingKind` above is an attachment picker's kind; this is the Post's, and
+   * the two are deliberately named apart — the older one was here first and
+   * renaming it would touch every picker call for a field it has nothing to do
+   * with.
+   */
+  const [postKind, setPostKind] = useState<WallPostKind>('community')
+  const [title, setTitle] = useState('')
+  const [endsAt, setEndsAt] = useState<Date | null>(null)
   const [body, setBody] = useState('')
   const [staged, setStaged] = useState<StagedAttachment[]>([])
   const [linkLabel, setLinkLabel] = useState('')
@@ -137,6 +153,21 @@ function ComposeSheet({
   const [organizationError, setOrganizationError] = useState<string | null>(null)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
+  const [titleError, setTitleError] = useState<string | null>(null)
+  const [endsAtError, setEndsAtError] = useState<string | null>(null)
+
+  /*
+   * A kind that cannot carry a deadline drops the one already chosen, rather
+   * than holding it back to refuse the submit: the field goes away with the
+   * kind, and a value behind a field nobody can see is a refusal about
+   * something invisible.
+   */
+  function chooseKind(next: WallPostKind) {
+    setPostKind(next)
+    setTitleError(null)
+    setEndsAtError(null)
+    if (!wallKindAllowsDeadline(next)) setEndsAt(null)
+  }
 
   function removeStaged(id: string) {
     setStaged(current => current.filter(item => item.id !== id));
@@ -169,6 +200,10 @@ function ComposeSheet({
   async function submit() {
     const errors = wallComposeErrors({
       hasOrganization: organizationId !== null,
+      kind: postKind,
+      title,
+      endsAt: endsAt ? endsAt.getTime() : null,
+      now: Date.now(),
       attachmentKinds: staged.map(item => item.local.kind),
       linkLabel,
       linkUrl,
@@ -176,7 +211,9 @@ function ComposeSheet({
     setOrganizationError(errors.organization)
     setAttachmentError(errors.attachment)
     setLinkError(errors.link)
-    if (errors.organization || errors.attachment || errors.link || !organizationId) return
+    setTitleError(errors.title)
+    setEndsAtError(errors.endsAt)
+    if (hasWallComposeError(errors) || !organizationId) return
 
     setSubmitting(true)
 
@@ -197,6 +234,9 @@ function ComposeSheet({
 
     const result = await onCreate({
       organizationId,
+      kind: postKind,
+      title: title.trim() || undefined,
+      endsAt: endsAt ? endsAt.toISOString() : undefined,
       body: trimmedBody || undefined,
       attachments: attachments.length > 0 ? attachments : undefined,
       link: trimmedLabel && trimmedUrl ? { label: trimmedLabel, url: trimmedUrl } : undefined,
@@ -271,6 +311,159 @@ function ComposeSheet({
                   {organizationError ? (
                     <Text variant="label" accessibilityLiveRegion="polite" className="text-danger">
                       {organizationError}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/*
+                What the Post is, first: it decides whether a title is required
+                and whether a deadline may be set at all, so asking for it after
+                those two would be asking somebody to fill in fields that might
+                then vanish.
+              */}
+              <View className="gap-1.5">
+                <Text variant="label" className="font-semibold text-ink-soft">
+                  Kind
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {wallPostKinds.map(option => {
+                    const selected = option === postKind
+                    return (
+                      <TactilePressable
+                        key={option}
+                        accessibilityRole="radio"
+                        accessibilityLabel={wallKindLabel(option)}
+                        accessibilityState={{ selected }}
+                        disabled={submitting}
+                        onPress={() => chooseKind(option)}
+                        className={cn(
+                          'min-h-11 flex-row items-center justify-center gap-1.5 rounded-full border px-3.5',
+                          selected ? 'border-transparent bg-primary' : 'border-line/80 bg-line/35',
+                        )}
+                      >
+                        <View
+                          aria-hidden
+                          className="size-1.5 rounded-full"
+                          style={{
+                            backgroundColor: selected
+                              ? colors.primaryForeground
+                              : wallKindColor(option),
+                          }}
+                        />
+                        <Text
+                          variant="label"
+                          className={
+                            selected ? 'font-semibold text-primary-foreground' : 'text-ink-soft'
+                          }
+                        >
+                          {wallKindLabel(option)}
+                        </Text>
+                      </TactilePressable>
+                    )
+                  })}
+                </View>
+              </View>
+
+              {/*
+                The headline. Offered for every kind and required for all but
+                `community` — a remark needs no name, and everything else
+                announces something that does.
+              */}
+              <View className="gap-1.5">
+                <View className="flex-row items-center justify-between">
+                  <Text variant="label" className="font-semibold text-ink-soft">
+                    Title{wallKindNeedsTitle(postKind) ? '' : ' (optional)'}
+                  </Text>
+                  <Text variant="meta" className="tabular-nums text-muted">
+                    {title.length}/{WALL_POST_TITLE_MAX}
+                  </Text>
+                </View>
+                <TextInput
+                  value={title}
+                  onChangeText={value => {
+                    setTitle(value)
+                    if (titleError) setTitleError(null)
+                  }}
+                  maxLength={WALL_POST_TITLE_MAX}
+                  placeholder="What is this about?"
+                  placeholderTextColor={colors.muted}
+                  accessibilityLabel="Post title"
+                  editable={!submitting}
+                  className="min-h-12 rounded-xl border border-line/70 bg-bg px-3 py-2.5 text-base text-ink"
+                />
+                {titleError ? (
+                  <Text variant="label" accessibilityLiveRegion="polite" className="text-danger">
+                    {titleError}
+                  </Text>
+                ) : null}
+              </View>
+
+              {/*
+                A deadline, and only where one means something. A Post nothing
+                happens to cannot end, so the field is absent rather than
+                disabled for the three kinds the API refuses one on.
+              */}
+              {wallKindAllowsDeadline(postKind) ? (
+                <View className="gap-1.5">
+                  <Text variant="label" className="font-semibold text-ink-soft">
+                    Ends (optional)
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {WALL_DEADLINE_CHOICES.map(choice => {
+                      const selected =
+                        endsAt !== null &&
+                        Math.abs(endsAt.getTime() - (Date.now() + choice.ms)) < MINUTE_MS
+                      return (
+                        <TactilePressable
+                          key={choice.label}
+                          accessibilityRole="radio"
+                          accessibilityLabel={`Ends in ${choice.label}`}
+                          accessibilityState={{ selected }}
+                          disabled={submitting}
+                          onPress={() => {
+                            setEndsAt(new Date(Date.now() + choice.ms))
+                            setEndsAtError(null)
+                          }}
+                          className={cn(
+                            'min-h-11 justify-center rounded-full border px-3.5',
+                            selected
+                              ? 'border-transparent bg-primary'
+                              : 'border-line/80 bg-line/35',
+                          )}
+                        >
+                          <Text
+                            variant="label"
+                            className={
+                              selected ? 'font-semibold text-primary-foreground' : 'text-ink-soft'
+                            }
+                          >
+                            {choice.label}
+                          </Text>
+                        </TactilePressable>
+                      )
+                    })}
+                    {endsAt ? (
+                      <TactilePressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear the end date"
+                        disabled={submitting}
+                        onPress={() => {
+                          setEndsAt(null)
+                          setEndsAtError(null)
+                        }}
+                        className="min-h-11 flex-row items-center justify-center gap-1 rounded-full border border-line/80 bg-line/35 px-3.5"
+                      >
+                        <X color={colors.muted} size={14} />
+                        <Text variant="label" className="text-ink-soft">
+                          No end date
+                        </Text>
+                      </TactilePressable>
+                    ) : null}
+                  </View>
+                  {endsAtError ? (
+                    <Text variant="label" accessibilityLiveRegion="polite" className="text-danger">
+                      {endsAtError}
                     </Text>
                   ) : null}
                 </View>

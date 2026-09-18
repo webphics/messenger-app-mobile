@@ -432,6 +432,58 @@ export type ChartMetric = {
   slices?: ChartSlice[]
 }
 
+/**
+ * What `GET /analytics/overview` answers with, for the Admin Hub's charts.
+ *
+ * Only the parts a chart is drawn from. The response also carries `agents` — a
+ * per-actor breakdown the web dashboard renders as a table — and this client
+ * has no screen for it, so it is deliberately not parsed (`lib/wall-parse`'s
+ * rule: the parts nothing renders yet are not read).
+ *
+ * `snapshot` is a right-now reading and `resolution`/`series` are bound to the
+ * range, which is the one thing about this payload worth keeping straight: they
+ * travel together and answer on different clocks (the API's own schema doc).
+ */
+export type AnalyticsSeriesPoint = {
+  /** `YYYY-MM-DD`, UTC. One point per day in the range, gaps included as zeroes. */
+  date: string
+  conversationsOpened: number
+  messagesSent: number
+}
+
+export type AnalyticsUserCounts = {
+  admin: number
+  agent: number
+  customer: number
+}
+
+/** Current state, whatever range was asked for. */
+export type AnalyticsSnapshot = {
+  unassigned: number
+  engaged: number
+  closed: number
+  groups: number
+  users: AnalyticsUserCounts
+}
+
+/**
+ * What arrived and what was resolved inside the range. `closed` may exceed
+ * `opened` — a team working down a backlog resolves more than arrived — so
+ * nothing may treat the pair as a ratio bounded at 1.
+ */
+export type AnalyticsResolution = {
+  opened: number
+  closed: number
+}
+
+export type AnalyticsOverview = {
+  /** Echoed by the API, so a client that sent no range can say what it is showing. */
+  range: { from: string; to: string }
+  snapshot: AnalyticsSnapshot
+  resolution: AnalyticsResolution
+  series: AnalyticsSeriesPoint[]
+}
+
 /** An organization the signed-in person belongs to, from `GET /memberships/mine`. */
 export type Organization = {
   id: string
@@ -603,12 +655,40 @@ export type WallVoteDirection = 'up' | 'down'
  */
 export type WallSort = 'recent' | 'popular'
 
+/**
+ * What a Post is for — the one fact the Wall cannot derive from the Post itself.
+ * Mirrors `wallPostKinds` in the API. Set once at creation and never editable,
+ * the same way `organizationId` is: a kind is what a reader filtered on and what
+ * the card is drawn from, so re-kinding a Post people have already acted on
+ * rewrites what they responded to.
+ */
+export const wallPostKinds = ['promotion', 'giveaway', 'news', 'ad', 'community'] as const
+
+export type WallPostKind = (typeof wallPostKinds)[number]
+
 export type WallPost = {
   id: string
   author: WallPostAuthor
   /** The Post's whole audience, set once. A Wall spanning several needs it. */
   organizationId: string
+  /**
+   * Never null. A Post written before kinds existed reads as `community`, which
+   * the API defaults on both write and read — so there is one shape to render
+   * and the kind filter has no nameless sixth bucket.
+   */
+  kind: WallPostKind
+  /** The headline, separate from `body`. A community Post is a remark and may omit it. */
+  title: string | null
   body: string | null
+  /**
+   * When a promotion or giveaway stops being one. Nothing hides an ended Post —
+   * an expired offer is still a record of what was offered — so a card draws it
+   * as ended rather than dropping it. Null on every other kind: the API refuses
+   * a deadline on a Post nothing happens to.
+   */
+  endsAt: string | null
+  /** When somebody pinned this Post, null when it is not pinned. */
+  pinnedAt: string | null
   attachments: WallPostAttachment[]
   link: WallPostLink | null
   reactions: WallPostReaction[]

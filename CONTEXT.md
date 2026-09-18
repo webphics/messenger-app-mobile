@@ -385,8 +385,25 @@ button says.
 _Avoid_: Comment, thread, Reply (bare — that is a Message quoting another), Message the author
 
 **Offers**:
-In-app promo carousel plus the shared group chat `id: 'offers'`. `"Sponsored"` is a section label only.
+The shared group chat `id: 'offers'`, and the mock promo catalogue an Admin can still add to. No
+longer on the Customer Hub: the carousel that drew it now draws the Wall (**Latest on the Wall**).
 _Avoid_: Stories, ads, sponsored content (as a product feature)
+
+**Analytics & Charts**:
+The Admin Hub's carousel of five cards read from `GET /analytics/overview` — conversations opened
+and messages sent per day over the API's default thirty UTC days, the queue's current mix, opened
+against closed for the range, and every account by role. A tap opens that one chart full-screen,
+where pull-to-refresh re-reads the overview. Staff-only server-side; absent entirely when the read
+failed with nothing already drawn. **Opened and closed are never drawn as one whole** — the API
+permits `closed` to exceed `opened` when a team works down a backlog.
+_Avoid_: Dashboard, metrics, reports, KPIs
+
+**Latest on the Wall**:
+The Customer Hub's carousel of the newest Posts on the reader's own Wall — the Offers carousel's
+strip, reading `GET /wall/posts` instead of the catalogue. A card is a Post's lead image, its body
+and its link label; a tap on any of them opens the Wall tab, since this app has no screen for a
+single Post. Absent entirely when the Wall is empty or could not be read.
+_Avoid_: Feed, highlights (as a product surface), Wall preview
 
 **Launch animation**:
 The looping transparent character animation on the cold-start screen, shown while the session hydrates. Rendered from an animated WebP; the surface behind it is the app background, not part of the asset.

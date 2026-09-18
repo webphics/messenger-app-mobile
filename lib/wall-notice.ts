@@ -46,6 +46,15 @@ export type WallNoticeInput = {
    * (or neither) instead.
    */
   searching?: string
+  /**
+   * The kind the Wall is narrowed to, when it is narrowed at all (#54's kinds).
+   *
+   * Its own branch for the reason `searching` is one: a Wall filtered to
+   * Giveaways with nothing in it has not run out of Posts, it has run out of
+   * *those* Posts, and the default copy's "nobody has posted" would send a
+   * reader looking for a fault that is a filter they set two taps ago.
+   */
+  filteredTo?: string
 }
 
 const COPY = {
@@ -70,7 +79,32 @@ function searchCopy(term: string): typeof COPY {
   }
 }
 
-export function wallNotice({ drawn, loading, failure, named, searching }: WallNoticeInput): WallNotice {
-  const copy = searching !== undefined ? searchCopy(searching) : named ? NAMED_COPY : COPY
+/** Built per filter, since the hint names the kind that is hiding the rest. */
+function filteredCopy(label: string): typeof COPY {
+  return {
+    refusedTitle: 'Could not load the Wall',
+    emptyTitle: `No ${label.toLowerCase()} posts`,
+    emptyHint: `Nothing here is a ${label.toLowerCase()} post yet. Choose All to see everything.`,
+  }
+}
+
+export function wallNotice({
+  drawn,
+  loading,
+  failure,
+  named,
+  searching,
+  filteredTo,
+}: WallNoticeInput): WallNotice {
+  // Search first: a search result is never also filtered — `lib/use-wall` reads
+  // a search through its own path, which passes no kind at all.
+  const copy =
+    searching !== undefined
+      ? searchCopy(searching)
+      : filteredTo !== undefined
+        ? filteredCopy(filteredTo)
+        : named
+          ? NAMED_COPY
+          : COPY
   return readNotice({ drawn, confirmed: drawn, loading, failure }, copy)
 }
