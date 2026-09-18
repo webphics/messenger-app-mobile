@@ -26,7 +26,7 @@ export function conversationTitle(
   conversation: Conversation,
   organizationNames: ReadonlyMap<string, string> = new Map(),
 ): string {
-  if (conversation.type === 'group' || conversation.type === 'community_announcement') {
+  if (conversation.type === 'group' || conversation.type === 'broadcast_inbox') {
     return conversation.title?.trim() || (conversation.type === 'group' ? 'Group' : 'Announcements')
   }
 

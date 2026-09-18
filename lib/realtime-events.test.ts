@@ -239,6 +239,7 @@ describe('parseConversationUpdated', () => {
     expect(parseConversationUpdated(CONVERSATION_UPDATED)).toEqual({
       id: '6f74c64f-445b-40fd-b264-e2adcbd77619',
       organizationId: 'acb16271-ee14-4a52-8952-68113b7a11bc',
+      communityId: null,
       type: 'support_dm',
       lastMessageAt: '2026-09-03T20:22:05.730Z',
       lastMessagePreview: 'fixture probe',

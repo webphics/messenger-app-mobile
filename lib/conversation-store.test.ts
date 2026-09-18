@@ -345,6 +345,9 @@ function conversation(id: string, overrides: Partial<Conversation> = {}): Conver
   return {
     id,
     organizationId: 'org-1',
+    // Supplied by the round trip through `parseConversation`, so a fixture
+    // compared against what came back off the disk has to carry it too.
+    communityId: null,
     type: 'support_dm',
     lastMessageAt: '2026-08-13T08:00:00.000Z',
     lastMessagePreview: 'Hello',

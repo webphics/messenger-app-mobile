@@ -41,12 +41,93 @@ function staffRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * An Announcements thread, exactly as `mapBroadcastInboxConversation` sends it.
+ *
+ * Every field here is the API's, and the type is the one that matters: the wire
+ * type is `broadcast_inbox`. This client used to declare a `community_announcement`
+ * the server has never sent, and because the parser drops a row whose type it
+ * does not recognise, every thread of this shape was discarded on arrival — 16
+ * of one account's 36 conversations. A Broadcast notification then pointed at a
+ * thread the app did not hold.
+ */
+function broadcastInboxRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'conv-3',
+    organizationId: 'org-1',
+    communityId: 'community-1',
+    type: 'broadcast_inbox',
+    title: 'Announcements',
+    lastMessageAt: '2026-08-13T08:30:00.000Z',
+    lastMessagePreview: 'The office is closed on Monday.',
+    lastMessageMine: false,
+    lastMessageReceiptStatus: null,
+    lastMessageRead: false,
+    unreadCount: 1,
+    ...overrides,
+  }
+}
+
+describe('parseConversation, on an Announcements thread', () => {
+  test('reads the row the API sends', () => {
+    expect(parseConversation(broadcastInboxRow())).toEqual({
+      id: 'conv-3',
+      organizationId: 'org-1',
+      communityId: 'community-1',
+      type: 'broadcast_inbox',
+      title: 'Announcements',
+      lastMessageAt: '2026-08-13T08:30:00.000Z',
+      lastMessagePreview: 'The office is closed on Monday.',
+      lastMessageMine: false,
+      lastMessageReceiptStatus: null,
+      lastMessageRead: false,
+      unreadCount: 1,
+    })
+  })
+
+  /**
+   * The personal Announcements thread, which is the one conversation type that
+   * may arrive with no organization: it belongs to a person rather than to an
+   * organization, so that somebody who belongs to none still has somewhere to
+   * receive a Broadcast. Requiring one was the second half of what dropped it.
+   */
+  test('reads one that belongs to a person rather than an organization', () => {
+    const conversation = parseConversation(
+      broadcastInboxRow({ organizationId: null, communityId: null }),
+    )
+
+    expect(conversation).toMatchObject({
+      type: 'broadcast_inbox',
+      organizationId: null,
+      communityId: null,
+    })
+  })
+
+  test('falls back to a name rather than dropping an untitled one', () => {
+    expect(parseConversation(broadcastInboxRow({ title: null }))).toMatchObject({
+      title: 'Announcements',
+    })
+  })
+
+  test('is kept by the list parser rather than filtered out of it', () => {
+    const rows = [customerSupportRow(), broadcastInboxRow()]
+
+    expect(parseConversations(rows).map((row) => row.type)).toEqual([
+      'support_dm',
+      'broadcast_inbox',
+    ])
+  })
+})
+
 describe('parseConversation', () => {
   test('reads a Customer support row', () => {
     const conversation = parseConversation(customerSupportRow())
     expect(conversation).toEqual({
       id: 'conv-1',
       organizationId: 'org-1',
+      // A support thread belongs to no Community, which is said rather than left
+      // out: the field is what the inbox and the Communities tab are split on.
+      communityId: null,
       type: 'support_dm',
       lastMessageAt: '2026-08-13T08:22:00.000Z',
       lastMessagePreview: 'Checking the mail logs now.',

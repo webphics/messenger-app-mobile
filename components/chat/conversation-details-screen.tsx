@@ -90,8 +90,8 @@ export function ConversationDetailsScreen({
   const showLabels = canLabel(conversation, viewerRole)
   const showNotes = canReadNotes(conversation, viewerRole)
   const members = isStaffConversation(conversation) ? conversation.members : []
-  const isGroup =
-    conversation.type === 'group' || conversation.type === 'community_announcement'
+  // A broadcast thread carries no members, so a group is the only many-person shape left.
+  const isGroup = conversation.type === 'group'
 
   /**
    * Leaving with a note half-written.

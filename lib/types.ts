@@ -56,11 +56,26 @@ export type Person = {
  * `lib/attachment-view.ts` turns one into the other.
  */
 
+/**
+ * The four shapes a conversation arrives as, and they are the API's four —
+ * `chatConversationTypes` in `chat.mongo.constants.ts`, which is the list this
+ * has to match exactly.
+ *
+ * `broadcast_inbox` is the read-only Announcements thread. One of them belongs
+ * to the person — where a Broadcast addressed to them lands — and the rest
+ * belong to Communities, which is what `communityId` tells apart.
+ *
+ * It replaces a `community_announcement` that this client invented and the API
+ * has never sent. The cost of that was not cosmetic: `parseConversation` drops
+ * a row whose type it does not recognise, so every Announcements thread there
+ * is — the personal one and every Community's — was discarded on arrival, and a
+ * Broadcast notification pointed at a thread the app did not hold.
+ */
 export type ConversationType =
   | 'support_dm'
   | 'staff_dm'
   | 'group'
-  | 'community_announcement'
+  | 'broadcast_inbox'
 
 /** Assignment state of a Support DM. Null on every other conversation type. */
 export type SupportStatus = 'unassigned' | 'engaged' | 'closed'
@@ -124,6 +139,23 @@ export type ConversationStaffPerson = ConversationPerson & { role: UserRole }
 type ConversationBase = {
   id: string
   organizationId: string
+  /**
+   * The Community this thread belongs to, or null for one that belongs to no
+   * Community.
+   *
+   * What separates a Community's room from an ordinary group chat, which share a
+   * `type` and are not the same thing to a person: a Community's rooms are read
+   * in the Communities tab, and a group three colleagues started is read in the
+   * inbox beside their DMs. `lib/conversation-scope` is where that question is
+   * asked; nothing else should read this field directly.
+   *
+   * Optional for the reason `writePolicy` below is: the fixtures in this
+   * codebase predate it and carry none. A real payload always sends it, and an
+   * absent one reads as "belongs to no Community" — which is the safe way
+   * round, because it leaves a thread in the inbox rather than hiding it inside
+   * a Community nobody can name.
+   */
+  communityId?: string | null
   lastMessageAt: string | null
   lastMessagePreview: string | null
   lastMessageMine: boolean
@@ -172,18 +204,28 @@ export type CustomerGroupConversation = ConversationBase & {
   canWrite: boolean
 }
 
-export type CustomerAnnouncementConversation = ConversationBase & {
-  type: 'community_announcement'
+/**
+ * A read-only Announcements thread: a Community's, or the person's own.
+ *
+ * One shape for every role, unlike every other conversation type — the API maps
+ * it through a single mapper because the thread has one reader and no second
+ * viewer whose copy would differ.
+ *
+ * `organizationId` is the one field that does not come from `ConversationBase`,
+ * because on this type alone it may be null: the personal Announcements thread
+ * belongs to a person rather than to an organization, so that somebody who
+ * belongs to none still has somewhere to receive a Broadcast.
+ */
+export type BroadcastInboxConversation = Omit<ConversationBase, 'organizationId'> & {
+  type: 'broadcast_inbox'
+  organizationId: string | null
   title: string
-  description: string | null
-  avatarUrl: string | null
-  members: ConversationStaffPerson[]
 }
 
 export type CustomerConversation =
   | CustomerSupportConversation
   | CustomerGroupConversation
-  | CustomerAnnouncementConversation
+  | BroadcastInboxConversation
 
 export type Conversation = StaffConversation | CustomerConversation
 

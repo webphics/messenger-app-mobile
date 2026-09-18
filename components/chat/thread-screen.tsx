@@ -403,8 +403,9 @@ export function ThreadScreen({
     onDismissSendError?.()
   }, [onDismissSendError])
 
-  const isGroup =
-    conversation.type === 'group' || conversation.type === 'community_announcement'
+  // What decides whether a bubble names who sent it. An Announcements thread
+  // speaks for the company rather than for a person, so it does not.
+  const isGroup = conversation.type === 'group'
   const rows = useMemo(
     () => buildThreadRows(messages, { viewerId: viewer.id, namesSenders: isGroup }),
     [messages, viewer.id, isGroup],

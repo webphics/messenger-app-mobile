@@ -113,6 +113,42 @@ describe('myCommunities', () => {
   it('has nothing to show nobody', () => {
     expect(myCommunities([community()], null)).toEqual([])
   })
+
+  /**
+   * The case that made this take a third argument, and the one no unit test
+   * would have thought to write: membership and the rooms a person holds are
+   * set separately, so an Admin can be given a Community's Announcements thread
+   * and its Groups without being a member of the Community.
+   *
+   * It cost nothing while Chats showed every conversation — the rooms were
+   * readable there. Once Chats held only what is not a Community's, a Community
+   * narrowed away here took its rooms off both tabs and the threads were
+   * reachable from nowhere at all. Sixteen of one account's thirty-six, found by
+   * opening the screen.
+   */
+  it("keeps a Community holding a room the viewer can open, with no membership", () => {
+    const notAMember = community({ id: 'held', name: 'Held', memberIds: ['someone else'] })
+    const stranger = community({ id: 'stranger', name: 'Stranger', memberIds: ['someone else'] })
+    const room = conversation({ id: 'room-1', communityId: 'held' })
+
+    expect(myCommunities([notAMember, stranger], 'viewer', [room]).map((row) => row.id)).toEqual([
+      'held',
+    ])
+  })
+
+  it('counts a membership and a held room once, not twice', () => {
+    const both = community({ id: 'both', memberIds: ['viewer'] })
+    const room = conversation({ id: 'room-1', communityId: 'both' })
+
+    expect(myCommunities([both], 'viewer', [room]).map((row) => row.id)).toEqual(['both'])
+  })
+
+  it('is not widened by a conversation belonging to no Community', () => {
+    const stranger = community({ id: 'stranger', memberIds: ['someone else'] })
+    const plainChat = conversation({ id: 'chat-1', communityId: null })
+
+    expect(myCommunities([stranger], 'viewer', [plainChat])).toEqual([])
+  })
 })
 
 describe('sortCommunities', () => {

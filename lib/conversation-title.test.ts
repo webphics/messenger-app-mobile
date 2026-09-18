@@ -56,7 +56,7 @@ describe('conversationTitle', () => {
 
   test('an untitled group still has a name to render', () => {
     expect(conversationTitle(staff({ type: 'group', title: null }))).toBe('Group')
-    expect(conversationTitle(staff({ type: 'community_announcement', title: '  ' }))).toBe(
+    expect(conversationTitle(staff({ type: 'broadcast_inbox', title: '  ' }))).toBe(
       'Announcements',
     )
   })

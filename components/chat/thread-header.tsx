@@ -41,7 +41,8 @@ function statusPill(
 }
 
 function memberCount(conversation: Conversation): number | null {
-  if (conversation.type !== "group" && conversation.type !== "community_announcement") {
+  // Only a group names members. An Announcements thread has none to count.
+  if (conversation.type !== "group") {
     return null;
   }
   return conversation.members.length;
