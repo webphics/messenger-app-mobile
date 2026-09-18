@@ -259,7 +259,12 @@ export async function signInWithPassword(
   const outcome = interpretSignIn(
     await apiRequest(SIGN_IN_PATH, {
       method: "POST",
-      body: { email: email.trim(), password },
+      // `identifier`, not `email`: the API takes a username or an email address in
+      // this slot (its ADR 0010) and validates the body with a *strict* object, so
+      // an `email` key is not merely ignored -- it is rejected outright, and the
+      // sign-in answers "Unrecognized key: email" before a password is ever
+      // checked. The field still carries whatever was typed; only the name moved.
+      body: { identifier: email.trim(), password },
     }),
   );
 

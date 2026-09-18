@@ -344,19 +344,19 @@ describe("signInWithPassword", () => {
 
     expect(request).toHaveBeenCalledWith("/auth/login", {
       method: "POST",
-      body: { email: "qa-agent@talo.test", password: "hunter2" },
+      body: { identifier: "qa-agent@talo.test", password: "hunter2" },
     });
     expect(writeCookie).toHaveBeenCalledWith(ISSUED);
     expect(getSessionCookie()).toBe(ISSUED);
     expect(getSessionUser()).toEqual(PARSED_USER);
   });
 
-  test("the password is sent as typed — only the email is trimmed", async () => {
+  test("the password is sent as typed — only the identifier is trimmed", async () => {
     request.mockResolvedValueOnce(ok(USER, ISSUED));
     await signInWithPassword("a@b.co", "  spaces matter  ");
     expect(request).toHaveBeenCalledWith("/auth/login", {
       method: "POST",
-      body: { email: "a@b.co", password: "  spaces matter  " },
+      body: { identifier: "a@b.co", password: "  spaces matter  " },
     });
   });
 
