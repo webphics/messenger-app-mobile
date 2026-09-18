@@ -12,8 +12,8 @@ import type { ChartSlice } from '@/lib/types'
  * lib/tokens.ts, and do not re-point this ramp at colors.amber/colors.danger.
  */
 export const SLICE_COLORS = [
-  colors.primary, // #B83E0B ember
-  colors.success, // #1F9D6C green
+  colors.primary, // JoyChat lavender
+  colors.success, // sage
   '#F2A93B', // gold
   '#3D3129', // graphite
 ] as const

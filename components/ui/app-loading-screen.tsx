@@ -100,7 +100,7 @@ export function AppLoadingScreen({
   return (
     <Animated.View
       accessibilityRole="progressbar"
-      aria-label="Loading Enki…"
+      aria-label="Loading JoyChat…"
       style={[styles.container, { backgroundColor }, animatedStyle]}
     >
       <Image

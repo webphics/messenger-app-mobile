@@ -312,12 +312,12 @@ export function SignInForm() {
         >
           <Image
             source={require("../../assets/images/logo.png")}
-            accessibilityLabel="Enki"
+            accessibilityLabel="JoyChat"
             className="mb-3 h-20 w-28"
             resizeMode="contain"
           />
           <Text variant="display" className="text-center text-ink">
-            Enki
+            JoyChat
           </Text>
           <Text variant="meta" className="mt-1 text-center text-muted">
             Internal Support & Team Collaboration
