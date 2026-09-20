@@ -25,7 +25,9 @@ wherever this summary and they disagree: `docs/api/auth.md`, `docs/api/membershi
 Sign-in now takes a username **or** an email under one `identifier` field — this app already sends
 that and needs nothing. Two new link-shaped ways into the product were added, invitations and
 organization join links, and neither exists on mobile at all. The credential scheme did not change,
-so none of this needs an API change to support a native client. The one thing that will break
+so none of this needs an API change to support a native client. Sign-in on the web is three steps
+with **no new-user branch** — the API refuses to say whether an account exists — and onboarding is a
+post-authentication gate on a blank name, not a step in that form. The one thing that will break
 silently is `MAGIC_LINK_APP_ORIGINS`, which still names the old scheme.
 
 ---
@@ -124,9 +126,88 @@ generates it, copies it, and sends it however they like. There is no email and n
 
 **The asymmetry with invitations is the thing to design around.** An invitation link *creates* the
 account. A join link *requires* one — so on a phone, a signed-out person tapping a join link has to
-sign in or sign up first and have the token survive that trip. See §6.
+sign in or sign up first and have the token survive that trip. See §7.
 
-## 4. The rest of the window, briefly
+## 4. Sign-in is three steps, and onboarding is not one of them
+
+This is the flow to copy, read off `src/features/auth/login/form/login-form.tsx` and `src/proxy.ts`
+rather than inferred.
+
+`type LoginStep = "email" | "password" | "magic-link-sent"` — one form across all three, so the
+identifier typed on step one is the one every later step uses.
+
+| Step | Heading | What is on it |
+| --- | --- | --- |
+| `email` | "Welcome back" | the identifier field, and Google — a `GoogleLogin` button plus One Tap |
+| `password` | "Enter your password" | the password field, and a button that asks for a magic link instead |
+| `magic-link-sent` | "Check your email" | confirmation, resend, and a way back |
+
+Every step after the first shows the identifier as a row that is itself the way back to step one.
+
+### There is no new-user branch, and there cannot be one
+
+**`handleEmailStepSubmit` calls `trigger("email")` and then `setStep("password")`. That is the whole
+of it** — a local validation of one field and a step change. No request is made, and nothing on step
+one knows or asks whether the identifier belongs to an account.
+
+That is not an omission to fix on mobile. The API refuses to answer the question on purpose, in
+three separate places:
+
+- `POST /auth/login` returns one `401 invalid_credentials` for a wrong password, an unknown email
+  and an unknown username alike, and the username branch resolves the account inside the same call
+  that checks the password so the three cost the same work.
+- `POST /auth/magic-link` answers `200 data: true` for a username that matches nothing, reporting a
+  link it never sent, explicitly so the endpoint cannot be probed.
+- The magic-link budget is charged on the identifier **before** the username lookup, so a real
+  username and an unknown one cannot be told apart by which starts answering `429`.
+
+A screen that branched on "is this a new user" would need an existence oracle, and building one
+would hand back the enumeration all three of those exist to deny. **So step one advances to the
+password step for everybody**, and whether the account exists is answered by the password attempt
+or by the link.
+
+### What onboarding actually is
+
+Not a signup screen and not part of the login form. It is a **post-authentication gate in the
+proxy**:
+
+```ts
+function needsOnboarding(user: AuthUser): boolean {
+	return !user.name?.trim();
+}
+```
+
+Any authenticated account whose name is blank is redirected to `/onboarding?redirect=<where they
+were going>` from anywhere, and the redirect is placed *before* the "already signed in, go home"
+rule so a new account landing back on `/login` reaches it in one hop. The two-factor challenge is
+carved out. The gate runs in both directions: once the name is set, `/onboarding` bounces you out,
+so a bookmark cannot re-ask a settled question.
+
+It collects **`name`, required, and `phone`, optional** (`onboarding-schema.ts`). It is reached
+whatever produced the session — Google, magic link, password, invitation redemption — because the
+only thing it tests is the blank name. In practice that is mostly the magic-link signup path, since
+invitation redemption takes a `name` in its body and Google usually supplies one.
+
+The write is `PUT /auth/profile`. Two things about it that will bite:
+
+- **`name` is required on every call. It is a replace, not a patch.**
+- **Omitting `phone` clears it.** The service writes `input.phone ?? null` unconditionally, which is
+  the opposite of how `username` on the same route behaves. Send the current value to keep it.
+
+### So the mobile flow is
+
+1. Screen one: identifier + Google.
+2. Screen two: password, with "email me a link instead".
+3. Screen three: link sent, with resend.
+4. **Then a gate, not a screen in the stack:** on reaching `signed-in`, if `user.name` is blank, go
+   to onboarding before the Hub rather than to `ROLE_HREF[role]`. Same rule on a cold start with a
+   hydrated session, which is what makes it a gate.
+
+`lib/auth-machine.ts` already has the states this needs, and `lib/magic-link-route.ts` already
+routes a signed-in person to `ROLE_HREF[state.user.role]` — that is the one place the gate has to
+sit in front of. There is no onboarding in this app today.
+
+## 5. The rest of the window, briefly
 
 - **`20af591` / `3b43402` — broadcast acknowledgement.** The web dashboard is blocked until required
   broadcasts are acknowledged. This is a gate that sits *after* sign-in, so it shapes what a
@@ -140,7 +221,7 @@ sign in or sign up first and have the token survive that trip. See §6.
 - **`c0b3667` — `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in deploy.** Web plumbing. This app's Google audience
   arrangement is unchanged; see `ADR-0005`.
 
-## 5. What did *not* change, and it matters
+## 6. What did *not* change, and it matters
 
 The credential scheme. `docs/api/auth.md` is explicit: **"A native client needs no API change at
 all."**
@@ -158,7 +239,7 @@ client was built against it once and the approach was dropped.
 
 ---
 
-## 6. Invite app auto-open
+## 7. Invite app auto-open
 
 ### What is actually broken
 
@@ -232,7 +313,7 @@ so doing it once serves all three link shapes.
 
 ---
 
-## 7. Action items
+## 8. Action items
 
 **Do this first — it is a live regression, not a feature.**
 
@@ -253,11 +334,16 @@ so doing it once serves all three link shapes.
 - [ ] `app.json`: `intentFilters` + `associatedDomains`.
 - [ ] `app/invitations/redeem.tsx` and `lib/invite-link-config.ts` with its contract test.
 - [ ] `app/join.tsx` and the held-token-across-sign-in path.
+- [ ] Split sign-in into the three steps §4 describes, with the identifier and Google on the first.
+- [ ] Add the onboarding gate: on reaching `signed-in` with a blank `user.name`, go to onboarding
+      rather than `ROLE_HREF[role]`, on a fresh sign-in and on a hydrated cold start alike. Name
+      required, phone optional, written with `PUT /auth/profile` — and send the current phone back,
+      because omitting it clears it.
 - [ ] Surface `username` on the profile screen, now that the API returns and accepts it.
 - [ ] Answer whether required broadcasts should gate the mobile Hub the way they gate the web
       dashboard.
 
-## 8. Open questions
+## 9. Open questions
 
 - **Does an invitation redeemed on a phone belong to that phone's signed-in person?** No — the API
   is explicit that it attaches to the address the invitation names. The app should probably say so
