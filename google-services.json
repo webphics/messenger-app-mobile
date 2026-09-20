@@ -1,29 +1,29 @@
 {
-  "project_info": {
-    "project_number": "222329918095",
-    "project_id": "enki-24cce",
-    "storage_bucket": "enki-24cce.firebasestorage.app"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:222329918095:android:db245a5ff87c5bb59256fa",
-        "android_client_info": {
-          "package_name": "com.anonymous.enki"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDkd2YAMRUApaEIzsFWlRW3QCl2CH9vs-w"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    }
-  ],
-  "configuration_version": "1"
+	"project_info": {
+		"project_number": "1076858460874",
+		"project_id": "messenger-app-ea336",
+		"storage_bucket": "messenger-app-ea336.firebasestorage.app"
+	},
+	"client": [
+		{
+			"client_info": {
+				"mobilesdk_app_id": "1:1076858460874:android:341cd1e4815aa2cae3f233",
+				"android_client_info": {
+					"package_name": "com.zeestglobal.joychat"
+				}
+			},
+			"oauth_client": [],
+			"api_key": [
+				{
+					"current_key": "AIzaSyA6RpNiYs0mBQbmKZX8-qinwSDCf8BB8B4"
+				}
+			],
+			"services": {
+				"appinvite_service": {
+					"other_platform_oauth_client": []
+				}
+			}
+		}
+	],
+	"configuration_version": "1"
 }

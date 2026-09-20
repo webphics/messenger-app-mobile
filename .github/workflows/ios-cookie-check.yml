@@ -52,7 +52,7 @@ jobs:
       - name: Check the bundle id the flow targets
         run: |
           set -euo pipefail
-          EXPECTED=com.anonymous.enki
+          EXPECTED=com.zeestglobal.joychat
           ACTUAL=$(node -p "require('./app.json').expo.ios.bundleIdentifier")
           if [ "$ACTUAL" != "$EXPECTED" ]; then
             echo "::error::app.json says $ACTUAL but scripts/ios-cookie-check/flow.yaml targets $EXPECTED. Update the flow."

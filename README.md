@@ -119,11 +119,11 @@ selects its without-Firebase path, which writes to `Info.plist` and nothing else
 - **No API change.** The token's audience is still the web client — see ADR-0005.
 
 Two things are worth settling before the client is created, because both are expensive afterwards.
-The bundle identifier is still `com.anonymous.enki`, the `create-expo-app` placeholder; once it exists
-in the Apple Developer portal and an OAuth client, changing it means a new OAuth client, a new
-Firebase Android app, and a new App Store record. And `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` goes into
-`eas.json` only once there is a real value for it — EAS rejects an empty string in an `env` block
-outright, and an absent variable is already what the app reads as “no iOS client”.
+The bundle identifier is `com.zeestglobal.joychat`; once it exists in the Apple Developer portal and
+an OAuth client, changing it means a new OAuth client, a new Firebase Android app, and a new App
+Store record. And `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` goes into `eas.json` only once there is a real
+value for it — EAS rejects an empty string in an `env` block outright, and an absent variable is
+already what the app reads as “no iOS client”.
 
 ## Push notifications
 

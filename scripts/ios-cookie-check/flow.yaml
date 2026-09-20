@@ -5,7 +5,7 @@
 #
 # Selectors are the sign-in screen's own copy from components/auth/auth-form.tsx.
 # If that copy changes, this flow needs updating with it.
-appId: com.anonymous.enki
+appId: com.zeestglobal.joychat
 ---
 - launchApp:
     clearState: true
