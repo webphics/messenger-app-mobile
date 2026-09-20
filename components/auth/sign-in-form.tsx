@@ -147,6 +147,19 @@ export function SignInForm() {
   const [identifierFieldError, setIdentifierFieldError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [linkRequest, setLinkRequest] = useState<LinkRequest>(NO_LINK_REQUEST);
+  /**
+   * Whether the machine's standing notice still describes what is on screen.
+   *
+   * The machine clears its notice when a new attempt starts, which covers the
+   * case of pressing the same button twice. It cannot cover the case of
+   * *leaving*: a refusal for one identifier stayed on screen through a step
+   * back and a different identifier being typed, still saying the password was
+   * wrong for an account nobody had tried. The same reasoning `linkRequest`
+   * already applies to its own failure — a message must not outlive the attempt
+   * it described — and there is no event that would clear a notice the machine
+   * owns, so it is suppressed here rather than cleared there.
+   */
+  const [noticeStale, setNoticeStale] = useState(false);
   const sendingLink = linkRequest.sending;
   /**
    * Whether anything at all is out — the one guard every control on this screen
@@ -170,7 +183,7 @@ export function SignInForm() {
   const notice =
     linkRequest.failure !== null
       ? linkRequest.failure
-      : state.status === "signed-out"
+      : state.status === "signed-out" && !noticeStale
         ? state.notice
         : null;
 
@@ -201,6 +214,7 @@ export function SignInForm() {
     if (target === null || anyRequestOut) return;
 
     setStep(target);
+    setNoticeStale(true);
     // Only the failure. A standing confirmation is not cleared: a link did go to
     // that identifier, and still has.
     setLinkRequest((prev) => ({ ...prev, failure: null }));
@@ -246,6 +260,7 @@ export function SignInForm() {
       return;
     }
 
+    setNoticeStale(false);
     setPending("password");
     try {
       await signIn(normaliseIdentifier(identifier), password);
@@ -278,6 +293,7 @@ export function SignInForm() {
 
     const sending = normaliseIdentifier(identifier);
     setIdentifierFieldError(null);
+    setNoticeStale(false);
     // The standing confirmation is kept, not cleared: while a second link is on
     // its way the first one is still the true answer to "where did it go".
     setLinkRequest((prev) => ({ ...prev, sending: true, failure: null }));
@@ -304,6 +320,7 @@ export function SignInForm() {
   async function onGoogleSignIn() {
     if (anyRequestOut) return;
 
+    setNoticeStale(false);
     setPending("google");
     try {
       // Cleared afterwards rather than before, and only when there was an
@@ -448,6 +465,7 @@ export function SignInForm() {
                 onChangeText={(v) => {
                   setIdentifier(v);
                   setIdentifierFieldError(null);
+                  setNoticeStale(true);
                   // A confirmation names an identifier. The moment that stops
                   // being the one in the field, it is describing somewhere else.
                   setLinkRequest(NO_LINK_REQUEST);

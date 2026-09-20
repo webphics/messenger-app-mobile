@@ -347,7 +347,13 @@ export async function requestMagicLink(
     await apiRequest(MAGIC_LINK_REQUEST_PATH, {
       method: "POST",
       body: {
-        email: email.trim(),
+        // `identifier`, not `email`, for the reason `signInWithPassword` sends
+        // one: `/auth/magic-link` renamed the slot and its body is a
+        // `z.strictObject`, so the old key fails twice — the missing
+        // `identifier` and the unrecognised `email` — as a 422 before a link is
+        // ever generated. The rename landed on both routes; only the password
+        // one was followed, so every link request from this client was refused.
+        identifier: email.trim(),
         ...(person ? { name: person } : {}),
         url: MAGIC_LINK_ORIGIN,
       },
