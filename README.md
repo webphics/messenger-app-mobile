@@ -44,7 +44,7 @@ the app — still runs in Expo&nbsp;Go exactly as it did.
 | --- | --- | --- |
 | Password sign-in | yes | yes |
 | Requesting a magic link | yes | yes |
-| Opening a magic link (`enki://`) | no | yes |
+| Opening a magic link (`joychat://`) | no | yes |
 | Google sign-in | **no** | yes |
 | Push notifications | **no** | yes |
 | Everything after sign-in | yes | yes |
@@ -158,7 +158,7 @@ rather than the browser subscription route beside it.
 | | Where it runs | Output | Signing |
 | --- | --- | --- | --- |
 | Android | EAS Build (Expo's servers) | APK, from the EAS install page linked in the run summary | EAS-managed release keystore |
-| iOS | `macos-latest` runner | `enki-unsigned.ipa`, attached to the run as an artifact | **Unsigned** |
+| iOS | `macos-latest` runner | `joychat-unsigned.ipa`, attached to the run as an artifact | **Unsigned** |
 
 The iOS IPA will not install via TestFlight or the App Store. Sideload it with AltStore or Sideloadly; on a free Apple ID the signature expires after 7 days. A signed build needs a paid Apple Developer account, at which point iOS should move to EAS too.
 
