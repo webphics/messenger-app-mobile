@@ -28,13 +28,30 @@ import type { SessionUser } from "@/lib/types";
 export const ONBOARDING_HREF = "/(auth)/onboarding" as Href;
 
 /**
- * Written the way the web writes it, optional chaining included, because the
- * payload's `name` is typed as a string here and the API may still answer null
- * for an account created by a link that carried no name — which is the exact
- * account this gate exists for.
+ * Whether the server has a name for this person.
+ *
+ * Two tests rather than one, and the second is the load-bearing half.
+ * `parseSessionUser` does not hand on a blank name: it substitutes the address
+ * (`nonEmptyString(record.name) ?? email`) so every display site has something
+ * to draw. That substitution is deliberate and stays — the Hub greeting reads
+ * this field — but it means a blank name never survives the parse, so a gate
+ * testing only for blank can never fire. It did not: an account the API had
+ * just created with `name: ''` walked straight into the Hub, greeted by its own
+ * address.
+ *
+ * So this is the inverse of that substitution rather than a guess about it. The
+ * one person it catches who does have a name is somebody whose name *is* their
+ * address, and asking them for a better one is the right outcome anyway.
+ *
+ * The lesson is in `onboarding-gate.test.ts`: the tests that passed while this
+ * was broken built a `SessionUser` by hand. The ones that matter go through the
+ * parser, because that is where the substitution lives.
  */
 export function needsOnboarding(user: SessionUser): boolean {
-  return !user.name?.trim();
+  const name = user.name?.trim();
+  if (!name) return true;
+
+  return name.toLowerCase() === user.email.trim().toLowerCase();
 }
 
 /**
