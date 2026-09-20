@@ -30,23 +30,23 @@ export const KEPT_PERSON_KEY = "joychat.session_user";
 /**
  * Keys nothing reads any more, cleared off any install that still holds one.
  *
- * `enki.session_token` is the credential the previous slice of Phase 3a stored,
- * which cannot authenticate anything now. The other two are the same two keys
- * above under the product's former name: the rebrand moved them, and an install
- * upgraded across it would otherwise keep a signed-in person's cookie in the
- * keystore forever with nothing left in the app that would ever read it.
+ * Empty, and that is the end state rather than a gap. This list held the
+ * previous brand's three keys so that an install upgrading across the rename
+ * would not keep a signed-in person's cookie in the keystore forever with
+ * nothing left in the app that would ever read it.
  *
- * Retiring rather than migrating is deliberate. Reading the old cookie into the
- * new key would carry a session across a change of application id, and on
- * Android that is a different app with a different keystore anyway — so the
- * honest outcome of the rename is one sign-in, not a session smuggled through
- * it.
+ * The application id moved with the rename — a different Android package and a
+ * different iOS bundle identifier — and a keystore belongs to an application
+ * id. So there is no install that holds both the old keys and this code: the
+ * old app's keystore is another app's keystore, unreachable from here, and it
+ * goes when that app is uninstalled. Naming those keys here cleared nothing and
+ * only kept the retired name alive in the source.
+ *
+ * It stays as a list rather than being deleted outright because the next rename
+ * that does *not* move the application id will need exactly this, and the loop
+ * below is already written for it.
  */
-const RETIRED_CREDENTIAL_KEYS = [
-  "enki.session_token",
-  "enki.session_cookie",
-  "enki.session_user",
-];
+const RETIRED_CREDENTIAL_KEYS: string[] = [];
 
 /** The stored Session cookie, or null when there is none and when the keystore cannot say. */
 export async function readSessionCookie(): Promise<string | null> {

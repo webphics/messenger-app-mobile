@@ -96,10 +96,14 @@ describe("clearSessionCookie", () => {
 });
 
 describe("clearRetiredCredential", () => {
-  test("removes what the previous slice left behind, under its own key", async () => {
+  test("asks the keystore for nothing while the retired list is empty", async () => {
+    // The list emptied when the application id moved with the rename: a
+    // keystore belongs to an application id, so the previous brand's keys are
+    // another app's keys and unreachable from here. Nothing to clear is the
+    // correct behaviour, not a missing case.
     store.deleteItemAsync.mockResolvedValueOnce(undefined);
     await clearRetiredCredential();
-    expect(store.deleteItemAsync).toHaveBeenCalledWith("enki.session_token");
+    expect(store.deleteItemAsync).not.toHaveBeenCalled();
   });
 
   test("leaves the live credential alone", async () => {
@@ -212,12 +216,12 @@ describe("round trip", () => {
       delete disk[key];
     });
 
-    disk["enki.session_token"] = "left over";
     await writeSessionCookie(COOKIE);
 
     await clearRetiredCredential();
 
-    expect(disk["enki.session_token"]).toBeUndefined();
+    // The point of this test is the live credential, and it survives whether
+    // the retired list has entries or none.
     await expect(readSessionCookie()).resolves.toBe(COOKIE);
   });
 });
