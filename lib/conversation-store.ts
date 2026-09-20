@@ -103,7 +103,7 @@ import type { Community, CommunityFeedRow, Conversation, Message } from '@/lib/t
  * tab that was open comes back open with no write of its own.
  */
 
-const DATABASE_NAME = 'enki-store.db'
+const DATABASE_NAME = 'joychat-store.db'
 
 /**
  * Created only on a database this build has just made. A database whose version

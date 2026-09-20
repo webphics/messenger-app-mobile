@@ -15,7 +15,7 @@ import type { SessionUser } from "@/lib/types";
  */
 
 /** Namespaced so it cannot collide with anything a later feature stores. */
-export const SESSION_COOKIE_KEY = "enki.session_cookie";
+export const SESSION_COOKIE_KEY = "joychat.session_cookie";
 
 /**
  * The Kept person: who the cookie above belongs to, as this device last heard it.
@@ -25,16 +25,28 @@ export const SESSION_COOKIE_KEY = "enki.session_cookie";
  * with the cookie, in the same keystore, and `forgetCredential` takes both. See
  * `docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`.
  */
-export const KEPT_PERSON_KEY = "enki.session_user";
+export const KEPT_PERSON_KEY = "joychat.session_user";
 
 /**
- * The key the previous slice of Phase 3a stored its credential under.
+ * Keys nothing reads any more, cleared off any install that still holds one.
  *
- * What is in it cannot authenticate anything any more. An install upgraded from
- * that slice would otherwise keep it in the keystore indefinitely, with nothing
- * left in the app that would ever read or remove it.
+ * `enki.session_token` is the credential the previous slice of Phase 3a stored,
+ * which cannot authenticate anything now. The other two are the same two keys
+ * above under the product's former name: the rebrand moved them, and an install
+ * upgraded across it would otherwise keep a signed-in person's cookie in the
+ * keystore forever with nothing left in the app that would ever read it.
+ *
+ * Retiring rather than migrating is deliberate. Reading the old cookie into the
+ * new key would carry a session across a change of application id, and on
+ * Android that is a different app with a different keystore anyway — so the
+ * honest outcome of the rename is one sign-in, not a session smuggled through
+ * it.
  */
-const RETIRED_CREDENTIAL_KEY = "enki.session_token";
+const RETIRED_CREDENTIAL_KEYS = [
+  "enki.session_token",
+  "enki.session_cookie",
+  "enki.session_user",
+];
 
 /** The stored Session cookie, or null when there is none and when the keystore cannot say. */
 export async function readSessionCookie(): Promise<string | null> {
@@ -75,10 +87,13 @@ export async function clearSessionCookie(): Promise<boolean> {
  * exactly where it already was — not worth a boolean anyone would act on.
  */
 export async function clearRetiredCredential(): Promise<void> {
-  try {
-    await SecureStore.deleteItemAsync(RETIRED_CREDENTIAL_KEY);
-  } catch {
-    // See above: nothing here is recoverable and nothing downstream reads it.
+  for (const key of RETIRED_CREDENTIAL_KEYS) {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch {
+      // See above: nothing here is recoverable and nothing downstream reads it.
+      // Per key, so one refusal does not skip the rest.
+    }
   }
 }
 
