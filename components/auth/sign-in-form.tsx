@@ -29,17 +29,28 @@ import { hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { magicLinkRequestNotice } from "@/lib/magic-link-route";
 import { settleDownEnter, settleEnter } from "@/lib/motion-enter";
+import { type AccountState, fetchAccountState } from "@/lib/account-state";
+import {
+  cacheAccountState,
+  type CachedAccountState,
+  readCachedAccountState,
+} from "@/lib/account-state-cache";
+import { OFFLINE_NOTICE } from "@/lib/auth-machine";
 import { signedInDestination } from "@/lib/onboarding-gate";
 import {
   identifierError,
   normaliseIdentifier,
 } from "@/lib/sign-in-identifier";
 import {
+  CREDENTIALS_COPY,
+  type CredentialsMode,
   FIRST_STEP,
   STEP_COPY,
   type SignInStep,
+  credentialsMode,
   previousStep,
   showsIdentifierRow,
+  showsPasswordField,
 } from "@/lib/sign-in-steps";
 import type { SeedAccount } from "@/lib/seed-accounts";
 import { colors, screenTopPad } from "@/lib/tokens";
@@ -48,10 +59,16 @@ import { colors, screenTopPad } from "@/lib/tokens";
  * The only way into the app, in the three steps the web client asks in
  * (`login-form.tsx`, `type LoginStep`).
  *
- * The identifier is asked for alone, and what follows it is a password or a
- * link — not a branch on who this is. Step one makes no request, because the
- * API refuses to say whether an account exists and a screen that asked would
- * need the oracle three separate defences exist to deny. See `lib/sign-in-steps`.
+ * The identifier is asked for alone, and what follows it is whatever that
+ * identifier actually needs: a password for an account that has one, the link
+ * for an account that does not and for an address nobody holds yet.
+ *
+ * Step one asks the API which of those it is (`POST /auth/account-state`), and
+ * it did not used to — this screen was written when the API refused to say
+ * whether an account existed. `lib/account-state` records why that changed:
+ * drawing the controls is itself the disclosure, so the choice was between
+ * telling for free and telling under a budget. A failed probe stays on step one
+ * rather than guessing which screen to draw.
  *
  * There was a second screen beside this one — a registration form — and it
  * posted nowhere, because the API has no self-registration endpoint. An account
@@ -160,6 +177,17 @@ export function SignInForm() {
    * owns, so it is suppressed here rather than cleared there.
    */
   const [noticeStale, setNoticeStale] = useState(false);
+  /** What step two is about, once the probe has said. Null until it has. */
+  const [credentials, setCredentials] = useState<CredentialsMode | null>(null);
+  /** The one answer this screen holds, so going back and returning is free. */
+  const [accountCache, setAccountCache] = useState<CachedAccountState | null>(null);
+  const [probing, setProbing] = useState(false);
+  /**
+   * Why the probe could not answer. Its own field rather than the machine's
+   * notice: nobody was signed in or refused by it, and it describes the control
+   * that was pressed last.
+   */
+  const [probeFailure, setProbeFailure] = useState<string | null>(null);
   const sendingLink = linkRequest.sending;
   /**
    * Whether anything at all is out — the one guard every control on this screen
@@ -171,7 +199,7 @@ export function SignInForm() {
    * confirmation on a screen nobody is looking at. And a control that accepts a
    * press it will drop is worse than one that says it is busy.
    */
-  const anyRequestOut = busy || sendingLink;
+  const anyRequestOut = busy || sendingLink || probing;
   const identifierRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   /**
@@ -181,11 +209,13 @@ export function SignInForm() {
    * newer answer, and it describes the control that was pressed last.
    */
   const notice =
-    linkRequest.failure !== null
-      ? linkRequest.failure
-      : state.status === "signed-out" && !noticeStale
-        ? state.notice
-        : null;
+    probeFailure !== null
+      ? probeFailure
+      : linkRequest.failure !== null
+        ? linkRequest.failure
+        : state.status === "signed-out" && !noticeStale
+          ? state.notice
+          : null;
 
   // Navigating from the state rather than from the submit handler's return value
   // is what makes the destination the role the *server* assigned. Nothing on this
@@ -222,13 +252,18 @@ export function SignInForm() {
   }
 
   /**
-   * Step one: validate the identifier and advance. Deliberately nothing else.
+   * Step one: validate the identifier, then ask what it needs.
    *
-   * No request is made here and none may be. Whether this identifier belongs to
-   * anybody is answered by the password attempt or by the link, never by this
-   * screen — see `lib/sign-in-steps`.
+   * It used to advance on the validation alone, because the API refused to say
+   * whether an account existed. `POST /auth/account-state` now answers that
+   * deliberately — see `lib/account-state` for why the API conceded it — so
+   * step two can draw a password field only for an account that has one.
+   *
+   * A cached answer is used rather than asked for again, which is what makes
+   * fixing a typo and coming back free against a budget the API keeps per
+   * identifier.
    */
-  function onIdentifierSubmit() {
+  async function onIdentifierSubmit() {
     if (anyRequestOut) return;
 
     const next = identifierError(identifier);
@@ -239,8 +274,48 @@ export function SignInForm() {
       return;
     }
 
-    setStep("password");
-    focusAfterPaint(passwordRef);
+    setNoticeStale(false);
+    setProbeFailure(null);
+
+    const sending = normaliseIdentifier(identifier);
+    const known = readCachedAccountState(accountCache, sending, Date.now());
+    if (known) {
+      enterCredentials(known);
+      return;
+    }
+
+    setProbing(true);
+    try {
+      const result = await fetchAccountState(sending);
+      if (!result.ok) {
+        // Stay where we are. Advancing on a failed probe means picking one of
+        // the two step-two screens without knowing which is right, and picking
+        // the link-only one would hide the password field from somebody who has
+        // a password and blame their account for it.
+        hapticWarning();
+        setProbeFailure(
+          result.failure.kind === "refused"
+            ? result.failure.message
+            : result.failure.kind === "unreachable"
+              ? OFFLINE_NOTICE
+              : "The server sent something this app could not read.",
+        );
+        return;
+      }
+
+      setAccountCache(cacheAccountState(sending, result.value, Date.now()));
+      enterCredentials(result.value);
+    } finally {
+      setProbing(false);
+    }
+  }
+
+  /** Move to step two knowing what it has to draw, and open on the right field. */
+  function enterCredentials(state: AccountState) {
+    const mode = credentialsMode(state);
+    setCredentials(mode);
+    setStep("credentials");
+    if (showsPasswordField(mode)) focusAfterPaint(passwordRef);
   }
 
   async function onSubmit() {
@@ -352,10 +427,16 @@ export function SignInForm() {
     setPasswordError(null);
     // A confirmation names an identifier, and this one has just changed.
     setLinkRequest(NO_LINK_REQUEST);
-    setStep("password");
+    setProbeFailure(null);
+    // A seed account has a password by construction — that is what the picker
+    // filled in — so step two is asked for it without spending a probe.
+    enterCredentials({ exists: true, hasPassword: true });
   }
 
-  const heading = STEP_COPY[step];
+  const heading =
+    step === "credentials"
+      ? CREDENTIALS_COPY[credentials ?? "password"]
+      : STEP_COPY[step];
 
   return (
     // Shrinking the scroll viewport is what keeps a focused field above the
@@ -460,12 +541,13 @@ export function SignInForm() {
                 textContentType="username"
                 returnKeyType="next"
                 submitBehavior="submit"
-                onSubmitEditing={onIdentifierSubmit}
+                onSubmitEditing={() => void onIdentifierSubmit()}
                 value={identifier}
                 onChangeText={(v) => {
                   setIdentifier(v);
                   setIdentifierFieldError(null);
                   setNoticeStale(true);
+                  setProbeFailure(null);
                   // A confirmation names an identifier. The moment that stops
                   // being the one in the field, it is describing somewhere else.
                   setLinkRequest(NO_LINK_REQUEST);
@@ -475,7 +557,7 @@ export function SignInForm() {
             </View>
           ) : null}
 
-          {step === "password" ? (
+          {step === "credentials" && showsPasswordField(credentials ?? "password") ? (
             <View className="mt-4">
               <Text variant="label" className="mb-1.5 text-ink">
                 Password
@@ -575,7 +657,7 @@ export function SignInForm() {
           {step === "identifier" ? (
             <Button
               className="mt-6 min-h-12 w-full"
-              onPress={onIdentifierSubmit}
+              onPress={() => void onIdentifierSubmit()}
               disabled={anyRequestOut}
               accessibilityState={{ disabled: anyRequestOut }}
             >
@@ -583,7 +665,7 @@ export function SignInForm() {
             </Button>
           ) : null}
 
-          {step === "password" ? (
+          {step === "credentials" && showsPasswordField(credentials ?? "password") ? (
             <Button
               className="mt-6 min-h-12 w-full"
               onPress={() => void onSubmit()}

@@ -4,10 +4,9 @@ import {
   type SignInStep,
   previousStep,
   showsIdentifierRow,
-  stepMayAsk,
 } from "@/lib/sign-in-steps";
 
-const ALL_STEPS: SignInStep[] = ["identifier", "password", "link-sent"];
+const ALL_STEPS: SignInStep[] = ["identifier", "credentials", "link-sent"];
 
 describe("where sign-in starts", () => {
   test("the identifier, alone", () => {
@@ -22,29 +21,15 @@ describe("where sign-in starts", () => {
   });
 });
 
-describe("step one cannot ask the API anything", () => {
-  // The rule the whole flow rests on. The API refuses to say whether an account
-  // exists, so a step that branched on it would need an oracle three separate
-  // defences exist to deny.
-  test("the identifier step may not", () => {
-    expect(stepMayAsk("identifier")).toBe(false);
-  });
-
-  test("every later step may", () => {
-    expect(stepMayAsk("password")).toBe(true);
-    expect(stepMayAsk("link-sent")).toBe(true);
-  });
-});
-
 describe("getting back", () => {
-  test("the password step returns to the identifier", () => {
-    expect(previousStep("password")).toBe("identifier");
+  test("the credentials step returns to the identifier", () => {
+    expect(previousStep("credentials")).toBe("identifier");
   });
 
-  test("a sent link returns to the password, not to the identifier", () => {
+  test("a sent link returns to the credentials step, not to the identifier", () => {
     // The address is not what somebody is reconsidering when they have just
     // been told a link went to it.
-    expect(previousStep("link-sent")).toBe("password");
+    expect(previousStep("link-sent")).toBe("credentials");
   });
 
   test("every step reaches the first one by walking back", () => {
@@ -66,14 +51,17 @@ describe("the identifier stays visible once it stops being asked for", () => {
   });
 
   test("on every step that does not", () => {
-    expect(showsIdentifierRow("password")).toBe(true);
+    expect(showsIdentifierRow("credentials")).toBe(true);
     expect(showsIdentifierRow("link-sent")).toBe(true);
   });
 });
 
 describe("copy", () => {
-  test("every step has a heading and a description", () => {
-    for (const step of ALL_STEPS) {
+  // The credentials step is deliberately absent here: what it says depends on
+  // what the probe found, so its three wordings live in `CREDENTIALS_COPY` and
+  // are covered in `sign-in-steps-credentials.test.ts`.
+  test("the two fixed steps have a heading and a description", () => {
+    for (const step of ["identifier", "link-sent"] as const) {
       expect(STEP_COPY[step].title).not.toBe("");
       expect(STEP_COPY[step].description).not.toBe("");
     }
