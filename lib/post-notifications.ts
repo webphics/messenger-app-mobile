@@ -87,6 +87,6 @@ export function postNotificationCaveat(standing: PermissionStanding): string | n
   return shouldOfferSystemSettings(standing)
     ? 'A Post will not reach this phone while notifications are off. ' +
         'A switch you turn on is still kept, and it takes effect as soon as they are on.'
-    : 'Notifications are not on for Enki yet, so a Post will not reach this phone. ' +
+    : 'Notifications are not on for JoyChat yet, so a Post will not reach this phone. ' +
         'A switch you turn on is still kept, and it takes effect as soon as they are on.'
 }

@@ -111,7 +111,7 @@ describe('the iOS flag', () => {
 
   it('runs the flag before the delegate hands back', () => {
     const patched = excludeStoreInAppDelegate(APP_DELEGATE)
-    expect(patched.indexOf('enkiExcludeStoreFromBackup()')).toBeLessThan(
+    expect(patched.indexOf('joychatExcludeStoreFromBackup()')).toBeLessThan(
       patched.indexOf('return super.application(application, didFinishLaunchingWithOptions'),
     )
   })

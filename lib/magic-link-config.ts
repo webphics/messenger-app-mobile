@@ -37,7 +37,7 @@ export const MAGIC_LINK_TOKEN_PARAM = "token";
 
 /**
  * An origin has to carry a scheme and the `//` that starts an authority, and
- * nothing more: `enki://` is as valid a target as `https://app.example.com`, and
+ * nothing more: `joychat://` is as valid a target as `https://app.example.com`, and
  * insisting on a host would rule out the custom scheme this ships with. What it
  * must not be is a bare host or a path — those produce a link no OS will route.
  */
@@ -46,7 +46,7 @@ const ORIGIN = /^[a-z][a-z0-9+.-]*:\/\/[^\s?#]*$/i;
 /**
  * Trailing slashes are stripped the way the API strips them, rather than merely
  * tidily, so `magicLinkUrl` below predicts the link that is actually sent. It is
- * why `enki://` normalises to `enki:` and the link reads `enki:/auth/magic-link`
+ * why `joychat://` normalises to `joychat:` and the link reads `joychat:/auth/magic-link`
  * — one slash, an empty authority, which every deep-link parser in the path
  * treats as the same route as two.
  */

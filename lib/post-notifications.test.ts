@@ -92,7 +92,7 @@ describe('postNotificationCaveat', () => {
       canAskAgain: true,
       askedBefore: false,
     })
-    expect(caveat).toMatch(/not on for Enki yet/i)
+    expect(caveat).toMatch(/not on for JoyChat yet/i)
     expect(caveat).toMatch(/will not reach this phone/i)
     expect(caveat).toMatch(/still kept/i)
   })

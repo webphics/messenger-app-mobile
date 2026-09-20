@@ -1,10 +1,10 @@
-# Enki (Expo mobile)
+# JoyChat (Expo mobile)
 
 Internal support messenger mobile client. This repo is Expo-only; web and API live elsewhere.
 
 ## Language
 
-**Enki**:
+**JoyChat**:
 The product brand shown on launcher, auth, and hub wordmarks.
 _Avoid_: Messenger (as product name), Casewire, ISM
 

@@ -4,7 +4,7 @@
 >
 > **REQUIRED SUB-SKILL (UI tasks):** Before editing any UI file in Tasks 2, 4, 6, or 7, load `reference/craft-floor.md` from the `impeccable` skill.
 
-**Goal:** Replace Enki Blue with an ember palette derived from the logo, stop Android 15+ painting black strips behind the system bars, give the Contact role the floating tab capsule, and strip text labels from that capsule across all three roles.
+**Goal:** Replace JoyChat Blue with an ember palette derived from the logo, stop Android 15+ painting black strips behind the system bars, give the Contact role the floating tab capsule, and strip text labels from that capsule across all three roles.
 
 **Architecture:** Colour lives in two hand-synced places (`global.css` `@theme` for Tailwind/uniwind classes, `lib/tokens.ts` for native header/tab props that cannot take a `className`). Task 1 adds a test that pins those two together so the swap in Task 2 cannot half-land. The system-bar fix paints `window.decorView` — the surface exposed by the existing native inset padding — rather than the `statusBarColor`/`navigationBarColor` setters, which are no-ops on API 35+. Contact converts from a flat `Stack` to `Tabs` + a nested `(home)` `Stack`, mirroring the existing `(agent)` structure exactly, so no route URL changes.
 
@@ -18,7 +18,7 @@
 
 | Decision | Value |
 |---|---|
-| Primary | `#B83E0B` (Enki Ember) — 5.63:1 on white, 4.86:1 on ember-mist |
+| Primary | `#B83E0B` (JoyChat Ember) — 5.63:1 on white, 4.86:1 on ember-mist |
 | Primary soft | `#FEEBDC` (Ember Mist), replacing Beacon Mist `#E8EDFB` |
 | Danger | `#B3261E`, was `#D64545` |
 | Amber | `#A16207`, was `#E2831C` |
@@ -363,7 +363,7 @@ Expected: PASS, including the new danger floor and every parity case.
 
 ```bash
 git add global.css lib/tokens.ts lib/tokens.test.ts
-git commit -m "feat(theme): replace Enki Blue with Enki Ember
+git commit -m "feat(theme): replace JoyChat Blue with JoyChat Ember
 
 primary #3452D9 -> #B83E0B (5.63:1 on white, 4.86:1 on ember-mist, matching
 the old blue's contrast profile). primary-soft, danger, amber retuned; grey
@@ -374,17 +374,17 @@ neutrals warmed off their blue tint. Dark tokens updated but still unshipped."
 
 ### Task 3: Update the design-system records
 
-`DESIGN.md` is the human-readable source of visual truth and `.impeccable/design.json` is its generated sidecar; both still name `enki-blue`. Leaving them is worse than not having them.
+`DESIGN.md` is the human-readable source of visual truth and `.impeccable/design.json` is its generated sidecar; both still name `joychat-blue`. Leaving them is worse than not having them.
 
 **Files:**
-- Modify: `DESIGN.md` (front-matter `colors:`, plus every `{colors.enki-blue}` / `{colors.beacon-mist}` reference in `components:`)
+- Modify: `DESIGN.md` (front-matter `colors:`, plus every `{colors.joychat-blue}` / `{colors.beacon-mist}` reference in `components:`)
 - Modify: `.impeccable/design.json` (`extensions.colorMeta`)
 
 - [ ] **Step 1: Rewrite the `colors:` map in `DESIGN.md` front-matter**
 
 ```yaml
 colors:
-  enki-ember: "#B83E0B"
+  joychat-ember: "#B83E0B"
   ember-mist: "#FEEBDC"
   graphite: "#1A1714"
   ink-soft: "#453F39"
@@ -406,20 +406,20 @@ Also update the `description:` line from `Clear Desk chrome with Beacon accents`
 Run these two replacements across the whole file:
 
 ```bash
-sed -i 's/{colors\.enki-blue}/{colors.enki-ember}/g; s/{colors\.beacon-mist}/{colors.ember-mist}/g' DESIGN.md
-grep -n "enki-blue\|beacon-mist" DESIGN.md
+sed -i 's/{colors\.joychat-blue}/{colors.joychat-ember}/g; s/{colors\.beacon-mist}/{colors.ember-mist}/g' DESIGN.md
+grep -n "joychat-blue\|beacon-mist" DESIGN.md
 ```
 
 Expected: the `grep` prints nothing.
 
 - [ ] **Step 3: Update the `colorMeta` sidecar**
 
-In `.impeccable/design.json`, rename the `enki-blue` key to `enki-ember` and `beacon-mist` to `ember-mist`, and replace their `displayName`, `canonical`, and `tonalRamp`:
+In `.impeccable/design.json`, rename the `joychat-blue` key to `joychat-ember` and `beacon-mist` to `ember-mist`, and replace their `displayName`, `canonical`, and `tonalRamp`:
 
 ```json
-"enki-ember": {
+"joychat-ember": {
   "role": "primary",
-  "displayName": "Enki Ember",
+  "displayName": "JoyChat Ember",
   "canonical": "#B83E0B",
   "tonalRamp": [
     "#3A1303", "#571C05", "#7A2807", "#99330B",
@@ -448,7 +448,7 @@ Expected: `ok`
 
 ```bash
 git add DESIGN.md .impeccable/design.json
-git commit -m "docs(design): rename Enki Blue to Enki Ember across the design system"
+git commit -m "docs(design): rename JoyChat Blue to JoyChat Ember across the design system"
 ```
 
 ---
@@ -1045,7 +1045,7 @@ Install it on the device, then **put the phone's system theme into dark mode** (
 adb exec-out screencap -p > .tmp-shots/release-dark-mode.png
 ```
 
-Read it. Expected: the strip behind the status bar and the strip behind the gesture pill are **white**, matching the hub background, with dark status icons and a dark gesture pill. If either strip is still black, the decor-view paint is not landing — check that the APK was rebuilt after Task 5 (`grep -n "decorView.setBackgroundColor" android/app/src/main/java/com/anonymous/enki/MainActivity.kt` must hit; if it does not, the plugin did not re-run, so `pnpm exec expo prebuild --clean -p android` and rebuild).
+Read it. Expected: the strip behind the status bar and the strip behind the gesture pill are **white**, matching the hub background, with dark status icons and a dark gesture pill. If either strip is still black, the decor-view paint is not landing — check that the APK was rebuilt after Task 5 (`grep -n "decorView.setBackgroundColor" android/app/src/main/java/com/anonymous/joychat/MainActivity.kt` must hit; if it does not, the plugin did not re-run, so `pnpm exec expo prebuild --clean -p android` and rebuild).
 
 Restore the phone: `adb shell cmd uimode night no`.
 

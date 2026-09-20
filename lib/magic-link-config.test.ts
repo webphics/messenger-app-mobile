@@ -10,19 +10,19 @@ import {
 
 describe("reading the configured origin", () => {
   test("an HTTPS origin is taken as it stands", () => {
-    expect(readMagicLinkOrigin("https://app.example.com", "enki")).toBe(
+    expect(readMagicLinkOrigin("https://app.example.com", "joychat")).toBe(
       "https://app.example.com",
     );
   });
 
   test("a trailing slash is stripped the way the API strips it", () => {
-    expect(readMagicLinkOrigin("https://app.example.com/", "enki")).toBe(
+    expect(readMagicLinkOrigin("https://app.example.com/", "joychat")).toBe(
       "https://app.example.com",
     );
   });
 
   test("a custom scheme is as valid a target as a domain", () => {
-    expect(readMagicLinkOrigin("enki://", undefined)).toBe("enki:");
+    expect(readMagicLinkOrigin("joychat://", undefined)).toBe("joychat:");
   });
 
   test("surrounding whitespace is not part of the value", () => {
@@ -32,21 +32,21 @@ describe("reading the configured origin", () => {
   });
 
   test("the configured value wins over the app's own scheme", () => {
-    expect(readMagicLinkOrigin("https://app.example.com", "enki")).not.toContain("enki");
+    expect(readMagicLinkOrigin("https://app.example.com", "joychat")).not.toContain("joychat");
   });
 });
 
 describe("falling back to the app's scheme", () => {
   test("an unset variable falls back rather than leaving the flow dead", () => {
-    expect(readMagicLinkOrigin(undefined, "enki")).toBe("enki:");
+    expect(readMagicLinkOrigin(undefined, "joychat")).toBe("joychat:");
   });
 
   test("an empty variable is the same as an unset one", () => {
-    expect(readMagicLinkOrigin("   ", "enki")).toBe("enki:");
+    expect(readMagicLinkOrigin("   ", "joychat")).toBe("joychat:");
   });
 
   test("app config may list several schemes; the first is the app's own", () => {
-    expect(readMagicLinkOrigin(undefined, ["enki", "com.anonymous.enki"])).toBe("enki:");
+    expect(readMagicLinkOrigin(undefined, ["joychat", "com.zeestglobal.joychat"])).toBe("joychat:");
   });
 });
 
@@ -54,18 +54,18 @@ describe("refusing to guess", () => {
   const unusable: [string, string | undefined][] = [
     ["a bare host routes nowhere", "app.example.com"],
     ["a path is not an origin", "/auth/magic-link"],
-    ["a scheme with no authority is not one either", "enki:"],
+    ["a scheme with no authority is not one either", "joychat:"],
     ["a query cannot be part of an origin the API appends to", "https://app.example.com?a=b"],
   ];
 
   test.each(unusable)("%s", (_label, configured) => {
-    expect(readMagicLinkOrigin(configured, "enki")).toBeNull();
+    expect(readMagicLinkOrigin(configured, "joychat")).toBeNull();
   });
 
   test("a bad value is not quietly swapped for the scheme fallback", () => {
     // Falling back here would send a link that works while hiding that the
     // configured origin — the one production depends on — is wrong.
-    expect(readMagicLinkOrigin("app.example.com", "enki")).toBeNull();
+    expect(readMagicLinkOrigin("app.example.com", "joychat")).toBeNull();
   });
 
   test("no configuration and no scheme leaves nothing to send", () => {
@@ -82,12 +82,12 @@ describe("the link the API will build", () => {
   });
 
   test("a custom scheme produces the same route", () => {
-    expect(magicLinkUrl("enki:", "abc123")).toBe(`enki:${MAGIC_LINK_PATH}?token=abc123`);
+    expect(magicLinkUrl("joychat:", "abc123")).toBe(`joychat:${MAGIC_LINK_PATH}?token=abc123`);
   });
 
   test("a token is escaped, so a link cannot smuggle a second parameter", () => {
-    expect(magicLinkUrl("enki:", "a&callbackURL=b")).toBe(
-      `enki:${MAGIC_LINK_PATH}?token=a%26callbackURL%3Db`,
+    expect(magicLinkUrl("joychat:", "a&callbackURL=b")).toBe(
+      `joychat:${MAGIC_LINK_PATH}?token=a%26callbackURL%3Db`,
     );
   });
 });
@@ -99,14 +99,14 @@ describe("the link and the route it has to reach", () => {
   // right on its own; the join is where a wrong origin would look fine and open
   // nothing, which is not a thing a phone tells you about.
   const origins: [string, string | undefined][] = [
-    ["the custom scheme this ships with", "enki://"],
+    ["the custom scheme this ships with", "joychat://"],
     ["a production HTTPS origin", "https://app.example.com"],
     ["an HTTPS origin someone left a slash on", "https://app.example.com/"],
     ["the scheme fallback, when nothing is configured", undefined],
   ];
 
   test.each(origins)("%s reaches app/auth/magic-link.tsx", (_label, configured) => {
-    const origin = readMagicLinkOrigin(configured, "enki");
+    const origin = readMagicLinkOrigin(configured, "joychat");
     expect(origin).not.toBeNull();
 
     expect(extractExpoPathFromURL([], magicLinkUrl(origin!, "abc123"))).toBe(

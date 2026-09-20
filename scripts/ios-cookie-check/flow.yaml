@@ -14,7 +14,7 @@ appId: com.zeestglobal.joychat
 - assertVisible: "Welcome back"
 
 - tapOn: "name@company.com"
-- inputText: "ci-agent@enki.test"
+- inputText: "ci-agent@joychat.test"
 - hideKeyboard
 
 - tapOn:

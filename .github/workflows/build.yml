@@ -104,7 +104,7 @@ jobs:
         run: pod install
 
       # No Apple Developer account, so the build is unsigned. Derive the scheme
-      # from the generated workspace rather than hardcoding "Enki", so renaming
+      # from the generated workspace rather than hardcoding "JoyChat", so renaming
       # expo.name cannot silently break CI.
       - name: Build unsigned .app
         run: |
@@ -135,13 +135,13 @@ jobs:
           fi
           mkdir -p dist/Payload
           cp -R "$APP" dist/Payload/
-          (cd dist && zip -qry enki-unsigned.ipa Payload && rm -rf Payload)
-          ls -lh dist/enki-unsigned.ipa
+          (cd dist && zip -qry joychat-unsigned.ipa Payload && rm -rf Payload)
+          ls -lh dist/joychat-unsigned.ipa
 
       - uses: actions/upload-artifact@v4
         with:
-          name: enki-ios-unsigned-${{ github.sha }}
-          path: dist/enki-unsigned.ipa
+          name: joychat-ios-unsigned-${{ github.sha }}
+          path: dist/joychat-unsigned.ipa
           retention-days: 30
 
       - name: Note how to install
@@ -150,7 +150,7 @@ jobs:
           {
             echo "### iOS unsigned IPA"
             echo
-            echo "Download the \`enki-ios-unsigned-${{ github.sha }}\` artifact from this run."
+            echo "Download the \`joychat-ios-unsigned-${{ github.sha }}\` artifact from this run."
             echo
             echo "It is **unsigned** — it will not install via TestFlight or the App Store. Sideload it with AltStore or Sideloadly. On a free Apple ID the signature expires after 7 days."
           } >> "$GITHUB_STEP_SUMMARY"
