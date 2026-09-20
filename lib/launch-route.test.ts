@@ -2,6 +2,7 @@ import type { AuthState } from "@/lib/auth-machine";
 import { chatHref } from "@/lib/chat-route-id";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
 import { launchDestination } from "@/lib/launch-route";
+import { ONBOARDING_HREF } from "@/lib/onboarding-gate";
 import type { ConversationFetch, SessionUser, UserRole } from "@/lib/types";
 
 const AGENT: SessionUser = {
@@ -427,5 +428,75 @@ describe("a notification tapped for a thread", () => {
         );
       }
     }
+  });
+});
+
+/**
+ * The gate #4 of the sign-in rework put in front of every resolved session.
+ *
+ * A cold start never goes through the sign-in form, so if the gate lived there
+ * an account that signed in yesterday and was never asked for a name would walk
+ * straight into a Hub today. It is a property of a resolved session rather than
+ * of a way in, which is why it is tested on this path as well as on that one.
+ */
+describe("an account with no name", () => {
+  const nameless = (role: UserRole, stale = false): AuthState => ({
+    status: "signed-in",
+    user: { ...AGENT, role, name: "" },
+    stale,
+  });
+
+  test("is sent to onboarding rather than to its Hub", () => {
+    for (const role of ["customer", "agent", "admin"] as UserRole[]) {
+      expect(launchDestination(nameless(role), "answered")).toEqual({
+        kind: "navigate",
+        href: ONBOARDING_HREF,
+      });
+    }
+  });
+
+  test("including on a Stale session, which is still a session", () => {
+    expect(launchDestination(nameless("agent", true), "failed")).toEqual({
+      kind: "navigate",
+      href: ONBOARDING_HREF,
+    });
+  });
+
+  test("a whitespace name is no name", () => {
+    const whitespace: AuthState = {
+      status: "signed-in",
+      user: { ...AGENT, name: "   " },
+      stale: false,
+    };
+    expect(launchDestination(whitespace, "answered")).toEqual({
+      kind: "navigate",
+      href: ONBOARDING_HREF,
+    });
+  });
+
+  test("the gate outranks a tapped notification", () => {
+    // A thread opened behind onboarding would sit under a form the person
+    // cannot leave. Close to unreachable in practice — an account new enough to
+    // have no name has nothing to be notified about — but the order must match
+    // every other entry point's.
+    expect(
+      launchDestination(nameless("agent"), "answered", "c-1"),
+    ).toEqual({ kind: "navigate", href: ONBOARDING_HREF });
+  });
+
+  test("but it still waits for the fetch, like any other signed-in launch", () => {
+    // The gate is about where the launch lands, not about skipping the wait
+    // that keeps a Hub from arriving half-drawn underneath somebody.
+    expect(launchDestination(nameless("agent"), "outstanding")).not.toEqual({
+      kind: "navigate",
+      href: ONBOARDING_HREF,
+    });
+  });
+
+  test("an account with a name is unaffected", () => {
+    expect(launchDestination(signedIn("agent"), "answered")).toEqual({
+      kind: "navigate",
+      href: ROLE_HREF.agent,
+    });
   });
 });

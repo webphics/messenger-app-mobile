@@ -27,6 +27,9 @@ import {
   verifyMagicLink as spendMagicLink,
 } from "@/lib/auth-service";
 import { googleAuthEvent } from "@/lib/google-auth";
+import type { ApiResult } from "@/lib/api-result";
+import { updateProfile } from "@/lib/profile-api";
+import type { SessionUser } from "@/lib/types";
 
 /**
  * The only place the auth state machine is driven.
@@ -80,6 +83,18 @@ type AuthContextValue = {
    * event-shaped proof that the server is reachable again.
    */
   confirmStaleSession: () => void;
+  /**
+   * Write the caller's own name and phone, and replace the signed-in person
+   * with whoever the API says they are afterwards.
+   *
+   * `phone` is not optional on purpose: `PUT /auth/profile` clears the stored
+   * number when the body omits it, so a caller that means to keep one has to
+   * send it back. See `lib/profile-api`.
+   */
+  saveProfile: (input: {
+    name: string;
+    phone: string | null;
+  }) => Promise<ApiResult<SessionUser>>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -269,6 +284,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "retry" });
   }, []);
 
+  /**
+   * Write the caller's own profile, and take the answer as who they now are.
+   *
+   * Dispatched as `confirmed` rather than through a new event, because that is
+   * exactly what this is: the API re-reads the session after the write and
+   * answers with the user it resolved, so the name that lands in state is the
+   * stored one and never the one that was typed. It replaces the person in
+   * place — no navigation and nothing unmounted — which is what lets the
+   * onboarding gate close on this call without the screen routing itself.
+   *
+   * Only the success path touches state. A refusal is the caller's to show;
+   * nobody has been signed out by a name the server would not take.
+   */
+  const saveProfile = useCallback(
+    async (input: { name: string; phone: string | null }) => {
+      const result = await updateProfile(input);
+      if (result.ok) dispatch({ type: "confirmed", user: result.value });
+
+      return result;
+    },
+    [],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       state,
@@ -279,6 +317,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       retry,
       confirmStaleSession,
+      saveProfile,
     }),
     [
       state,
@@ -289,6 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       retry,
       confirmStaleSession,
+      saveProfile,
     ],
   );
 
