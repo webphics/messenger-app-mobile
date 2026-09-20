@@ -26,7 +26,8 @@ Sign-in now takes a username **or** an email under one `identifier` field — th
 that and needs nothing. Two new link-shaped ways into the product were added, invitations and
 organization join links, and neither exists on mobile at all. The credential scheme did not change,
 so none of this needs an API change to support a native client. Sign-in on the web is three steps
-with **no new-user branch** — the API refuses to say whether an account exists — and onboarding is a
+with a **new-user branch** — `POST /auth/account-state` was added after this was first written,
+reversing the refusal it described (§4) — and onboarding is a
 post-authentication gate on a blank name, not a step in that form. The one thing that will break
 silently is `MAGIC_LINK_APP_ORIGINS`, which still names the old scheme.
 
@@ -176,7 +177,14 @@ identifier typed on step one is the one every later step uses.
 
 Every step after the first shows the identifier as a row that is itself the way back to step one.
 
-### There is no new-user branch, and there cannot be one
+### Superseded: there *is* a new-user branch now
+
+**This section was right when it was written and is no longer true.** The API has since added
+`POST /auth/account-state`, and the web form's step one calls it before advancing. Keep reading for
+why it was refused, because the reasoning is what makes the reversal legible — then see
+"What replaced it" below.
+
+### What it used to be: no new-user branch, and there could not be one
 
 **`handleEmailStepSubmit` calls `trigger("email")` and then `setStep("password")`. That is the whole
 of it** — a local validation of one field and a step change. No request is made, and nothing on step
@@ -197,6 +205,46 @@ A screen that branched on "is this a new user" would need an existence oracle, a
 would hand back the enumeration all three of those exist to deny. **So step one advances to the
 password step for everybody**, and whether the account exists is answered by the password attempt
 or by the link.
+
+### What replaced it
+
+`POST /auth/account-state` → `{ exists, hasPassword }`. Unauthenticated, `POST` so the address stays
+out of URLs and access logs, rate limited per identifier *and* per IP, and it carries two booleans
+and nothing else off the row.
+
+**The argument that changed is worth stating, because it is not "we stopped caring".** From the
+route's own schema: *drawing the controls is itself the disclosure* — a second step with no password
+field says the address has no password whatever the payload withheld. So the choice was never
+between telling and not telling. It was between telling for free, via a screen anyone can read, and
+telling under a budget. The route is the second. The other three defences above are untouched:
+`/auth/login` still answers one `401`, and the magic-link route still reports a link it never sent.
+
+Step two is therefore one of three things:
+
+| `exists` | `hasPassword` | step two |
+| --- | --- | --- |
+| true | true | "Enter your password" — the password field |
+| true | false | "Check your email instead" — link only |
+| false | false | "Let's get you started" — link only |
+
+The last two draw identical controls and are worded apart on purpose: "your account has no password"
+and "you have no account" are different news, and one line covering both is useless to either
+person.
+
+Two behaviours that are not obvious from the contract and are worth copying rather than
+rediscovering:
+
+- **A failed probe does not advance.** Picking one of the two step-two screens without an answer
+  means guessing, and guessing the link-only one hides the password field from somebody who has a
+  password and blames their account for it. The web form stays on step one and reports it; so does
+  this app.
+- **The answer is cached for five minutes**, keyed on the identifier as sent. Going back to fix a
+  typo and returning is then free against a budget the API keeps per identifier. Five minutes
+  rather than longer because what it describes changes — somebody can set a password in another tab,
+  and a stale "no password" strands them on a screen that will not take it.
+
+This app implements all of the above (`lib/account-state`, `lib/account-state-cache`,
+`lib/sign-in-steps`), verified against the live API and on the emulator for all three rows.
 
 ### What onboarding actually is
 
