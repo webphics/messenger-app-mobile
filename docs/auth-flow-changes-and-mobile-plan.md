@@ -56,11 +56,38 @@ How the value is read:
 An unknown username, an unknown email and a wrong password all return the same
 `401 invalid_credentials`, deliberately — the route will not say which usernames exist.
 
-**This app is already correct.** `lib/auth-service.ts:267` sends `identifier`, and the comment there
-already names the strict-object failure. The `main` commit `c8f89fa` did this.
+### Corrected: the web offers email only, and reverted inside the window
 
-**What is still missing here:** the username is now part of the shared user payload and is editable
-on web profile surfaces. This app neither displays nor edits it. That is a gap, not a break.
+An earlier draft of this file read `6650879` as the current state of the web form. It is not.
+`6e088bf` — 96 files, titled "refactor(inbox)" — rewrote the login form later the same window and
+took the username option back out. `login-schema.ts` on `main` says so in as many words: *"Sign-in is
+email-only. `/auth/login` and `/auth/magic-link` both still take a username in the same slot, and
+the wire field is still called `identifier`, but nothing in the web app offers that: one field, one
+meaning, one label."*
+
+Confirmed by running it: `/login` labels the field **Email**, types the input `email`, and refuses
+`adalovelace` with *"Email must be a valid email address."* before any request.
+
+So three different things are true at once, and they are easy to conflate:
+
+- **The API takes either.** Verified against a local instance: every shape this client refuses comes
+  back `422`, every shape it accepts reaches the handler and comes back `401`.
+- **The wire field is `identifier` on both routes.** That part of `6650879` stands.
+- **The web deliberately offers only an address.** A product decision, not a limitation.
+
+**This app now offers both**, which is a divergence from the web rather than a defect — it works
+against the API either way. Whether mobile should narrow to match is a decision nobody has made; the
+argument for matching is the one `login-schema.ts` makes, and the argument against is that a
+username is a credential the API issues and this is the only client that would honour it.
+
+**Password sign-in was already correct** (`lib/auth-service.ts`, `main` commit `c8f89fa`).
+**The link request was not.** It still sent `email`, so every magic-link request from this client
+was refused `422` before a link was generated — and since a link is this client's sign-up, no
+account could be created from mobile at all. The test beside it asserted `email:` too, which is why
+the suite was green while describing a request the API refuses. Both are fixed.
+
+**Still missing here:** the username is part of the shared user payload and editable on web profile
+surfaces. This app neither displays nor edits it. A gap, not a break.
 
 ## 2. Invitations became links
 
@@ -131,7 +158,12 @@ sign in or sign up first and have the token survive that trip. See §7.
 ## 4. Sign-in is three steps, and onboarding is not one of them
 
 This is the flow to copy, read off `src/features/auth/login/form/login-form.tsx` and `src/proxy.ts`
-rather than inferred.
+rather than inferred, and since confirmed by running the web app locally.
+
+Both the three steps and onboarding arrived in the same commit, `6e088bf` on 09-19 — which also
+reverted the username option (§1) and is titled "refactor(inbox)". Nothing in its subject says it
+touches auth at all, which is why reading the log by subject line misses all three. **The window's
+auth story is mostly in one grab-bag commit**, so date the files rather than trusting the titles.
 
 `type LoginStep = "email" | "password" | "magic-link-sent"` — one form across all three, so the
 identifier typed on step one is the one every later step uses.
