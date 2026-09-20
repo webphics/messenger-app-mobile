@@ -2,6 +2,8 @@ import { readOutcome } from "@/lib/api-result";
 import type { ApiResult } from "@/lib/api-result";
 import { parseSessionUser } from "@/lib/auth-response";
 import { authenticatedRequest } from "@/lib/auth-service";
+import { writeKeptPerson } from "@/lib/keychain";
+import { setSessionUser } from "@/lib/session";
 import type { SessionUser } from "@/lib/types";
 
 /**
@@ -33,5 +35,22 @@ export async function updateProfile(input: {
     body: { name: input.name, phone: input.phone },
   });
 
-  return readOutcome(outcome, parseSessionUser);
+  const result = readOutcome(outcome, parseSessionUser);
+
+  // The same two writes a successful sign-in makes, for the same reason: the
+  // signed-in person is held in three places and a write that updated only one
+  // of them is a lie the next render tells. The auth state is the caller's —
+  // `saveProfile` dispatches it — but screens read `getSessionUser()`, which is
+  // a module snapshot rather than React state and therefore re-renders for
+  // nobody, and the Kept person is what a cold start with no signal resolves to.
+  //
+  // Found on a device: onboarding wrote the name, the gate let the person
+  // through, and the Hub went on greeting them by their email address until the
+  // app was restarted.
+  if (result.ok) {
+    setSessionUser(result.value);
+    await writeKeptPerson(result.value);
+  }
+
+  return result;
 }
