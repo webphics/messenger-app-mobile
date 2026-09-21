@@ -171,6 +171,7 @@ describe('parseMessageCreated', () => {
       body: 'fixture probe',
       messageType: 'text',
       createdAt: '2026-09-03T20:22:05.789Z',
+      editedAt: null,
       fromCompany: true,
       replyTo: null,
       reactions: [],

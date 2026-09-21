@@ -29,6 +29,7 @@ function staffMessage(
     body: id,
     messageType: 'text',
     createdAt,
+    editedAt: null,
     replyTo: null,
     reactions: [],
     attachments: [],

@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Info, Reply } from "@/components/icons";
+import { Info, Pencil, Reply } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -24,8 +24,8 @@ import { colors } from "@/lib/tokens";
 
 export type { ReactionAnchor };
 
-/** One row's worth, so Info clears the Reply pill it sits under. */
-const INFO_OFFSET = 52;
+/** One row's worth, so each pill clears the one it sits under. */
+const PILL_OFFSET = 52;
 
 type MessageActionsProps = {
   anchor: ReactionAnchor;
@@ -40,6 +40,12 @@ type MessageActionsProps = {
    * second, so neither is offered rather than offered and refused.
    */
   onInfo?: () => void;
+  /**
+   * Rewrite the message. Absent on anybody else's, on one still being carried,
+   * on anything that is not text, and once the API's edit window has closed —
+   * `canEditMessage` decides all four, so this is offered only where it works.
+   */
+  onEdit?: () => void;
 };
 
 export function MessageActions({
@@ -48,6 +54,7 @@ export function MessageActions({
   onReact,
   onReply,
   onInfo,
+  onEdit,
 }: MessageActionsProps) {
   const reduceMotion = useReducedMotion();
   // The tray appears where a finger just was, so Reduce Motion keeps the fade
@@ -71,6 +78,39 @@ export function MessageActions({
   const replyAnim = useAnimatedStyle(() => ({
     opacity: opacity.get(),
   }));
+
+  /*
+    Reply, then Edit, then Info: most often wanted first, and the one that
+    leaves the thread for a screen of its own last. Each is absent rather than
+    disabled where it does not apply, which is `wall-post-actions`' rule too —
+    a control that opens onto a refusal is worse than no control.
+  */
+  const pills = [
+    onReply && {
+      label: "Reply",
+      accessibilityLabel: "Reply",
+      Icon: Reply,
+      onPress: () => {
+        onReply();
+      },
+    },
+    onEdit && {
+      label: "Edit",
+      accessibilityLabel: "Edit message",
+      Icon: Pencil,
+      onPress: () => {
+        onEdit();
+      },
+    },
+    onInfo && {
+      label: "Info",
+      accessibilityLabel: "Message info",
+      Icon: Info,
+      onPress: () => {
+        onInfo();
+      },
+    },
+  ].filter((pill): pill is Exclude<typeof pill, false | undefined> => Boolean(pill));
 
   const trayPos = trayStyle(anchor, anchor.outgoing, anchor.hostWidth);
   const replyPos = replyStyle(anchor, anchor.outgoing, anchor.hostWidth);
@@ -116,69 +156,43 @@ export function MessageActions({
       </Animated.View>
       ) : null}
 
-      {/* Absent where the thread is read-only: a Reply with no composer to open
-          would be a control that does nothing. */}
-      {onReply ? (
-      <Animated.View
-        pointerEvents="auto"
-        style={[
-          {
-            position: "absolute",
-            elevation: 24,
-            zIndex: 30,
-            ...replyPos,
-          },
-          replyAnim,
-        ]}
-      >
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Reply"
-          onPress={() => {
-            onReply();
-          }}
-          className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line/80 bg-surface px-5 py-2 shadow-2xl shadow-black/20"
+      {/*
+          The pills, stacked under the bubble in the order they are most often
+          wanted. Which ones are present varies — a read-only thread has no
+          Reply, somebody else's message has no Edit or Info — so the offset is
+          the pill's index in what is actually drawn rather than a constant per
+          pill. A fixed offset per pill would leave a gap where a missing one
+          used to be, and on a bubble near the bottom of the screen that gap is
+          the difference between the last pill being reachable and being off it.
+      */}
+      {pills.map((pill, index) => (
+        <Animated.View
+          key={pill.label}
+          pointerEvents="auto"
+          style={[
+            {
+              position: "absolute",
+              elevation: 24,
+              zIndex: 30,
+              ...replyPos,
+              top: replyPos.top + index * PILL_OFFSET,
+            },
+            replyAnim,
+          ]}
         >
-          <Reply color={colors.primary} size={18} />
-          <Text variant="meta" className="font-semibold text-primary">
-            Reply
-          </Text>
-        </TactilePressable>
-      </Animated.View>
-      ) : null}
-
-      {/* Message info, on the viewer's own messages. It sits under Reply rather
-          than in the tray: the tray is emoji, one tap each, and this leaves the
-          thread for a screen of its own. */}
-      {onInfo ? (
-      <Animated.View
-        pointerEvents="auto"
-        style={[
-          {
-            position: "absolute",
-            elevation: 24,
-            zIndex: 30,
-            ...replyPos,
-            top: replyPos.top + INFO_OFFSET,
-          },
-          replyAnim,
-        ]}
-      >
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Message info"
-          onPress={() => {
-            onInfo();
-          }}
-          className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line/80 bg-surface px-5 py-2 shadow-2xl shadow-black/20"
-        >
-          <Info color={colors.primary} size={18} />
-          <Text variant="meta" className="font-semibold text-primary">
-            Info
-          </Text>
-        </TactilePressable>
-      </Animated.View>
-      ) : null}
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel={pill.accessibilityLabel}
+            onPress={pill.onPress}
+            className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line/80 bg-surface px-5 py-2 shadow-2xl shadow-black/20"
+          >
+            <pill.Icon color={colors.primary} size={18} />
+            <Text variant="meta" className="font-semibold text-primary">
+              {pill.label}
+            </Text>
+          </TactilePressable>
+        </Animated.View>
+      ))}
     </View>
   );
 }

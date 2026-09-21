@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   addReaction,
+  editMessage,
   listMessages,
   removeReaction,
   sendMessage,
@@ -9,6 +10,7 @@ import {
   MESSAGE_PAGE_LIMIT,
   type ApiFailure,
 } from '@/lib/conversation-api'
+import { messageEditRefusal, withRefreshedQuotes } from '@/lib/message-edit'
 import { restoreOlderMessages, restoreThread, saveThread } from '@/lib/conversation-store'
 import { missingStagedFiles } from '@/lib/staged-file'
 import { isDeviceUri, missingFilesMessage, sendMessageType } from '@/lib/attachment-upload'
@@ -126,6 +128,16 @@ export type ThreadMessages = {
    * this carries whichever of the two endpoints that turned out to mean.
    */
   react: (messageId: string, emoji: string) => void
+  /**
+   * Rewrite a message this person sent, inside the API's edit window.
+   *
+   * Answers the refusal to show, or null when it landed — unlike everything else
+   * here, which reports itself through state. The sheet that calls this stays
+   * open on a refusal with the reason under the box, so it needs the answer
+   * rather than a flag somewhere else: an edit that failed has a draft the person
+   * is still holding, and closing the sheet to show a banner would throw it away.
+   */
+  edit: (messageId: string, body: string) => Promise<string | null>
 }
 
 /**
@@ -230,6 +242,15 @@ export function useThreadMessages(
    * bubble says nothing about another.
    */
   const reacting = useRef(new Map<string, number>())
+  /**
+   * How many edits this screen has sent for each message.
+   *
+   * The same job `reacting` does one line up, and kept apart from it: a person
+   * who edits a message and then reacts to it has two requests out on one bubble
+   * that settle different fields, and one counter would let either answer
+   * discard the other's.
+   */
+  const editing = useRef(new Map<string, number>())
   /**
    * The current state, for the callbacks that must read it without being rebuilt
    * by it. Retry lives on a memoised bubble, and a callback that changed
@@ -645,6 +666,73 @@ export function useThreadMessages(
   )
 
   /**
+   * Rewrite a message, optimistically, and put it back if the API refuses.
+   *
+   * `react` above is the shape: the bubble changes on the tap, a per-message
+   * counter marks this attempt, and a stale answer is dropped rather than
+   * allowed to overwrite a newer one. What differs is the answer — this one is
+   * awaited by the sheet, because a refusal leaves a draft the person is still
+   * holding and the sheet has to stay open around it.
+   *
+   * `editedAt` is stamped locally as well as the body, so the "edited" marker
+   * arrives with the new wording rather than a round trip later. The server's own
+   * stamp replaces it on success, and a refusal takes both back together.
+   *
+   * Quotes of this message move with it. The API rewrites the stored copies but
+   * re-broadcasts only the message itself, so `withRefreshedQuotes` does here
+   * what the server did there — otherwise the old wording stays legible in every
+   * reply quoting it until the thread is fetched again.
+   */
+  const edit = useCallback(
+    async (messageId: string, body: string): Promise<string | null> => {
+      if (!conversationId || !author) return 'This conversation is not ready yet.'
+      if (isLocalId(messageId)) return 'That message has not been sent yet.'
+
+      // From the ref rather than from state, for the reason `react` gives: this
+      // is about to start a request, which a `setState` updater may not do.
+      const before = held.current.messages.find((message) => message.id === messageId)
+      if (!before) return 'That message is no longer here.'
+
+      const mine = (editing.current.get(messageId) ?? 0) + 1
+      editing.current.set(messageId, mine)
+
+      const optimistic = { ...before, body, editedAt: new Date().toISOString() }
+      setState((thread) => ({
+        ...thread,
+        messages: withRefreshedQuotes(mergeMessages(thread.messages, [optimistic]), optimistic),
+      }))
+
+      const answer = await editMessage(conversationId, messageId, body)
+
+      if (onScreen.current !== conversationId) return null
+      // A later edit of the same bubble is already on screen and its own answer
+      // is the one worth having. Rolling this one back would take away wording
+      // the person can see and has not been refused.
+      if (editing.current.get(messageId) !== mine) return null
+
+      setState((thread) => {
+        const now = thread.messages.find((message) => message.id === messageId)
+        if (!now) return thread
+
+        // Onto the copy the thread holds now rather than the one the sheet read:
+        // a receipt or a reaction can have landed while the request was out, and
+        // putting the whole older copy back would take those with it.
+        const settled = answer.ok
+          ? answer.value
+          : { ...now, body: before.body, editedAt: before.editedAt }
+
+        return {
+          ...thread,
+          messages: withRefreshedQuotes(mergeMessages(thread.messages, [settled]), settled),
+        }
+      })
+
+      return answer.ok ? null : messageEditRefusal(answer.failure)
+    },
+    [author, conversationId],
+  )
+
+  /**
    * Every state this thread reaches, written through to the Store.
    *
    * Observed here rather than written at each transition, the way the shared
@@ -690,6 +778,7 @@ export function useThreadMessages(
     send,
     retrySend,
     react,
+    edit,
   }
 }
 

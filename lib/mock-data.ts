@@ -219,6 +219,7 @@ function staffMessage(
     body,
     messageType: extra.attachments?.length ? 'media' : 'text',
     createdAt,
+    editedAt: null,
     replyTo: null,
     reactions: [],
     attachments: [],

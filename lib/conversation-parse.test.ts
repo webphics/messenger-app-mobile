@@ -272,6 +272,7 @@ describe('parseMessage', () => {
       body: 'Hi, the reset link never arrives',
       messageType: 'text',
       createdAt: '2026-08-13T08:00:00.000Z',
+      editedAt: null,
       replyTo: null,
       reactions: [],
       attachments: [],
@@ -279,6 +280,18 @@ describe('parseMessage', () => {
       fromCompany: true,
     })
     expect(isStaffMessage(message!)).toBe(false)
+  })
+
+  test('reads the edit stamp when the author has rewritten it', () => {
+    const message = parseMessage(
+      messageRow({ fromCompany: true, editedAt: '2026-08-13T08:04:11.000Z' }),
+    )
+    expect(message?.editedAt).toBe('2026-08-13T08:04:11.000Z')
+  })
+
+  test('an unreadable edit stamp reads as never edited', () => {
+    const message = parseMessage(messageRow({ fromCompany: true, editedAt: 'whenever' }))
+    expect(message?.editedAt).toBeNull()
   })
 
   test('reads a message with a sender as the staff shape', () => {

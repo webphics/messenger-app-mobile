@@ -67,6 +67,13 @@ type MessageBubbleProps = {
   status: ReceiptStatus
   createdAt: string
   /**
+   * Whether the author rewrote this message after sending it.
+   *
+   * A boolean rather than the timestamp: the bubble says only that it happened,
+   * and the props here are flattened so a memoised row compares scalars.
+   */
+  edited?: boolean
+  /**
    * Whether this bubble states its own time without being asked.
    *
    * True for the newest message in the thread and nothing else. Not "the last of
@@ -554,6 +561,7 @@ export const MessageBubble = memo(function MessageBubble({
   outgoing,
   status,
   createdAt,
+  edited,
   showTime,
   timeLabel,
   timeRevealed,
@@ -782,7 +790,14 @@ export const MessageBubble = memo(function MessageBubble({
     ],
   }))
 
-  const a11yLabel = attachmentLabel(attachments, outgoing)
+  // The visible marker is hidden from assistive tech and named here instead, so
+  // it is announced once, as part of the bubble, rather than read out mid-sentence.
+  // Undefined rather than an empty string where there is nothing to say: an empty
+  // label overrides the text the bubble would otherwise be read as.
+  const a11yLabel =
+    [attachmentLabel(attachments, outgoing), edited ? 'edited' : null]
+      .filter(Boolean)
+      .join(', ') || undefined
 
   return (
     <Animated.View
@@ -931,6 +946,32 @@ export const MessageBubble = memo(function MessageBubble({
                     )}
                   >
                     {body}
+                    {/*
+                      Trailing the text, inside the bubble, rather than beside the
+                      time. The time cluster is drawn only on the newest bubble and
+                      on one somebody has tapped, so a marker there would be hidden
+                      on exactly the messages worth marking — an edit nobody can see
+                      is the thing `editedAt` exists to prevent.
+
+                      Dimmed by opacity rather than by a colour, because this sits on
+                      two fills: the primary of an outgoing bubble and the surface of
+                      an incoming one. One muted token is legible on one and nearly
+                      invisible on the other. The label itself is in the accessible
+                      name of the bubble, so it is not read out twice.
+                    */}
+                    {edited ? (
+                      <Text
+                        variant="body"
+                        accessibilityElementsHidden
+                        importantForAccessibility="no"
+                        className={cn(
+                          'text-[12px] opacity-70',
+                          outgoing ? 'text-primary-foreground' : 'text-ink',
+                        )}
+                      >
+                        {'  (edited)'}
+                      </Text>
+                    ) : null}
                   </Text>
                 ) : null}
                 {!attachment && !hasText ? (

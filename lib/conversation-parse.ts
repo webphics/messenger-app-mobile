@@ -340,6 +340,9 @@ export function parseMessage(value: unknown): Message | null {
     body: nullableText(record.body) ?? '',
     messageType: oneOf(record.messageType, MESSAGE_TYPES) ?? ('text' as const),
     createdAt,
+    // Absent on a message written before the field existed, and on every message
+    // nobody has rewritten — both read as null, which is the same thing here.
+    editedAt: timestamp(record.editedAt) ?? null,
     replyTo: replyTo(record.replyTo),
     reactions: records(record.reactions).flatMap((item) => {
       const parsed = reaction(item)

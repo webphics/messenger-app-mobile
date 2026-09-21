@@ -294,6 +294,15 @@ type MessageBase = {
   body: string
   messageType: MessageType
   createdAt: string
+  /**
+   * Null until the author rewrote it, within the API's fifteen-minute edit window.
+   * Presence is the flag and the value is the timestamp — one field, because there
+   * is no state where a separate boolean could disagree with it.
+   *
+   * `createdAt` is untouched by an edit, so a message does not move in the thread
+   * because somebody fixed a typo.
+   */
+  editedAt: string | null
   replyTo: MessageReplyTo | null
   reactions: MessageReaction[]
   attachments: MessageAttachment[]
@@ -601,12 +610,19 @@ export type ManagedUser = {
  * A Post, and the pieces it is made of.
  *
  * Not a Message, and the glossary is emphatic about it: a Message is addressed
- * to a conversation's participants, carries Receipts and cannot be edited; a
- * Post belongs to its author, is readable by an organization rather than sent to
- * anybody, carries no Receipt at all, and can be edited. The two share a
- * reactions shape and nothing else, which is why this is its own type rather
- * than a `Message` with fields switched off — see the API's
- * `docs/adr/ADR-0007-the-wall-is-not-a-conversation.md`.
+ * to a conversation's participants and carries Receipts; a Post belongs to its
+ * author, is readable by an organization rather than sent to anybody, and
+ * carries no Receipt at all. The two share a reactions shape and nothing else,
+ * which is why this is its own type rather than a `Message` with fields switched
+ * off — see the API's `docs/adr/ADR-0007-the-wall-is-not-a-conversation.md`.
+ *
+ * This once read "and cannot be edited", which was the sharpest line between the
+ * two and is no longer true: a Message is editable by its author for fifteen
+ * minutes. The distinction survives in the shape of the two edits rather than in
+ * one having none. A Post is its author's to revise for as long as it stands,
+ * because it is a thing they published. A Message was handed to somebody, so the
+ * window closes — what can be rewritten is bounded to what has probably not been
+ * read yet, and `editedAt` says so permanently either way.
  *
  * Nothing here is a Delivery state, because a Post has no delivery to report: it
  * is published rather than sent, and there is no Outbox row for one.

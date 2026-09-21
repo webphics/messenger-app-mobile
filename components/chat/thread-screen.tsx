@@ -14,6 +14,7 @@ import { useReducedMotion } from 'react-native-reanimated'
 import { AlertCircle, X } from '@/components/icons'
 import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
 import { MessageActions } from '@/components/chat/message-actions'
+import { MessageEditSheet } from '@/components/chat/message-edit-sheet'
 import { ThreadDayPill } from '@/components/chat/thread-day-pill'
 import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
 import { ThreadHeader } from '@/components/chat/thread-header'
@@ -27,6 +28,7 @@ import { useMessageReceipts } from '@/lib/use-message-receipts'
 import { rejectUploadReason } from '@/lib/attachment-upload'
 import { composerAccess, type ComposerAction } from '@/lib/composer-access'
 import type { ApiFailure } from '@/lib/conversation-api'
+import { canEditMessage } from '@/lib/message-edit'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
   isLocalId,
@@ -119,6 +121,15 @@ type ThreadScreenProps = {
    * reported nowhere is exactly what this screen used to have.
    */
   onToggleReaction: (messageId: string, emoji: string) => void
+  /**
+   * Rewrite a message this person sent, and answer the refusal to show or null.
+   *
+   * Required for the same reason `onToggleReaction` is: the menu item is offered
+   * from here, and one that reported nowhere would be a control that does
+   * nothing. Who may edit is still `canEditMessage`'s, judged where the menu
+   * opens — this only carries the words.
+   */
+  onEditMessage: (messageId: string, body: string) => Promise<string | null>
   /**
    * Claim this thread, or take it from whoever holds it.
    *
@@ -357,6 +368,7 @@ export function ThreadScreen({
   sendError = null,
   onDismissSendError,
   onToggleReaction,
+  onEditMessage,
   onAssign,
   assigning = false,
   assignError = null,
@@ -658,6 +670,49 @@ export function ThreadScreen({
     [readOnly],
   )
 
+  /**
+   * The message the edit sheet is open on, held whole rather than by id.
+   *
+   * By id it would re-resolve against the thread, and the thread changes under
+   * an edit — the author's own optimistic write lands in it — so the sheet would
+   * be re-seeded from the body it just wrote while they were still typing.
+   */
+  const [messageToEdit, setMessageToEdit] = useState<Message | null>(null)
+
+  /**
+   * Whether this message can be rewritten, judged at the moment the menu opens.
+   *
+   * Read once here rather than watched: nothing in this app re-renders a
+   * virtualised list on a timer, and a window that closes while the menu is open
+   * is the API's refusal to give, shown in the sheet. `canEditMessage` holds the
+   * rule and is table-tested; this supplies the clock and the thread's kind.
+   */
+  const canEdit = useCallback(
+    (messageId: string) => {
+      if (readOnly) return false
+      const message = messages.find((item) => item.id === messageId)
+      if (!message) return false
+
+      return canEditMessage({
+        message,
+        outgoing: isOutgoing(message, viewer.id),
+        conversationType: conversation.type,
+        now: Date.now(),
+      })
+    },
+    [conversation.type, messages, readOnly, viewer.id],
+  )
+
+  const openEditSheet = useCallback(
+    (messageId: string) => {
+      const message = messages.find((item) => item.id === messageId)
+      if (!message) return
+      setMenu(null)
+      setMessageToEdit(message)
+    },
+    [messages],
+  )
+
   const openMenu = useCallback((payload: OpenMenuPayload) => {
     const host = hostRef.current
     if (!host) return
@@ -769,6 +824,7 @@ export function ThreadScreen({
           outgoing={isOutgoing(item.message, viewer.id)}
           status={item.message.receiptStatus}
           createdAt={item.message.createdAt}
+          edited={Boolean(item.message.editedAt)}
           endsRun={item.endsRun}
           showTime={item.message.id === latest?.id}
           timeLabel={item.message.id === latest?.id ? latestStamp : undefined}
@@ -910,7 +966,21 @@ export function ThreadScreen({
               : undefined
           }
           onReply={readOnly ? undefined : () => handleReply(menu.messageId)}
+          onEdit={canEdit(menu.messageId) ? () => openEditSheet(menu.messageId) : undefined}
           onInfo={canShowInfo(menu) ? () => showMessageInfo(menu.messageId) : undefined}
+        />
+      ) : null}
+
+      {/*
+        Mounted beside the overlay rather than per bubble: one sheet serves the
+        thread, and a Modal per row on a virtualised list is a window per row.
+      */}
+      {messageToEdit ? (
+        <MessageEditSheet
+          visible
+          message={messageToEdit}
+          onClose={() => setMessageToEdit(null)}
+          onSave={(body) => onEditMessage(messageToEdit.id, body)}
         />
       ) : null}
     </View>
