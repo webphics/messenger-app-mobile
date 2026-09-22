@@ -160,10 +160,21 @@ const env = {
 // Absolute path, not a bare name: the .bat needs `shell: true` on Windows, and
 // cmd.exe skips the working directory when NoDefaultCurrentDirectoryInExePath
 // is set, so `gradlew.bat` alone is "not recognized" even from inside android/.
+/**
+ * Which ABIs the native build produces.
+ *
+ * Both by default, because a local build is also what gets installed on an
+ * x86_64 emulator. CI overrides it to `arm64-v8a` alone: nothing there runs an
+ * emulator, and the second ABI is most of the native compile time — every
+ * CMake project in the tree is built once per ABI.
+ */
+const abis = process.env.ANDROID_ABIS?.trim() || "arm64-v8a,x86_64";
+
 const gradle = join(android, win ? "gradlew.bat" : "gradlew");
+console.log(`gradlew assembleRelease (${abis})`);
 const result = spawnSync(
   win ? `"${gradle}"` : gradle,
-  ["assembleRelease", "-PreactNativeArchitectures=arm64-v8a,x86_64"],
+  ["assembleRelease", `-PreactNativeArchitectures=${abis}`],
   { cwd: android, env, stdio: "inherit", shell: win },
 );
 if (result.status !== 0) process.exit(result.status ?? 1);
