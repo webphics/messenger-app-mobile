@@ -87,20 +87,29 @@ jobs:
           fi
 
           APP_NAME="$(node -p "require('./app.json').expo.name")"
-          APP_SLUG="$(node -p "require('./app.json').expo.slug")"
-          if [ -z "$APP_NAME" ] || [ -z "$APP_SLUG" ]; then
-            echo "::error::app.json must set expo.name and expo.slug."
+          if [ -z "$APP_NAME" ]; then
+            echo "::error::app.json must set expo.name."
+            exit 1
+          fi
+
+          # From expo.name, deliberately not expo.slug. The slug is the EAS
+          # project's identifier and is fixed for the life of that project's id,
+          # so it can name something the product no longer is; the asset people
+          # download should carry the product's name instead.
+          APK_BASE="$(printf '%s' "$APP_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]')"
+          if [ -z "$APK_BASE" ]; then
+            echo "::error::expo.name \"$APP_NAME\" has no alphanumeric characters to build a filename from."
             exit 1
           fi
 
           {
             echo "version=$VERSION"
             echo "tag=${RELEASE_TAG_PREFIX}${VERSION}"
-            echo "apk=${APP_SLUG}-release.apk"
+            echo "apk=${APK_BASE}-release.apk"
             echo "title=${APP_NAME} Android ${VERSION}"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Version $VERSION → tag ${RELEASE_TAG_PREFIX}${VERSION}, asset ${APP_SLUG}-release.apk"
+          echo "Version $VERSION → tag ${RELEASE_TAG_PREFIX}${VERSION}, asset ${APK_BASE}-release.apk"
 
       # Version comes from the "packageManager" field in package.json.
       - uses: pnpm/action-setup@v4

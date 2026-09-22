@@ -4,6 +4,21 @@
  * Everything else stays in `app.json`; Expo reads that first and hands it here
  * as `config`, so this file is only the plugin that needs a value from `.env`.
  *
+ * ## `slug` is not an ordinary field
+ *
+ * It is bound to the EAS project in `extra.eas.projectId` for that project's
+ * whole life — https://expo.fyi/eas-project-id — so the two move together or
+ * not at all. `eas build` refuses outright when they disagree, and so does
+ * `eas project:info`, which is how the rename to JoyChat was caught: the slug
+ * changed here and the project on expo.dev was still `enki`.
+ *
+ * It was settled by creating a new project, `@webphics/joychat`, which is only
+ * cheap while nothing is shipped: a new project issues a new Android keystore,
+ * so the signing SHA-1 changes, anything registered against the old one has to
+ * be re-registered, and an APK signed by the old key cannot be upgraded in
+ * place. Editing this field later is that decision, whether or not it looks
+ * like one.
+ *
  * ## Why this exists
  *
  * Google's iOS SDK completes the sign-in by reopening the app on a URL scheme
