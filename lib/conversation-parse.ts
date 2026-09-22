@@ -45,7 +45,7 @@ const CONVERSATION_TYPES: readonly ConversationType[] = [
   'support_dm',
   'staff_dm',
   'group',
-  'community_announcement',
+  'broadcast_inbox',
 ]
 
 const SUPPORT_STATUSES: readonly SupportStatus[] = ['unassigned', 'engaged', 'closed']
@@ -198,9 +198,45 @@ export function parseConversation(value: unknown): Conversation | null {
   const id = text(record.id)
   const organizationId = text(record.organizationId)
   const type = oneOf(record.type, CONVERSATION_TYPES)
-  if (!id || !organizationId || !type) return null
+  if (!id || !type) return null
 
-  const base = { id, organizationId, ...lastMessageFields(record) }
+  const shared = {
+    id,
+    communityId: nullableText(record.communityId),
+    ...lastMessageFields(record),
+  }
+
+  /*
+   * Answered before the organization is required, because this is the one type
+   * that may arrive without one: the personal Announcements thread belongs to a
+   * person rather than to an organization. Requiring it here was what dropped
+   * the row, and dropping the row was what left a Broadcast notification
+   * pointing at a thread the app did not hold.
+   *
+   * First, too, rather than after the staff branch below: a broadcast thread
+   * carries no labels for that branch to recognise it by, whoever is reading.
+   */
+  if (type === 'broadcast_inbox') {
+    return {
+      ...shared,
+      organizationId: organizationId ?? null,
+      type,
+      title: text(record.title) ?? 'Announcements',
+    }
+  }
+
+  /*
+   * A Support DM without one is the onboarding thread: the Customer belongs to no
+   * organization yet, so there is none to stamp. Admitted for the same reason the
+   * Announcements thread above is -- requiring an organization here would drop the row, and a
+   * dropped row is a thread the app does not hold and a notification pointing at nothing.
+   *
+   * Every other type still requires one, and a row arriving without it is malformed rather
+   * than a shape this list has to draw.
+   */
+  if (!organizationId && type !== 'support_dm') return null
+
+  const base = { ...shared, organizationId: organizationId ?? null }
 
   if (Array.isArray(record.labels)) {
     return {
@@ -224,24 +260,17 @@ export function parseConversation(value: unknown): Conversation | null {
     }
   }
 
-  if (type === 'group' || type === 'community_announcement') {
-    const shared = {
+  if (type === 'group') {
+    return {
       ...base,
+      type,
+      title: text(record.title) ?? 'Group',
       description: nullableText(record.description),
       avatarUrl: nullableText(record.avatarUrl),
       members: staffPeople(record.members),
+      writePolicy: oneOf(record.writePolicy, WRITE_POLICIES) ?? 'everyone',
+      canWrite: record.canWrite !== false,
     }
-    // Written as two returns rather than one with a computed `type`: a union of
-    // both literals is not assignable to either member of the discriminated union.
-    return type === 'group'
-      ? {
-          ...shared,
-          type,
-          title: text(record.title) ?? 'Group',
-          writePolicy: oneOf(record.writePolicy, WRITE_POLICIES) ?? 'everyone',
-          canWrite: record.canWrite !== false,
-        }
-      : { ...shared, type, title: text(record.title) ?? 'Announcements' }
   }
 
   // A Customer never receives a staff DM, so anything left is their support thread.
@@ -319,7 +348,15 @@ export function parseMessage(value: unknown): Message | null {
     id,
     body: nullableText(record.body) ?? '',
     messageType: oneOf(record.messageType, MESSAGE_TYPES) ?? ('text' as const),
+    // Set only when true, rather than always written as a boolean: absent is what "internal"
+    // already means here, and it is what an older API sends. Writing `false` onto every
+    // message would also change the shape of every parsed message, which the store compares
+    // by value when it restores a draft.
+    ...(record.addressedToCustomer === true ? { addressedToCustomer: true } : {}),
     createdAt,
+    // Absent on a message written before the field existed, and on every message
+    // nobody has rewritten — both read as null, which is the same thing here.
+    editedAt: timestamp(record.editedAt) ?? null,
     replyTo: replyTo(record.replyTo),
     reactions: records(record.reactions).flatMap((item) => {
       const parsed = reaction(item)

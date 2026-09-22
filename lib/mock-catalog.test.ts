@@ -2,9 +2,7 @@ import {
   addFaq,
   addKnowledge,
   addOffer,
-  getChart,
   getKnowledge,
-  listCharts,
   listFaqs,
   listKnowledge,
   listOffers,
@@ -21,7 +19,6 @@ describe('mock-catalog', () => {
     expect(listFaqs()).toHaveLength(FAQ_ITEMS.length)
     expect(listKnowledge()).toHaveLength(KNOWLEDGE.length)
     expect(listOffers()).toHaveLength(OFFERS.length)
-    expect(listCharts().length).toBeGreaterThan(0)
   })
 
   test('addFaq appends', () => {
@@ -46,10 +43,5 @@ describe('mock-catalog', () => {
     expect(item.ctaLabel).toBe('View offer')
     expect(item.chatId).toBe('offers')
     expect(listOffers().at(-1)).toEqual(item)
-  })
-
-  test('getChart finds seed metric', () => {
-    expect(getChart('open-threads')?.title).toBe('Open threads')
-    expect(getChart('missing')).toBeUndefined()
   })
 })

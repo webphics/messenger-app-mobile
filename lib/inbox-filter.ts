@@ -128,7 +128,13 @@ export function filterConversations(
   const q = query.trim().toLowerCase()
   const mine = viewerId ? new Set(listAssignedConversations(viewerId, list).map((row) => row.id)) : null
   const filtered = list.filter((conversation) => {
-    if (organizationIds && !organizationIds.has(conversation.organizationId)) return false
+    // A thread with no organization — the personal Announcements thread is the
+    // only one — belongs to no saved inbox, since a saved inbox is a set of
+    // organizations and this is in none of them.
+    if (organizationIds) {
+      if (!conversation.organizationId) return false
+      if (!organizationIds.has(conversation.organizationId)) return false
+    }
 
     const resolved = isResolved(conversation)
     if (chip === 'open' && resolved) return false

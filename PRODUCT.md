@@ -18,7 +18,7 @@ Primary jobs on this client: support conversations, internal role-shaped communi
 
 ## Product Purpose
 
-Enki is an internal support messenger. People log in, work in Customer / Agent / Admin roles, and handle help threads (plus related hub tools) without leaving the org’s messenger.
+JoyChat is an internal support messenger. People log in, work in Customer / Agent / Admin roles, and handle help threads (plus related hub tools) without leaving the org’s messenger.
 
 Success: each role reaches the right conversations and hub actions quickly, with RBAC respected; Customers get help; Agents triage and reply; Admins oversee on mobile without needing the full web admin stack.
 
@@ -32,7 +32,7 @@ Success: each role reaches the right conversations and hub actions quickly, with
 
 - This repo is the Expo iOS/Android client only. Next.js web, NestJS, and Postgres live elsewhere.
 - Current phase: real auth against the API — password, Magic link and Google sign-in, the Session cookie in the device keychain, and the role served by the API rather than chosen locally. Plus Phase 5a local media UI (`Message.attachment`, no server upload). Conversations are still mock data; auth is the only part talking to a backend. The old `{ email, role }` AsyncStorage blob (`ism.session`) is gone and is purged on launch by `lib/legacy-session.ts`.
-- Terminology source of truth: `CONTEXT.md` (Enki, Customer, Contact list, Agent, Admin, Hub, Unassigned pool, Offers, Message, Attachment, Voice note).
+- Terminology source of truth: `CONTEXT.md` (JoyChat, Customer, Contact list, Agent, Admin, Hub, Unassigned pool, Offers, Message, Attachment, Voice note).
 - Scope source of truth: `docs/scope.md` + current phase in `AGENTS.md`.
 
 ## Capabilities and Constraints
@@ -41,11 +41,11 @@ Success: each role reaches the right conversations and hub actions quickly, with
 - Phase discipline: do not install later-phase packages (real auth, sockets, TanStack Query, FlashList, etc.) ahead of the phase bump.
 - Dead controls stay dead where phase says so (e.g. inbox compose). Thread attach + voice notes are live for Phase 5a (local URI only).
 - RBAC helpers live in `lib/rbac.ts`; screens import them.
-- Undecided for product record: exact org that will deploy Enki; production API contracts (owned outside this repo).
+- Undecided for product record: exact org that will deploy JoyChat; production API contracts (owned outside this repo).
 
 ## Brand Commitments
 
-- Product name: **Enki** (launcher, auth, hub wordmarks).
+- Product name: **JoyChat** (launcher, auth, hub wordmarks).
 - Avoid as product naming: Messenger, Casewire, ISM.
 - Hub role eyebrow labels: SUPPORT (Customer), AGENT, ADMIN — not in the header wordmark.
 - Greeting copy (ADR-0001): Customer `How can we help, {name}?`; Agent `Ready when you are, {name}`; Admin `Welcome back, {name}`.

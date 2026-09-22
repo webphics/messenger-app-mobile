@@ -45,7 +45,7 @@ const USER = {
   id: "6f1d4e0c-9a3b-4c21-8f77-0d5b2e9a1c44",
   publicId: "6f1d4e0c-9a3b-4c21-8f77-0d5b2e9a1c44",
   name: "CI Agent",
-  email: "ci-agent@enki.test",
+  email: "ci-agent@joychat.test",
   emailVerified: true,
   image: null,
   phone: null,

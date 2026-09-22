@@ -203,7 +203,7 @@ Omit as a second brand accent. Status colors below are functional, not brand.
 
 ### Hierarchy
 - **Display** (`variant="display"`, ExtraBold face, `text-2xl` ~24px): Auth and hub brand moments (“JoyChat”, large greetings), primary metrics.
-- **Headline** (`variant="headline"`, ExtraBold, `text-xl` ~20px): Screen titles, offer card titles, settings display name.
+- **Headline** (`variant="headline"`, ExtraBold, `text-xl` ~20px): Screen titles, settings display name.
 - **Title** (`variant="title"`, semibold, `text-base` ~16px): Card/row titles, primary button labels, section headers.
 - **Body** (`variant="body"`, regular, `text-base` ~16px): Message text, supporting prose, thread titles. Text inputs also use `text-base` (≥16px iOS floor).
 - **Meta** (`variant="meta"`, regular, `text-sm` ~14px): Previews, FAQ answers, empty-state hints, secondary copy.
@@ -219,7 +219,7 @@ Use the Uniwind scale (`text-xs` / `text-sm` / `text-base` / `text-xl` / `text-2
 
 ## Layout
 
-Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px). Hub/inbox lists stack soft cards with ~12–14px gaps, not hairline separator rows. Headerless screens (hub, search, chat) share `screenTopPad(insets.top)` = safe-area top + 12px. Bottom chrome respects safe-area + the floating tab capsule, shared by Agent, Admin, and Customer. Hide scrollbars. Offers carousel: edge pad 16 both ends, ~78% card width with next-slide peek.
+Mobile-first portrait Expo client. Horizontal rhythm is typically `px-4` (16px). Hub/inbox lists stack soft cards with ~12–14px gaps, not hairline separator rows. Headerless screens (hub, search, chat) share `screenTopPad(insets.top)` = safe-area top + 12px. Bottom chrome respects safe-area + the floating tab capsule, shared by Agent, Admin, and Customer. Hide scrollbars. Hub carousel (Latest on the Wall, Admin charts): edge pad 16 both ends, ~78% card width with next-slide peek.
 
 ### Named Rules
 **The Safe Desk Rule.** Content stays inside safe areas; Android edge-to-edge + inset padding is mandatory — do not invent a second status-bar stack.
@@ -261,7 +261,7 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 
 ### Buttons
 - **Shape:** 12px radius default (`rounded-xl`); large ~16px; icon buttons fully round (44px).
-- **Primary:** JoyChat Lavender fill, white label, height 48px, semibold — main CTAs (auth submit, Join Offers).
+- **Primary:** JoyChat Lavender fill, white label, height 48px, semibold — main CTAs (auth submit, Wall retry).
 - **Secondary:** Lavender Mist fill, JoyChat Lavender text.
 - **Outline:** Surface + `line` border, Graphite text.
 - **Ghost / Link:** No fill; ghost tints Lavender Mist on press; link uses JoyChat Lavender.
@@ -310,8 +310,8 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Receipts:** Tick icons only; read tint JoyChat Lavender.
 - **Reactions / reply:** Same-window overlay tray (not Modal-as-cell); honor reduced motion.
 
-### Offers carousel (signature)
-- Local image + dark gradient overlay; white “View offer”; primary pill “Join Offers chat”. `"Sponsored"` is a section label only — not stories UI.
+### Hub carousel (signature)
+- Post's lead image + dark gradient overlay; body over byline; white pill only where the Post carries a link label. No Sponsored chip and no primary pill under the strip — not stories UI, not an ad unit.
 
 ### Settings
 - Active role pill shows `hubEyebrow` labels (SUPPORT / AGENT / ADMIN), not raw `session.role` strings.

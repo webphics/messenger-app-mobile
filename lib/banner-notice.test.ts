@@ -6,6 +6,7 @@ const SHARED = {
   body: 'Are you still there?',
   messageType: 'text',
   createdAt: '2026-08-13T08:00:00.000Z',
+  editedAt: null,
   replyTo: null,
   reactions: [],
   attachments: [],

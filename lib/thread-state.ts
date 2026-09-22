@@ -140,11 +140,15 @@ export function isSystemMessage(message: Pick<Message, 'messageType'>): boolean 
 /**
  * Whether a message may be shown to the person looking at it.
  *
- * The rule: a Customer never sees a `system` message in a Support DM. The only
- * system messages the product writes are the Engage, Takeover and Transfer
- * notices, and each reports an assignment event and names the staff member who
- * caused it. Assignment is internal, and the company is meant to reach a
- * Customer as one voice rather than as whoever is currently holding the thread.
+ * The rule: a Customer never sees an *internal* `system` message in a Support DM.
+ * The internal ones are the Engage, Takeover and Transfer notices, and each
+ * reports an assignment event and names the staff member who caused it.
+ * Assignment is internal, and the company is meant to reach a Customer as one
+ * voice rather than as whoever is currently holding the thread.
+ *
+ * `addressedToCustomer` is what separates those from the onboarding thread's
+ * welcome, a system message written *for* the Customer. It still draws as a
+ * centred line rather than a bubble, which is what it wants to be.
  *
  * The API enforces this and withholds those messages from a Customer's payload
  * before it is sent — the same predicate, under the same name, lives in its
@@ -156,10 +160,10 @@ export function isSystemMessage(message: Pick<Message, 'messageType'>): boolean 
 export function isMessageVisibleTo(
   role: UserRole,
   conversationType: ConversationType,
-  message: Pick<Message, 'messageType'>,
+  message: Pick<Message, 'messageType' | 'addressedToCustomer'>,
 ): boolean {
   if (role !== 'customer' || conversationType !== 'support_dm') return true
-  return !isSystemMessage(message)
+  return !isSystemMessage(message) || message.addressedToCustomer === true
 }
 
 export function visibleMessages(
@@ -559,6 +563,10 @@ export function draftMessage(draft: MessageDraft): Message {
     body: draft.body,
     messageType: attachments.length > 0 ? ('media' as const) : ('text' as const),
     createdAt: draft.sentAt ?? new Date().toISOString(),
+    // Nothing this device is still carrying has been edited: a message has to
+    // reach the API before it can be rewritten, and `canEditMessage` refuses a
+    // `local-` id for exactly that reason.
+    editedAt: null,
     replyTo: draft.replyTo
       ? { id: draft.replyTo.id, preview: draft.replyTo.body.slice(0, REPLY_PREVIEW_LENGTH) }
       : null,

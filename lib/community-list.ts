@@ -37,25 +37,55 @@ import type {
 export const MAX_INLINE_GROUPS = 3
 
 /**
- * The Communities the viewer is actually in.
+ * The Communities this tab has something to show for: the ones the viewer
+ * belongs to, and the ones holding a room they can already open.
  *
  * `GET /communities` is scoped by the API for a Customer and an Agent, and not
  * for an Admin: theirs is every Community in the product, which is the list the
  * web client's admin screen needs. This tab is a different surface asking a
- * different question — what am I a member of — so the narrowing happens here
- * rather than by threading a second contract through one endpoint.
+ * different question, so the narrowing happens here rather than by threading a
+ * second contract through one endpoint.
  *
- * A Community the viewer is not in is invisible, not refused: it never reaches a
- * screen, and because this runs before anything is persisted it never reaches
- * the disk either.
+ * ## Why membership is not the whole question
+ *
+ * It was, and that was a hole this tab could not see on its own. Membership and
+ * the rooms a person holds are set separately: an Admin is given a Community's
+ * Announcements thread and its Groups in `GET /conversations` without being a
+ * member of the Community itself — sixteen such threads against zero
+ * memberships, on the first account this was tried against.
+ *
+ * While Chats showed every conversation that did not matter, because the rooms
+ * were readable there. Now that Chats holds only what is not a Community's, a
+ * Community narrowed away here takes its rooms off *both* halves and the threads
+ * are reachable from nowhere at all — which is a worse failure than the bleed
+ * this split was made to fix, and the kind only opening the screen finds.
+ *
+ * So the rule is the one the person would state: if you can open the room, you
+ * can see the Community it is in. `conversations` is the list the tab is drawn
+ * beside, so the two cannot disagree about which rooms exist.
+ *
+ * A Community with neither — no membership and no room the viewer holds — is
+ * still invisible rather than refused, which is what keeps an Admin's answer
+ * from listing every Community in the product.
  */
 export function myCommunities(
   communities: readonly Community[],
   viewerId: string | null,
+  conversations: readonly Conversation[] = [],
 ): Community[] {
   if (!viewerId) return []
+
+  const holdsARoomIn = new Set(
+    conversations
+      .map((conversation) => conversation.communityId)
+      .filter((id): id is string => typeof id === 'string' && id !== ''),
+  )
+
   return sortCommunities(
-    communities.filter((community) => community.memberIds.includes(viewerId)),
+    communities.filter(
+      (community) =>
+        community.memberIds.includes(viewerId) || holdsARoomIn.has(community.id),
+    ),
   )
 }
 
@@ -94,11 +124,59 @@ function rowActivityAt(row: CommunityThreadRow): number {
  * is why these come back apart rather than as one ordered list with a rule about
  * the head of it.
  */
-export function communityThreads(rows: readonly CommunityFeedRow[]): {
+/**
+ * A Group the feed calls joinable but the viewer already holds a conversation
+ * for, read as the room it actually is.
+ *
+ * The two answers disagree because they are answers to different questions.
+ * `GET /communities/:id/groups` classifies by *membership*, and an Admin is not
+ * a member of the Groups in an organization they administer — the feed reports
+ * `non_member` / `may_request`. `GET /conversations` hands them that Group's
+ * conversation anyway, `canWrite: true`, and posting into it works.
+ *
+ * Drawn from the membership answer alone, such a room appears nowhere: the
+ * Communities tab skips it as joinable, and the inbox no longer holds it because
+ * it belongs to a Community. So the conversation wins, which is the rule the
+ * rest of this client already follows — ADR-0008 makes the Conversation list the
+ * source of truth, and holding the conversation is what being in a room means.
+ *
+ * `Ask to join` is still right for a Group with no conversation behind it, which
+ * is every joinable row this does not convert.
+ */
+function heldJoinableGroup(
+  row: CommunityJoinableGroupRow,
+  conversations: readonly Conversation[],
+): CommunityMemberGroupRow | null {
+  const live = conversations.find((conversation) => conversation.id === row.id)
+  if (!live) return null
+
+  return {
+    kind: 'member_group',
+    id: row.id,
+    title: row.title,
+    avatarUrl: row.avatarUrl,
+    lastMessageAt: live.lastMessageAt,
+    lastMessagePreview: live.lastMessagePreview,
+    unreadCount: live.unreadCount ?? 0,
+    // The feed says nothing about muting a room it does not think you are in.
+    muted: false,
+    joinPolicy: row.joinPolicy,
+  }
+}
+
+export function communityThreads(
+  rows: readonly CommunityFeedRow[],
+  conversations: readonly Conversation[] = [],
+): {
   announcements: CommunityAnnouncementsRow | null
   groups: CommunityMemberGroupRow[]
 } {
-  const threads = rows.filter(isCommunityThreadRow)
+  const held = rows
+    .filter((row): row is CommunityJoinableGroupRow => row.kind === 'joinable_group')
+    .map((row) => heldJoinableGroup(row, conversations))
+    .filter((row): row is CommunityMemberGroupRow => row !== null)
+
+  const threads = [...rows.filter(isCommunityThreadRow), ...held]
   const announcements =
     threads.find((row): row is CommunityAnnouncementsRow => row.kind === 'announcements') ?? null
   const groups = threads
@@ -128,10 +206,19 @@ export type CommunitySections = {
  * Reuses `communityThreads` for the first two rather than filtering the feed a
  * second time, so the one ordering rule for a joined Group lives in one place.
  */
-export function communitySections(rows: readonly CommunityFeedRow[]): CommunitySections {
-  const { announcements, groups } = communityThreads(rows)
+export function communitySections(
+  rows: readonly CommunityFeedRow[],
+  conversations: readonly Conversation[] = [],
+): CommunitySections {
+  const { announcements, groups } = communityThreads(rows, conversations)
+  // A Group promoted above — one the viewer already holds — is not also
+  // something to ask to join.
+  const joined = new Set(groups.map((row) => row.id))
   const joinable = rows
-    .filter((row): row is CommunityJoinableGroupRow => row.kind === 'joinable_group')
+    .filter(
+      (row): row is CommunityJoinableGroupRow =>
+        row.kind === 'joinable_group' && !joined.has(row.id),
+    )
     .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
 
   return { announcements, joined: groups, joinable }
@@ -351,7 +438,7 @@ export function communityTabRows({
         hint: feed.hint,
       })
     } else {
-      const { announcements, groups } = communityThreads(feed.rows)
+      const { announcements, groups } = communityThreads(feed.rows, conversations)
       const inline = groups.slice(0, MAX_INLINE_GROUPS)
       const drawn = announcements ? [announcements, ...inline] : inline
 

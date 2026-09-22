@@ -41,12 +41,93 @@ function staffRow(overrides: Record<string, unknown> = {}) {
   }
 }
 
+/**
+ * An Announcements thread, exactly as `mapBroadcastInboxConversation` sends it.
+ *
+ * Every field here is the API's, and the type is the one that matters: the wire
+ * type is `broadcast_inbox`. This client used to declare a `community_announcement`
+ * the server has never sent, and because the parser drops a row whose type it
+ * does not recognise, every thread of this shape was discarded on arrival — 16
+ * of one account's 36 conversations. A Broadcast notification then pointed at a
+ * thread the app did not hold.
+ */
+function broadcastInboxRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'conv-3',
+    organizationId: 'org-1',
+    communityId: 'community-1',
+    type: 'broadcast_inbox',
+    title: 'Announcements',
+    lastMessageAt: '2026-08-13T08:30:00.000Z',
+    lastMessagePreview: 'The office is closed on Monday.',
+    lastMessageMine: false,
+    lastMessageReceiptStatus: null,
+    lastMessageRead: false,
+    unreadCount: 1,
+    ...overrides,
+  }
+}
+
+describe('parseConversation, on an Announcements thread', () => {
+  test('reads the row the API sends', () => {
+    expect(parseConversation(broadcastInboxRow())).toEqual({
+      id: 'conv-3',
+      organizationId: 'org-1',
+      communityId: 'community-1',
+      type: 'broadcast_inbox',
+      title: 'Announcements',
+      lastMessageAt: '2026-08-13T08:30:00.000Z',
+      lastMessagePreview: 'The office is closed on Monday.',
+      lastMessageMine: false,
+      lastMessageReceiptStatus: null,
+      lastMessageRead: false,
+      unreadCount: 1,
+    })
+  })
+
+  /**
+   * The personal Announcements thread, which is the one conversation type that
+   * may arrive with no organization: it belongs to a person rather than to an
+   * organization, so that somebody who belongs to none still has somewhere to
+   * receive a Broadcast. Requiring one was the second half of what dropped it.
+   */
+  test('reads one that belongs to a person rather than an organization', () => {
+    const conversation = parseConversation(
+      broadcastInboxRow({ organizationId: null, communityId: null }),
+    )
+
+    expect(conversation).toMatchObject({
+      type: 'broadcast_inbox',
+      organizationId: null,
+      communityId: null,
+    })
+  })
+
+  test('falls back to a name rather than dropping an untitled one', () => {
+    expect(parseConversation(broadcastInboxRow({ title: null }))).toMatchObject({
+      title: 'Announcements',
+    })
+  })
+
+  test('is kept by the list parser rather than filtered out of it', () => {
+    const rows = [customerSupportRow(), broadcastInboxRow()]
+
+    expect(parseConversations(rows).map((row) => row.type)).toEqual([
+      'support_dm',
+      'broadcast_inbox',
+    ])
+  })
+})
+
 describe('parseConversation', () => {
   test('reads a Customer support row', () => {
     const conversation = parseConversation(customerSupportRow())
     expect(conversation).toEqual({
       id: 'conv-1',
       organizationId: 'org-1',
+      // A support thread belongs to no Community, which is said rather than left
+      // out: the field is what the inbox and the Communities tab are split on.
+      communityId: null,
       type: 'support_dm',
       lastMessageAt: '2026-08-13T08:22:00.000Z',
       lastMessagePreview: 'Checking the mail logs now.',
@@ -128,10 +209,28 @@ describe('parseConversation', () => {
 
   test.each([
     ['no id', { id: '' }],
-    ['no organization', { organizationId: undefined }],
     ['an unknown type', { type: 'smoke_signal' }],
   ])('refuses a row with %s', (_case, overrides) => {
     expect(parseConversation(customerSupportRow(overrides))).toBeNull()
+  })
+
+  /*
+   * The second row that may arrive with no organization, alongside the personal
+   * Announcements thread above: the onboarding Support DM, held by a Customer who belongs
+   * nowhere yet. Refusing it would drop the only conversation such a person has.
+   */
+  test('reads a support row that belongs to no organization', () => {
+    expect(parseConversation(customerSupportRow({ organizationId: undefined }))).toMatchObject({
+      id: 'conv-1',
+      type: 'support_dm',
+      organizationId: null,
+    })
+  })
+
+  test('still refuses a group that belongs to no organization', () => {
+    expect(
+      parseConversation(customerSupportRow({ type: 'group', organizationId: undefined })),
+    ).toBeNull()
   })
 
   test('refuses anything that is not an object', () => {
@@ -191,6 +290,7 @@ describe('parseMessage', () => {
       body: 'Hi, the reset link never arrives',
       messageType: 'text',
       createdAt: '2026-08-13T08:00:00.000Z',
+      editedAt: null,
       replyTo: null,
       reactions: [],
       attachments: [],
@@ -198,6 +298,18 @@ describe('parseMessage', () => {
       fromCompany: true,
     })
     expect(isStaffMessage(message!)).toBe(false)
+  })
+
+  test('reads the edit stamp when the author has rewritten it', () => {
+    const message = parseMessage(
+      messageRow({ fromCompany: true, editedAt: '2026-08-13T08:04:11.000Z' }),
+    )
+    expect(message?.editedAt).toBe('2026-08-13T08:04:11.000Z')
+  })
+
+  test('an unreadable edit stamp reads as never edited', () => {
+    const message = parseMessage(messageRow({ fromCompany: true, editedAt: 'whenever' }))
+    expect(message?.editedAt).toBeNull()
   })
 
   test('reads a message with a sender as the staff shape', () => {

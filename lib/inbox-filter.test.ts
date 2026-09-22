@@ -209,6 +209,9 @@ describe('filterConversations', () => {
 
 describe('filterConversations, narrowed to a custom inbox', () => {
   const elsewhere = { ...assigned, id: 'conv-elsewhere', organizationId: 'org-elsewhere' }
+  // Named rather than read off the fixture: `organizationId` is nullable now that the
+  // onboarding thread has none, and a custom inbox names organizations it knows exist.
+  const assignedOrganizationId = 'org-mock'
 
   test('null is the unified inbox and narrows nothing', () => {
     const ids = filterConversations([assigned, elsewhere], {
@@ -223,7 +226,7 @@ describe('filterConversations, narrowed to a custom inbox', () => {
     const ids = filterConversations([assigned, elsewhere], {
       query: '',
       chip: 'all',
-      organizationIds: new Set([assigned.organizationId]),
+      organizationIds: new Set([assignedOrganizationId]),
     }).map((c) => c.id)
     expect(ids).toEqual(['conv-assigned'])
   })
@@ -241,7 +244,7 @@ describe('filterConversations, narrowed to a custom inbox', () => {
     const ids = filterConversations([assigned, closed], {
       query: '',
       chip: 'resolved',
-      organizationIds: new Set([assigned.organizationId]),
+      organizationIds: new Set([assignedOrganizationId]),
     }).map((c) => c.id)
     expect(ids).toEqual([closed.id])
   })

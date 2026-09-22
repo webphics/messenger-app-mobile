@@ -12,6 +12,7 @@ import {
   findUnsent,
   isLocalId,
   isMessageVisibleTo,
+  isSystemMessage,
   isOutgoing,
   mergeMessages,
   messageSenderName,
@@ -41,6 +42,7 @@ function customerMessage(
     body: id,
     messageType: 'text',
     createdAt,
+    editedAt: null,
     replyTo: null,
     reactions: [],
     attachments: [],
@@ -60,6 +62,7 @@ function staffMessage(
     body: id,
     messageType: 'text',
     createdAt,
+    editedAt: null,
     replyTo: null,
     reactions: [],
     attachments: [],
@@ -117,8 +120,21 @@ describe('isMessageVisibleTo', () => {
     },
   )
 
-  test('a Customer never sees a system message in their Support DM', () => {
+  test('a Customer never sees an internal system notice in their Support DM', () => {
     expect(isMessageVisibleTo('customer', 'support_dm', { messageType: 'system' })).toBe(false)
+  })
+
+  test('a Customer does see a system notice addressed to them', () => {
+    expect(
+      isMessageVisibleTo('customer', 'support_dm', {
+        messageType: 'system',
+        addressedToCustomer: true,
+      }),
+    ).toBe(true)
+  })
+
+  test('a notice addressed to the Customer is still not a bubble', () => {
+    expect(isSystemMessage({ messageType: 'system' })).toBe(true)
   })
 })
 
@@ -300,6 +316,7 @@ describe('draftMessage', () => {
       body: 'Is my payout on the way?',
       messageType: 'text',
       createdAt: '2026-08-13T08:00:00.000Z',
+      editedAt: null,
       replyTo: null,
       reactions: [],
       attachments: [],

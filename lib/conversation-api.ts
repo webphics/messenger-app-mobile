@@ -289,6 +289,29 @@ export async function addReaction(
 }
 
 /**
+ * Rewrites the body of a message this person sent.
+ *
+ * Author-only on the API, and only within its fifteen-minute window —
+ * `canEditMessage` mirrors both so the menu item is absent rather than offered
+ * and refused. Answers the whole updated `Message`, the same shape a reaction
+ * does, so it merges into the thread by id like any other copy of it.
+ *
+ * The body is sent untrimmed by no one: the caller trims, because the sheet has
+ * to decide whether Save is even enabled from the same string.
+ */
+export async function editMessage(
+  id: string,
+  messageId: string,
+  body: string,
+): Promise<ApiResult<Message>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`,
+    { method: 'PATCH', body: { body } },
+  )
+  return readOutcome(outcome, parseMessage)
+}
+
+/**
  * Who has read one message, and when.
  *
  * Sender-only on the API: asking about somebody else's message answers 403

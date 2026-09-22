@@ -56,11 +56,26 @@ export type Person = {
  * `lib/attachment-view.ts` turns one into the other.
  */
 
+/**
+ * The four shapes a conversation arrives as, and they are the API's four —
+ * `chatConversationTypes` in `chat.mongo.constants.ts`, which is the list this
+ * has to match exactly.
+ *
+ * `broadcast_inbox` is the read-only Announcements thread. One of them belongs
+ * to the person — where a Broadcast addressed to them lands — and the rest
+ * belong to Communities, which is what `communityId` tells apart.
+ *
+ * It replaces a `community_announcement` that this client invented and the API
+ * has never sent. The cost of that was not cosmetic: `parseConversation` drops
+ * a row whose type it does not recognise, so every Announcements thread there
+ * is — the personal one and every Community's — was discarded on arrival, and a
+ * Broadcast notification pointed at a thread the app did not hold.
+ */
 export type ConversationType =
   | 'support_dm'
   | 'staff_dm'
   | 'group'
-  | 'community_announcement'
+  | 'broadcast_inbox'
 
 /** Assignment state of a Support DM. Null on every other conversation type. */
 export type SupportStatus = 'unassigned' | 'engaged' | 'closed'
@@ -123,7 +138,30 @@ export type ConversationStaffPerson = ConversationPerson & { role: UserRole }
 /** What every conversation row reports about its newest message, resolved for the viewer. */
 type ConversationBase = {
   id: string
-  organizationId: string
+  /**
+   * The organization this thread belongs to, or null for the two that belong to none: a
+   * person's own Announcements thread, and the onboarding Support DM a Customer holds
+   * before they belong anywhere. The API stops sending the second the moment they join an
+   * organization.
+   */
+  organizationId: string | null
+  /**
+   * The Community this thread belongs to, or null for one that belongs to no
+   * Community.
+   *
+   * What separates a Community's room from an ordinary group chat, which share a
+   * `type` and are not the same thing to a person: a Community's rooms are read
+   * in the Communities tab, and a group three colleagues started is read in the
+   * inbox beside their DMs. `lib/conversation-scope` is where that question is
+   * asked; nothing else should read this field directly.
+   *
+   * Optional for the reason `writePolicy` below is: the fixtures in this
+   * codebase predate it and carry none. A real payload always sends it, and an
+   * absent one reads as "belongs to no Community" — which is the safe way
+   * round, because it leaves a thread in the inbox rather than hiding it inside
+   * a Community nobody can name.
+   */
+  communityId?: string | null
   lastMessageAt: string | null
   lastMessagePreview: string | null
   lastMessageMine: boolean
@@ -172,18 +210,28 @@ export type CustomerGroupConversation = ConversationBase & {
   canWrite: boolean
 }
 
-export type CustomerAnnouncementConversation = ConversationBase & {
-  type: 'community_announcement'
+/**
+ * A read-only Announcements thread: a Community's, or the person's own.
+ *
+ * One shape for every role, unlike every other conversation type — the API maps
+ * it through a single mapper because the thread has one reader and no second
+ * viewer whose copy would differ.
+ *
+ * `organizationId` is the one field that does not come from `ConversationBase`,
+ * because on this type alone it may be null: the personal Announcements thread
+ * belongs to a person rather than to an organization, so that somebody who
+ * belongs to none still has somewhere to receive a Broadcast.
+ */
+export type BroadcastInboxConversation = Omit<ConversationBase, 'organizationId'> & {
+  type: 'broadcast_inbox'
+  organizationId: string | null
   title: string
-  description: string | null
-  avatarUrl: string | null
-  members: ConversationStaffPerson[]
 }
 
 export type CustomerConversation =
   | CustomerSupportConversation
   | CustomerGroupConversation
-  | CustomerAnnouncementConversation
+  | BroadcastInboxConversation
 
 export type Conversation = StaffConversation | CustomerConversation
 
@@ -251,7 +299,25 @@ type MessageBase = {
   /** Caption or plain text; empty when the message is only attachments. */
   body: string
   messageType: MessageType
+  /**
+   * Whether a `system` notice is addressed to the Customer rather than recording a staff
+   * action. The onboarding thread's welcome is the one that is; every other system message
+   * the product writes is internal and withheld from a Customer.
+   *
+   * Optional, and absent reads as "internal" -- which is the behaviour every system message
+   * had before the welcome existed, and what a payload from an older API carries.
+   */
+  addressedToCustomer?: boolean
   createdAt: string
+  /**
+   * Null until the author rewrote it, within the API's fifteen-minute edit window.
+   * Presence is the flag and the value is the timestamp — one field, because there
+   * is no state where a separate boolean could disagree with it.
+   *
+   * `createdAt` is untouched by an edit, so a message does not move in the thread
+   * because somebody fixed a typo.
+   */
+  editedAt: string | null
   replyTo: MessageReplyTo | null
   reactions: MessageReaction[]
   attachments: MessageAttachment[]
@@ -390,6 +456,58 @@ export type ChartMetric = {
   slices?: ChartSlice[]
 }
 
+/**
+ * What `GET /analytics/overview` answers with, for the Admin Hub's charts.
+ *
+ * Only the parts a chart is drawn from. The response also carries `agents` — a
+ * per-actor breakdown the web dashboard renders as a table — and this client
+ * has no screen for it, so it is deliberately not parsed (`lib/wall-parse`'s
+ * rule: the parts nothing renders yet are not read).
+ *
+ * `snapshot` is a right-now reading and `resolution`/`series` are bound to the
+ * range, which is the one thing about this payload worth keeping straight: they
+ * travel together and answer on different clocks (the API's own schema doc).
+ */
+export type AnalyticsSeriesPoint = {
+  /** `YYYY-MM-DD`, UTC. One point per day in the range, gaps included as zeroes. */
+  date: string
+  conversationsOpened: number
+  messagesSent: number
+}
+
+export type AnalyticsUserCounts = {
+  admin: number
+  agent: number
+  customer: number
+}
+
+/** Current state, whatever range was asked for. */
+export type AnalyticsSnapshot = {
+  unassigned: number
+  engaged: number
+  closed: number
+  groups: number
+  users: AnalyticsUserCounts
+}
+
+/**
+ * What arrived and what was resolved inside the range. `closed` may exceed
+ * `opened` — a team working down a backlog resolves more than arrived — so
+ * nothing may treat the pair as a ratio bounded at 1.
+ */
+export type AnalyticsResolution = {
+  opened: number
+  closed: number
+}
+
+export type AnalyticsOverview = {
+  /** Echoed by the API, so a client that sent no range can say what it is showing. */
+  range: { from: string; to: string }
+  snapshot: AnalyticsSnapshot
+  resolution: AnalyticsResolution
+  series: AnalyticsSeriesPoint[]
+}
+
 /** An organization the signed-in person belongs to, from `GET /memberships/mine`. */
 export type Organization = {
   id: string
@@ -513,12 +631,19 @@ export type ManagedUser = {
  * A Post, and the pieces it is made of.
  *
  * Not a Message, and the glossary is emphatic about it: a Message is addressed
- * to a conversation's participants, carries Receipts and cannot be edited; a
- * Post belongs to its author, is readable by an organization rather than sent to
- * anybody, carries no Receipt at all, and can be edited. The two share a
- * reactions shape and nothing else, which is why this is its own type rather
- * than a `Message` with fields switched off — see the API's
- * `docs/adr/ADR-0007-the-wall-is-not-a-conversation.md`.
+ * to a conversation's participants and carries Receipts; a Post belongs to its
+ * author, is readable by an organization rather than sent to anybody, and
+ * carries no Receipt at all. The two share a reactions shape and nothing else,
+ * which is why this is its own type rather than a `Message` with fields switched
+ * off — see the API's `docs/adr/ADR-0007-the-wall-is-not-a-conversation.md`.
+ *
+ * This once read "and cannot be edited", which was the sharpest line between the
+ * two and is no longer true: a Message is editable by its author for fifteen
+ * minutes. The distinction survives in the shape of the two edits rather than in
+ * one having none. A Post is its author's to revise for as long as it stands,
+ * because it is a thing they published. A Message was handed to somebody, so the
+ * window closes — what can be rewritten is bounded to what has probably not been
+ * read yet, and `editedAt` says so permanently either way.
  *
  * Nothing here is a Delivery state, because a Post has no delivery to report: it
  * is published rather than sent, and there is no Outbox row for one.
@@ -567,12 +692,40 @@ export type WallVoteDirection = 'up' | 'down'
  */
 export type WallSort = 'recent' | 'popular'
 
+/**
+ * What a Post is for — the one fact the Wall cannot derive from the Post itself.
+ * Mirrors `wallPostKinds` in the API. Set once at creation and never editable,
+ * the same way `organizationId` is: a kind is what a reader filtered on and what
+ * the card is drawn from, so re-kinding a Post people have already acted on
+ * rewrites what they responded to.
+ */
+export const wallPostKinds = ['promotion', 'giveaway', 'news', 'ad', 'community'] as const
+
+export type WallPostKind = (typeof wallPostKinds)[number]
+
 export type WallPost = {
   id: string
   author: WallPostAuthor
   /** The Post's whole audience, set once. A Wall spanning several needs it. */
   organizationId: string
+  /**
+   * Never null. A Post written before kinds existed reads as `community`, which
+   * the API defaults on both write and read — so there is one shape to render
+   * and the kind filter has no nameless sixth bucket.
+   */
+  kind: WallPostKind
+  /** The headline, separate from `body`. A community Post is a remark and may omit it. */
+  title: string | null
   body: string | null
+  /**
+   * When a promotion or giveaway stops being one. Nothing hides an ended Post —
+   * an expired offer is still a record of what was offered — so a card draws it
+   * as ended rather than dropping it. Null on every other kind: the API refuses
+   * a deadline on a Post nothing happens to.
+   */
+  endsAt: string | null
+  /** When somebody pinned this Post, null when it is not pinned. */
+  pinnedAt: string | null
   attachments: WallPostAttachment[]
   link: WallPostLink | null
   reactions: WallPostReaction[]

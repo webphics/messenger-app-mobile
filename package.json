@@ -1,5 +1,5 @@
 {
-  "name": "enki",
+  "name": "joychat",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "packageManager": "pnpm@11.3.0",

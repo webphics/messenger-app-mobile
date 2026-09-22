@@ -20,7 +20,7 @@
 /**
  * `expo-sqlite` opens every database under a `SQLite` directory — inside
  * `filesDir` on Android, inside `Documents` on iOS. Excluding the directory
- * rather than `enki-store.db` is deliberate: SQLite writes `-wal` and `-shm`
+ * rather than `joychat-store.db` is deliberate: SQLite writes `-wal` and `-shm`
  * beside the database, and a rule naming only the database would back up the
  * write-ahead log holding the newest Messages.
  */
@@ -47,11 +47,11 @@ const EXCLUSIONS = [
   { domain: "file", path: STORE_DIRECTORY },
 ]
 
-const BACKUP_RULES_FILE = "enki_backup_rules.xml"
-const DATA_EXTRACTION_RULES_FILE = "enki_data_extraction_rules.xml"
+const BACKUP_RULES_FILE = "joychat_backup_rules.xml"
+const DATA_EXTRACTION_RULES_FILE = "joychat_data_extraction_rules.xml"
 
-const BACKUP_RULES_RESOURCE = "@xml/enki_backup_rules"
-const DATA_EXTRACTION_RULES_RESOURCE = "@xml/enki_data_extraction_rules"
+const BACKUP_RULES_RESOURCE = "@xml/joychat_backup_rules"
+const DATA_EXTRACTION_RULES_RESOURCE = "@xml/joychat_data_extraction_rules"
 
 const SECURE_STORE_BACKUP_RULES_RESOURCE = "@xml/secure_store_backup_rules"
 const SECURE_STORE_DATA_EXTRACTION_RULES_RESOURCE = "@xml/secure_store_data_extraction_rules"
@@ -135,7 +135,7 @@ function backupAttributes(current) {
  * `expo-sqlite` will open the database in is created here, before anything has
  * opened one, and marked.
  */
-const EXCLUSION_FUNCTION = "enkiExcludeStoreFromBackup"
+const EXCLUSION_FUNCTION = "joychatExcludeStoreFromBackup"
 
 const LAUNCH_ANCHOR =
   "return super.application(application, didFinishLaunchingWithOptions: launchOptions)"

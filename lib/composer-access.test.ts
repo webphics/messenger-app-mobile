@@ -37,7 +37,7 @@ function staffRow(overrides: Partial<StaffConversation> = {}): Conversation {
   } as StaffConversation
 }
 
-function customerRow(type: 'support_dm' | 'group' | 'community_announcement'): Conversation {
+function customerRow(type: 'support_dm' | 'group' | 'broadcast_inbox'): Conversation {
   const base = {
     id: 'conv-2',
     organizationId: 'org-1',
@@ -51,10 +51,19 @@ function customerRow(type: 'support_dm' | 'group' | 'community_announcement'): C
   if (type === 'support_dm') return { ...base, type }
   // Two returns rather than one with a computed `type`: a union of both literals
   // is not assignable to either member of the discriminated union.
-  const shared = { ...base, description: null, avatarUrl: null, members: [] }
-  return type === 'group'
-    ? { ...shared, type, title: 'QA Group', writePolicy: 'everyone', canWrite: true }
-    : { ...shared, type, title: 'Announcements' }
+  // An Announcements thread carries no members and no policy — it is read, not
+  // written in — so it is built from the base rather than from the group shape.
+  if (type === 'broadcast_inbox') return { ...base, type, title: 'Announcements' }
+  return {
+    ...base,
+    type,
+    description: null,
+    avatarUrl: null,
+    members: [],
+    title: 'QA Group',
+    writePolicy: 'everyone',
+    canWrite: true,
+  }
 }
 
 /** A Customer's group row, locked by its write policy. */
@@ -130,42 +139,26 @@ describe('composerAccess, on the other conversation types', () => {
     expect(composerAccess(conversation, ME)).toEqual({ kind: 'open' })
   })
 
-  test('an Agent posts in the announcements they were added to', () => {
-    const member: ConversationStaffPerson = { id: 'me', name: 'Jonah Reed', role: 'agent' }
-    const announcement = staffRow({
-      type: 'community_announcement',
-      status: null,
-      title: 'Announcements',
-      members: [member],
-    })
-    expect(composerAccess(announcement, ME)).toEqual({ kind: 'open' })
-  })
-
-  test('and reads the ones they were not', () => {
-    const announcement = staffRow({
-      type: 'community_announcement',
-      status: null,
-      title: 'Announcements',
-      members: [OTHER_AGENT],
-    })
-    expect(composerAccess(announcement, ME)).toEqual({
-      kind: 'read-only',
-      reason: 'Announcements are posted by the team.',
-    })
-  })
-
-  test('an Admin posts in any announcement', () => {
-    const announcement = staffRow({
-      type: 'community_announcement',
-      status: null,
-      title: 'Announcements',
-      members: [],
-    })
-    expect(composerAccess(announcement, ADMIN)).toEqual({ kind: 'open' })
-  })
-
-  test('a Customer receives announcements rather than posting in them', () => {
-    expect(composerAccess(customerRow('community_announcement'), CUSTOMER)).toEqual({
+  /*
+   * Read-only for everybody, which is a correction rather than a tightening.
+   *
+   * These cases used to assert that an Agent posted in the announcements they
+   * were a member of and an Admin in any of them. The API has never allowed
+   * either: it answers every reply to one with `broadcast_inbox_read_only`,
+   * "Announcements cannot be replied to", and answers an Admin's management of
+   * one with a 404. So the composer those cases described opened onto a refusal.
+   *
+   * They also described a type the API does not send. `community_announcement`
+   * was this client's own invention; the wire type is `broadcast_inbox`, and
+   * because the parser dropped every row it did not recognise, none of this
+   * code had ever run against a real payload.
+   */
+  test.each([
+    ['an Agent', staffRow({ type: 'broadcast_inbox', status: null, title: 'Announcements' }), ME],
+    ['an Admin', staffRow({ type: 'broadcast_inbox', status: null, title: 'Announcements' }), ADMIN],
+    ['a Customer', customerRow('broadcast_inbox'), CUSTOMER],
+  ])('%s receives announcements rather than posting in them', (_case, conversation, viewer) => {
+    expect(composerAccess(conversation, viewer)).toEqual({
       kind: 'read-only',
       reason: 'Announcements are posted by the team.',
     })

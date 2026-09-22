@@ -1,4 +1,4 @@
-# Enki (internal support messenger) — scope
+# JoyChat (internal support messenger) — scope
 
 Self-contained internal chat for support. Users log in. Three roles:
 

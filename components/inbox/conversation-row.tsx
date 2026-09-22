@@ -32,8 +32,7 @@ export const ConversationRow = memo(function ConversationRow({
 }: ConversationRowProps) {
   const title = conversationTitle(conversation, organizationNames);
   const broadcast =
-    isOffersConversation(conversation) ||
-    conversation.type === "community_announcement";
+    isOffersConversation(conversation) || conversation.type === "broadcast_inbox";
   const online = conversationPeer(conversation)?.isOnline === true;
   const hasUnread = isConversationUnread(conversation);
   const unreadCount = conversation.unreadCount ?? 0;

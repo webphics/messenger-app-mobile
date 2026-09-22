@@ -20,7 +20,7 @@ const TYPE_LABEL: Record<Conversation['type'], string> = {
   // the *concept* and this line is describing one conversation's shape.
   staff_dm: 'Staff 1:1',
   group: 'Group',
-  community_announcement: 'Announcement',
+  broadcast_inbox: 'Announcements',
 }
 
 /**
@@ -67,7 +67,7 @@ export function conversationDetailFields(conversation: Conversation): DetailFiel
 
   if (!isStaffConversation(conversation)) return fields
 
-  if (conversation.type === 'group' || conversation.type === 'community_announcement') {
+  if (conversation.type === 'group') {
     fields.push({
       label: 'Members',
       value: `${conversation.members.length}`,

@@ -3,6 +3,7 @@ import type { Href } from "expo-router";
 import type { AuthState } from "@/lib/auth-machine";
 import { chatHref } from "@/lib/chat-route-id";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
+import { needsOnboarding, ONBOARDING_HREF } from "@/lib/onboarding-gate";
 import type { ConversationFetch } from "@/lib/types";
 
 /**
@@ -86,6 +87,17 @@ export function launchDestination(
     // ever answers.
     case "signed-in": {
       if (conversationFetch === "outstanding") return WAIT;
+      // The gate outranks both the Hub and a tapped thread. An account with no
+      // name is owed onboarding before it is shown anything, and a thread
+      // opened behind that screen would sit under a form the person cannot
+      // leave. The combination is close to unreachable in practice — an
+      // account new enough to have no name has no conversations to be notified
+      // about — but the order has to be the same one every other entry point
+      // uses, or the gate is true on one route in and false on another.
+      if (needsOnboarding(state.user)) {
+        return { kind: "navigate", href: ONBOARDING_HREF };
+      }
+
       const hub = ROLE_HREF[state.user.role];
       return pendingThread
         ? { kind: "navigate", href: chatHref(pendingThread), behind: hub }

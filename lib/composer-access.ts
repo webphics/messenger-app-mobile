@@ -90,22 +90,30 @@ export function composerAccess(
    * always write in their own support thread, closed or not, and an
    * announcement is something they receive rather than post in.
    */
+  /*
+   * An Announcements thread is read-only for everybody, whatever their role.
+   *
+   * The API refuses every reply to one — `broadcast_inbox_read_only`,
+   * "Announcements cannot be replied to" — and refuses an Admin's management of
+   * one with a 404, because ADR 0009 keeps the existence of a person's
+   * announcements thread private even from them. A Community's announcements
+   * are written through the Communities API rather than through this composer,
+   * so there is no role here for which offering one would lead anywhere but a
+   * refusal.
+   *
+   * Answered before the staff split below, since the answer does not depend on
+   * it — and since a broadcast payload has no `members` for a staff branch to
+   * test a viewer against.
+   */
+  if (conversation.type === 'broadcast_inbox') {
+    return readOnly('Announcements are posted by the team.')
+  }
+
   if (!isStaffConversation(conversation)) {
-    if (conversation.type === 'community_announcement') {
-      return readOnly('Announcements are posted by the team.')
-    }
     if (conversation.type === 'group') {
       return groupWriteAccess(conversation) ?? OPEN
     }
     return OPEN
-  }
-
-  if (conversation.type === 'community_announcement') {
-    // An Agent posts only in the announcements they were added to; an Admin in any.
-    if (viewer.role === 'admin') return OPEN
-    return conversation.members.some((member) => member.id === viewer.id)
-      ? OPEN
-      : readOnly('Announcements are posted by the team.')
   }
 
   if (conversation.type === 'group') {

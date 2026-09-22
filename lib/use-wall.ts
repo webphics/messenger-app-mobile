@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useFocusEffect } from 'expo-router'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
@@ -14,6 +15,7 @@ import { shouldRecordWallPostView } from '@/lib/wall-card'
 import {
   createWallPost,
   getNamedWall,
+  getWallPost,
   listWallPosts,
   reactToWallPost,
   recordWallPostView,
@@ -39,9 +41,10 @@ import {
   withUpdatedPost,
   type WallPages,
 } from '@/lib/wall-pages'
+import { wallKindLabel } from '@/lib/wall-kind'
 import { wallNotice, type WallNotice } from '@/lib/wall-notice'
 import { readWallSort, writeWallSort } from '@/lib/wall-sort-storage'
-import type { WallPost, WallSort, WallVoteDirection } from '@/lib/types'
+import type { WallPost, WallPostKind, WallSort, WallVoteDirection } from '@/lib/types'
 
 /**
  * The default Wall: a page at a time, and what to say when there is nothing to
@@ -219,6 +222,8 @@ function useWallPages(
   wallId: string | undefined,
   sort: WallSort,
   searchTerm?: string,
+  postId?: string,
+  kind?: WallPostKind,
 ): WallView {
   const { state } = useAuth()
   /**
@@ -252,11 +257,21 @@ function useWallPages(
 
   /** The one difference between reading the Wall and reading a search result. */
   const readPage = useCallback(
-    (params: { cursor?: string }) =>
-      searchTerm !== undefined
+    async (params: { cursor?: string }) => {
+      // A permalink is a page of exactly one. There is nothing behind it, so it
+      // never asks twice: `applyFirstPage` reads a page shorter than the limit
+      // as the end, which is what switches paging off without a second rule.
+      if (postId !== undefined) {
+        const result = await getWallPost(postId)
+        return result.ok
+          ? ({ ok: true, value: [result.value] } as ApiResult<WallPost[]>)
+          : result
+      }
+      return searchTerm !== undefined
         ? searchWallPosts({ q: searchTerm, wall: wallId, cursor: params.cursor })
-        : listWallPosts({ wall: wallId, sort, cursor: params.cursor }),
-    [wallId, sort, searchTerm],
+        : listWallPosts({ wall: wallId, sort, kind, cursor: params.cursor })
+    },
+    [wallId, sort, searchTerm, postId, kind],
   )
   const pageLimit = searching ? WALL_SEARCH_PAGE_LIMIT : WALL_PAGE_LIMIT
 
@@ -316,6 +331,28 @@ function useWallPages(
       generation.current += 1
     }
   }, [loadFirst])
+
+  /**
+   * A return to a Wall that has nothing on it asks again.
+   *
+   * The mount effect above is the only other read, and a tab is mounted once
+   * and then kept — so a first read that answered with nothing, or failed,
+   * used to be what the screen showed for the rest of the session however many
+   * times somebody came back to it. Pull-to-refresh was the only way out, which
+   * is a thing a person has to know to do about a screen that looks finished.
+   *
+   * Deliberately only when nothing is drawn. A Wall that has Posts is left
+   * exactly as it was found — that is the rule the mount effect's own doc
+   * states, and it is what stops a return resetting somebody who had paged back
+   * through it. `loading` guards the other direction: a focus landing while the
+   * first read is still out would otherwise start a second one beside it.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (loading || read.posts.length > 0) return
+      loadFirst()
+    }, [loading, read.posts.length, loadFirst]),
+  )
 
   const loadOlder = useCallback(() => {
     if (loadingOlder || !canPageBack(read)) return
@@ -648,7 +685,7 @@ function useWallPages(
    * unguarded — an in-place patch and a removal never reorder anything.
    */
   useRealtimeEvents((event: RealtimeEvent) => {
-    if (wallId !== undefined || searching) return
+    if (wallId !== undefined || searching || postId !== undefined) return
 
     if (event.kind === 'resync') {
       loadFirst()
@@ -681,6 +718,7 @@ function useWallPages(
       failure,
       named: wallId !== undefined,
       searching: searchTerm,
+      filteredTo: kind ? wallKindLabel(kind) : undefined,
     }),
     loadingOlder,
     refreshing,
@@ -713,6 +751,9 @@ export type WallBodyView = Omit<WallView, 'createPost'>
 
 /** Everything `WallView` answers, plus the one control only the default Wall offers (#86). */
 export type WallSortView = WallView & {
+  /** Which kind the Wall is narrowed to, or null for every kind. */
+  kind: WallPostKind | null
+  setKind: (kind: WallPostKind | null) => void
   /** Which order the Wall reads in right now. */
   sort: WallSort
   /**
@@ -736,14 +777,27 @@ export type WallSortView = WallView & {
  */
 export function useWall(): WallSortView {
   const [sort, setSort] = useState<WallSort>(() => readWallSort())
-  const base = useWallPages(undefined, sort)
+  /**
+   * Which kind the Wall is narrowed to, or nothing for every kind.
+   *
+   * Not persisted, unlike the sort. A sort is how somebody likes to read a Wall
+   * and is worth remembering; a filter is what they came to look at once, and a
+   * Wall that silently opens showing only Giveaways next week is a Wall that
+   * looks empty for a reason nothing on screen explains.
+   *
+   * A change resets paging exactly as a sort switch does — `useWallPages`'
+   * mount effect already treats every change to its inputs that way, and `kind`
+   * is one of them, so there is nothing extra here to keep the two in step.
+   */
+  const [kind, setKind] = useState<WallPostKind | null>(null)
+  const base = useWallPages(undefined, sort, undefined, undefined, kind ?? undefined)
 
   const setSortAndPersist = useCallback((next: WallSort) => {
     setSort(next)
     writeWallSort(next)
   }, [])
 
-  return { ...base, sort, setSort: setSortAndPersist }
+  return { ...base, sort, setSort: setSortAndPersist, kind, setKind }
 }
 
 /**
@@ -766,6 +820,24 @@ export function useWall(): WallSortView {
  */
 export function useWallSearch(term: string): WallBodyView {
   return useWallPages(undefined, 'recent', term)
+}
+
+/**
+ * One Post on its own screen, reached from a permalink (`lib/wall-route`).
+ *
+ * `useWallPages` with a Post id rather than a hook of its own: what a screen
+ * showing one Post needs — the card, every action on it, the four things it can
+ * say when there is nothing to draw — is what a screen showing twenty needs, and
+ * the only real difference is which request fills it. That difference is one
+ * branch in `readPage`, the same seam search already goes through, so a Post
+ * opened on its own is voted on, reacted to, saved, edited and removed by
+ * exactly the code the Wall uses.
+ *
+ * `createPost` is dropped the way it is for search and the Saved view: there is
+ * no compose control on a single Post to have produced one.
+ */
+export function useWallPost(postId: string): WallBodyView {
+  return useWallPages(undefined, 'recent', undefined, postId)
 }
 
 /** A shared, named Wall — see `lib/wall-route` and `components/wall/shared-wall-screen`. */

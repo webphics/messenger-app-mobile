@@ -27,6 +27,10 @@ function customerConversation(overrides: Partial<CustomerConversation> = {}): Co
   return {
     id: 'conv-1',
     organizationId: 'org-1',
+    // Present for the reason `writePolicy` is on the staff builder below: the
+    // round trip through `parseConversation` always supplies it, even where the
+    // payload it read did not.
+    communityId: null,
     type: 'support_dm',
     lastMessageAt: '2026-08-13T08:00:00.000Z',
     lastMessagePreview: 'Hello',
@@ -42,6 +46,7 @@ function staffConversation(overrides: Partial<StaffConversation> = {}): Conversa
   return {
     id: 'conv-1',
     organizationId: 'org-1',
+    communityId: null,
     type: 'support_dm',
     status: 'engaged',
     title: null,
@@ -312,6 +317,7 @@ function customerMessage(
     body: id,
     messageType: 'text',
     createdAt,
+    editedAt: null,
     replyTo: null,
     reactions: [],
     attachments: [],
@@ -331,6 +337,7 @@ function staffMessage(
     body: id,
     messageType: 'text',
     createdAt,
+    editedAt: null,
     replyTo: null,
     reactions: [],
     attachments: [],

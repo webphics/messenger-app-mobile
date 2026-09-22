@@ -1,5 +1,12 @@
 import { router } from "expo-router";
-import { AlertCircle, Eye, EyeOff, MailCheck } from "@/components/icons";
+import {
+  AlertCircle,
+  ChevronLeft,
+  Eye,
+  EyeOff,
+  MailCheck,
+  Pencil,
+} from "@/components/icons";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,22 +26,58 @@ import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { GOOGLE_CONFIG } from "@/lib/google-config";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
-import { ROLE_HREF } from "@/lib/hub-routes";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { magicLinkRequestNotice } from "@/lib/magic-link-route";
 import { settleDownEnter, settleEnter } from "@/lib/motion-enter";
-import { emailLooksValid } from "@/lib/email";
+import { type AccountState, fetchAccountState } from "@/lib/account-state";
+import {
+  cacheAccountState,
+  type CachedAccountState,
+  readCachedAccountState,
+} from "@/lib/account-state-cache";
+import { OFFLINE_NOTICE } from "@/lib/auth-machine";
+import { signedInDestination } from "@/lib/onboarding-gate";
+import {
+  identifierError,
+  normaliseIdentifier,
+} from "@/lib/sign-in-identifier";
+import {
+  CREDENTIALS_COPY,
+  type CredentialsMode,
+  FIRST_STEP,
+  STEP_COPY,
+  type SignInStep,
+  credentialsMode,
+  previousStep,
+  showsIdentifierRow,
+  showsPasswordField,
+} from "@/lib/sign-in-steps";
 import type { SeedAccount } from "@/lib/seed-accounts";
 import { colors, screenTopPad } from "@/lib/tokens";
 
 /**
- * The only way into the app.
+ * The only way into the app, in the three steps the web client asks in
+ * (`login-form.tsx`, `type LoginStep`).
+ *
+ * The identifier is asked for alone, and what follows it is whatever that
+ * identifier actually needs: a password for an account that has one, the link
+ * for an account that does not and for an address nobody holds yet.
+ *
+ * Step one asks the API which of those it is (`POST /auth/account-state`), and
+ * it did not used to — this screen was written when the API refused to say
+ * whether an account existed. `lib/account-state` records why that changed:
+ * drawing the controls is itself the disclosure, so the choice was between
+ * telling for free and telling under a budget. A failed probe stays on step one
+ * rather than guessing which screen to draw.
  *
  * There was a second screen beside this one — a registration form — and it
  * posted nowhere, because the API has no self-registration endpoint. An account
  * comes into existence one way on mobile: someone asks for a sign-in link and
- * verifies it. So the link below is not a convenience, it is the sign-up path,
- * and the copy where "create an account" used to link says so.
+ * verifies it. So the link below is not a convenience, it is the sign-up path.
+ * What it no longer does is ask for a name on the way: a link-made account
+ * arrives with none, and the onboarding gate asks for it once the session
+ * exists, which is the one place that question is asked of every account
+ * however it was made.
  */
 
 /**
@@ -46,16 +89,13 @@ import { colors, screenTopPad } from "@/lib/tokens";
  *
  * Three fields rather than a union, because they genuinely vary independently: a
  * second link is in flight *while* the first one's confirmation still stands.
- * Collapsing them would take the confirmation off the screen for the length of
- * the resend and flip the button's label mid-spinner, so the control someone
- * just pressed would read as a different one exactly while it was busy.
  *
- * `sentTo` is the address that was *typed*, never anything the server said back,
- * because an answer that varied by whether the account existed is exactly what
- * this flow must not have.
+ * `sentTo` is the identifier that was *typed*, never anything the server said
+ * back, because an answer that varied by whether the account existed is exactly
+ * what this flow must not have.
  */
 type LinkRequest = {
-  /** The address the last confirmed link went to, or null when none has gone. */
+  /** The identifier the last confirmed link went to, or null when none has gone. */
   sentTo: string | null;
   sending: boolean;
   /** What went wrong last time, or null. */
@@ -117,20 +157,37 @@ export function SignInForm() {
    * on this screen may be pressable while it is.
    */
   const busy = submitting || pending !== null;
-  const [email, setEmail] = useState("");
+  const [step, setStep] = useState<SignInStep>(FIRST_STEP);
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
+  const [identifierFieldError, setIdentifierFieldError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  /**
-   * What to call the account a link would create.
-   *
-   * Not part of `LinkRequest`, because it is not something a request produced —
-   * it is what someone typed, and it has to survive a refusal and a resend the
-   * same way the address does.
-   */
-  const [name, setName] = useState("");
   const [linkRequest, setLinkRequest] = useState<LinkRequest>(NO_LINK_REQUEST);
+  /**
+   * Whether the machine's standing notice still describes what is on screen.
+   *
+   * The machine clears its notice when a new attempt starts, which covers the
+   * case of pressing the same button twice. It cannot cover the case of
+   * *leaving*: a refusal for one identifier stayed on screen through a step
+   * back and a different identifier being typed, still saying the password was
+   * wrong for an account nobody had tried. The same reasoning `linkRequest`
+   * already applies to its own failure — a message must not outlive the attempt
+   * it described — and there is no event that would clear a notice the machine
+   * owns, so it is suppressed here rather than cleared there.
+   */
+  const [noticeStale, setNoticeStale] = useState(false);
+  /** What step two is about, once the probe has said. Null until it has. */
+  const [credentials, setCredentials] = useState<CredentialsMode | null>(null);
+  /** The one answer this screen holds, so going back and returning is free. */
+  const [accountCache, setAccountCache] = useState<CachedAccountState | null>(null);
+  const [probing, setProbing] = useState(false);
+  /**
+   * Why the probe could not answer. Its own field rather than the machine's
+   * notice: nobody was signed in or refused by it, and it describes the control
+   * that was pressed last.
+   */
+  const [probeFailure, setProbeFailure] = useState<string | null>(null);
   const sendingLink = linkRequest.sending;
   /**
    * Whether anything at all is out — the one guard every control on this screen
@@ -141,13 +198,9 @@ export function SignInForm() {
    * is about to be replaced by a Hub; signing in mid-link-request lands a
    * confirmation on a screen nobody is looking at. And a control that accepts a
    * press it will drop is worse than one that says it is busy.
-   *
-   * Which control is *spinning* stays separate: that has to be the one that was
-   * pressed, or the button someone did not touch reads as busy to the eye and to
-   * a screen reader alike.
    */
-  const anyRequestOut = busy || sendingLink;
-  const emailRef = useRef<TextInput>(null);
+  const anyRequestOut = busy || sendingLink || probing;
+  const identifierRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   /**
    * What the last attempt came back with — the server's own words for a refusal,
@@ -156,46 +209,136 @@ export function SignInForm() {
    * newer answer, and it describes the control that was pressed last.
    */
   const notice =
-    linkRequest.failure !== null
-      ? linkRequest.failure
-      : state.status === "signed-out"
-        ? state.notice
-        : null;
+    probeFailure !== null
+      ? probeFailure
+      : linkRequest.failure !== null
+        ? linkRequest.failure
+        : state.status === "signed-out" && !noticeStale
+          ? state.notice
+          : null;
 
   // Navigating from the state rather than from the submit handler's return value
   // is what makes the destination the role the *server* assigned. Nothing on this
-  // screen chooses it, and nothing on this screen can.
+  // screen chooses it, and nothing on this screen can — including the one case
+  // where the destination is not a Hub at all: an account with no name is owed
+  // onboarding first, whichever of the three ways in produced the session.
   useEffect(() => {
     if (state.status !== "signed-in") return;
     hapticSuccess();
-    router.replace(ROLE_HREF[state.user.role]);
+    router.replace(signedInDestination(state.user));
   }, [state]);
+
+  /**
+   * Move to the field the new step opens on, once that field is mounted.
+   *
+   * Deferred because the control mounts in the render the step change causes, so
+   * a focus call made alongside `setStep` is aimed at something that is not
+   * there yet.
+   */
+  function focusAfterPaint(ref: React.RefObject<TextInput | null>) {
+    requestAnimationFrame(() => ref.current?.focus());
+  }
+
+  function goBack() {
+    const target = previousStep(step);
+    if (target === null || anyRequestOut) return;
+
+    setStep(target);
+    setNoticeStale(true);
+    // Only the failure. A standing confirmation is not cleared: a link did go to
+    // that identifier, and still has.
+    setLinkRequest((prev) => ({ ...prev, failure: null }));
+    if (target === "identifier") focusAfterPaint(identifierRef);
+  }
+
+  /**
+   * Step one: validate the identifier, then ask what it needs.
+   *
+   * It used to advance on the validation alone, because the API refused to say
+   * whether an account existed. `POST /auth/account-state` now answers that
+   * deliberately — see `lib/account-state` for why the API conceded it — so
+   * step two can draw a password field only for an account that has one.
+   *
+   * A cached answer is used rather than asked for again, which is what makes
+   * fixing a typo and coming back free against a budget the API keeps per
+   * identifier.
+   */
+  async function onIdentifierSubmit() {
+    if (anyRequestOut) return;
+
+    const next = identifierError(identifier);
+    setIdentifierFieldError(next);
+    if (next) {
+      hapticWarning();
+      identifierRef.current?.focus();
+      return;
+    }
+
+    setNoticeStale(false);
+    setProbeFailure(null);
+
+    const sending = normaliseIdentifier(identifier);
+    const known = readCachedAccountState(accountCache, sending, Date.now());
+    if (known) {
+      enterCredentials(known);
+      return;
+    }
+
+    setProbing(true);
+    try {
+      const result = await fetchAccountState(sending);
+      if (!result.ok) {
+        // Stay where we are. Advancing on a failed probe means picking one of
+        // the two step-two screens without knowing which is right, and picking
+        // the link-only one would hide the password field from somebody who has
+        // a password and blame their account for it.
+        hapticWarning();
+        setProbeFailure(
+          result.failure.kind === "refused"
+            ? result.failure.message
+            : result.failure.kind === "unreachable"
+              ? OFFLINE_NOTICE
+              : "The server sent something this app could not read.",
+        );
+        return;
+      }
+
+      setAccountCache(cacheAccountState(sending, result.value, Date.now()));
+      enterCredentials(result.value);
+    } finally {
+      setProbing(false);
+    }
+  }
+
+  /** Move to step two knowing what it has to draw, and open on the right field. */
+  function enterCredentials(state: AccountState) {
+    const mode = credentialsMode(state);
+    setCredentials(mode);
+    setStep("credentials");
+    if (showsPasswordField(mode)) focusAfterPaint(passwordRef);
+  }
 
   async function onSubmit() {
     if (anyRequestOut) return;
     // Only the failure. It outranks the machine's notice, so left standing it
-    // would outlive the attempt it described and speak over this one. A standing
-    // confirmation is not cleared: a link did go to that address, and still has.
+    // would outlive the attempt it described and speak over this one.
     setLinkRequest((prev) => ({ ...prev, failure: null }));
 
-    const nextEmail = emailLooksValid(email.trim()) ? null : "Enter a valid email address";
     // Shape is not judged here. Refusing to send a password that fails today's
     // rules would lock out an older account that met the rules when it was
     // created — the server is the authority on what is valid.
     const nextPassword = password === "" ? "Enter your password" : null;
-    setEmailError(nextEmail);
     setPasswordError(nextPassword);
-    if (nextEmail || nextPassword) {
+    if (nextPassword) {
       hapticWarning();
-      // Move to the first thing that is wrong: the errors below the fold are
-      // otherwise invisible on a short screen with the keyboard up.
-      (nextEmail ? emailRef : passwordRef).current?.focus();
+      passwordRef.current?.focus();
       return;
     }
 
+    setNoticeStale(false);
     setPending("password");
     try {
-      await signIn(email.trim(), password);
+      await signIn(normaliseIdentifier(identifier), password);
     } finally {
       setPending(null);
     }
@@ -204,30 +347,33 @@ export function SignInForm() {
   /**
    * Ask for a sign-in link, and say where it went.
    *
-   * Deliberately says the same thing for every address. The API answers a
-   * first-time email exactly as it answers a known one — verifying the link is
-   * what creates the Customer account — and a screen that said "no account with
-   * that email" would hand anyone who can type a way to find out who has one.
+   * Deliberately says the same thing for every identifier. The API answers a
+   * first-time address exactly as it answers a known one — verifying the link is
+   * what creates the account — and a screen that said "no account with that
+   * email" would hand anyone who can type a way to find out who has one. An
+   * unknown *username* is answered identically and sends nothing, which is the
+   * same refusal to enumerate seen from the other side.
    */
   async function onRequestLink() {
     if (anyRequestOut) return;
 
-    const trimmed = email.trim();
-    if (!emailLooksValid(trimmed)) {
-      setEmailError("Enter a valid email address");
+    const next = identifierError(identifier);
+    if (next) {
+      setIdentifierFieldError(next);
       hapticWarning();
-      emailRef.current?.focus();
+      setStep("identifier");
+      focusAfterPaint(identifierRef);
       return;
     }
 
-    setEmailError(null);
+    const sending = normaliseIdentifier(identifier);
+    setIdentifierFieldError(null);
+    setNoticeStale(false);
     // The standing confirmation is kept, not cleared: while a second link is on
     // its way the first one is still the true answer to "where did it go".
     setLinkRequest((prev) => ({ ...prev, sending: true, failure: null }));
 
-    const message = magicLinkRequestNotice(
-      await requestMagicLink(trimmed, name),
-    );
+    const message = magicLinkRequestNotice(await requestMagicLink(sending));
     if (message) {
       hapticWarning();
       setLinkRequest((prev) => ({ ...prev, sending: false, failure: message }));
@@ -235,27 +381,28 @@ export function SignInForm() {
     }
 
     hapticSuccess();
-    setLinkRequest({ sentTo: trimmed, sending: false, failure: null });
+    setLinkRequest({ sentTo: sending, sending: false, failure: null });
+    setStep("link-sent");
   }
 
   /**
    * Hand off to Google, and let the machine decide what came back.
    *
-   * Nothing typed is touched, on any path. A person who cancels the sheet or
-   * whose sign-in fails still has the email and password they were part-way
-   * through, so falling back to another method is not a retype.
+   * Nothing typed is touched, on any path. A person who cancels the sheet still
+   * has what they were part-way through, so falling back to another method is
+   * not a retype.
    */
   async function onGoogleSignIn() {
     if (anyRequestOut) return;
 
+    setNoticeStale(false);
     setPending("google");
     try {
       // Cleared afterwards rather than before, and only when there was an
       // attempt. A stale link failure outranks the machine's notice and would
       // speak over a Google error, so it cannot stay; but a dismissed sheet is
       // not an attempt, and clearing it then would make closing a sheet erase
-      // something. The standing confirmation is never cleared either way — a
-      // link did go to that address, and still has.
+      // something.
       if (await signInWithGoogle()) {
         setLinkRequest((prev) => ({ ...prev, failure: null }));
       }
@@ -269,16 +416,27 @@ export function SignInForm() {
    *
    * Not a sign-in: the fields fill, the person presses the same button as
    * everyone else, and the role they land in is whatever the server says that
-   * account holds. See `components/auth/seed-account-picker`.
+   * account holds. It advances to the password step, because filling a password
+   * on a step that does not show one would be a control writing somewhere
+   * nobody can see.
    */
   function onPickSeedAccount(account: SeedAccount) {
-    setEmail(account.email);
+    setIdentifier(account.email);
     setPassword(account.password);
-    setEmailError(null);
+    setIdentifierFieldError(null);
     setPasswordError(null);
-    // A confirmation names an address, and this one has just changed.
+    // A confirmation names an identifier, and this one has just changed.
     setLinkRequest(NO_LINK_REQUEST);
+    setProbeFailure(null);
+    // A seed account has a password by construction — that is what the picker
+    // filled in — so step two is asked for it without spending a probe.
+    enterCredentials({ exists: true, hasPassword: true });
   }
+
+  const heading =
+    step === "credentials"
+      ? CREDENTIALS_COPY[credentials ?? "password"]
+      : STEP_COPY[step];
 
   return (
     // Shrinking the scroll viewport is what keeps a focused field above the
@@ -329,96 +487,158 @@ export function SignInForm() {
           className="mt-6 rounded-3xl border border-line/70 bg-surface p-5 shadow-md shadow-black/8"
         >
           <Text variant="headline" className="text-ink">
-            Welcome back
+            {heading.title}
           </Text>
           <Text variant="label" className="mt-0.5 font-normal text-muted">
-            Sign in to access your queue and chats
+            {heading.description}
           </Text>
 
-          <View className="mt-5">
-            <Text variant="label" className="mb-1.5 text-ink">
-              Work Email
-            </Text>
-            <Input
-              ref={emailRef}
-              className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
-              placeholder="name@company.com"
-              accessibilityLabel="Email"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoCorrect={false}
-              spellCheck={false}
-              // Both, deliberately: Android reads autoComplete, iOS reads
-              // textContentType, and without them a password manager has nothing
-              // to offer against.
-              autoComplete="email"
-              textContentType="emailAddress"
-              returnKeyType="next"
-              submitBehavior="submit"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              value={email}
-              onChangeText={(v) => {
-                setEmail(v);
-                setEmailError(null);
-                // A confirmation names an address. The moment that address stops
-                // being the one in the field, it is describing somewhere else.
-                setLinkRequest(NO_LINK_REQUEST);
-              }}
-            />
-            <FieldError message={emailError} />
-          </View>
+          {/* The identifier, on the steps that no longer ask for it. The whole
+              row is the way back, rather than a line of text with a separate
+              control beside it. */}
+          {showsIdentifierRow(step) ? (
+            <TactilePressable
+              accessibilityRole="button"
+              accessibilityLabel={`Signing in as ${identifier}. Change it.`}
+              disabled={anyRequestOut}
+              onPress={goBack}
+              className="mt-4 flex-row items-center gap-2 rounded-2xl border border-line/70 bg-line/25 px-3.5 py-3"
+            >
+              <ChevronLeft color={colors.muted} size={16} />
+              <Text
+                variant="label"
+                className="min-w-0 flex-1 text-ink"
+                numberOfLines={1}
+              >
+                {identifier.trim()}
+              </Text>
+              <Pencil color={colors.muted} size={14} />
+            </TactilePressable>
+          ) : null}
 
-          <View className="mt-4">
-            <Text variant="label" className="mb-1.5 text-ink">
-              Password
-            </Text>
-            <View className="relative justify-center">
+          {step === "identifier" ? (
+            <View className="mt-5">
+              <Text variant="label" className="mb-1.5 text-ink">
+                Username or email
+              </Text>
               <Input
-                ref={passwordRef}
-                className="h-12 rounded-2xl border-line/80 bg-line/35 pr-11 font-sans text-base text-ink"
-                placeholder="••••••••"
-                accessibilityLabel="Password"
-                secureTextEntry={!showPassword}
+                ref={identifierRef}
+                className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
+                placeholder="name@company.com"
+                accessibilityLabel="Username or email"
                 autoCapitalize="none"
+                // Not `email-address`: a username is as valid here as an
+                // address, and that keyboard hides the layout somebody typing
+                // one needs.
+                keyboardType="default"
                 autoCorrect={false}
                 spellCheck={false}
-                autoComplete="current-password"
-                textContentType="password"
-                returnKeyType="go"
-                onSubmitEditing={() => void onSubmit()}
-                value={password}
+                // Both, deliberately: Android reads autoComplete, iOS reads
+                // textContentType, and without them a password manager has
+                // nothing to offer against. `username` rather than `email`,
+                // since either may be stored against this field.
+                autoComplete="username"
+                textContentType="username"
+                returnKeyType="next"
+                submitBehavior="submit"
+                onSubmitEditing={() => void onIdentifierSubmit()}
+                value={identifier}
                 onChangeText={(v) => {
-                  setPassword(v);
-                  setPasswordError(null);
+                  setIdentifier(v);
+                  setIdentifierFieldError(null);
+                  setNoticeStale(true);
+                  setProbeFailure(null);
+                  // A confirmation names an identifier. The moment that stops
+                  // being the one in the field, it is describing somewhere else.
+                  setLinkRequest(NO_LINK_REQUEST);
                 }}
               />
-              <TactilePressable
-                accessibilityRole="button"
-                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                onPress={() => setShowPassword((prev) => !prev)}
-                className="absolute right-3 size-8 items-center justify-center rounded-full"
-              >
-                {showPassword ? (
-                  <EyeOff color={colors.inkSoft} size={18} />
-                ) : (
-                  <Eye color={colors.muted} size={18} />
-                )}
-              </TactilePressable>
+              <FieldError message={identifierFieldError} />
             </View>
-            <FieldError message={passwordError} />
-          </View>
+          ) : null}
 
-          <SeedAccountPicker
-            filled={{ email, password }}
-            onSelect={onPickSeedAccount}
-            // Inert while either request is out. Filling the form clears the
-            // link request's state, and doing that mid-flight would take the
-            // spinner off the button, drop the guard that stops a second
-            // request, and land the confirmation on an address the form no
-            // longer holds.
-            disabled={anyRequestOut}
-          />
+          {step === "credentials" && showsPasswordField(credentials ?? "password") ? (
+            <View className="mt-4">
+              <Text variant="label" className="mb-1.5 text-ink">
+                Password
+              </Text>
+              <View className="relative justify-center">
+                <Input
+                  ref={passwordRef}
+                  className="h-12 rounded-2xl border-line/80 bg-line/35 pr-11 font-sans text-base text-ink"
+                  placeholder="••••••••"
+                  accessibilityLabel="Password"
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  autoComplete="current-password"
+                  textContentType="password"
+                  returnKeyType="go"
+                  onSubmitEditing={() => void onSubmit()}
+                  value={password}
+                  onChangeText={(v) => {
+                    setPassword(v);
+                    setPasswordError(null);
+                  }}
+                />
+                <TactilePressable
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 size-8 items-center justify-center rounded-full"
+                >
+                  {showPassword ? (
+                    <EyeOff color={colors.inkSoft} size={18} />
+                  ) : (
+                    <Eye color={colors.muted} size={18} />
+                  )}
+                </TactilePressable>
+              </View>
+              <FieldError message={passwordError} />
+            </View>
+          ) : null}
+
+          {/* Deliberately not cleared when the step changes. The confirmation
+              names where a link went, and going back to look at the password
+              does not move it. */}
+          {step === "link-sent" && linkRequest.sentTo !== null ? (
+            <View
+              className="mt-4 flex-row items-start gap-2.5 rounded-2xl border border-line/70 bg-primary-soft/40 p-3.5"
+              accessibilityLiveRegion="polite"
+            >
+              <View className="mt-0.5">
+                <MailCheck color={colors.primary} size={16} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text variant="label" className="text-ink">
+                  Sign-in link sent
+                </Text>
+                {/* Names the identifier, and nothing else. The same sentence
+                    appears whether or not it has an account. */}
+                <Text variant="meta" className="mt-1 text-muted">
+                  Check the inbox for{" "}
+                  <Text variant="meta" className="font-semibold text-ink">
+                    {linkRequest.sentTo}
+                  </Text>
+                  {" and open the link on this device. It expires shortly — ask for another if it does."}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {step === "identifier" ? (
+            <SeedAccountPicker
+              filled={{ email: identifier, password }}
+              onSelect={onPickSeedAccount}
+              // Inert while either request is out. Filling the form clears the
+              // link request's state, and doing that mid-flight would take the
+              // spinner off the button and drop the guard that stops a second
+              // request.
+              disabled={anyRequestOut}
+            />
+          ) : null}
 
           {notice ? (
             <View
@@ -434,151 +654,118 @@ export function SignInForm() {
             </View>
           ) : null}
 
-          <Button
-            className="mt-6 min-h-12 w-full"
-            onPress={() => void onSubmit()}
-            // Enabled until an attempt starts, then disabled with a spinner —
-            // which is also the second half of the double-submit guard. "An
-            // attempt" includes a Google sheet that is open, which the machine
-            // cannot see.
-            disabled={anyRequestOut}
-            accessibilityState={{ disabled: anyRequestOut, busy: passwordBusy }}
-          >
-            {passwordBusy ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : null}
-            {/* The label stays put while it spins, so the control never looks like a different one. */}
-            <Text>Sign In</Text>
-          </Button>
-
-          <View className="mt-6 flex-row items-center gap-3">
-            <View className="h-px flex-1 bg-line" />
-            <Text variant="label" className="text-muted">
-              or
-            </Text>
-            <View className="h-px flex-1 bg-line" />
-          </View>
-
-          <View className="mt-4">
-            <Text variant="label" className="mb-1.5 text-ink">
-              Your Name <Text variant="label" className="text-muted">(optional)</Text>
-            </Text>
-            <Input
-              className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
-              placeholder="Jordan Ellis"
-              accessibilityLabel="Your name, optional"
-              autoCapitalize="words"
-              autoCorrect={false}
-              autoComplete="name"
-              textContentType="name"
-              returnKeyType="send"
-              onSubmitEditing={() => void onRequestLink()}
-              value={name}
-              onChangeText={setName}
-            />
-            {/* No `FieldError` beneath it, and no validation behind it: there is
-                no rule a name can fail, and inventing one here would be the only
-                place on this screen that turned someone away over a preference. */}
-          </View>
-
-          {/* Deliberately not cleared when the name changes, unlike the address.
-              The confirmation names where a link went, and editing a name does
-              not move it. */}
-          {linkRequest.sentTo !== null ? (
-            <View
-              className="mt-4 flex-row items-start gap-2.5 rounded-2xl border border-line/70 bg-primary-soft/40 p-3.5"
-              accessibilityLiveRegion="polite"
+          {step === "identifier" ? (
+            <Button
+              className="mt-6 min-h-12 w-full"
+              onPress={() => void onIdentifierSubmit()}
+              disabled={anyRequestOut}
+              accessibilityState={{ disabled: anyRequestOut }}
             >
-              <View className="mt-0.5">
-                <MailCheck color={colors.primary} size={16} />
-              </View>
-              <View className="min-w-0 flex-1">
-                <Text variant="label" className="text-ink">
-                  Sign-in link sent
-                </Text>
-                {/* Names the address, and nothing else. The same sentence appears
-                    whether or not that address has an account. */}
-                <Text variant="meta" className="mt-1 text-muted">
-                  Check{" "}
-                  <Text variant="meta" className="font-semibold text-ink">
-                    {linkRequest.sentTo}
-                  </Text>
-                  {" and open the link on this device. It expires shortly — ask for another if it does."}
-                </Text>
-              </View>
-            </View>
+              <Text>Continue</Text>
+            </Button>
           ) : null}
 
-          <Button
-            variant="outline"
-            className="mt-4 min-h-12 w-full"
-            onPress={() => void onRequestLink()}
-            disabled={anyRequestOut}
-            accessibilityState={{ disabled: anyRequestOut, busy: sendingLink }}
-          >
-            {sendingLink ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : null}
-            {/* Reads as a repeat once one has gone, so asking again is an obvious
-                move rather than something that looks like starting over. */}
-            <Text className="text-ink">
-              {linkRequest.sentTo === null
-                ? "Email me a sign-in link"
-                : "Send another link"}
-            </Text>
-          </Button>
+          {step === "credentials" && showsPasswordField(credentials ?? "password") ? (
+            <Button
+              className="mt-6 min-h-12 w-full"
+              onPress={() => void onSubmit()}
+              // Enabled until an attempt starts, then disabled with a spinner —
+              // which is also the second half of the double-submit guard.
+              disabled={anyRequestOut}
+              accessibilityState={{ disabled: anyRequestOut, busy: passwordBusy }}
+            >
+              {passwordBusy ? (
+                <ActivityIndicator size="small" color={colors.primaryForeground} />
+              ) : null}
+              {/* The label stays put while it spins, so the control never looks like a different one. */}
+              <Text>Sign In</Text>
+            </Button>
+          ) : null}
 
-          {/* Where “Don’t have an account? Create one” used to link to a form that
-              posted nowhere. Verifying a link is how an account is made, so the
-              sentence names that rather than sending anyone looking for a screen
-              that no longer exists. */}
-          <Text variant="meta" className="mt-2.5 text-center text-muted">
-            No account yet? No password needed — the link makes one when you open
-            it, under the name above.
-          </Text>
+          {/* The link, on the two steps where an identifier has been settled on.
+              Step one does not offer it: asking for a link is a request, and
+              step one makes none. */}
+          {step !== "identifier" ? (
+            <Button
+              variant="outline"
+              className="mt-4 min-h-12 w-full"
+              onPress={() => void onRequestLink()}
+              disabled={anyRequestOut}
+              accessibilityState={{ disabled: anyRequestOut, busy: sendingLink }}
+            >
+              {sendingLink ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : null}
+              {/* Reads as a repeat once one has gone, so asking again is an
+                  obvious move rather than something that looks like starting
+                  over. */}
+              <Text className="text-ink">
+                {linkRequest.sentTo === null
+                  ? "Email me a sign-in link"
+                  : "Send another link"}
+              </Text>
+            </Button>
+          ) : null}
 
-          {/*
-            The promise the disabled button in 3a made, kept.
+          {step === "identifier" ? (
+            <>
+              <View className="mt-6 flex-row items-center gap-3">
+                <View className="h-px flex-1 bg-line" />
+                <Text variant="label" className="text-muted">
+                  or
+                </Text>
+                <View className="h-px flex-1 bg-line" />
+              </View>
 
-            It is still a real `disabled` button rather than something that
-            merely looks like one when this build has no OAuth client
-            configured — AGENTS.md's "if it looks clickable, it must be
-            clickable" cuts both ways, and a control that is honestly shut beats
-            one that fires nothing. What changed is that the reason is now a
-            build problem rather than a roadmap, so it is named in a sentence
-            underneath instead of hidden behind a "Soon" pill: the person who
-            can fix it is the person who built it.
-          */}
-          <Button
-            variant="outline"
-            className="mt-3 min-h-12 w-full"
-            onPress={() => void onGoogleSignIn()}
-            // Disabled while any attempt is out, not only this one: the machine
-            // refuses a second submit anyway, and a button that accepts a press
-            // it will drop is worse than one that says it is busy.
-            disabled={googleUnavailable !== null || anyRequestOut}
-            accessibilityLabel={
-              googleUnavailable
-                ? "Continue with Google — not available in this build"
-                : "Continue with Google"
-            }
-            accessibilityState={{
-              disabled: googleUnavailable !== null || anyRequestOut,
-              busy: googleBusy,
-            }}
-          >
-            {googleBusy ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : null}
-            {/* The label stays put while it spins, so the control never looks
-                like a different one. */}
-            <Text className="text-ink">Continue with Google</Text>
-          </Button>
+              {/*
+                It is a real `disabled` button rather than something that merely
+                looks like one when this build has no OAuth client configured —
+                AGENTS.md's "if it looks clickable, it must be clickable" cuts
+                both ways, and a control that is honestly shut beats one that
+                fires nothing. The reason is a build problem, so it is named in a
+                sentence underneath: the person who can fix it is the person who
+                built it.
+              */}
+              <Button
+                variant="outline"
+                className="mt-4 min-h-12 w-full"
+                onPress={() => void onGoogleSignIn()}
+                // Disabled while any attempt is out, not only this one: the
+                // machine refuses a second submit anyway, and a button that
+                // accepts a press it will drop is worse than one that says it is
+                // busy.
+                disabled={googleUnavailable !== null || anyRequestOut}
+                accessibilityLabel={
+                  googleUnavailable
+                    ? "Continue with Google — not available in this build"
+                    : "Continue with Google"
+                }
+                accessibilityState={{
+                  disabled: googleUnavailable !== null || anyRequestOut,
+                  busy: googleBusy,
+                }}
+              >
+                {googleBusy ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : null}
+                <Text className="text-ink">Continue with Google</Text>
+              </Button>
 
-          {googleUnavailable ? (
-            <Text variant="meta" className="mt-2 text-center text-muted">
-              {googleUnavailable}
-            </Text>
+              {googleUnavailable ? (
+                <Text variant="meta" className="mt-2 text-center text-muted">
+                  {googleUnavailable}
+                </Text>
+              ) : null}
+
+              {/* Where “Don’t have an account? Create one” used to link to a form
+                  that posted nowhere. Verifying a link is how an account is
+                  made, so the sentence names that rather than sending anyone
+                  looking for a screen that no longer exists. */}
+              <Text variant="meta" className="mt-4 text-center text-muted">
+                No account yet? Continue with your email — the link makes one
+                when you open it.
+              </Text>
+            </>
           ) : null}
         </Animated.View>
       </ScrollView>

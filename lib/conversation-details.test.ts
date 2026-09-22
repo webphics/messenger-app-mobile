@@ -57,9 +57,7 @@ describe('conversationTypeLabel', () => {
     expect(conversationTypeLabel(staff({ type: 'support_dm' }))).toBe('Support DM')
     expect(conversationTypeLabel(staff({ type: 'staff_dm' }))).toBe('Staff 1:1')
     expect(conversationTypeLabel(staff({ type: 'group' }))).toBe('Group')
-    expect(conversationTypeLabel(staff({ type: 'community_announcement' }))).toBe(
-      'Announcement',
-    )
+    expect(conversationTypeLabel(staff({ type: 'broadcast_inbox' }))).toBe('Announcements')
   })
 })
 

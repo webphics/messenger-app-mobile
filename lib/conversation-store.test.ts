@@ -339,12 +339,15 @@ function loadStore(): Store {
   return require('@/lib/conversation-store') as Store
 }
 
-const DATABASE_NAME = 'enki-store.db'
+const DATABASE_NAME = 'joychat-store.db'
 
 function conversation(id: string, overrides: Partial<Conversation> = {}): Conversation {
   return {
     id,
     organizationId: 'org-1',
+    // Supplied by the round trip through `parseConversation`, so a fixture
+    // compared against what came back off the disk has to carry it too.
+    communityId: null,
     type: 'support_dm',
     lastMessageAt: '2026-08-13T08:00:00.000Z',
     lastMessagePreview: 'Hello',
@@ -831,6 +834,7 @@ function message(id: string, minute: number, overrides: Partial<CustomerMessage>
     body: id,
     messageType: 'text',
     createdAt: at,
+    editedAt: null,
     replyTo: null,
     reactions: [],
     attachments: [],

@@ -14,6 +14,13 @@ import type { Conversation, ConversationPerson } from '@/lib/types'
 
 const SUPPORT_FALLBACK = 'Support'
 
+/**
+ * What to call the one Support DM with no organization to name it: the onboarding thread, held
+ * by a Customer who belongs nowhere yet. Named for what it is for, since there is nothing else
+ * to name it after.
+ */
+const ONBOARDING_TITLE = 'Getting started'
+
 /** The other person in a two-sided conversation, or null where there is not one. */
 export function conversationPeer(conversation: Conversation): ConversationPerson | null {
   if (!isStaffConversation(conversation)) return null
@@ -26,7 +33,7 @@ export function conversationTitle(
   conversation: Conversation,
   organizationNames: ReadonlyMap<string, string> = new Map(),
 ): string {
-  if (conversation.type === 'group' || conversation.type === 'community_announcement') {
+  if (conversation.type === 'group' || conversation.type === 'broadcast_inbox') {
     return conversation.title?.trim() || (conversation.type === 'group' ? 'Group' : 'Announcements')
   }
 
@@ -36,5 +43,6 @@ export function conversationTitle(
     return conversation.title?.trim() || SUPPORT_FALLBACK
   }
 
+  if (!conversation.organizationId) return ONBOARDING_TITLE
   return organizationNames.get(conversation.organizationId)?.trim() || SUPPORT_FALLBACK
 }

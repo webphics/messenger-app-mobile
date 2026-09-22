@@ -4,25 +4,29 @@ import { ScrollView, useWindowDimensions, View } from "react-native";
 import { MetricChart } from "@/components/hub/metric-chart";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
-import {
-  makeRefreshControl,
-  useSimulatedRefresh,
-} from "@/lib/simulated-refresh";
+import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { ChartMetric } from "@/lib/types";
 
 type ChartDetailProps = {
   chart: ChartMetric;
+  /** True while the overview behind this chart is being read again. */
+  refreshing: boolean;
+  /**
+   * Pull-to-refresh. A real request, handed down from `useAnalytics` — this
+   * screen ran `useSimulatedRefresh(() => {})` while the numbers were invented,
+   * which drew a spinner over a function that did nothing.
+   */
+  onRefresh: () => void;
 };
 
-export function ChartDetail({ chart }: ChartDetailProps) {
+export function ChartDetail({ chart, refreshing, onRefresh }: ChartDetailProps) {
   const { width } = useWindowDimensions();
   const plotWidth = Math.max(width - 64, 160);
   const plotHeight =
     chart.kind === "pie" || chart.kind === "donut" ? Math.min(plotWidth, 220) : 180;
   const isPositive = chart.deltaLabel.startsWith("+");
   const isNegative = chart.deltaLabel.startsWith("-");
-  const { refreshing, onRefresh } = useSimulatedRefresh(() => {});
 
   return (
     <ScrollView

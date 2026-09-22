@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-08-21T17:45:28.259Z",
-  "title": "Design System: Enki",
+  "title": "Design System: JoyChat",
   "extensions": {
     "colorMeta": {
-      "enki-ember": {
+      "joychat-ember": {
         "role": "primary",
-        "displayName": "Enki Ember",
+        "displayName": "JoyChat Ember",
         "canonical": "#B83E0B",
         "tonalRamp": [
           "#3A1303", "#571C05", "#7A2807", "#99330B",
@@ -191,7 +191,7 @@
     "typographyMeta": {
       "display": {
         "displayName": "Display",
-        "purpose": "Auth and hub brand moments; extrabold Enki wordmark and large greetings."
+        "purpose": "Auth and hub brand moments; extrabold JoyChat wordmark and large greetings."
       },
       "headline": {
         "displayName": "Headline",
@@ -250,7 +250,7 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Main CTA — Enki Ember fill, white semibold label, 48px tall.",
+      "description": "Main CTA — JoyChat Ember fill, white semibold label, 48px tall.",
       "html": "<button class=\"ds-btn-primary\">Sign in</button>",
       "css": ".ds-btn-primary { background: #B83E0B; color: #FFFFFF; padding: 10px 20px; height: 48px; border: none; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.10); transition: background 0.15s, transform 0.15s; } .ds-btn-primary:hover { background: rgba(184,62,11,0.9); } .ds-btn-primary:active { transform: scale(0.97); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.5); }"
     },
@@ -258,7 +258,7 @@
       "name": "Secondary Button",
       "kind": "button",
       "refersTo": "button-secondary",
-      "description": "Ember Mist wash with Enki Ember text for secondary actions.",
+      "description": "Ember Mist wash with JoyChat Ember text for secondary actions.",
       "html": "<button class=\"ds-btn-secondary\">Secondary</button>",
       "css": ".ds-btn-secondary { background: #FEEBDC; color: #B83E0B; padding: 10px 20px; height: 48px; border: none; border-radius: 12px; font-family: Manrope, system-ui, sans-serif; font-size: 16px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.15s, transform 0.15s; } .ds-btn-secondary:hover { background: rgba(254,235,220,0.8); } .ds-btn-secondary:active { transform: scale(0.97); } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.4); }"
     },
@@ -282,7 +282,7 @@
       "name": "Filter Chip Selected",
       "kind": "chip",
       "refersTo": "chip-selected",
-      "description": "Selected inbox/users filter — Enki Ember fill, white label.",
+      "description": "Selected inbox/users filter — JoyChat Ember fill, white label.",
       "html": "<button class=\"ds-chip-selected\">All</button>",
       "css": ".ds-chip-selected { background: #B83E0B; color: #FFFFFF; border: 1px solid transparent; border-radius: 9999px; padding: 8px 14px; min-height: 36px; font-family: Manrope, system-ui, sans-serif; font-size: 12px; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.10); transition: transform 0.15s, background 0.15s; } .ds-chip-selected:hover { background: rgba(184,62,11,0.9); } .ds-chip-selected:active { transform: scale(0.97); } .ds-chip-selected:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(184,62,11,0.45); }"
     },
@@ -306,7 +306,7 @@
       "name": "Outgoing Bubble",
       "kind": "custom",
       "refersTo": "bubble-outgoing",
-      "description": "Support Ember accent in chat — Enki Ember fill, ~22px radius.",
+      "description": "Support Ember accent in chat — JoyChat Ember fill, ~22px radius.",
       "html": "<div class=\"ds-bubble-out\">Thanks — I’ll check that now.</div>",
       "css": ".ds-bubble-out { background: #B83E0B; color: #FFFFFF; border-radius: 22px 22px 6px 22px; padding: 10px 12px; max-width: 80%; font-family: Manrope, system-ui, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.4; }"
     },
@@ -322,16 +322,16 @@
       "name": "Hub Brand Header",
       "kind": "nav",
       "refersTo": "card-surface",
-      "description": "Enki logo + extrabold wordmark; role eyebrow stays out of this row.",
-      "html": "<header class=\"ds-hub-header\"><span class=\"ds-hub-mark\" aria-hidden=\"true\"></span><span class=\"ds-hub-wordmark\">Enki</span></header>",
+      "description": "JoyChat logo + extrabold wordmark; role eyebrow stays out of this row.",
+      "html": "<header class=\"ds-hub-header\"><span class=\"ds-hub-mark\" aria-hidden=\"true\"></span><span class=\"ds-hub-wordmark\">JoyChat</span></header>",
       "css": ".ds-hub-header { display: flex; align-items: center; gap: 10px; background: #FFFFFF; } .ds-hub-mark { width: 36px; height: 36px; border-radius: 12px; background: #B83E0B; box-shadow: 0 1px 2px rgba(0,0,0,0.10); } .ds-hub-wordmark { font-family: Manrope, system-ui, sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #1A1714; }"
     }
   ],
   "narrative": {
     "northStar": "The Clear Desk (with Support Ember accents)",
-    "overview": "Enki is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. Enki Ember appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Ember Mist). Ember Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.\n\nPersonality is friendly and direct: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is hybrid — hairline line borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). The thread composer is border-only at rest. This phase locks light chrome only; dark tokens exist in CSS for later but must not drive UI now.",
+    "overview": "JoyChat is a modern, usable internal support messenger on a calm white plane. The Clear Desk leads: screens stay light, sparse, and scannable so Contacts, Agents, and Admins can finish a job without chrome noise. JoyChat Ember appears when it means action, selection, or “you” (primary buttons, selected chips, outgoing bubbles, avatar initials on Ember Mist). Ember Mist is the soft help wash — selected states and soft chips — not a second brand color fighting Graphite type.\n\nPersonality is friendly and direct: soft full pills, rounded cards, tactile press, no theatrical gradients. Depth is hybrid — hairline line borders at rest; soft card shadows for hub/inbox rows; stronger shadow only for overlays (reaction tray, attachment sheet). The thread composer is border-only at rest. This phase locks light chrome only; dark tokens exist in CSS for later but must not drive UI now.",
     "keyCharacteristics": [
-      "White Clear Desk surfaces; Graphite type; Enki Ember as the sparse action/help signal",
+      "White Clear Desk surfaces; Graphite type; JoyChat Ember as the sparse action/help signal",
       "Manrope for UI; JetBrains Mono for code-like fragments only",
       "Soft rounded cards (~24px) and chat bubbles (~22px); pills are fully round",
       "Hybrid elevation: border-first, soft card lift, stronger shadow only on overlays (composer is border-only at rest)",
@@ -341,7 +341,7 @@
     "rules": [
       {
         "name": "The One Signal Rule",
-        "body": "Enki Ember occupies a small share of any screen. If ember is everywhere, the Clear Desk failed.",
+        "body": "JoyChat Ember occupies a small share of any screen. If ember is everywhere, the Clear Desk failed.",
         "section": "colors"
       },
       {
@@ -361,7 +361,7 @@
       },
       {
         "name": "The Role Eyebrow Rule",
-        "body": "Role labels are uppercase text-xs labels in the greeting block (and settings active-role pill via hubEyebrow), never competing with the Enki header wordmark.",
+        "body": "Role labels are uppercase text-xs labels in the greeting block (and settings active-role pill via hubEyebrow), never competing with the JoyChat header wordmark.",
         "section": "typography"
       },
       {
@@ -381,9 +381,9 @@
       }
     ],
     "dos": [
-      "Do keep the Clear Desk: white Bg/Surface, Graphite type, Enki Ember as sparse signal.",
+      "Do keep the Clear Desk: white Bg/Surface, Graphite type, JoyChat Ember as sparse signal.",
       "Do use Ember Mist for soft selected/avatar/secondary moments.",
-      "Do put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as Enki only.",
+      "Do put SUPPORT / AGENT / ADMIN in the greeting block and settings pill; brand the header as JoyChat only.",
       "Do use hybrid elevation — line at rest (including composer), stronger shadow on overlays only.",
       "Do keep Agent/Admin hub stats and tiles quiet (Graphite / neutral / amber attention).",
       "Do honor reduced-motion paths for animated transitions.",
@@ -396,7 +396,7 @@
       "Don't build stories, case-status steppers, or Casewire branding.",
       "Don't put role labels in the header wordmark or theme whole hubs per role color.",
       "Don't show the agent avatar stack on the Contact hub.",
-      "Don't stack Enki Ember on unread time + badge + Offers avatar in the same row.",
+      "Don't stack JoyChat Ember on unread time + badge + Offers avatar in the same row.",
       "Don't put overlay-weight shadow on the resting composer.",
       "Don't enable system dark mode for app chrome this phase.",
       "Don't treat Offers as an ad SDK, checkout, or Instagram stories surface."

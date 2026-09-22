@@ -33,7 +33,7 @@ slug: app-agent-layout-tsx
 
 ## Design Specificity Verdict
 
-**LLM:** Partially authored for Enki — role-true IA (Agent 3 / Admin 4, Contact tab-less, chat full-screen) with Clear Desk tokens, but stock React Navigation chrome + Lucide set. Swap labels and it could sit under any SaaS messenger.
+**LLM:** Partially authored for JoyChat — role-true IA (Agent 3 / Admin 4, Contact tab-less, chat full-screen) with Clear Desk tokens, but stock React Navigation chrome + Lucide set. Swap labels and it could sit under any SaaS messenger.
 
 **Deterministic scan:** CLI `detect.mjs` returned `[]` (exit 0) on the three files — expected weak coverage on TSX/native. Manual scan confirmed `title: "Messages"` vs `tabBarLabel: "Conversations"` on both Agent and Admin; token-backed tints (active 6.26:1, inactive 4.83:1 on white); no explicit tab height/safe-area in `tabChrome`.
 
@@ -46,14 +46,14 @@ IA is the win: role-shaped destinations and intentional absence of tabs on Conta
 ## What's Working
 
 1. **Role-true IA** — Agent/Admin/Contact nav model matches product; chat correctly leaves the tab shell.
-2. **Tokenized Clear Desk chrome** — `tabChrome` centralizes surface / line / Enki Blue / muted; One Signal Rule held.
+2. **Tokenized Clear Desk chrome** — `tabChrome` centralizes surface / line / JoyChat Blue / muted; One Signal Rule held.
 3. **Labeled destinations** — not icon-only; Unassigned as a named primary tab is structurally right.
 
 ## Priority Issues
 
 ### [P1] Silent ops tabs — no queue/unread badges
 - **Why:** Agents/Admins live on status; a quiet Unassigned tab forces Home hops and creates anxiety after leaving a thread.
-- **Fix:** Drive `tabBarBadge` from the same mock helpers hubs already use; Enki Blue counts only (document if amber is allowed on chrome).
+- **Fix:** Drive `tabBarBadge` from the same mock helpers hubs already use; JoyChat Blue counts only (document if amber is allowed on chrome).
 - **Suggested command:** `$impeccable harden`
 
 ### [P1] Messages vs Conversations naming split

@@ -47,6 +47,12 @@ export function canViewConversation(
   if (role === 'customer') {
     if (isStaffConversation(conversation)) return false
     if (conversation.type === 'support_dm') return true
+    /*
+     * An Announcements thread names no members — it has one reader, and the API
+     * only ever sends it to them. There is nobody to check this viewer against,
+     * and the send is the check.
+     */
+    if (conversation.type === 'broadcast_inbox') return true
     return conversation.members.some((member) => member.id === userId)
   }
 

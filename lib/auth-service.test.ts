@@ -894,7 +894,7 @@ describe("requesting a magic link", () => {
 
     expect(request).toHaveBeenCalledWith("/auth/magic-link", {
       method: "POST",
-      body: { email: "first-timer@talo.test", url: "https://app.example.com" },
+      body: { identifier: "first-timer@talo.test", url: "https://app.example.com" },
     });
   });
 
@@ -905,7 +905,7 @@ describe("requesting a magic link", () => {
 
     expect(request).toHaveBeenCalledWith(
       "/auth/magic-link",
-      expect.objectContaining({ body: { email: "first-timer@talo.test", url: "https://app.example.com" } }),
+      expect.objectContaining({ body: { identifier: "first-timer@talo.test", url: "https://app.example.com" } }),
     );
   });
 
@@ -942,7 +942,7 @@ describe("requesting a magic link", () => {
       "/auth/magic-link",
       expect.objectContaining({
         body: {
-          email: "first-timer@talo.test",
+          identifier: "first-timer@talo.test",
           name: "Jordan Ellis",
           url: "https://app.example.com",
         },
@@ -977,7 +977,7 @@ describe("requesting a magic link", () => {
 
     expect(request).toHaveBeenCalledWith("/auth/magic-link", {
       method: "POST",
-      body: { email: "first-timer@talo.test", url: "https://app.example.com" },
+      body: { identifier: "first-timer@talo.test", url: "https://app.example.com" },
     });
   });
 });

@@ -10,6 +10,10 @@ import {
 function input(overrides: Partial<WallComposeInput> = {}): WallComposeInput {
   return {
     hasOrganization: true,
+    kind: 'community',
+    title: '',
+    endsAt: null,
+    now: Date.parse('2026-09-19T00:00:00.000Z'),
     attachmentKinds: ['image'],
     linkLabel: '',
     linkUrl: '',
@@ -34,7 +38,13 @@ describe('whether an image is attached', () => {
 describe('what a submit is wrong about', () => {
   it('is nothing, for a valid submit', () => {
     const errors = wallComposeErrors(input())
-    expect(errors).toEqual({ organization: null, attachment: null, link: null })
+    expect(errors).toEqual({
+      organization: null,
+      attachment: null,
+      link: null,
+      title: null,
+      endsAt: null,
+    })
     expect(hasWallComposeError(errors)).toBe(false)
   })
 
@@ -111,5 +121,67 @@ describe('the organization a fresh form starts on', () => {
 
   it('infers nothing with none at all', () => {
     expect(wallComposeDefaultOrganization([])).toBeNull()
+  })
+})
+
+describe('a Post that says what it is', () => {
+  const now = Date.parse('2026-09-19T00:00:00.000Z')
+  const day = 24 * 60 * 60 * 1000
+
+  it('lets a community Post go without a title, because it is a remark', () => {
+    expect(wallComposeErrors(input({ kind: 'community', title: '' })).title).toBeNull()
+  })
+
+  it.each(['promotion', 'giveaway', 'news', 'ad'] as const)(
+    'makes a %s carry a title, which is what it announces',
+    kind => {
+      expect(wallComposeErrors(input({ kind, title: '' })).title).toBe(
+        'This kind of post needs a title.',
+      )
+      expect(wallComposeErrors(input({ kind, title: 'Half price' })).title).toBeNull()
+    },
+  )
+
+  it('reads a title of nothing but spaces as no title', () => {
+    expect(wallComposeErrors(input({ kind: 'news', title: '   ' })).title).not.toBeNull()
+  })
+
+  it('holds the API ceiling on a title', () => {
+    expect(wallComposeErrors(input({ kind: 'news', title: 'x'.repeat(80) })).title).toBeNull()
+    expect(wallComposeErrors(input({ kind: 'news', title: 'x'.repeat(81) })).title).toBe(
+      'A title is at most 80 characters.',
+    )
+  })
+
+  it.each(['promotion', 'giveaway'] as const)('lets a %s end', kind => {
+    expect(
+      wallComposeErrors(input({ kind, title: 'Ends soon', endsAt: now + day, now })).endsAt,
+    ).toBeNull()
+  })
+
+  it.each(['news', 'ad', 'community'] as const)('refuses a deadline on a %s', kind => {
+    expect(wallComposeErrors(input({ kind, title: 'Notice', endsAt: now + day, now })).endsAt).toBe(
+      'Only a promotion or a giveaway can have an end date.',
+    )
+  })
+
+  /** The one the API judges on arrival, so a sheet left open is caught here first. */
+  it('refuses a deadline that has already passed', () => {
+    expect(
+      wallComposeErrors(input({ kind: 'promotion', title: 'Sale', endsAt: now - 1, now })).endsAt,
+    ).toBe('The end date must be in the future.')
+    expect(
+      wallComposeErrors(input({ kind: 'promotion', title: 'Sale', endsAt: now, now })).endsAt,
+    ).toBe('The end date must be in the future.')
+  })
+
+  it('asks for no deadline at all when none was chosen', () => {
+    expect(wallComposeErrors(input({ kind: 'promotion', title: 'Sale', endsAt: null })).endsAt).toBeNull()
+  })
+
+  it('counts a title and a deadline among the things a submit can be wrong about', () => {
+    expect(
+      hasWallComposeError(wallComposeErrors(input({ kind: 'news', title: '' }))),
+    ).toBe(true)
   })
 })

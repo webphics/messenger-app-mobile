@@ -6,7 +6,7 @@ import {
   LINK_REFUSED_NOTICE,
   type MagicLinkRequestOutcome,
 } from "@/lib/auth-response";
-import { ROLE_HREF } from "@/lib/hub-routes";
+import { signedInDestination } from "@/lib/onboarding-gate";
 
 /**
  * What the verification route shows, as a pure function of the token it was
@@ -81,7 +81,12 @@ export function magicLinkStage(
     // being spent, which is the safe way round: verifying would mean ending a
     // live session first, and a tampered link would then have cost them one.
     case "signed-in":
-      return { kind: "navigate", href: ROLE_HREF[state.user.role] };
+      // Through the gate rather than straight to the Hub, and this is the path
+      // that needs it most: a link is this client's sign-up, and an account a
+      // link just made has whatever name was supplied with the request, which
+      // is none. So the common first arrival here is exactly the one owed
+      // onboarding.
+      return { kind: "navigate", href: signedInDestination(state.user) };
 
     // Hydration is still deciding whether there is already a session, and the
     // machine will not take a `submit` until it has. Nothing to say about the

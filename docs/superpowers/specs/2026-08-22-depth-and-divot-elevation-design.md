@@ -2,13 +2,13 @@
 
 **Date:** 2026-08-22  
 **Status:** Approved  
-**Topic:** Visual Depth, Shadows & Recessed "Diviting" Hierarchy across Enki Mobile  
+**Topic:** Visual Depth, Shadows & Recessed "Diviting" Hierarchy across JoyChat Mobile  
 
 ---
 
 ## 1. Overview & Goals
 
-The Enki mobile support client currently presents a clean but predominantly flat plane where cards, inputs, and screens blend into a uniform white field. 
+The JoyChat mobile support client currently presents a clean but predominantly flat plane where cards, inputs, and screens blend into a uniform white field. 
 
 This design introduces a cohesive, modern physical depth model with:
 1. **Recessed "Divit" Wells (Level -1)**: Tactile sunken containers for inputs, search bars, chat composer input field, and metric containers that feel physically carved into the desk canvas.

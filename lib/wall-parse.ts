@@ -1,10 +1,12 @@
 import { asRecord } from '@/lib/api-envelope'
+import { wallPostKinds } from '@/lib/types'
 import type {
   NamedWall,
   WallAttachmentKind,
   WallPost,
   WallPostAttachment,
   WallPostAuthor,
+  WallPostKind,
   WallPostLink,
   WallPostReaction,
 } from '@/lib/types'
@@ -116,6 +118,14 @@ export function parseWallPost(data: unknown): WallPost | null {
     id,
     author,
     organizationId,
+    // Never null, and never dropped for being unreadable: the API defaults an
+    // unclassified Post to `community` on both write and read, so a value this
+    // build does not know reads as the open case rather than as a sixth kind
+    // nothing has a label or a colour for.
+    kind: oneOf(row.kind, wallPostKinds) ?? 'community',
+    title: text(row.title),
+    endsAt: text(row.endsAt),
+    pinnedAt: text(row.pinnedAt),
     body: text(row.body),
     attachments: parseList(row.attachments, parseWallAttachment),
     link: parseWallLink(row.link),

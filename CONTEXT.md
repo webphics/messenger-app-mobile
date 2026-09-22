@@ -1,10 +1,10 @@
-# Enki (Expo mobile)
+# JoyChat (Expo mobile)
 
 Internal support messenger mobile client. This repo is Expo-only; web and API live elsewhere.
 
 ## Language
 
-**Enki**:
+**JoyChat**:
 The product brand shown on launcher, auth, and hub wordmarks.
 _Avoid_: Messenger (as product name), Casewire, ISM
 
@@ -337,9 +337,10 @@ It leads with an image — at least one is required — and may carry text up to
 video and documents, and at most one labelled link button. A reader may react to it, **Vote** on it
 and **Bookmark** it, and nothing else: there are still no replies, no reposts and no quotes, and a
 Post has no reply count because nothing points back at it. It says how many distinct people have
-seen it. Its author may edit it, and an edited Post
+seen it. Its author may edit it, with no window on it, and an edited Post
 says so while keeping the Reactions it already had. Not a Message: a Message lives in a Conversation
-and is addressed to its participants, carries a Receipt, and cannot be edited.
+and is addressed to its participants, carries a Receipt, and is editable only for the fifteen
+minutes after it was sent.
 _Avoid_: Message, announcement, status, update, wall post
 
 **Wall**:
@@ -385,8 +386,25 @@ button says.
 _Avoid_: Comment, thread, Reply (bare — that is a Message quoting another), Message the author
 
 **Offers**:
-In-app promo carousel plus the shared group chat `id: 'offers'`. `"Sponsored"` is a section label only.
+The shared group chat `id: 'offers'`, and the mock promo catalogue an Admin can still add to. No
+longer on the Customer Hub: the carousel that drew it now draws the Wall (**Latest on the Wall**).
 _Avoid_: Stories, ads, sponsored content (as a product feature)
+
+**Analytics & Charts**:
+The Admin Hub's carousel of five cards read from `GET /analytics/overview` — conversations opened
+and messages sent per day over the API's default thirty UTC days, the queue's current mix, opened
+against closed for the range, and every account by role. A tap opens that one chart full-screen,
+where pull-to-refresh re-reads the overview. Staff-only server-side; absent entirely when the read
+failed with nothing already drawn. **Opened and closed are never drawn as one whole** — the API
+permits `closed` to exceed `opened` when a team works down a backlog.
+_Avoid_: Dashboard, metrics, reports, KPIs
+
+**Latest on the Wall**:
+The Customer Hub's carousel of the newest Posts on the reader's own Wall — the Offers carousel's
+strip, reading `GET /wall/posts` instead of the catalogue. A card is a Post's lead image, its body
+and its link label; a tap on any of them opens the Wall tab, since this app has no screen for a
+single Post. Absent entirely when the Wall is empty or could not be read.
+_Avoid_: Feed, highlights (as a product surface), Wall preview
 
 **Launch animation**:
 The looping transparent character animation on the cold-start screen, shown while the session hydrates. Rendered from an animated WebP; the surface behind it is the app background, not part of the asset.
@@ -420,6 +438,18 @@ _Avoid_: Tab bar (that is the host navigator's own bar, kept invisible beneath),
 
 **Message**:
 A unit of chat content in a Conversation: a text body and/or one Attachment. The body may be empty when the Message is only an Attachment; when both are present the body is a caption.
+
+Its author may rewrite it for **fifteen minutes** after sending, and an **Edited** Message says so
+permanently. Only the body changes: the Receipts, Reactions, Attachments and send time are what they
+were, so an edit does not move a Message in its thread. There is no version history — the previous
+wording is gone, which is what the window is for. Text only: a voice note has no body to rewrite,
+and a System notice is the product's own words.
+
+This entry used to end "and cannot be edited", and that reasoning is worth keeping rather than
+quietly deleting: it was the sharpest line between a Message and a Post, and what changed is the
+shape of the edit rather than one of them having none. A Post is its author's to revise for as long
+as it stands, because it is a thing they published. A Message was handed to somebody, so the window
+closes — what can be rewritten is bounded to what has probably not been read yet.
 _Avoid_: Post, chat item, media message (as a separate entity from Message)
 
 **Unsent message**:

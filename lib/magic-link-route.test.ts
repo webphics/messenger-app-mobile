@@ -1,6 +1,7 @@
 import { EXPIRED_NOTICE, OFFLINE_NOTICE, type AuthState } from "@/lib/auth-machine";
 import { LINK_REFUSED_NOTICE } from "@/lib/auth-response";
 import { ROLE_HREF } from "@/lib/hub-routes";
+import { ONBOARDING_HREF } from "@/lib/onboarding-gate";
 import {
   magicLinkRequestNotice,
   magicLinkStage,
@@ -185,5 +186,41 @@ describe("what a link request has to say for itself", () => {
 
   test("a dead network gets the sentence the rest of the app already uses for it", () => {
     expect(magicLinkRequestNotice({ kind: "transport-failure" })).toBe(OFFLINE_NOTICE);
+  });
+});
+
+/**
+ * A link is this client's sign-up, so this is the path most likely to resolve a
+ * session for an account that has no name: the API creates the user inside
+ * `/magic-link/verify`, with whatever name the request carried — and since the
+ * sign-in screen stopped asking for one, that is nothing.
+ */
+describe("a verified link for an account with no name", () => {
+  const nameless: AuthState = {
+    status: "signed-in",
+    user: { ...CUSTOMER, name: "" },
+    stale: false,
+  };
+
+  test("lands on onboarding rather than the Hub", () => {
+    expect(magicLinkStage(TOKEN, nameless, true)).toEqual({
+      kind: "navigate",
+      href: ONBOARDING_HREF,
+    });
+  });
+
+  test("and does so before the token is settled, like any other signed-in link", () => {
+    // Someone already signed in who taps a link is not verifying anything; the
+    // gate applies to them for the same reason the Hub did.
+    expect(magicLinkStage(TOKEN, nameless, false)).toEqual({
+      kind: "navigate",
+      href: ONBOARDING_HREF,
+    });
+  });
+
+  test("an account with a name still goes to its Hub", () => {
+    expect(
+      magicLinkStage(TOKEN, { status: "signed-in", user: CUSTOMER, stale: false }, true),
+    ).toEqual({ kind: "navigate", href: ROLE_HREF[CUSTOMER.role] });
   });
 });

@@ -96,6 +96,18 @@ export function useCommunities(): CommunityTabView {
   const inbox = useConversationInbox()
   const conversations = inbox.status === 'ready' ? inbox.conversations : EMPTY_CONVERSATIONS
 
+  /**
+   * The Conversation list as it stands when a read of the Communities answers,
+   * rather than when that read was started.
+   *
+   * A ref because `myCommunities` needs it and `loadCommunities` must not be
+   * rebuilt every time a message moves a row — that callback is what an effect
+   * re-runs on, so depending on the list directly would re-fetch the Communities
+   * on every socket event.
+   */
+  const conversationsRef = useRef(conversations)
+  conversationsRef.current = conversations
+
   const [communities, setCommunities] = useState<Community[]>([])
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(NOBODY_EXPANDED)
   const [feeds, setFeeds] = useState<ReadonlyMap<string, CommunityFeed>>(NO_FEEDS)
@@ -163,9 +175,10 @@ export function useCommunities(): CommunityTabView {
       }
       setFailure(null)
       // Narrowed before anything is drawn and before anything is written: an
-      // Admin's answer is every Community there is, and one they are not in has
-      // to be invisible rather than refused — on the disk as well as on screen.
-      setCommunities(myCommunities(result.value, viewerId))
+      // Admin's answer is every Community there is, and one that neither holds
+      // them nor holds a room they can open has to be invisible rather than
+      // refused — on the disk as well as on screen.
+      setCommunities(myCommunities(result.value, viewerId, conversationsRef.current))
     })
   }, [viewerId])
 

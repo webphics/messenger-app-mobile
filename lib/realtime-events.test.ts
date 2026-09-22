@@ -171,6 +171,7 @@ describe('parseMessageCreated', () => {
       body: 'fixture probe',
       messageType: 'text',
       createdAt: '2026-09-03T20:22:05.789Z',
+      editedAt: null,
       fromCompany: true,
       replyTo: null,
       reactions: [],
@@ -239,6 +240,7 @@ describe('parseConversationUpdated', () => {
     expect(parseConversationUpdated(CONVERSATION_UPDATED)).toEqual({
       id: '6f74c64f-445b-40fd-b264-e2adcbd77619',
       organizationId: 'acb16271-ee14-4a52-8952-68113b7a11bc',
+      communityId: null,
       type: 'support_dm',
       lastMessageAt: '2026-09-03T20:22:05.730Z',
       lastMessagePreview: 'fixture probe',
@@ -272,7 +274,9 @@ describe('parseConversationUpdated', () => {
     ['null', null],
     ['an empty envelope', {}],
     ['a row with no id', { conversation: { organizationId: 'o1', type: 'support_dm' } }],
-    ['a row with no organization', { conversation: { id: 'c1', type: 'support_dm' } }],
+    // A *group* with no organization, not a support DM: an org-less support DM is the
+    // onboarding thread and is read rather than refused.
+    ['a row with no organization', { conversation: { id: 'c1', type: 'group' } }],
     ['a row with an unknown type', { conversation: { id: 'c1', organizationId: 'o1', type: 'dm' } }],
   ]
 

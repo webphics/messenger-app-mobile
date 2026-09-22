@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Transform Enki's visual system from a flat plane into a rich, modern tactile environment with recessed "divit" wells for inputs/containers, crisp ambient + direct shadows for raised cards, resting elevation on buttons, and high-elevation floating navigation/overlays without introducing new brand colors.
+**Goal:** Transform JoyChat's visual system from a flat plane into a rich, modern tactile environment with recessed "divit" wells for inputs/containers, crisp ambient + direct shadows for raised cards, resting elevation on buttons, and high-elevation floating navigation/overlays without introducing new brand colors.
 
 **Architecture:** Implement a standardized 5-level depth ramp (Level -1 to Level 3) across design tokens (`DESIGN.md`, `lib/tokens.ts`, `global.css`), apply recessed well styling to inputs, search bars, and the chat composer, upgrade conversation/hub/analytics cards with crisp soft shadows and hairline borders, and enhance floating tab capsule and modal sheets with high elevation.
 
