@@ -28,6 +28,8 @@ const AGENT: SessionUser = {
   name: "QA Agent",
   email: "qa-agent@talo.test",
   role: "agent",
+  hasPassword: false,
+  twoFactorEnabled: false,
 };
 
 /** What a missing native module actually throws, verbatim enough to be recognisable. */
@@ -125,7 +127,14 @@ describe("the Kept person", () => {
 
     const [key, value] = store.setItemAsync.mock.calls[0];
     expect(key).toBe(KEPT_PERSON_KEY);
-    expect(JSON.parse(value)).toEqual(AGENT);
+    // The four identity fields and nothing else, which `lib/kept-person` decides
+    // and this only repeats.
+    expect(JSON.parse(value)).toEqual({
+      id: AGENT.id,
+      name: AGENT.name,
+      email: AGENT.email,
+      role: AGENT.role,
+    });
   });
 
   test("reads back as the person who was written", async () => {

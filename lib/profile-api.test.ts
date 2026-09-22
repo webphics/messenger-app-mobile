@@ -32,6 +32,8 @@ const NAMED = {
   name: "Grace Hopper",
   email: "onboarding-probe@talo.test",
   role: "customer",
+  hasPassword: true,
+  twoFactorEnabled: false,
 };
 
 /** Who the device thought was signed in before the write: the nameless account. */
@@ -42,6 +44,8 @@ const BEFORE = {
   name: "onboarding-probe@talo.test",
   email: "onboarding-probe@talo.test",
   role: "customer" as const,
+  hasPassword: true,
+  twoFactorEnabled: false,
 };
 
 const answered = (data: unknown) => ({

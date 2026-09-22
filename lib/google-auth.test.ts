@@ -18,6 +18,8 @@ const CUSTOMER: SessionUser = {
   name: "Ada Customer",
   email: "ada@example.com",
   role: "customer",
+  hasPassword: true,
+  twoFactorEnabled: false,
 };
 
 const SUBMITTING: AuthState = { status: "submitting" };

@@ -6,21 +6,43 @@ const AGENT: SessionUser = {
   name: "QA Agent",
   email: "qa-agent@talo.test",
   role: "agent",
+  // Both false, because the keystore does not carry them and the parse
+  // therefore hands them back as false. See `serialiseKeptPerson`.
+  hasPassword: false,
+  twoFactorEnabled: false,
 };
 
 test("a kept person comes back exactly as they went in", () => {
   expect(parseKeptPerson(serialiseKeptPerson(AGENT))).toEqual(AGENT);
 });
 
-test("only the four fields are written down", () => {
+test("only the four identity fields are written down", () => {
   const written = serialiseKeptPerson({
     ...AGENT,
-    // Whatever a later slice hangs off a session, the keystore is not where it
-    // goes: this holds an identity, not a copy of the session payload.
+    // Whatever a session hangs off a person, the keystore is not where it goes:
+    // this holds an identity, not a copy of the session payload. Which is why
+    // the two account-state flags are dropped here and come back false — a
+    // Stale session hides the account controls until the API confirms it. See
+    // `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
+    hasPassword: true,
     twoFactorEnabled: true,
-  } as SessionUser);
+  });
 
-  expect(JSON.parse(written)).toEqual(AGENT);
+  expect(JSON.parse(written)).toEqual({
+    id: AGENT.id,
+    name: AGENT.name,
+    email: AGENT.email,
+    role: AGENT.role,
+  });
+});
+
+test("a Stale person comes back with both account flags false", () => {
+  const kept = parseKeptPerson(
+    serialiseKeptPerson({ ...AGENT, hasPassword: true, twoFactorEnabled: true }),
+  );
+
+  expect(kept?.hasPassword).toBe(false);
+  expect(kept?.twoFactorEnabled).toBe(false);
 });
 
 describe("what is not a kept person", () => {

@@ -122,9 +122,17 @@ function envelopeData(body: unknown): Record<string, unknown> | null {
 /**
  * The signed-in person, or null when the payload is not one.
  *
- * Only the four fields this client acts on are required. An unknown `role` fails
- * the parse rather than defaulting: guessing would put someone in the wrong Hub,
- * which is the exact failure this whole ticket exists to prevent.
+ * Only the three fields this client acts on are required, being the id, the
+ * address and the role. An unknown `role` fails the parse rather than
+ * defaulting: guessing would put someone in the wrong Hub, which is the exact
+ * failure this whole ticket exists to prevent.
+ *
+ * `hasPassword` and `twoFactorEnabled` are the exception to that strictness, and
+ * deliberately so. They gate the account screens' controls rather than deciding
+ * who anybody is, so a field this client did not receive falls back to false,
+ * which hides a control. The other way round would draw one that acts on an
+ * assumption the payload never made. See
+ * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
  */
 export function parseSessionUser(data: unknown): SessionUser | null {
   const record = asRecord(data);
@@ -142,6 +150,11 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     name: nonEmptyString(record.name) ?? email,
     email,
     role: role as UserRole,
+    // `=== true` rather than truthiness: a string, a 1 or an object would all
+    // pass a loose check and every one of them is a payload this client did not
+    // understand, which is the case the false default exists for.
+    hasPassword: record.hasPassword === true,
+    twoFactorEnabled: record.twoFactorEnabled === true,
   };
 }
 

@@ -24,6 +24,20 @@ export type SessionUser = {
   name: string
   email: string
   role: UserRole
+  /**
+   * Whether this account has a password at all, which is what the password
+   * screen reads to decide whether it is setting a first one or changing an
+   * existing one.
+   *
+   * A magic-link-only or Google-only account has none. `lib/account-state` asks
+   * the same question of an identifier before sign-in, and that path stops being
+   * usable once there is a session, so for anybody already signed in this is the
+   * answer. See
+   * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
+   */
+  hasPassword: boolean
+  /** Whether two-factor is on, which is the state the two-factor row reports. */
+  twoFactorEnabled: boolean
 }
 
 /** A mock directory entry. Only the Agent and Admin screens still read this. */

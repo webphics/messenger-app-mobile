@@ -118,6 +118,8 @@ const USER = {
   name: "QA Agent",
   email: "qa-agent@talo.test",
   role: "agent",
+  hasPassword: true,
+  twoFactorEnabled: false,
 };
 
 const PARSED_USER = {
@@ -125,6 +127,8 @@ const PARSED_USER = {
   name: "QA Agent",
   email: "qa-agent@talo.test",
   role: "agent" as const,
+  hasPassword: true,
+  twoFactorEnabled: false,
 };
 
 function ok(data: unknown, sessionCookie: string | null = null) {

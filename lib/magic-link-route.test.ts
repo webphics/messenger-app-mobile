@@ -16,6 +16,8 @@ const CUSTOMER: SessionUser = {
   name: "First Timer",
   email: "first-timer@talo.test",
   role: "customer",
+  hasPassword: false,
+  twoFactorEnabled: false,
 };
 
 const TOKEN = "3f9a2c";

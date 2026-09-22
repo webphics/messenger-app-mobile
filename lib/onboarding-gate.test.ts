@@ -13,6 +13,8 @@ function person(overrides: Partial<SessionUser> = {}): SessionUser {
     name: "Ada Lovelace",
     email: "ada@example.com",
     role: "customer",
+    hasPassword: true,
+    twoFactorEnabled: false,
     ...overrides,
   };
 }

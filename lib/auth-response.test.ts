@@ -46,12 +46,61 @@ function ok(body: unknown, sessionCookie: string | null = ISSUED): HttpOutcome {
 }
 
 describe("parseSessionUser", () => {
-  test("reads the four fields this client acts on", () => {
+  test("reads the fields this client acts on", () => {
     expect(parseSessionUser(apiUser())).toEqual({
       id: "ab05cfc4-5ee5-40fb-93af-564a773257e5",
       name: "Admin",
       email: "admin@talo.com",
       role: "admin",
+      hasPassword: true,
+      twoFactorEnabled: false,
+    });
+  });
+
+  /**
+   * The two fields the account screens gate on. They are the one place this
+   * parse defaults rather than drops, and the default is the safe direction: a
+   * field this client did not receive hides a control instead of drawing one
+   * that acts on an assumption the payload never made.
+   */
+  describe("the account-state flags", () => {
+    test("both are carried through as the API sent them", () => {
+      const user = parseSessionUser(
+        apiUser({ hasPassword: false, twoFactorEnabled: true }),
+      );
+
+      expect(user?.hasPassword).toBe(false);
+      expect(user?.twoFactorEnabled).toBe(true);
+    });
+
+    test.each(["hasPassword", "twoFactorEnabled"] as const)(
+      "a payload with no %s reads as false rather than dropping the person",
+      (field) => {
+        const payload = apiUser();
+        delete (payload as Record<string, unknown>)[field];
+
+        const user = parseSessionUser(payload);
+        expect(user).not.toBeNull();
+        expect(user?.[field]).toBe(false);
+      },
+    );
+
+    test.each([
+      ["a string", "true"],
+      ["a number", 1],
+      ["null", null],
+      ["an object", {}],
+    ])("%s reads as false", (_label, value) => {
+      const user = parseSessionUser(
+        apiUser({ hasPassword: value, twoFactorEnabled: value }),
+      );
+
+      expect(user?.hasPassword).toBe(false);
+      expect(user?.twoFactorEnabled).toBe(false);
+    });
+
+    test("a field that was already required still drops the person", () => {
+      expect(parseSessionUser(apiUser({ id: "", twoFactorEnabled: true }))).toBeNull();
     });
   });
 
@@ -94,6 +143,8 @@ describe("interpretSignIn", () => {
         name: "Admin",
         email: "admin@talo.com",
         role: "admin",
+        hasPassword: true,
+        twoFactorEnabled: false,
       },
     });
   });
@@ -226,6 +277,8 @@ describe("interpretSession", () => {
         name: "Admin",
         email: "admin@talo.com",
         role: "agent",
+        hasPassword: true,
+        twoFactorEnabled: false,
       },
     });
   });
@@ -314,6 +367,8 @@ describe("interpretMagicLinkVerify", () => {
         name: "Admin",
         email: "admin@talo.com",
         role: "customer",
+        hasPassword: true,
+        twoFactorEnabled: false,
       },
     });
   });
@@ -395,6 +450,8 @@ describe("interpretGoogleSignIn", () => {
         name: "Admin",
         email: "admin@talo.com",
         role: "customer",
+        hasPassword: true,
+        twoFactorEnabled: false,
       },
     });
   });

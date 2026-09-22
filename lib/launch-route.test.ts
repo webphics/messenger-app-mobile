@@ -10,6 +10,8 @@ const AGENT: SessionUser = {
   name: "QA Agent",
   email: "qa-agent@talo.test",
   role: "agent",
+  hasPassword: true,
+  twoFactorEnabled: false,
 };
 
 const signedIn = (role: UserRole): AuthState => ({
