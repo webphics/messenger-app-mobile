@@ -42,6 +42,21 @@ import type { HttpOutcome } from "@/lib/auth-response";
 const SESSION_COOKIE = "better-auth.session_token";
 const SECURE_COOKIE_PREFIX = "__Secure-";
 
+/**
+ * The short-lived cookie better-auth's `twoFactor` plugin sets when a correct
+ * password lands on an account that wants a second factor, under the same two
+ * names and for the same reason.
+ *
+ * It is the only thing besides the Session cookie and the CSRF pair this client
+ * retains off a response, and it is retained for the length of one handshake —
+ * see `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`.
+ * Nothing here holds it: unlike the Session cookie there is deliberately no
+ * module-level slot for it, because a credential kept in a variable outlives the
+ * state it belongs to. It is reported on the outcome and held by the machine
+ * state alone.
+ */
+const TWO_FACTOR_COOKIE = "better-auth.two_factor";
+
 const CSRF_PATH = "/csrf";
 const CSRF_COOKIE = "csrf-token";
 const CSRF_HEADER = "x-csrf-token";
@@ -158,6 +173,30 @@ export function readCookieValue(setCookie: string | null, name: string): string 
  */
 export function findSessionCookie(setCookie: string | null): string | null {
   for (const name of [`${SECURE_COOKIE_PREFIX}${SESSION_COOKIE}`, SESSION_COOKIE]) {
+    const value = readCookieValue(setCookie, name);
+    if (value) return `${name}=${value}`;
+  }
+
+  return null;
+}
+
+/**
+ * The two-factor challenge a response issued, as the `name=value` pair to replay
+ * on the verify call.
+ *
+ * The same shape as `findSessionCookie`, beside it deliberately: both names, the
+ * prefixed one first, the pair kept whole so this client never has to know which
+ * way the API is running. What differs is how long the answer is worth anything,
+ * which is `CHALLENGE_LIFETIME_MS` in `lib/two-factor-challenge` and not a
+ * question this module can answer — the cookie's own `Max-Age` is on the header
+ * and is deliberately not read, because a client that trusted it would trust a
+ * number it has no way to check.
+ */
+export function findChallengeCookie(setCookie: string | null): string | null {
+  for (const name of [
+    `${SECURE_COOKIE_PREFIX}${TWO_FACTOR_COOKIE}`,
+    TWO_FACTOR_COOKIE,
+  ]) {
     const value = readCookieValue(setCookie, name);
     if (value) return `${name}=${value}`;
   }
@@ -423,11 +462,16 @@ export type ApiRequestOptions = {
    */
   file?: UploadFile;
   /**
-   * Present the given Session cookie instead of the held one.
+   * Present the given cookie instead of the held Session one.
    *
-   * For the single case of signing out, where the credential is deliberately
-   * dropped locally *before* the server is told, so a slow logout cannot leave a
-   * live cookie attached to whatever the person does next.
+   * Two callers, wanting it for opposite reasons. Signing out drops the
+   * credential locally *before* the server is told, so that a slow logout cannot
+   * leave a live cookie attached to whatever the person does next, and hands the
+   * ending one down explicitly. Verifying a two-factor code has no Session
+   * cookie to drop — the challenge is the only thing identifying the
+   * half-finished sign-in — and presents it through this same slot rather than
+   * through a second mechanism, because "which cookie goes out on this request"
+   * is one question and deserves one answer.
    */
   cookie?: string;
 };
@@ -482,5 +526,6 @@ export async function apiRequest(
     status: answer.status,
     body: answer.body,
     sessionCookie: findSessionCookie(answer.setCookie),
+    challengeCookie: findChallengeCookie(answer.setCookie),
   };
 }

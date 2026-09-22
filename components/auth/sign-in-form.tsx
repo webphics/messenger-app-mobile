@@ -53,6 +53,7 @@ import {
   showsPasswordField,
 } from "@/lib/sign-in-steps";
 import type { SeedAccount } from "@/lib/seed-accounts";
+import { CHALLENGE_COPY, codeError } from "@/lib/two-factor-challenge";
 import { colors, screenTopPad } from "@/lib/tokens";
 
 /**
@@ -123,12 +124,54 @@ function FieldError({ message }: { message: string | null }) {
   );
 }
 
+/**
+ * The standing message over the form, above whichever controls are on display.
+ *
+ * A component rather than a block written twice, because the three steps and the
+ * code entry both stand under one — and a refused code and a refused password
+ * should not drift into looking like different kinds of news.
+ */
+function FormNotice({ message }: { message: string | null }) {
+  if (!message) return null;
+
+  return (
+    <View className="mt-5 flex-row items-start gap-1.5" accessibilityLiveRegion="polite">
+      <View className="mt-0.5">
+        <AlertCircle color={colors.danger} size={14} />
+      </View>
+      <Text variant="label" className="min-w-0 flex-1 font-medium text-danger">
+        {message}
+      </Text>
+    </View>
+  );
+}
+
 export function SignInForm() {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
   const { keyboardInset, contentRef, scrollProps } = useKeyboardAwareScroll();
-  const { state, signIn, signInWithGoogle, requestMagicLink } = useAuth();
+  const {
+    state,
+    signIn,
+    signInWithGoogle,
+    requestMagicLink,
+    submitTwoFactorCode,
+    cancelTwoFactor,
+  } = useAuth();
   const submitting = state.status === "submitting";
+  /**
+   * The challenge, when the machine is in one.
+   *
+   * Read off `state.status` rather than held as a fourth `SignInStep`, and
+   * deliberately not a route: a half-finished handshake with a held credential
+   * that only makes sense mid-flow must not be an address anyone can reach out
+   * of order. See
+   * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`. The
+   * three steps below are untouched by it — an account without a second factor
+   * never sees this branch at all.
+   */
+  const challenge = state.status === "two-factor" ? state : null;
+  const verifying = challenge?.verifying ?? false;
   /**
    * Which of the two sign-in controls is waiting on something.
    *
@@ -188,6 +231,9 @@ export function SignInForm() {
    * that was pressed last.
    */
   const [probeFailure, setProbeFailure] = useState<string | null>(null);
+  /** The code being typed, and why it cannot be sent yet. */
+  const [code, setCode] = useState("");
+  const [codeFieldError, setCodeFieldError] = useState<string | null>(null);
   const sendingLink = linkRequest.sending;
   /**
    * Whether anything at all is out — the one guard every control on this screen
@@ -199,17 +245,23 @@ export function SignInForm() {
    * confirmation on a screen nobody is looking at. And a control that accepts a
    * press it will drop is worse than one that says it is busy.
    */
-  const anyRequestOut = busy || sendingLink || probing;
+  const anyRequestOut = busy || sendingLink || probing || verifying;
   const identifierRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+  const codeRef = useRef<TextInput>(null);
   /**
    * What the last attempt came back with — the server's own words for a refusal,
    * the two-factor explanation, or a network message. Cleared by the machine the
    * moment a new attempt starts. A failed link request outranks it: it is the
    * newer answer, and it describes the control that was pressed last.
    */
-  const notice =
-    probeFailure !== null
+  const notice = challenge
+    ? // The challenge carries its own, and nothing from before it can still be
+      // true: the identifier was accepted and the password was too, so a probe
+      // failure or a link error standing here would describe a step that has
+      // already succeeded.
+      challenge.notice
+    : probeFailure !== null
       ? probeFailure
       : linkRequest.failure !== null
         ? linkRequest.failure
@@ -227,6 +279,35 @@ export function SignInForm() {
     hapticSuccess();
     router.replace(signedInDestination(state.user));
   }, [state]);
+
+  /**
+   * Open on the code field when the challenge arrives, and leave nothing typed
+   * in it behind when the challenge goes.
+   *
+   * Keyed on whether there is a challenge rather than on which one, so a refused
+   * code leaves the field alone — somebody correcting a typo should not find it
+   * emptied under them.
+   *
+   * Every way *out* clears the code and the password both, which is the half of
+   * "nothing about the attempt retained" that lives on this screen rather than
+   * in the machine. The password especially: it was accepted a moment ago, so a
+   * cancelled challenge that left it sitting in a field would be the abandoned
+   * attempt somebody else holding the phone could finish. The identifier stays,
+   * because it is not a secret and it is what the row above offers as the way
+   * back.
+   */
+  const inChallenge = challenge !== null;
+  useEffect(() => {
+    if (inChallenge) {
+      focusAfterPaint(codeRef);
+      return;
+    }
+
+    setCode("");
+    setCodeFieldError(null);
+    setPassword("");
+    setShowPassword(false);
+  }, [inChallenge]);
 
   /**
    * Move to the field the new step opens on, once that field is mounted.
@@ -433,8 +514,44 @@ export function SignInForm() {
     enterCredentials({ exists: true, hasPassword: true });
   }
 
-  const heading =
-    step === "credentials"
+  /**
+   * Send the code, having refused to send one that could only come back refused.
+   *
+   * The one place this screen judges shape where the password field deliberately
+   * does not — `lib/two-factor-challenge` says why. The challenge itself is not
+   * passed: it lives in the machine state, and a screen that had to hand it back
+   * could hand back the wrong one.
+   */
+  async function onSubmitCode() {
+    if (anyRequestOut || challenge === null) return;
+
+    const next = codeError(code);
+    setCodeFieldError(next);
+    if (next) {
+      hapticWarning();
+      codeRef.current?.focus();
+      return;
+    }
+
+    await submitTwoFactorCode(code);
+  }
+
+  /**
+   * Back out of the challenge, to a sign-in screen with nothing standing on it.
+   *
+   * There is no step behind this one to return to — the challenge is not a step
+   * — so it does not go through `goBack`. Everything it leaves behind is
+   * discarded by the machine and by the effect above, the challenge cookie
+   * included.
+   */
+  function onCancelChallenge() {
+    if (anyRequestOut) return;
+    cancelTwoFactor();
+  }
+
+  const heading = challenge
+    ? CHALLENGE_COPY
+    : step === "credentials"
       ? CREDENTIALS_COPY[credentials ?? "password"]
       : STEP_COPY[step];
 
@@ -493,6 +610,78 @@ export function SignInForm() {
             {heading.description}
           </Text>
 
+          {challenge ? (
+            <>
+              {/*
+                One field, and nothing else on offer. A backup code cannot be
+                redeemed at this moment — `POST /auth/two-factor/verify-backup-code`
+                carries `@UseGuards(AuthGuard)` and there is no session here to
+                satisfy it — so a control for one would be a door that opens onto
+                a wall. See ADR-0013.
+              */}
+              <View className="mt-5">
+                <Text variant="label" className="mb-1.5 text-ink">
+                  Authentication code
+                </Text>
+                <Input
+                  ref={codeRef}
+                  className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base tracking-[6px] text-ink"
+                  placeholder="123456"
+                  accessibilityLabel="Authentication code from your authenticator app"
+                  // The one-time-code hint is what makes an authenticator's own
+                  // suggestion appear over the keyboard, on both platforms.
+                  autoComplete="one-time-code"
+                  textContentType="oneTimeCode"
+                  inputMode="numeric"
+                  keyboardType="number-pad"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  // Long enough to hold a pasted `123 456`, which is normalised
+                  // rather than refused. Nothing here blocks a paste.
+                  maxLength={16}
+                  returnKeyType="go"
+                  onSubmitEditing={() => void onSubmitCode()}
+                  value={code}
+                  onChangeText={(v) => {
+                    setCode(v);
+                    setCodeFieldError(null);
+                  }}
+                />
+                <FieldError message={codeFieldError} />
+              </View>
+
+              <FormNotice message={notice} />
+
+              <Button
+                className="mt-6 min-h-12 w-full"
+                onPress={() => void onSubmitCode()}
+                disabled={anyRequestOut}
+                accessibilityState={{ disabled: anyRequestOut, busy: verifying }}
+              >
+                {verifying ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : null}
+                {/* The label stays put while it spins, as on the password step. */}
+                <Text>Verify</Text>
+              </Button>
+
+              {/* No dead end: there is always a way back to the sign-in screen,
+                  and taking it keeps nothing of the attempt. */}
+              <Button
+                variant="outline"
+                className="mt-4 min-h-12 w-full"
+                onPress={onCancelChallenge}
+                disabled={anyRequestOut}
+                accessibilityLabel="Cancel and go back to sign in"
+                accessibilityState={{ disabled: anyRequestOut }}
+              >
+                <ChevronLeft color={colors.muted} size={16} />
+                <Text className="text-ink">Back to sign in</Text>
+              </Button>
+            </>
+          ) : (
+            <>
           {/* The identifier, on the steps that no longer ask for it. The whole
               row is the way back, rather than a line of text with a separate
               control beside it. */}
@@ -640,19 +829,7 @@ export function SignInForm() {
             />
           ) : null}
 
-          {notice ? (
-            <View
-              className="mt-5 flex-row items-start gap-1.5"
-              accessibilityLiveRegion="polite"
-            >
-              <View className="mt-0.5">
-                <AlertCircle color={colors.danger} size={14} />
-              </View>
-              <Text variant="label" className="min-w-0 flex-1 font-medium text-danger">
-                {notice}
-              </Text>
-            </View>
-          ) : null}
+          <FormNotice message={notice} />
 
           {step === "identifier" ? (
             <Button
@@ -767,6 +944,8 @@ export function SignInForm() {
               </Text>
             </>
           ) : null}
+            </>
+          )}
         </Animated.View>
       </ScrollView>
     </View>

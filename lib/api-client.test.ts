@@ -2,6 +2,7 @@ import { API_BASE_URL } from "@/lib/api-config";
 import {
   apiRequest,
   clearCsrfPair,
+  findChallengeCookie,
   findSessionCookie,
   getSessionCookie,
   readCookieValue,
@@ -261,6 +262,58 @@ describe("findSessionCookie", () => {
   });
 });
 
+/**
+ * The other credential, and the whole of what was blocking two-factor on this
+ * device: the response that raises the challenge sets this cookie, and until now
+ * every cookie that was not the Session one was thrown away as it arrived. See
+ * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`.
+ */
+describe("findChallengeCookie", () => {
+  test("returns the pair to replay, name included", () => {
+    expect(
+      findChallengeCookie("better-auth.two_factor=chal.lenge; Path=/; HttpOnly; Max-Age=600"),
+    ).toBe("better-auth.two_factor=chal.lenge");
+  });
+
+  test("keeps the __Secure- prefix the API adds when it runs with secure cookies", () => {
+    expect(
+      findChallengeCookie("__Secure-better-auth.two_factor=chal.lenge; Path=/; Secure"),
+    ).toBe("__Secure-better-auth.two_factor=chal.lenge");
+  });
+
+  test("finds it in the comma-joined header React Native produces", () => {
+    const joined =
+      "better-auth.session_data=cached; Path=/, better-auth.two_factor=chal.lenge; Path=/; HttpOnly, csrf-token=xyz; Path=/";
+    expect(findChallengeCookie(joined)).toBe("better-auth.two_factor=chal.lenge");
+  });
+
+  test("is not confused by the comma inside an Expires attribute", () => {
+    const joined =
+      "better-auth.two_factor=chal.lenge; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT; HttpOnly";
+    expect(findChallengeCookie(joined)).toBe("better-auth.two_factor=chal.lenge");
+  });
+
+  /**
+   * The two cookies are looked for separately and must stay that way. A
+   * challenge read as a session would be written to the keychain, and a session
+   * read as a challenge would be presented to a route that establishes one.
+   */
+  test("does not answer with the Session cookie, and is not answered by it", () => {
+    const session = "better-auth.session_token=abc.def; Path=/; HttpOnly";
+    expect(findChallengeCookie(session)).toBeNull();
+    expect(findSessionCookie("better-auth.two_factor=chal.lenge; Path=/")).toBeNull();
+  });
+
+  test.each([
+    ["no header at all", null],
+    ["a response that set no cookies", ""],
+    ["a response that set only the CSRF cookie", "csrf-token=xyz; Path=/"],
+    ["a challenge being cleared", "better-auth.two_factor=; Path=/; Max-Age=0"],
+  ])("returns null for %s", (_label, header) => {
+    expect(findChallengeCookie(header)).toBeNull();
+  });
+});
+
 describe("the held credential", () => {
   test("round-trips and can be cleared", () => {
     expect(getSessionCookie()).toBeNull();
@@ -347,6 +400,28 @@ describe("apiRequest", () => {
     });
   });
 
+  /**
+   * The response that raises a two-factor challenge: a 200 carrying no session
+   * and a cookie that is good for ten minutes. Every cookie but the Session one
+   * used to be dropped here, which is why an account with a second factor could
+   * not sign in on this device at all.
+   */
+  test("reads the two-factor challenge off the response as well", async () => {
+    enqueue(
+      csrfResponse(),
+      response(
+        200,
+        { data: { twoFactorRedirect: true, twoFactorMethods: ["totp"] } },
+        { "Set-Cookie": "better-auth.two_factor=chal.lenge; Path=/; Max-Age=600" },
+      ),
+    );
+    expect(await apiRequest("/auth/login", { method: "POST" })).toMatchObject({
+      reached: true,
+      sessionCookie: null,
+      challengeCookie: "better-auth.two_factor=chal.lenge",
+    });
+  });
+
   test("reports the status and parsed body", async () => {
     enqueue(response(401, { message: "Invalid email or password." }));
     expect(await apiRequest("/auth/session")).toEqual({
@@ -354,6 +429,7 @@ describe("apiRequest", () => {
       status: 401,
       body: { message: "Invalid email or password." },
       sessionCookie: null,
+      challengeCookie: null,
     });
   });
 
@@ -364,6 +440,7 @@ describe("apiRequest", () => {
       status: 502,
       body: null,
       sessionCookie: null,
+      challengeCookie: null,
     });
   });
 
@@ -438,6 +515,7 @@ describe("a file upload", () => {
       status: 413,
       body: { statusCode: 413, message: "File too large" },
       sessionCookie: null,
+      challengeCookie: null,
     });
   });
 
@@ -450,6 +528,7 @@ describe("a file upload", () => {
       status: 502,
       body: null,
       sessionCookie: null,
+      challengeCookie: null,
     });
   });
 
@@ -602,6 +681,7 @@ describe("a CSRF refusal", () => {
       status: 403,
       body: { statusCode: 403, code: "csrf_invalid", message: "Invalid CSRF token." },
       sessionCookie: null,
+      challengeCookie: null,
     });
   });
 });
@@ -732,6 +812,7 @@ describe("a request that hangs", () => {
       status: 502,
       body: null,
       sessionCookie: null,
+      challengeCookie: null,
     });
   });
 

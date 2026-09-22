@@ -14,6 +14,7 @@ import {
   signInWithPassword,
   signOut,
   verifyMagicLink,
+  verifyTwoFactorCode,
 } from "@/lib/auth-service";
 import { releaseGoogleSession, requestGoogleIdToken } from "@/lib/google-session";
 import {
@@ -133,6 +134,19 @@ const PARSED_USER = {
 
 function ok(data: unknown, sessionCookie: string | null = null) {
   return { reached: true as const, status: 200, body: { data }, sessionCookie };
+}
+
+const CHALLENGE = "better-auth.two_factor=chal.lenge";
+
+/** The challenge as all three sign-in routes raise it: a 200, no session, one cookie. */
+function challenged(challengeCookie: string | null = CHALLENGE) {
+  return {
+    reached: true as const,
+    status: 200,
+    body: { data: { twoFactorRedirect: true, twoFactorMethods: ["totp"] } },
+    sessionCookie: null,
+    challengeCookie,
+  };
 }
 
 beforeEach(() => {
@@ -380,16 +394,19 @@ describe("signInWithPassword", () => {
     expect(getSessionUser()).toBeNull();
   });
 
-  test("a two-factor challenge stores no credential", async () => {
-    request.mockResolvedValueOnce(
-      ok({ twoFactorRedirect: true, twoFactorMethods: ["totp"] }, null),
-    );
+  test("a two-factor challenge carries the challenge out and stores no credential", async () => {
+    request.mockResolvedValueOnce(challenged());
 
     await expect(signInWithPassword("a@b.co", "right")).resolves.toEqual({
       kind: "two-factor",
+      challenge: CHALLENGE,
     });
     expect(writeCookie).not.toHaveBeenCalled();
     expect(clearCookie).toHaveBeenCalled();
+    // And in particular the challenge is neither written to the keychain nor
+    // held as the Session cookie. It lives in the machine state and nowhere
+    // else — see ADR-0013.
+    expect(writeCookie).not.toHaveBeenCalledWith(CHALLENGE);
     expect(getSessionCookie()).toBeNull();
     expect(getSessionUser()).toBeNull();
   });
@@ -402,6 +419,95 @@ describe("signInWithPassword", () => {
       kind: "signed-in",
     });
     expect(getSessionUser()).toEqual(PARSED_USER);
+  });
+});
+
+describe("verifyTwoFactorCode", () => {
+  const REFUSED = {
+    reached: true as const,
+    status: 401,
+    body: {
+      statusCode: 401,
+      code: "invalid_credentials",
+      message: "Invalid username, email, or password.",
+    },
+    sessionCookie: null,
+  };
+
+  /** The route answers 201, unlike `POST /auth/login`. */
+  function created(data: unknown, sessionCookie: string | null = ISSUED) {
+    return { reached: true as const, status: 201, body: { data }, sessionCookie };
+  }
+
+  test("presents the challenge and stores what comes back", async () => {
+    request.mockResolvedValueOnce(created(USER));
+
+    await expect(verifyTwoFactorCode(CHALLENGE, "123456")).resolves.toEqual({
+      kind: "signed-in",
+      cookie: ISSUED,
+      user: PARSED_USER,
+    });
+
+    expect(request).toHaveBeenCalledWith("/auth/two-factor/verify-totp", {
+      method: "POST",
+      body: { code: "123456" },
+      // The whole credential on this request. The route carries no auth guard,
+      // because at challenge time there is no session to guard it with.
+      cookie: CHALLENGE,
+    });
+    expect(writeCookie).toHaveBeenCalledWith(ISSUED);
+    expect(writePerson).toHaveBeenCalledWith(PARSED_USER);
+    expect(getSessionCookie()).toBe(ISSUED);
+    expect(getSessionUser()).toEqual(PARSED_USER);
+  });
+
+  test("a code pasted with the space its app shows is sent as digits", async () => {
+    request.mockResolvedValueOnce(created(USER));
+    await verifyTwoFactorCode(CHALLENGE, "  123 456 ");
+    expect(request).toHaveBeenCalledWith("/auth/two-factor/verify-totp", {
+      method: "POST",
+      body: { code: "123456" },
+      cookie: CHALLENGE,
+    });
+  });
+
+  test("the challenge never becomes the held cookie, whatever the answer is", async () => {
+    request.mockResolvedValueOnce(REFUSED);
+    await verifyTwoFactorCode(CHALLENGE, "000000");
+    expect(getSessionCookie()).toBeNull();
+    expect(writeCookie).not.toHaveBeenCalled();
+  });
+
+  test("a refused code writes nothing and leaves nobody signed in", async () => {
+    request.mockResolvedValueOnce(REFUSED);
+
+    // In words about a code, because the API's own 401 names a password.
+    await expect(verifyTwoFactorCode(CHALLENGE, "000000")).resolves.toMatchObject({
+      kind: "unauthorised",
+    });
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(writePerson).not.toHaveBeenCalled();
+    expect(getSessionUser()).toBeNull();
+  });
+
+  test("a dead network writes nothing and erases nothing", async () => {
+    request.mockResolvedValueOnce({ reached: false });
+
+    await expect(verifyTwoFactorCode(CHALLENGE, "123456")).resolves.toEqual({
+      kind: "transport-failure",
+    });
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(clearCookie).not.toHaveBeenCalled();
+  });
+
+  test("a verified code with no cookie behind it establishes nothing", async () => {
+    request.mockResolvedValueOnce(created(USER, null));
+
+    await expect(verifyTwoFactorCode(CHALLENGE, "123456")).resolves.toEqual({
+      kind: "malformed",
+    });
+    expect(writeCookie).not.toHaveBeenCalled();
+    expect(getSessionUser()).toBeNull();
   });
 });
 
@@ -478,17 +584,20 @@ describe("signInWithGoogle", () => {
     expect(releaseGoogle).toHaveBeenCalled();
   });
 
-  test("a two-factor account stores no credential and releases the Google session", async () => {
+  test("a two-factor account raises the challenge, stores no credential and releases Google", async () => {
     googleToken.mockResolvedValueOnce({ kind: "token", idToken: ID_TOKEN });
-    request.mockResolvedValueOnce(ok({ twoFactorRedirect: true }));
+    request.mockResolvedValueOnce(challenged());
 
     await expect(signInWithGoogle()).resolves.toEqual({
       kind: "settled",
-      outcome: { kind: "two-factor" },
+      outcome: { kind: "two-factor", challenge: CHALLENGE },
     });
 
     expect(writeCookie).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
+    // Released, as on every ending short of an issued session. The challenge is
+    // answered against our API, not Google's, so a native session held past this
+    // point could only stop somebody choosing a different account later.
     expect(releaseGoogle).toHaveBeenCalled();
   });
 
@@ -1030,13 +1139,16 @@ describe("verifying a magic link", () => {
     expect(getSessionUser()).toBeNull();
   });
 
-  test("a two-factor account is refused here with nothing stored, as on the password path", async () => {
-    request.mockResolvedValueOnce(ok({ twoFactorRedirect: true }, ISSUED));
+  test("a two-factor account raises the challenge here too, with nothing stored", async () => {
+    request.mockResolvedValueOnce(challenged());
 
-    await expect(verifyMagicLink("tok-en")).resolves.toEqual({ kind: "two-factor" });
+    await expect(verifyMagicLink("tok-en")).resolves.toEqual({
+      kind: "two-factor",
+      challenge: CHALLENGE,
+    });
 
-    // The challenge's cookie is a half-signed-in credential this app has no
-    // second step for. Keeping it would be worse than refusing.
+    // The challenge is a half-finished handshake, not a session. It travels out
+    // in the outcome and is written nowhere.
     expect(writeCookie).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
   });

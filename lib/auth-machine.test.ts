@@ -9,6 +9,7 @@ import {
   type AuthState,
 } from "@/lib/auth-machine";
 import type { AuthOutcome } from "@/lib/auth-response";
+import { CHALLENGE_LAPSED_NOTICE } from "@/lib/two-factor-challenge";
 import type { SessionUser } from "@/lib/types";
 
 const AGENT: SessionUser = {
@@ -24,8 +25,10 @@ const CUSTOMER: SessionUser = { ...AGENT, role: "customer" };
 
 const SESSION_COOKIE = "better-auth.session_token=abc.def";
 
+const CHALLENGE_COOKIE = "better-auth.two_factor=chal.lenge";
+
 const SIGNED_IN: AuthOutcome = { kind: "signed-in", cookie: SESSION_COOKIE, user: AGENT };
-const TWO_FACTOR: AuthOutcome = { kind: "two-factor" };
+const TWO_FACTOR: AuthOutcome = { kind: "two-factor", challenge: CHALLENGE_COOKIE };
 const REFUSED: AuthOutcome = {
   kind: "unauthorised",
   message: "Invalid email or password.",
@@ -44,6 +47,15 @@ const UNREACHABLE: AuthState = { status: "unreachable" };
 const AUTHENTICATED: AuthState = { status: "signed-in", user: AGENT, stale: false };
 /** The same person, on a device that has not been able to ask about them. */
 const STALE: AuthState = { status: "signed-in", user: AGENT, stale: true };
+/** The challenge, waiting for a code with nothing to say about the last one. */
+const CHALLENGED: AuthState = {
+  status: "two-factor",
+  challenge: CHALLENGE_COOKIE,
+  verifying: false,
+  notice: null,
+};
+/** The same challenge with a code out. */
+const VERIFYING: AuthState = { ...CHALLENGED, verifying: true };
 
 const EVERY_STATE: AuthState[] = [
   HYDRATING,
@@ -53,6 +65,8 @@ const EVERY_STATE: AuthState[] = [
   AUTHENTICATED,
   STALE,
   UNREACHABLE,
+  CHALLENGED,
+  VERIFYING,
 ];
 
 test("a cold start begins by hydrating", () => {
@@ -116,6 +130,44 @@ describe("hydration, with a person kept on the device", () => {
   });
 });
 
+/**
+ * The account screens' write, landing back on the person it changed.
+ *
+ * Distinct from confirming a Stale session below, and the two tests that matter
+ * are the two differences: it applies to a session nobody doubted, and it leaves
+ * `stale` alone rather than promoting anything.
+ */
+describe("an account screen writing to the signed-in person", () => {
+  const WITH_PASSWORD: SessionUser = { ...AGENT, hasPassword: true };
+  const WITHOUT = { ...AGENT, hasPassword: false, twoFactorEnabled: false };
+
+  test("replaces the person on a confirmed session, in place", () => {
+    const before: AuthState = { status: "signed-in", user: WITHOUT, stale: false };
+
+    expect(
+      authTransition(before, { type: "account-updated", user: WITH_PASSWORD }),
+    ).toEqual({ status: "signed-in", user: WITH_PASSWORD, stale: false });
+  });
+
+  test("a write does not verify a session, so a Stale one stays Stale", () => {
+    const before: AuthState = { status: "signed-in", user: WITHOUT, stale: true };
+
+    expect(
+      authTransition(before, { type: "account-updated", user: WITH_PASSWORD }),
+    ).toEqual({ status: "signed-in", user: WITH_PASSWORD, stale: true });
+  });
+
+  test("does nothing anywhere but signed-in", () => {
+    // A write that landed after a sign-out or an expiry must not sign anybody
+    // back in, the same rule every other event carrying a user follows.
+    for (const state of EVERY_STATE.filter((s) => s.status !== "signed-in")) {
+      expect(authTransition(state, { type: "account-updated", user: CUSTOMER })).toBe(
+        state,
+      );
+    }
+  });
+});
+
 describe("confirming a Stale session", () => {
   test("replaces the kept person with the one the API named, in place", () => {
     expect(authTransition(STALE, { type: "confirmed", user: CUSTOMER })).toEqual({
@@ -160,7 +212,7 @@ describe("a settled sign-in attempt", () => {
   const cases: [string, AuthOutcome, AuthState][] = [
     ["correct credentials sign the person in as the role the server gave", SIGNED_IN, AUTHENTICATED],
     ["wrong credentials say what the server said", REFUSED, { status: "signed-out", notice: "Invalid email or password." }],
-    ["two-factor is refused and points at the web app", TWO_FACTOR, { status: "signed-out", notice: TWO_FACTOR_NOTICE }],
+    ["a correct credential on a two-factor account asks for a code, carrying the challenge", TWO_FACTOR, CHALLENGED],
     ["a dead network says so", OFFLINE, { status: "signed-out", notice: OFFLINE_NOTICE }],
     ["a server error says what the server said", SERVER_ERROR, { status: "signed-out", notice: "Service unavailable" }],
     ["an unreadable answer says so", MALFORMED, { status: "signed-out", notice: UNREADABLE_NOTICE }],
@@ -182,6 +234,161 @@ describe("a settled sign-in attempt", () => {
   test("a response that outlived its request cannot sign anyone back in", () => {
     for (const state of EVERY_STATE.filter((s) => s.status !== "submitting")) {
       expect(authTransition(state, { type: "settled", outcome: SIGNED_IN })).toBe(state);
+    }
+  });
+});
+
+/**
+ * The five transitions ADR-0013 names, at the seam it names them at: entering
+ * the challenge, refusing a wrong code, expiring, cancelling, and completing.
+ *
+ * All five are here rather than in a component test because all five are facts
+ * about the machine, and because the two that matter most — a refusal that must
+ * not end the handshake, and a lapse that has no signal to read — are invisible
+ * in a rendered screen and obvious in a table.
+ */
+describe("the two-factor challenge", () => {
+  test("is entered carrying the challenge and nothing else", () => {
+    expect(authTransition(SUBMITTING, { type: "settled", outcome: TWO_FACTOR })).toEqual({
+      status: "two-factor",
+      challenge: CHALLENGE_COOKIE,
+      verifying: false,
+      notice: null,
+    });
+  });
+
+  test("is entered from a link and from Google too, because the API's hook fires on all three", () => {
+    // The same event either way: `lib/auth-service` interprets all three routes
+    // with the same reader, so there is one way in here and not three.
+    expect(authTransition(SUBMITTING, { type: "settled", outcome: TWO_FACTOR })).toMatchObject({
+      status: "two-factor",
+      challenge: CHALLENGE_COOKIE,
+    });
+  });
+
+  test("a correct password says nothing on the way in — there is nothing to accuse anybody of", () => {
+    expect(
+      authTransition(SUBMITTING, { type: "settled", outcome: TWO_FACTOR }),
+    ).toMatchObject({ notice: null });
+  });
+
+  describe("submitting a code", () => {
+    test("puts a code in flight and clears whatever the last one was told", () => {
+      const refused: AuthState = { ...CHALLENGED, notice: "That code was not accepted." };
+      expect(authTransition(refused, { type: "submit-code" })).toEqual(VERIFYING);
+    });
+
+    test("a second submit while one is in flight changes nothing", () => {
+      expect(authTransition(VERIFYING, { type: "submit-code" })).toBe(VERIFYING);
+    });
+
+    test("does nothing from any state that is not a challenge waiting for a code", () => {
+      for (const state of EVERY_STATE.filter((s) => s !== CHALLENGED)) {
+        expect(authTransition(state, { type: "submit-code" })).toBe(state);
+      }
+    });
+  });
+
+  describe("a settled code", () => {
+    const cases: [string, AuthOutcome, AuthState][] = [
+      ["the right code completes the sign-in as the role the server gave", SIGNED_IN, AUTHENTICATED],
+      ["a wrong code says so and leaves the challenge standing", { kind: "unauthorised", message: "That code was not accepted." }, { ...CHALLENGED, notice: "That code was not accepted." }],
+      ["a server error says what the server said, and keeps the challenge", SERVER_ERROR, { ...CHALLENGED, notice: "Service unavailable" }],
+      ["a dead network says so, and keeps the challenge", OFFLINE, { ...CHALLENGED, notice: OFFLINE_NOTICE }],
+      ["an unreadable answer says so, and keeps the challenge", MALFORMED, { ...CHALLENGED, notice: UNREADABLE_NOTICE }],
+      ["a verify that answered with another challenge is unreadable, not a second handshake", TWO_FACTOR, { ...CHALLENGED, notice: UNREADABLE_NOTICE }],
+    ];
+
+    test.each(cases)("%s", (_label, outcome, expected) => {
+      expect(authTransition(VERIFYING, { type: "code-settled", outcome })).toEqual(expected);
+    });
+
+    /**
+     * The acceptance criterion behind the whole ticket: a typo must not cost
+     * somebody the handshake. The cookie carried out is the cookie carried in,
+     * so the next code goes to the same half-finished sign-in.
+     */
+    test("a refusal keeps the same challenge, so another attempt needs no new password", () => {
+      const after = authTransition(VERIFYING, {
+        type: "code-settled",
+        outcome: { kind: "unauthorised", message: "no" },
+      });
+      expect(after).toMatchObject({ status: "two-factor", challenge: CHALLENGE_COOKIE });
+
+      const retried = authTransition(after, { type: "submit-code" });
+      expect(retried).toEqual(VERIFYING);
+    });
+
+    test("an answer that outlived its request cannot sign anyone in", () => {
+      for (const state of EVERY_STATE.filter((s) => s !== VERIFYING)) {
+        expect(authTransition(state, { type: "code-settled", outcome: SIGNED_IN })).toBe(state);
+      }
+    });
+  });
+
+  describe("cancelling", () => {
+    test("lands signed-out with nothing said", () => {
+      expect(authTransition(CHALLENGED, { type: "cancel-challenge" })).toEqual(SIGNED_OUT);
+    });
+
+    test("works with a code still in flight, whose answer can then sign nobody in", () => {
+      const cancelled = authTransition(VERIFYING, { type: "cancel-challenge" });
+      expect(cancelled).toEqual(SIGNED_OUT);
+      expect(
+        authTransition(cancelled, { type: "code-settled", outcome: SIGNED_IN }),
+      ).toBe(cancelled);
+    });
+
+    test("does nothing anywhere else", () => {
+      for (const state of EVERY_STATE.filter((s) => s.status !== "two-factor")) {
+        expect(authTransition(state, { type: "cancel-challenge" })).toBe(state);
+      }
+    });
+  });
+
+  describe("lapsing", () => {
+    /**
+     * Unlike every other notice in this module, this one cannot come from the
+     * server: better-auth answers a lapsed challenge and a wrong code with the
+     * same 401, so the only thing that can say "sign in again" is the clock in
+     * `lib/two-factor-challenge`.
+     */
+    test("lands signed-out and says to sign in again", () => {
+      expect(authTransition(CHALLENGED, { type: "challenge-lapsed" })).toEqual({
+        status: "signed-out",
+        notice: CHALLENGE_LAPSED_NOTICE,
+      });
+    });
+
+    test("lapses with a code in flight too, and that answer signs nobody in", () => {
+      const lapsed = authTransition(VERIFYING, { type: "challenge-lapsed" });
+      expect(lapsed).toEqual({ status: "signed-out", notice: CHALLENGE_LAPSED_NOTICE });
+      expect(authTransition(lapsed, { type: "code-settled", outcome: SIGNED_IN })).toBe(lapsed);
+    });
+
+    test("does nothing anywhere else — nothing but a challenge can lapse", () => {
+      for (const state of EVERY_STATE.filter((s) => s.status !== "two-factor")) {
+        expect(authTransition(state, { type: "challenge-lapsed" })).toBe(state);
+      }
+    });
+  });
+
+  /**
+   * The credential the challenge holds must not survive any of them. There is
+   * only one place it lives, so this is the same assertion five times: whatever
+   * the state is afterwards, it is not one carrying a challenge.
+   */
+  test("every way out discards the challenge", () => {
+    const exits: AuthEvent[] = [
+      { type: "code-settled", outcome: SIGNED_IN },
+      { type: "cancel-challenge" },
+      { type: "challenge-lapsed" },
+      { type: "sign-out" },
+      { type: "expired" },
+    ];
+
+    for (const event of exits) {
+      expect(authTransition(VERIFYING, event).status).not.toBe("two-factor");
     }
   });
 });
@@ -256,6 +463,13 @@ describe("as a whole", () => {
     { type: "expired" },
     { type: "retry" },
     { type: "confirmed", user: CUSTOMER },
+    { type: "settled", outcome: TWO_FACTOR },
+    { type: "submit-code" },
+    { type: "code-settled", outcome: SIGNED_IN },
+    { type: "code-settled", outcome: REFUSED },
+    { type: "cancel-challenge" },
+    { type: "challenge-lapsed" },
+    { type: "account-updated", user: CUSTOMER },
   ];
 
   test("every state/event pair lands on a state, and none mutates its input", () => {
@@ -312,6 +526,50 @@ describe("as a whole", () => {
     expect(state).toMatchObject({ status: "signed-in", user: { id: AGENT.id } });
 
     state = authTransition(state, { type: "confirmed", user: AGENT });
+    expect(state).toEqual(AUTHENTICATED);
+  });
+
+  test("a full sign-in with two-factor on: password, wrong code, right code, in", () => {
+    let state: AuthState = SIGNED_OUT;
+
+    state = authTransition(state, { type: "submit" });
+    state = authTransition(state, { type: "settled", outcome: TWO_FACTOR });
+    expect(state).toEqual(CHALLENGED);
+
+    state = authTransition(state, { type: "submit-code" });
+    state = authTransition(state, {
+      type: "code-settled",
+      outcome: { kind: "unauthorised", message: "That code was not accepted." },
+    });
+    // Still in the handshake, and still holding the credential for it.
+    expect(state).toEqual({ ...CHALLENGED, notice: "That code was not accepted." });
+
+    state = authTransition(state, { type: "submit-code" });
+    state = authTransition(state, { type: "code-settled", outcome: SIGNED_IN });
+    expect(state).toEqual(AUTHENTICATED);
+  });
+
+  test("a challenge somebody backs out of retains nothing of the attempt", () => {
+    let state: AuthState = SIGNED_OUT;
+    state = authTransition(state, { type: "submit" });
+    state = authTransition(state, { type: "settled", outcome: TWO_FACTOR });
+    state = authTransition(state, { type: "cancel-challenge" });
+
+    expect(state).toEqual(SIGNED_OUT);
+    // And the sign-in screen is the ordinary one, with nothing standing on it.
+    expect(state).toEqual({ status: "signed-out", notice: null });
+  });
+
+  test("a challenge left too long sends them back to the start, and says why", () => {
+    let state: AuthState = SIGNED_OUT;
+    state = authTransition(state, { type: "submit" });
+    state = authTransition(state, { type: "settled", outcome: TWO_FACTOR });
+    state = authTransition(state, { type: "challenge-lapsed" });
+    expect(state).toEqual({ status: "signed-out", notice: CHALLENGE_LAPSED_NOTICE });
+
+    // And the password path still works from there, as it does after any refusal.
+    state = authTransition(state, { type: "submit" });
+    state = authTransition(state, { type: "settled", outcome: SIGNED_IN });
     expect(state).toEqual(AUTHENTICATED);
   });
 

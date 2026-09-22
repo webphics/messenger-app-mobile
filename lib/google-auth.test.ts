@@ -1,4 +1,4 @@
-import { authTransition, TWO_FACTOR_NOTICE } from "@/lib/auth-machine";
+import { authTransition } from "@/lib/auth-machine";
 import type { AuthState } from "@/lib/auth-machine";
 import type { AuthOutcome } from "@/lib/auth-response";
 import {
@@ -24,6 +24,7 @@ const CUSTOMER: SessionUser = {
 
 const SUBMITTING: AuthState = { status: "submitting" };
 const SIGNED_OUT: AuthState = { status: "signed-out", notice: null };
+const CHALLENGE = "better-auth.two_factor=chal.lenge";
 
 /**
  * What the machine makes of an attempt that started from the Google button.
@@ -127,12 +128,20 @@ describe("what the machine does with a finished attempt", () => {
   });
 
   // The API's two-factor hook fires on Google sign-in as well as on a password,
-  // so Google must not become a way around the limitation the password path
-  // already explains.
-  test("a two-factor challenge is refused with the same sentence a password gets", () => {
-    expect(after({ kind: "settled", outcome: { kind: "two-factor" } })).toEqual({
-      status: "signed-out",
-      notice: TWO_FACTOR_NOTICE,
+  // so Google must not become a way around the second factor. Since #04 that
+  // means the same challenge rather than the same refusal: one way in, one code
+  // entry, whichever button started it.
+  test("a two-factor challenge asks for a code, exactly as a password does", () => {
+    expect(
+      after({
+        kind: "settled",
+        outcome: { kind: "two-factor", challenge: CHALLENGE },
+      }),
+    ).toEqual({
+      status: "two-factor",
+      challenge: CHALLENGE,
+      verifying: false,
+      notice: null,
     });
   });
 
@@ -147,17 +156,28 @@ describe("what the machine does with a finished attempt", () => {
 
   // Story 13: succeeding with Google and failing at our API must not be
   // half-signed-in. Every way an attempt can end short of an issued session
-  // ends signed-out, from the state a real attempt is in when it settles.
+  // ends signed-out, from the state a real attempt is in when it settles. The
+  // challenge is deliberately not on this list — it is a sign-in still in
+  // progress rather than one that ended, and the row below says the only thing
+  // that matters about it here, which is that it is not signed-in.
   test.each<GoogleResult>([
     { kind: "no-play-services" },
     { kind: "failed" },
-    { kind: "settled", outcome: { kind: "two-factor" } },
     { kind: "settled", outcome: { kind: "unauthorised", message: "no" } },
     { kind: "settled", outcome: { kind: "server-error", message: "no" } },
     { kind: "settled", outcome: { kind: "transport-failure" } },
     { kind: "settled", outcome: { kind: "malformed" } },
   ])("nothing short of an issued session signs anyone in (%p)", (result) => {
     expect(after(result).status).toBe("signed-out");
+  });
+
+  test("a challenge is not signed in either — it is a sign-in still owing a code", () => {
+    expect(
+      after({
+        kind: "settled",
+        outcome: { kind: "two-factor", challenge: CHALLENGE },
+      }).status,
+    ).toBe("two-factor");
   });
 
   // The cancellation half of the same guarantee: no event, so no state, so

@@ -1,4 +1,5 @@
 import type { AuthOutcome } from "@/lib/auth-response";
+import { CHALLENGE_LAPSED_NOTICE } from "@/lib/two-factor-challenge";
 import type { SessionUser } from "@/lib/types";
 
 /**
@@ -40,7 +41,35 @@ export type AuthState =
    * kept; a retry is offered. Since #50 this is the narrower case it always
    * described: a device that has a credential and no idea whose it is.
    */
-  | { status: "unreachable" };
+  | { status: "unreachable" }
+  /**
+   * The credential was accepted and the account wants a code as well.
+   *
+   * A state rather than a route, which is the whole of ADR-0013: a half-finished
+   * handshake with a held credential that only makes sense mid-flow must not be
+   * an address anybody can reach out of order. The sign-in screen already on
+   * display renders it off this status.
+   *
+   * It is also the only state in this union that carries a credential. It is
+   * carried here and nowhere else — not in the keychain, not in `api-client`'s
+   * held cookie — precisely so that leaving the state is the whole of discarding
+   * it, on every way out: signed in, refused, lapsed or cancelled.
+   */
+  | {
+      status: "two-factor";
+      /**
+       * The `better-auth.two_factor` cookie to present on the verify call, as
+       * the `name=value` pair.
+       */
+      challenge: string;
+      /** Whether a code is out. The only state a second code submit cannot leave. */
+      verifying: boolean;
+      /** What stands over the field, or null when there is nothing to say. */
+      notice: string | null;
+    };
+
+/** The challenge arm, named because three functions below have to take it whole. */
+type ChallengeState = Extract<AuthState, { status: "two-factor" }>;
 
 export type AuthEvent =
   /**
@@ -63,6 +92,22 @@ export type AuthEvent =
   | { type: "expired" }
   /** Try hydration again after an Unreachable outcome. */
   | { type: "retry" }
+  /** A code has been typed and sent. Ignored unless a challenge is waiting for one. */
+  | { type: "submit-code" }
+  | { type: "code-settled"; outcome: AuthOutcome }
+  /**
+   * Backing out of code entry. Lands signed-out with nothing said, because
+   * nobody needs a thing explained to them that they have just done, and with
+   * nothing of the attempt retained — the challenge goes with the state.
+   */
+  | { type: "cancel-challenge" }
+  /**
+   * The challenge ran out of time. Dispatched by a clock on this side rather
+   * than discovered from a refusal, because the API answers a lapsed challenge
+   * and a wrong code identically. See `CHALLENGE_LIFETIME_MS` in
+   * `lib/two-factor-challenge`.
+   */
+  | { type: "challenge-lapsed" }
   /**
    * The API finally answered for a Stale session: this is who it says you are.
    *
@@ -71,18 +116,41 @@ export type AuthEvent =
    * pocket arrives this way, which is the reason the whole user is carried and
    * not just the flag.
    */
-  | { type: "confirmed"; user: SessionUser };
+  | { type: "confirmed"; user: SessionUser }
+  /**
+   * An account screen wrote something about this person, and this is who the API
+   * says they now are.
+   *
+   * Separate from `confirmed` rather than folded into it, because the two answer
+   * different questions. `confirmed` is about a session nobody has verified: it
+   * applies only to a Stale one and its whole job is to stop being Stale. This
+   * one is about a session that was never in doubt, where a field on the person
+   * changed because they asked for it to.
+   *
+   * It exists because those fields gate controls. Setting a password makes
+   * `hasPassword` true and turning two-factor off makes `twoFactorEnabled`
+   * false, and the account rows on Settings read both off this state. Without
+   * this, the row that sent somebody to the screen would go on reporting what
+   * was true before they got there until something remounted it. See
+   * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
+   */
+  | { type: "account-updated"; user: SessionUser };
 
 export const INITIAL_AUTH_STATE: AuthState = { status: "hydrating" };
 
 /**
- * Deliberately a refusal rather than a broken flow: the handoff between
- * password-accepted and code-verified rides a short-lived cookie this client
- * could now carry, but the second step has no screen and no work behind it yet.
- * See ADR-0004.
+ * The one place a two-factor challenge lands somewhere that is not the challenge
+ * state, and it is a place nothing can actually reach.
+ *
+ * `GET /auth/session` issues no challenge, so `afterHydration`'s `two-factor`
+ * branch cannot arrive today; it exists only so the union stays exhaustive if
+ * the API ever changes. The sentence is therefore deliberately neutral: it names
+ * the fact and the next move and claims nothing about what this app can do. It
+ * used to say the app did not support two-factor and to send people to the web,
+ * which since ADR-0013 is no longer true anywhere.
  */
 export const TWO_FACTOR_NOTICE =
-  "This account uses two-factor authentication, which this app does not support yet. Sign in on the web app.";
+  "This account needs a code from your authenticator app. Sign in again to enter one.";
 
 /**
  * The API's sessions are a seven-day sliding window with no refresh token, so
@@ -106,8 +174,16 @@ function afterAttempt(outcome: AuthOutcome): AuthState {
   switch (outcome.kind) {
     case "signed-in":
       return { status: "signed-in", user: outcome.user, stale: false };
+    // The credential was right, and the account wants a code as well. Nothing is
+    // said on the way in: a correct password followed by an accusation would be
+    // this screen blaming somebody for their own account's settings.
     case "two-factor":
-      return { status: "signed-out", notice: TWO_FACTOR_NOTICE };
+      return {
+        status: "two-factor",
+        challenge: outcome.challenge,
+        verifying: false,
+        notice: null,
+      };
     case "unauthorised":
     case "server-error":
       return { status: "signed-out", notice: outcome.message };
@@ -115,6 +191,39 @@ function afterAttempt(outcome: AuthOutcome): AuthState {
       return { status: "signed-out", notice: OFFLINE_NOTICE };
     case "malformed":
       return { status: "signed-out", notice: UNREADABLE_NOTICE };
+  }
+}
+
+/**
+ * What a settled code attempt leaves behind.
+ *
+ * Only a success leaves the challenge. Every other answer stays in it with
+ * something to say and `verifying` back to false, which is the whole of "another
+ * attempt without restarting the sign-in": the challenge cookie is untouched, so
+ * the next code goes to the same handshake rather than to a password step
+ * somebody would have to walk through again.
+ *
+ * A refusal in particular stays. It is the case that looks most like an ending
+ * and is not one — the API cannot tell a wrong code from a lapsed challenge, so
+ * treating a refusal as the end of the road would throw away a live handshake
+ * over a typo.
+ */
+function afterCode(state: ChallengeState, outcome: AuthOutcome): AuthState {
+  switch (outcome.kind) {
+    case "signed-in":
+      return { status: "signed-in", user: outcome.user, stale: false };
+    case "unauthorised":
+    case "server-error":
+      return { ...state, verifying: false, notice: outcome.message };
+    case "transport-failure":
+      return { ...state, verifying: false, notice: OFFLINE_NOTICE };
+    // `two-factor` is here rather than beside `signed-in` on purpose: the verify
+    // route does not raise a second challenge, so an answer that looks like one
+    // is an answer this client cannot read. The challenge already in hand is
+    // kept rather than replaced, because the lapse clock was armed for that one.
+    case "malformed":
+    case "two-factor":
+      return { ...state, verifying: false, notice: UNREADABLE_NOTICE };
   }
 }
 
@@ -199,6 +308,37 @@ export function authTransition(state: AuthState, event: AuthEvent): AuthState {
     case "retry":
       return state.status === "unreachable" ? { status: "hydrating" } : state;
 
+    // The double-submit guard, one state along and for the same reason: a second
+    // tap arrives while `verifying`, which is not a challenge waiting for a
+    // code, so it changes nothing and starts no second request. The notice goes
+    // with the attempt that earned it, exactly as `submit` discards the sign-in
+    // screen's.
+    case "submit-code":
+      return state.status === "two-factor" && !state.verifying
+        ? { ...state, verifying: true, notice: null }
+        : state;
+
+    // A code's answer that outlived its request — cancelled, signed out, or
+    // lapsed while it was in flight — must not sign anybody in, the same rule
+    // `settled` follows one state back.
+    case "code-settled":
+      return state.status === "two-factor" && state.verifying
+        ? afterCode(state, event.outcome)
+        : state;
+
+    // Nothing is said. Somebody who pressed back knows what they pressed, and
+    // the challenge cookie goes with the state rather than being cleaned up.
+    case "cancel-challenge":
+      return state.status === "two-factor" ? SIGNED_OUT : state;
+
+    // The other way out that keeps nothing, and the only one with something to
+    // say. It is a clock on this side, not a reading of a refusal: see
+    // `CHALLENGE_LIFETIME_MS`.
+    case "challenge-lapsed":
+      return state.status === "two-factor"
+        ? { status: "signed-out", notice: CHALLENGE_LAPSED_NOTICE }
+        : state;
+
     // Only ever against a Stale session. A confirmation arriving for one that is
     // already confirmed changes nothing, and one arriving after a sign-out or an
     // expiry must not sign anybody back in — the same rule `settled` follows for
@@ -207,5 +347,16 @@ export function authTransition(state: AuthState, event: AuthEvent): AuthState {
       return state.status === "signed-in" && state.stale
         ? { status: "signed-in", user: event.user, stale: false }
         : state;
+
+    // Replaces the person in place and leaves `stale` exactly as it found it,
+    // which is the one thing that separates this from `confirmed`: a write does
+    // not verify a session, so it may not promote a Stale one to confirmed. In
+    // practice it never arrives against a Stale session, because these screens
+    // reach the API to get their answer and a Stale session is one that could
+    // not. Ignored anywhere but signed-in, so a write that landed after a
+    // sign-out or an expiry cannot sign anybody back in, which is the rule every
+    // event carrying a user follows here.
+    case "account-updated":
+      return state.status === "signed-in" ? { ...state, user: event.user } : state;
   }
 }

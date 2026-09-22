@@ -11,6 +11,7 @@ import {
   interpretMagicLinkVerify,
   interpretSession,
   interpretSignIn,
+  interpretTwoFactorVerify,
   saysSessionExpired,
   type AuthOutcome,
   type HttpOutcome,
@@ -39,6 +40,7 @@ import {
 import { setSessionUser } from "@/lib/session";
 import { pushDeregistrationSettled } from "@/lib/push-registry";
 import { endSessionOnDevice } from "@/lib/session-wipe";
+import { normaliseCode } from "@/lib/two-factor-challenge";
 import type { SessionUser } from "@/lib/types";
 
 /**
@@ -55,6 +57,7 @@ const SIGN_OUT_PATH = "/auth/logout";
 const MAGIC_LINK_REQUEST_PATH = "/auth/magic-link";
 const MAGIC_LINK_VERIFY_PATH = "/auth/magic-link/verify";
 const GOOGLE_PATH = "/auth/google";
+const TWO_FACTOR_VERIFY_PATH = "/auth/two-factor/verify-totp";
 
 /**
  * Bumped every time the credential is deliberately discarded.
@@ -101,6 +104,15 @@ async function applyOutcome(
       await writeKeptPerson(outcome.user);
       return;
     // Neither establishes a session, so neither may leave a credential behind.
+    //
+    // A challenge is no longer the end of the road, and the wipe still stands:
+    // the password was accepted but nothing was issued, so anything this device
+    // was holding from an earlier session is still a credential nobody has
+    // proved they own. What the challenge carries never touches any of this —
+    // `outcome.challenge` is deliberately not read here, so the challenge cookie
+    // is never written to the keychain and never becomes the held Session
+    // cookie. It lives in the machine state and nowhere else, which is what
+    // makes leaving that state the whole of discarding it. See ADR-0013.
     case "unauthorised":
     case "two-factor":
       await forgetCredential();
@@ -265,6 +277,48 @@ export async function signInWithPassword(
       // sign-in answers "Unrecognized key: email" before a password is ever
       // checked. The field still carries whatever was typed; only the name moved.
       body: { identifier: email.trim(), password },
+    }),
+  );
+
+  await applyOutcome(outcome, startedAt);
+  return outcome;
+}
+
+/**
+ * Finish a sign-in an account's second factor interrupted.
+ *
+ * The same shape as `signInWithPassword` on purpose, down to the epoch: this
+ * establishes a credential, so it has to store one, and a sign-out that overtook
+ * it must not leave a live cookie in the keychain. What comes back is an
+ * ordinary `AuthOutcome`, which is what keeps the second half of the handshake
+ * on the seam the first half already used.
+ *
+ * `challenge` is presented through `apiRequest`'s existing `cookie` option
+ * rather than through a mechanism of its own, and it is the whole credential on
+ * this request: `POST /auth/two-factor/verify-totp` carries no auth guard,
+ * because at challenge time there is no session to guard it with. It comes from
+ * the machine state and goes nowhere else — nothing here holds it, and
+ * `applyOutcome` never writes it.
+ *
+ * The code is normalised on the way out for the reason the identifier is trimmed
+ * on the way into `signInWithPassword`: the API's body is a `z.strictObject`
+ * over a TOTP code, and a code pasted with the space its authenticator draws is
+ * the same code.
+ *
+ * Backup codes are deliberately not offered here and must not be added:
+ * `POST /auth/two-factor/verify-backup-code` carries `@UseGuards(AuthGuard)`,
+ * which resolves a full session, and at this moment there is none. See ADR-0013.
+ */
+export async function verifyTwoFactorCode(
+  challenge: string,
+  code: string,
+): Promise<AuthOutcome> {
+  const startedAt = credentialEpoch;
+  const outcome = interpretTwoFactorVerify(
+    await apiRequest(TWO_FACTOR_VERIFY_PATH, {
+      method: "POST",
+      body: { code: normaliseCode(code) },
+      cookie: challenge,
     }),
   );
 

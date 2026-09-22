@@ -25,7 +25,9 @@ import {
   signInWithPassword,
   signOut as endSession,
   verifyMagicLink as spendMagicLink,
+  verifyTwoFactorCode,
 } from "@/lib/auth-service";
+import { CHALLENGE_LIFETIME_MS } from "@/lib/two-factor-challenge";
 import { googleAuthEvent } from "@/lib/google-auth";
 import type { ApiResult } from "@/lib/api-result";
 import { updateProfile } from "@/lib/profile-api";
@@ -71,6 +73,36 @@ type AuthContextValue = {
     email: string,
     name?: string,
   ) => Promise<MagicLinkRequestOutcome>;
+  /**
+   * Finish a sign-in an account's second factor interrupted, with the code from
+   * their authenticator.
+   *
+   * Takes no challenge: the challenge is in the machine state, which is the only
+   * place it exists, and a caller that had to pass one back could pass the wrong
+   * one. Ignored when the machine is not in the challenge, and while a code is
+   * already out.
+   */
+  submitTwoFactorCode: (code: string) => Promise<void>;
+  /**
+   * Back out of code entry. Lands signed-out, retaining nothing of the attempt —
+   * the challenge goes with the state it lived in.
+   */
+  cancelTwoFactor: () => void;
+  /**
+   * Take the answer to an account write as who this person now is.
+   *
+   * For the screens under `/account`, which write one field about the caller and
+   * get the re-read person back. They call their own module in `lib/` rather
+   * than going through here, the way `saveProfile` below does, because what they
+   * write differs per screen and what happens afterwards does not: the person in
+   * this state has to be replaced, or the Settings row that sent them there goes
+   * on reporting what was true before they arrived.
+   *
+   * The write's own module is what brings `getSessionUser()` and the Kept person
+   * in line, exactly as `lib/profile-api` does. This is the third of the three
+   * places the signed-in person is held, and the only one a module cannot reach.
+   */
+  accountUpdated: (user: SessionUser) => void;
   signOut: () => Promise<void>;
   /** Try hydration again after an Unreachable cold start. */
   retry: () => void;
@@ -273,6 +305,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /**
+   * The challenge this provider is holding, or null when it is holding none.
+   *
+   * Read off the state rather than kept in a ref, because it is state: the
+   * machine is where it lives, and the two things below that need it — the
+   * request and the clock — both have to stop the moment it is gone.
+   */
+  const challenge = state.status === "two-factor" ? state.challenge : null;
+
+  /**
+   * Arm the lapse, and disarm it on every way out of the challenge.
+   *
+   * The clock is here rather than in the machine because the machine does no
+   * timers, and it is a clock at all because the API cannot be asked: a lapsed
+   * challenge and a wrong code come back as the same 401, so a person who waited
+   * too long would otherwise be told their code was wrong, over and over, by a
+   * screen that had no way to know better. See `CHALLENGE_LIFETIME_MS`.
+   *
+   * Keyed on the challenge rather than on the status, so a notice appearing over
+   * the field does not restart the clock — the deadline belongs to the cookie
+   * the API minted, not to what has happened on screen since.
+   */
+  useEffect(() => {
+    if (challenge === null) return;
+
+    const timer = setTimeout(
+      () => dispatch({ type: "challenge-lapsed" }),
+      CHALLENGE_LIFETIME_MS,
+    );
+
+    return () => clearTimeout(timer);
+  }, [challenge]);
+
+  /**
+   * One attempt at finishing the handshake, in the same three dispatches
+   * `runAttempt` makes one state back: submit, await, settle.
+   *
+   * Not routed through `runAttempt` itself, because the events differ and the
+   * guard has one more thing to check — there is no challenge to answer unless
+   * the machine is holding one. The ref is the same ref, which is the point: two
+   * taps in the same tick both read the pre-dispatch state, so the machine alone
+   * would let the second through and fire a second request.
+   */
+  const submitTwoFactorCode = useCallback(
+    async (code: string) => {
+      if (challenge === null || submitting.current) return;
+      submitting.current = true;
+      dispatch({ type: "submit-code" });
+
+      try {
+        dispatch({
+          type: "code-settled",
+          outcome: await verifyTwoFactorCode(challenge, code),
+        });
+      } finally {
+        submitting.current = false;
+      }
+    },
+    [challenge],
+  );
+
+  /**
+   * Nothing to undo on the way out. `applyOutcome` already discarded every
+   * credential this device held when the challenge was raised, and the challenge
+   * itself exists only in the state this dispatch replaces.
+   */
+  const cancelTwoFactor = useCallback(() => {
+    dispatch({ type: "cancel-challenge" });
+  }, []);
+
+  const accountUpdated = useCallback((user: SessionUser) => {
+    dispatch({ type: "account-updated", user });
+  }, []);
+
   const signOut = useCallback(async () => {
     // Dispatched first: the person is signed out from this moment, whatever the
     // server says, and an in-flight sign-in can no longer sign them back in.
@@ -314,6 +420,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyMagicLink,
       signInWithGoogle,
       requestMagicLink,
+      submitTwoFactorCode,
+      cancelTwoFactor,
+      accountUpdated,
       signOut,
       retry,
       confirmStaleSession,
@@ -325,6 +434,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyMagicLink,
       signInWithGoogle,
       requestMagicLink,
+      submitTwoFactorCode,
+      cancelTwoFactor,
+      accountUpdated,
       signOut,
       retry,
       confirmStaleSession,

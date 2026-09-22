@@ -21,6 +21,19 @@ export type HttpOutcome =
       body: unknown;
       /** The Session cookie the response set, as a `name=value` pair. Null when it set none. */
       sessionCookie: string | null;
+      /**
+       * The two-factor challenge the response set, as a `name=value` pair. Null
+       * when it set none, which is every response but the one that raises the
+       * challenge.
+       *
+       * Optional rather than required, deliberately. Dozens of tests across this
+       * repo build an `HttpOutcome` literal out of the four fields above, and
+       * none of them is about two-factor — a required fifth field would fail
+       * every one of them to make a point that belongs to one code path.
+       * Missing and null therefore mean the same thing here, and nothing reads
+       * the difference.
+       */
+      challengeCookie?: string | null;
     }
   | { reached: false };
 
@@ -44,7 +57,18 @@ export type MagicLinkRequestOutcome =
 
 export type AuthOutcome =
   | { kind: "signed-in"; cookie: string; user: SessionUser }
-  | { kind: "two-factor" }
+  /**
+   * The credential was right and the account wants a code from an authenticator
+   * as well.
+   *
+   * `challenge` is the short-lived `better-auth.two_factor` cookie, as the
+   * `name=value` pair to present on `POST /auth/two-factor/verify-totp`. It is
+   * the whole of what this client holds between the two halves of the
+   * handshake: it travels in the machine state, is never written to the
+   * keychain, and is never held as the Session cookie. See
+   * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`.
+   */
+  | { kind: "two-factor"; challenge: string }
   /** The credential itself was refused. The only outcome that may erase a stored cookie. */
   | { kind: "unauthorised"; message: string }
   /** The server answered, but not about this credential — a 500, a 429, a bad request. */
@@ -79,6 +103,25 @@ export const LINK_REFUSED_NOTICE =
  */
 export const GOOGLE_REFUSED_NOTICE =
   "That Google account was not accepted. Try another account, or sign in with your email.";
+
+/**
+ * What to say when a two-factor code is refused.
+ *
+ * Unlike the two notices above this one is not merely a backstop — it replaces
+ * whatever the server said, which `interpretTwoFactorVerify` is the only
+ * function in this module to do. The API folds every 401 into
+ * `invalidCredentialsError()`, whose sentence names a username, an email and a
+ * password, and none of those is the control anybody was looking at. Carrying it
+ * through would send somebody back to a password they already typed correctly.
+ *
+ * It also has to cover the case the client cannot see: an expired challenge
+ * comes back as the same 401 as a wrong code, because better-auth raises
+ * `INVALID_CODE` and `INVALID_TWO_FACTOR_COOKIE` alike as UNAUTHORIZED. "The
+ * current code" is therefore the most this can honestly say — the lapse is
+ * announced by the clock in `lib/two-factor-challenge` instead.
+ */
+export const CODE_REFUSED_NOTICE =
+  "That code was not accepted. Check your authenticator app and enter the code it is showing now.";
 
 const DEFAULT_SERVER_ERROR = "The server could not handle that right now. Try again.";
 
@@ -204,7 +247,17 @@ function interpretIssuedSession(
   const data = envelopeData(outcome.body);
 
   // Checked before the status class: the challenge arrives as a 200.
-  if (isTwoFactorChallenge(data)) return { kind: "two-factor" };
+  if (isTwoFactorChallenge(data)) {
+    const challenge = nonEmptyString(outcome.challengeCookie);
+
+    // A handshake this client holds no credential for is not a handshake. The
+    // challenge cookie is the only thing identifying the half-finished sign-in
+    // to `POST /auth/two-factor/verify-totp`, so a challenge that arrived
+    // without one cannot be answered by anything anyone types. That is
+    // `malformed` and not a refusal: the credential was accepted, and what
+    // cannot be acted on is the server's answer about it.
+    return challenge ? { kind: "two-factor", challenge } : { kind: "malformed" };
+  }
 
   if (outcome.status < 200 || outcome.status >= 300) {
     return refusal(outcome.status, outcome.body, defaultRefusal);
@@ -260,6 +313,29 @@ export function interpretMagicLinkVerify(outcome: HttpOutcome): AuthOutcome {
  */
 export function interpretGoogleSignIn(outcome: HttpOutcome): AuthOutcome {
   return interpretIssuedSession(outcome, GOOGLE_REFUSED_NOTICE);
+}
+
+/**
+ * Read a `POST /auth/two-factor/verify-totp` response.
+ *
+ * The same interpreter as the three ways in, because the API answers this route
+ * with the same shape: the user in an envelope, the Session cookie in a header.
+ * It answers 201 rather than 200, which costs nothing here —
+ * `interpretIssuedSession` asks whether the status is a success rather than
+ * which success it is.
+ *
+ * The refusal is the one part that cannot be shared, and it is replaced rather
+ * than defaulted: see `CODE_REFUSED_NOTICE` for why the server's own words are
+ * the wrong ones on this route alone. A `server-error` still speaks for itself,
+ * because a 429 or a 500 is about the server rather than about the code, and a
+ * CSRF refusal keeps the sentence that tells somebody retyping cannot fix it.
+ */
+export function interpretTwoFactorVerify(outcome: HttpOutcome): AuthOutcome {
+  const result = interpretIssuedSession(outcome, CODE_REFUSED_NOTICE);
+
+  return result.kind === "unauthorised"
+    ? { kind: "unauthorised", message: CODE_REFUSED_NOTICE }
+    : result;
 }
 
 /**

@@ -118,6 +118,10 @@ export function launchDestination(
     // Not reachable from a cold start — a submit only ever comes from the
     // sign-in screen — but that is also the answer if it ever were.
     case "submitting":
+    // Nor is this: hydration issues no challenge, and a challenge is raised by
+    // the sign-in screen, which is where it is answered. The same destination
+    // for the same reason.
+    case "two-factor":
       return TO_SIGN_IN;
   }
 }

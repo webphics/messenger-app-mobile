@@ -1,11 +1,13 @@
 import { CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import {
+  CODE_REFUSED_NOTICE,
   GOOGLE_REFUSED_NOTICE,
   interpretGoogleSignIn,
   interpretMagicLinkRequest,
   interpretMagicLinkVerify,
   interpretSession,
   interpretSignIn,
+  interpretTwoFactorVerify,
   parseSessionUser,
   saysSessionExpired,
   type HttpOutcome,
@@ -43,6 +45,26 @@ const HELD = "better-auth.session_token=held";
 
 function ok(body: unknown, sessionCookie: string | null = ISSUED): HttpOutcome {
   return { reached: true, status: 200, body, sessionCookie };
+}
+
+const CHALLENGE = "better-auth.two_factor=chal.lenge";
+
+/**
+ * The challenge as it actually arrives on all three sign-in routes: a 200
+ * carrying no session at all, and one short-lived cookie that is the entire
+ * credential for the second half of the handshake.
+ */
+function challenged(challengeCookie: string | null = CHALLENGE): HttpOutcome {
+  return {
+    reached: true,
+    status: 200,
+    body: envelope(
+      { twoFactorRedirect: true, twoFactorMethods: ["totp"] },
+      "Two-factor authentication required",
+    ),
+    sessionCookie: null,
+    challengeCookie,
+  };
 }
 
 describe("parseSessionUser", () => {
@@ -154,12 +176,42 @@ describe("interpretSignIn", () => {
   });
 
   test("a two-factor challenge is its own outcome, not a sign-in", () => {
-    const challenge = envelope(
-      { twoFactorRedirect: true, twoFactorMethods: ["totp"] },
-      "Two-factor authentication required",
-    );
-    // The API returns the challenge as a 200 and deliberately sets no session cookie.
-    expect(interpretSignIn(ok(challenge, null))).toEqual({ kind: "two-factor" });
+    // The API returns the challenge as a 200 and deliberately sets no session
+    // cookie. What it does set is the credential for the second half.
+    expect(interpretSignIn(challenged())).toEqual({
+      kind: "two-factor",
+      challenge: CHALLENGE,
+    });
+  });
+
+  /**
+   * The one case that has to be told apart from a challenge rather than folded
+   * into it: `POST /auth/two-factor/verify-totp` is identified by the challenge
+   * cookie and by nothing else, so a handshake that arrived without one cannot
+   * be finished by anything anybody types. Drawing a code field over it would
+   * ask somebody to spend a code on a request that could only be refused.
+   */
+  test("a challenge that set no cookie is unreadable, not a challenge", () => {
+    expect(interpretSignIn(challenged(null))).toEqual({ kind: "malformed" });
+  });
+
+  test("a challenge whose cookie came back blank is unreadable too", () => {
+    expect(interpretSignIn(challenged("   "))).toEqual({ kind: "malformed" });
+  });
+
+  /**
+   * An `HttpOutcome` built before this field existed, which is most of them in
+   * this repo. Missing and null mean the same thing, and the challenge is the
+   * only branch that reads either.
+   */
+  test("an outcome carrying no challenge field at all is read as carrying none", () => {
+    const withoutTheField: HttpOutcome = {
+      reached: true,
+      status: 200,
+      body: envelope({ twoFactorRedirect: true }),
+      sessionCookie: null,
+    };
+    expect(interpretSignIn(withoutTheField)).toEqual({ kind: "malformed" });
   });
 
   test("wrong credentials are unauthorised, carrying the server's own words", () => {
@@ -422,9 +474,11 @@ describe("interpretMagicLinkVerify", () => {
     });
   });
 
-  test("two-factor fires on this path too, and is refused the same way", () => {
-    const challenge = envelope({ twoFactorRedirect: true }, "Two-factor authentication required");
-    expect(interpretMagicLinkVerify(ok(challenge, null))).toEqual({ kind: "two-factor" });
+  test("two-factor fires on this path too, and raises the same challenge", () => {
+    expect(interpretMagicLinkVerify(challenged())).toEqual({
+      kind: "two-factor",
+      challenge: CHALLENGE,
+    });
   });
 
   test("a verified link with no cookie establishes nothing", () => {
@@ -466,14 +520,13 @@ describe("interpretGoogleSignIn", () => {
     ).toMatchObject({ kind: "signed-in", user: { role: "customer" } });
   });
 
-  // The API's two-factor hook fires on Google sign-in, so it must not be a
-  // way around the limitation the password path already explains.
-  test("two-factor fires on this path too, and is refused the same way", () => {
-    const challenge = envelope(
-      { twoFactorRedirect: true },
-      "Two-factor authentication required",
-    );
-    expect(interpretGoogleSignIn(ok(challenge, null))).toEqual({ kind: "two-factor" });
+  // The API's two-factor hook fires on Google sign-in, so it must not be a way
+  // around the second factor the password path asks for.
+  test("two-factor fires on this path too, and raises the same challenge", () => {
+    expect(interpretGoogleSignIn(challenged())).toEqual({
+      kind: "two-factor",
+      challenge: CHALLENGE,
+    });
   });
 
   test("a rejected identity is refused in the API's own words", () => {
@@ -603,6 +656,106 @@ describe("interpretMagicLinkRequest", () => {
 
   test("a request that never got an answer is a transport failure", () => {
     expect(interpretMagicLinkRequest({ reached: false })).toEqual({
+      kind: "transport-failure",
+    });
+  });
+});
+
+describe("interpretTwoFactorVerify", () => {
+  /** The route answers 201, unlike every other one this module reads. */
+  function created(body: unknown, sessionCookie: string | null = ISSUED): HttpOutcome {
+    return { reached: true, status: 201, body, sessionCookie };
+  }
+
+  test("a 201 with a user and a cookie is a sign-in like any other", () => {
+    expect(interpretTwoFactorVerify(created(envelope(apiUser())))).toEqual({
+      kind: "signed-in",
+      cookie: ISSUED,
+      user: {
+        id: "ab05cfc4-5ee5-40fb-93af-564a773257e5",
+        name: "Admin",
+        email: "admin@talo.com",
+        role: "admin",
+        hasPassword: true,
+        twoFactorEnabled: false,
+      },
+    });
+  });
+
+  test("a verified code that issued no cookie establishes nothing", () => {
+    expect(interpretTwoFactorVerify(created(envelope(apiUser()), null))).toEqual({
+      kind: "malformed",
+    });
+  });
+
+  /**
+   * The whole reason this route needs an interpreter of its own. The API folds
+   * every 401 into `invalidCredentialsError()`, so a wrong code comes back
+   * saying to check a username, an email or a password — three controls nobody
+   * was looking at, one of which was accepted a moment ago.
+   */
+  test("a wrong code is refused in words about a code, not about a password", () => {
+    const outcome = interpretTwoFactorVerify({
+      reached: true,
+      status: 401,
+      body: {
+        statusCode: 401,
+        code: "invalid_credentials",
+        message: "Invalid username, email, or password.",
+      },
+      sessionCookie: null,
+    });
+
+    expect(outcome).toEqual({ kind: "unauthorised", message: CODE_REFUSED_NOTICE });
+    expect(CODE_REFUSED_NOTICE).not.toMatch(/password/i);
+  });
+
+  /**
+   * An expired challenge is the same 401 as a wrong code — better-auth raises
+   * `INVALID_CODE` and `INVALID_TWO_FACTOR_COOKIE` alike as UNAUTHORIZED — so
+   * this must not claim to tell them apart. The lapse is announced by the clock
+   * in `lib/two-factor-challenge` instead.
+   */
+  test("a lapsed challenge is indistinguishable from a wrong one, and is not guessed at", () => {
+    const lapsed = interpretTwoFactorVerify({
+      reached: true,
+      status: 401,
+      body: { statusCode: 401, code: "invalid_credentials", message: "Invalid username, email, or password." },
+      sessionCookie: null,
+    });
+    expect(lapsed).toEqual({ kind: "unauthorised", message: CODE_REFUSED_NOTICE });
+  });
+
+  // Not about the code, so the server keeps its own words here.
+  test("a rate limit is repeated in the server's words", () => {
+    const message = "Too many login attempts. Please try again later.";
+    expect(
+      interpretTwoFactorVerify({
+        reached: true,
+        status: 429,
+        body: { code: "rate_limit_exceeded", message },
+        sessionCookie: null,
+      }),
+    ).toEqual({ kind: "server-error", message });
+  });
+
+  test("a CSRF refusal still says the thing retyping cannot fix", () => {
+    expect(
+      interpretTwoFactorVerify({
+        reached: true,
+        status: 403,
+        body: { code: CSRF_REFUSED_CODE, message: "invalid csrf token" },
+        sessionCookie: null,
+      }),
+    ).toEqual({
+      kind: "server-error",
+      message:
+        "Could not start a secure connection to the server. Check your connection and try again.",
+    });
+  });
+
+  test("a request that never got an answer is a transport failure", () => {
+    expect(interpretTwoFactorVerify({ reached: false })).toEqual({
       kind: "transport-failure",
     });
   });

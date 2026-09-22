@@ -38,6 +38,10 @@ export function sessionEndHref({ from, to }: SessionChange): Href | null {
     case "hydrating":
     // A refused sign-in, on the screen it was typed into.
     case "submitting":
+    // A challenge cancelled or lapsed, on the same screen: the code entry is a
+    // state of the sign-in screen rather than a route, so backing out of it
+    // leaves somebody exactly where they already are.
+    case "two-factor":
     // Already there.
     case "signed-out":
       return null;

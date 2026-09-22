@@ -6,6 +6,7 @@ import {
   LINK_REFUSED_NOTICE,
   type MagicLinkRequestOutcome,
 } from "@/lib/auth-response";
+import { SIGN_IN_HREF } from "@/lib/hub-routes";
 import { signedInDestination } from "@/lib/onboarding-gate";
 
 /**
@@ -99,6 +100,15 @@ export function magicLinkStage(
     // checked either, and saying so beats a spinner that outlives the network.
     case "unreachable":
       return { kind: "refused", message: OFFLINE_NOTICE };
+
+    // The link was good and the account wants a code as well: the API's
+    // two-factor hook fires on this route exactly as it does on a password.
+    // It goes to the sign-in screen rather than growing a code field here,
+    // because the challenge is a state and that screen is the one that renders
+    // it — the state travels, so nothing about the half-finished handshake is
+    // carried in the navigation. See ADR-0013.
+    case "two-factor":
+      return { kind: "navigate", href: SIGN_IN_HREF };
 
     case "signed-out":
       return settled
