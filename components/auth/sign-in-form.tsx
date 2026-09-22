@@ -303,6 +303,17 @@ export function SignInForm() {
       return;
     }
 
+    // Synchronising with a value this component does not own: the challenge is
+    // the machine's state, and it ends in ways no handler here sees — a code
+    // accepted, a cookie expired, the machine reset — so the discard cannot be
+    // hung off the cancel button. It cascades once, on a transition that
+    // re-renders the screen anyway, and the effect does not re-run because
+    // `inChallenge` is already false when it does.
+    //
+    // Deleting the suppression means giving these four their own component,
+    // mounted with the challenge, so that leaving unmounts them. Worth doing;
+    // it is a component split rather than a change to this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCode("");
     setCodeFieldError(null);
     setPassword("");

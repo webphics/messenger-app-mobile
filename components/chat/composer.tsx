@@ -258,11 +258,22 @@ export function Composer({
     return () => clearInterval(id)
   }, [recording])
 
+  // `finishRecording` is redeclared every render and closes over `elapsedMs`,
+  // so naming it in the dependencies below would say something untrue either
+  // way: listed, the auto-stop re-subscribes on every tick for a function that
+  // has not meaningfully changed; omitted, the effect holds whichever copy the
+  // recording started with. The ref is the latest one, written in an effect
+  // rather than during render, which is the only place a ref may be written.
+  const finishRecordingRef = useRef(finishRecording)
+  useEffect(() => {
+    finishRecordingRef.current = finishRecording
+  })
+
   // Auto-stop at 20 minutes.
   useEffect(() => {
     if (!recording) return
     if (elapsedMs < VOICE_NOTE_MAX_MS) return
-    void finishRecording()
+    void finishRecordingRef.current()
   }, [elapsedMs, recording])
 
   const sendStyle = useAnimatedStyle(() => ({

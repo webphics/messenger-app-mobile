@@ -1,83 +1,57 @@
-name: Build
+name: iOS Build
 
-# Manual only. Android is submitted to EAS (Expo's servers do the work, so this
-# job costs ~1 GitHub minute); iOS builds on a macOS runner, which bills at 10x
-# on a private repo — roughly 300 minutes of quota per run. Keep it deliberate.
+# Manual only, and deliberately so: this builds on a macOS runner, which bills
+# at 10x on a private repo — roughly 300 minutes of quota per run.
+#
+# Android is not here. It is android-release.yml, which runs on every push to
+# main, builds on EAS and publishes the APK to a GitHub Release. One Android
+# path rather than two, because two copies of the build configuration is how
+# they end up disagreeing.
 on:
   workflow_dispatch:
-    inputs:
-      platform:
-        description: Which platform to build
-        type: choice
-        default: both
-        options:
-          - both
-          - android
-          - ios
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: ios-build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  android:
-    name: Android APK (EAS)
-    if: ${{ inputs.platform == 'android' || inputs.platform == 'both' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      # A missing secret otherwise surfaces as an opaque auth failure from the
-      # EAS CLI several steps later.
-      - name: Require EXPO_TOKEN
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::EXPO_TOKEN repository secret is not set. Run: gh secret set EXPO_TOKEN"
-            exit 1
-          fi
-
-      - name: Set up EAS CLI
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      # --no-wait, not --wait: the free EAS queue can exceed 90 minutes and
-      # --wait would bill every one of them to this runner while it sits idle.
-      # The APK is collected from the EAS install page instead.
-      - name: Submit Android build to EAS
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          set -o pipefail
-          eas build --platform android --profile preview --non-interactive --no-wait 2>&1 | tee eas.log
-
-      - name: Link the build
-        if: success()
-        run: |
-          URL=$(grep -oE 'https://expo\.dev/[^[:space:]]*builds/[0-9a-fA-F-]+' eas.log | head -1)
-          {
-            echo "### Android build submitted"
-            echo
-            if [ -n "$URL" ]; then
-              echo "[Open the build on expo.dev]($URL)"
-              echo
-              echo "Install the APK from the EAS page once it finishes — internal distribution serves an install link and QR code."
-            else
-              echo "Submitted, but the build URL could not be parsed from the log. See the previous step's output."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
   ios:
     name: iOS unsigned IPA
-    if: ${{ inputs.platform == 'ios' || inputs.platform == 'both' }}
     runs-on: macos-latest
     timeout-minutes: 60
+
+    # Metro inlines `EXPO_PUBLIC_*` at bundle time, and this job bundles on the
+    # runner rather than on EAS — xcodebuild's React Native phase is what reads
+    # these. So neither source the Android job relies on reaches here: `.env` is
+    # gitignored and absent from the checkout, and `eas.json`'s `env` block is
+    # read by `eas build` alone, never by `expo prebuild`. Unset, they compile to
+    # `undefined`, `lib/api-config.ts` throws at import, and the IPA crashes on
+    # launch rather than failing here. Job-level for the same reason
+    # ios-cookie-check.yml sets its own: the value has to be in the environment
+    # xcodebuild inherits.
+    #
+    # Repository *variables*, not secrets: an `EXPO_PUBLIC_*` value is inlined
+    # into the shipped bundle by definition, so anyone holding the IPA can read
+    # it, and hiding it in the log would only make it harder to check.
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+
     steps:
       - uses: actions/checkout@v4
+
+      # The same fail-fast the Android job gives EXPO_TOKEN, and for a worse
+      # failure: a missing token stops the build, a missing API URL ships an
+      # IPA that looks fine and dies on launch.
+      - name: Require the bundle-time configuration
+        run: |
+          if [ -z "$EXPO_PUBLIC_API_URL" ]; then
+            echo "::error::EXPO_PUBLIC_API_URL repository variable is not set. Run: gh variable set EXPO_PUBLIC_API_URL"
+            exit 1
+          fi
+          if [ -z "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" ]; then
+            echo "::warning::EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set. The build succeeds and Google sign-in is disabled in it."
+          fi
 
       # Version comes from the "packageManager" field in package.json.
       - uses: pnpm/action-setup@v4

@@ -218,11 +218,23 @@ export function AccountPasswordScreen() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const refs: Record<PasswordField, React.RefObject<TextInput | null>> = {
-    current: useRef<TextInput>(null),
-    next: useRef<TextInput>(null),
-    confirmation: useRef<TextInput>(null),
-  };
+  /**
+   * One ref per field, rather than a record of them.
+   *
+   * The record was rebuilt every render, which made it a new value in
+   * `onSubmit`'s dependencies each time and put a read of a ref — `refs.next` —
+   * in the render path. Three names and a lookup that runs inside the handler
+   * keep the refs where refs belong, which is everywhere except render.
+   */
+  const currentRef = useRef<TextInput>(null);
+  const nextRef = useRef<TextInput>(null);
+  const confirmationRef = useRef<TextInput>(null);
+
+  const focusField = useCallback((field: PasswordField) => {
+    const target =
+      field === "current" ? currentRef : field === "next" ? nextRef : confirmationRef;
+    target.current?.focus();
+  }, []);
 
   const live = useRef(true);
   useEffect(() => {
@@ -261,7 +273,7 @@ export function AccountPasswordScreen() {
 
     if (check.submission === null) {
       hapticWarning();
-      if (check.firstError) refs[check.firstError].current?.focus();
+      if (check.firstError) focusField(check.firstError);
       return;
     }
 
@@ -288,7 +300,7 @@ export function AccountPasswordScreen() {
         // A refused change is almost always the current password being wrong,
         // and the field it is about is where somebody has to go next.
         if (result.failure.kind === "refused" && asksForCurrentPassword(mode)) {
-          refs.current.current?.focus();
+          focusField("current");
         }
         return;
       }
@@ -301,7 +313,7 @@ export function AccountPasswordScreen() {
       setDraft(EMPTY_PASSWORD_DRAFT);
       setSaved(true);
     });
-  }, [accountUpdated, draft, mode, refs, saving]);
+  }, [accountUpdated, draft, focusField, mode, saving]);
 
   return (
     <View className="flex-1 bg-bg">
@@ -366,10 +378,10 @@ export function AccountPasswordScreen() {
               field="current"
               value={draft.current}
               error={errors.current}
-              inputRef={refs.current}
+              inputRef={currentRef}
               returnKeyType="next"
               onChangeText={(value) => edit("current", value)}
-              onSubmitEditing={() => refs.next.current?.focus()}
+              onSubmitEditing={() => nextRef.current?.focus()}
             />
           ) : null}
 
@@ -377,17 +389,17 @@ export function AccountPasswordScreen() {
             field="next"
             value={draft.next}
             error={errors.next}
-            inputRef={refs.next}
+            inputRef={nextRef}
             returnKeyType="next"
             onChangeText={(value) => edit("next", value)}
-            onSubmitEditing={() => refs.confirmation.current?.focus()}
+            onSubmitEditing={() => confirmationRef.current?.focus()}
           />
 
           <PasswordInput
             field="confirmation"
             value={draft.confirmation}
             error={errors.confirmation}
-            inputRef={refs.confirmation}
+            inputRef={confirmationRef}
             returnKeyType="go"
             onChangeText={(value) => edit("confirmation", value)}
             onSubmitEditing={onSubmit}

@@ -35,7 +35,6 @@ import {
   wallComposeNeedsOrganizationChoice,
   wallKindAllowsDeadline,
   wallKindNeedsTitle,
-  MINUTE_MS,
   WALL_DEADLINE_CHOICES,
   WALL_POST_ATTACHMENT_MAX,
   WALL_POST_LINK_LABEL_MAX,
@@ -142,7 +141,18 @@ function ComposeSheet({
    */
   const [postKind, setPostKind] = useState<WallPostKind>('community')
   const [title, setTitle] = useState('')
-  const [endsAt, setEndsAt] = useState<Date | null>(null)
+  /**
+   * The deadline and the chip that set it, held together.
+   *
+   * Which chip is lit used to be derived — the stored date compared against
+   * `Date.now()` plus each choice's offset, within a minute — which read the
+   * clock during render and so answered differently on renders the person did
+   * nothing to cause. A minute after the tap the gap exceeded the tolerance and
+   * the chip quietly went dark while the deadline it set was still there.
+   * Recording the label at the tap is the same answer at any later moment, and
+   * one piece of state means the two cannot disagree.
+   */
+  const [deadline, setDeadline] = useState<{ at: Date; label: string } | null>(null)
   const [body, setBody] = useState('')
   const [staged, setStaged] = useState<StagedAttachment[]>([])
   const [linkLabel, setLinkLabel] = useState('')
@@ -166,7 +176,7 @@ function ComposeSheet({
     setPostKind(next)
     setTitleError(null)
     setEndsAtError(null)
-    if (!wallKindAllowsDeadline(next)) setEndsAt(null)
+    if (!wallKindAllowsDeadline(next)) setDeadline(null)
   }
 
   function removeStaged(id: string) {
@@ -202,7 +212,7 @@ function ComposeSheet({
       hasOrganization: organizationId !== null,
       kind: postKind,
       title,
-      endsAt: endsAt ? endsAt.getTime() : null,
+      endsAt: deadline ? deadline.at.getTime() : null,
       now: Date.now(),
       attachmentKinds: staged.map(item => item.local.kind),
       linkLabel,
@@ -236,7 +246,7 @@ function ComposeSheet({
       organizationId,
       kind: postKind,
       title: title.trim() || undefined,
-      endsAt: endsAt ? endsAt.toISOString() : undefined,
+      endsAt: deadline ? deadline.at.toISOString() : undefined,
       body: trimmedBody || undefined,
       attachments: attachments.length > 0 ? attachments : undefined,
       link: trimmedLabel && trimmedUrl ? { label: trimmedLabel, url: trimmedUrl } : undefined,
@@ -411,9 +421,7 @@ function ComposeSheet({
                   </Text>
                   <View className="flex-row flex-wrap gap-2">
                     {WALL_DEADLINE_CHOICES.map(choice => {
-                      const selected =
-                        endsAt !== null &&
-                        Math.abs(endsAt.getTime() - (Date.now() + choice.ms)) < MINUTE_MS
+                      const selected = deadline?.label === choice.label
                       return (
                         <TactilePressable
                           key={choice.label}
@@ -422,7 +430,7 @@ function ComposeSheet({
                           accessibilityState={{ selected }}
                           disabled={submitting}
                           onPress={() => {
-                            setEndsAt(new Date(Date.now() + choice.ms))
+                            setDeadline({ at: new Date(Date.now() + choice.ms), label: choice.label })
                             setEndsAtError(null)
                           }}
                           className={cn(
@@ -443,13 +451,13 @@ function ComposeSheet({
                         </TactilePressable>
                       )
                     })}
-                    {endsAt ? (
+                    {deadline ? (
                       <TactilePressable
                         accessibilityRole="button"
                         accessibilityLabel="Clear the end date"
                         disabled={submitting}
                         onPress={() => {
-                          setEndsAt(null)
+                          setDeadline(null)
                           setEndsAtError(null)
                         }}
                         className="min-h-11 flex-row items-center justify-center gap-1 rounded-full border border-line/80 bg-line/35 px-3.5"

@@ -162,9 +162,8 @@ export function AccountSessionsScreen() {
     };
   }, []);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setFailure(null);
+  /** The request alone, with no state to set before it goes out. */
+  const fetchSessions = useCallback(() => {
     void readAccountSessions().then((result) => {
       if (!live.current) return;
       setLoading(false);
@@ -173,7 +172,20 @@ export function AccountSessionsScreen() {
     });
   }, []);
 
-  useEffect(() => load(), [load]);
+  /**
+   * Asking again: back to loading, and the last failure goes with the attempt
+   * that produced it. The first read needs neither — `loading` starts true and
+   * `failure` starts null — which is why the mount effect below calls the
+   * request rather than this, and so sets no state synchronously inside an
+   * effect.
+   */
+  const load = useCallback(() => {
+    setLoading(true);
+    setFailure(null);
+    fetchSessions();
+  }, [fetchSessions]);
+
+  useEffect(() => fetchSessions(), [fetchSessions]);
 
   const currentId = currentAccountSessionId(sessions);
   const rows = accountSessionRows(sessions, currentId);

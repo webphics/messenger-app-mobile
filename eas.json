@@ -15,8 +15,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-        "EXPO_PUBLIC_MAGIC_LINK_ORIGIN": "joychat://",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "935513852405-nkjrlg9aoghevdo56bdpv1f3bcmcj74d.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "753090717715-vtk6in9mcbhfjsls3v60qlk6f5h5bc83.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -26,8 +25,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-        "EXPO_PUBLIC_MAGIC_LINK_ORIGIN": "joychat://",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "935513852405-nkjrlg9aoghevdo56bdpv1f3bcmcj74d.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "753090717715-vtk6in9mcbhfjsls3v60qlk6f5h5bc83.apps.googleusercontent.com"
       }
     }
   }
