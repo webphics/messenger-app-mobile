@@ -451,13 +451,19 @@ export type Invitation = {
 /**
  * What an invite attempt did, per organization.
  *
- * Three lists rather than a success flag, because the API answers with three:
- * an invitation was created, the person was already a member, or one was
- * already pending. Only the first is news, and the other two are the reason a
- * repeated invite is not an error.
+ * Lists rather than a success flag, because the API answers with lists: an
+ * invitation was created, the person joined outright, they were already a
+ * member, or an invitation was already pending. Only the first two are news,
+ * and the other two are the reason a repeated invite is not an error.
+ *
+ * `invited` and `joined` never both carry entries. A Customer joins the moment
+ * they are invited and everybody else is offered an invitation (ADR 0013), and
+ * the role belongs to the person, so one call takes one path.
  */
 export type InviteOutcome = {
   invited: Organization[]
+  /** Memberships this call wrote, with no invitation in between. */
+  joined: Organization[]
   alreadyMembers: Organization[]
   alreadyInvited: Organization[]
 }

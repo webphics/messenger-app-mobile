@@ -110,6 +110,7 @@ export function parseInviteOutcome(value: unknown): InviteOutcome | null {
   if (!record) return null
   return {
     invited: organizationList(record.invited),
+    joined: organizationList(record.joined),
     alreadyMembers: organizationList(record.alreadyMembers),
     alreadyInvited: organizationList(record.alreadyInvited),
   }

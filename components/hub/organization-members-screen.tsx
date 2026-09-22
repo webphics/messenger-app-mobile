@@ -27,10 +27,11 @@ import type { ManagedUser, OrganizationMember } from "@/lib/types";
  * this organization".
  *
  * Inviting is the only way in — there is no route that grants a membership
- * directly — so the second list's button says Invite and the row stays in it
- * until the person accepts. Removing is the opposite and immediate: the API
- * revokes the membership and reassigns whatever the loss of it made
- * unreadable, which is the `membership_revoked` reason on
+ * directly. What the invite does depends on who is invited: a Customer joins at
+ * once (ADR 0013), so their row crosses to the members list, while everybody
+ * else stays in the second list until they accept. Removing is the opposite and
+ * immediate: the API revokes the membership and reassigns whatever the loss of
+ * it made unreadable, which is the `membership_revoked` reason on
  * `conversation.reassigned`.
  */
 
@@ -116,14 +117,19 @@ export function OrganizationMembersScreen({
           return;
         }
         /*
-         * The answer is three lists — invited, already a member, already
-         * invited — and all three end the same way here: there is now a
-         * pending invitation, so the row says so and stops offering.
+         * A join moves the person into the members list, which this screen only
+         * learns by asking again — the answer names organizations, not members.
+         * Every other outcome ends the same way: there is now a pending
+         * invitation, so the row says so and stops offering.
          */
+        if (result.value.joined.length > 0) {
+          load();
+          return;
+        }
         setInvited((held) => [...held, user.id]);
       });
     },
-    [organizationId],
+    [load, organizationId],
   );
 
   const remove = useCallback(

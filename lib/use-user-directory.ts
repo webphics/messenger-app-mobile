@@ -277,7 +277,9 @@ export function useUserDirectory(): UserDirectoryView {
       run(
         user,
         () => inviteToOrganizations(user.id, organizationIds),
-        'The invitation could not be sent.',
+        user.role === 'customer'
+          ? 'They could not be added.'
+          : 'The invitation could not be sent.',
         // The pending list on the row has grown, and the invite answer names
         // organizations rather than carrying the user.
         () => load(),
