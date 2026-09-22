@@ -51,9 +51,9 @@ export type AuthState =
    * display renders it off this status.
    *
    * It is also the only state in this union that carries a credential. It is
-   * carried here and nowhere else — not in the keychain, not in `api-client`'s
-   * held cookie — precisely so that leaving the state is the whole of discarding
-   * it, on every way out: signed in, refused, lapsed or cancelled.
+   * carried here and nowhere else, not in the keychain, not in `api-client`'s
+   * held cookie. That is precisely so that leaving the state is the whole of
+   * discarding it, on every way out: signed in, refused, lapsed or cancelled.
    */
   | {
       status: "two-factor";
@@ -98,7 +98,7 @@ export type AuthEvent =
   /**
    * Backing out of code entry. Lands signed-out with nothing said, because
    * nobody needs a thing explained to them that they have just done, and with
-   * nothing of the attempt retained — the challenge goes with the state.
+   * nothing of the attempt retained. The challenge goes with the state.
    */
   | { type: "cancel-challenge" }
   /**
@@ -204,7 +204,7 @@ function afterAttempt(outcome: AuthOutcome): AuthState {
  * somebody would have to walk through again.
  *
  * A refusal in particular stays. It is the case that looks most like an ending
- * and is not one — the API cannot tell a wrong code from a lapsed challenge, so
+ * and is not one. The API cannot tell a wrong code from a lapsed challenge, so
  * treating a refusal as the end of the road would throw away a live handshake
  * over a typo.
  */
@@ -318,9 +318,9 @@ export function authTransition(state: AuthState, event: AuthEvent): AuthState {
         ? { ...state, verifying: true, notice: null }
         : state;
 
-    // A code's answer that outlived its request — cancelled, signed out, or
-    // lapsed while it was in flight — must not sign anybody in, the same rule
-    // `settled` follows one state back.
+    // A code's answer that outlived its request must not sign anybody in, the
+    // same rule `settled` follows one state back. An answer outlives its request
+    // when it is cancelled, signed out, or lapsed while it was in flight.
     case "code-settled":
       return state.status === "two-factor" && state.verifying
         ? afterCode(state, event.outcome)

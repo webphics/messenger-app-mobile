@@ -405,7 +405,7 @@ describe("signInWithPassword", () => {
     expect(clearCookie).toHaveBeenCalled();
     // And in particular the challenge is neither written to the keychain nor
     // held as the Session cookie. It lives in the machine state and nowhere
-    // else — see ADR-0013.
+    // else. See ADR-0013.
     expect(writeCookie).not.toHaveBeenCalledWith(CHALLENGE);
     expect(getSessionCookie()).toBeNull();
     expect(getSessionUser()).toBeNull();

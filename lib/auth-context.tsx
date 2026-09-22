@@ -84,8 +84,8 @@ type AuthContextValue = {
    */
   submitTwoFactorCode: (code: string) => Promise<void>;
   /**
-   * Back out of code entry. Lands signed-out, retaining nothing of the attempt —
-   * the challenge goes with the state it lived in.
+   * Back out of code entry. Lands signed-out, retaining nothing of the attempt.
+   * The challenge goes with the state it lived in.
    */
   cancelTwoFactor: () => void;
   /**
@@ -309,8 +309,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * The challenge this provider is holding, or null when it is holding none.
    *
    * Read off the state rather than kept in a ref, because it is state: the
-   * machine is where it lives, and the two things below that need it — the
-   * request and the clock — both have to stop the moment it is gone.
+   * machine is where it lives, and the two things below that need it, the
+   * request and the clock, both have to stop the moment it is gone.
    */
   const challenge = state.status === "two-factor" ? state.challenge : null;
 
@@ -324,7 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * screen that had no way to know better. See `CHALLENGE_LIFETIME_MS`.
    *
    * Keyed on the challenge rather than on the status, so a notice appearing over
-   * the field does not restart the clock — the deadline belongs to the cookie
+   * the field does not restart the clock. The deadline belongs to the cookie
    * the API minted, not to what has happened on screen since.
    */
   useEffect(() => {
@@ -343,7 +343,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * `runAttempt` makes one state back: submit, await, settle.
    *
    * Not routed through `runAttempt` itself, because the events differ and the
-   * guard has one more thing to check — there is no challenge to answer unless
+   * guard has one more thing to check. There is no challenge to answer unless
    * the machine is holding one. The ref is the same ref, which is the point: two
    * taps in the same tick both read the pre-dispatch state, so the machine alone
    * would let the second through and fire a second request.

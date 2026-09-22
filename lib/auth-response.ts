@@ -28,7 +28,7 @@ export type HttpOutcome =
        *
        * Optional rather than required, deliberately. Dozens of tests across this
        * repo build an `HttpOutcome` literal out of the four fields above, and
-       * none of them is about two-factor — a required fifth field would fail
+       * none of them is about two-factor. A required fifth field would fail
        * every one of them to make a point that belongs to one code path.
        * Missing and null therefore mean the same thing here, and nothing reads
        * the difference.
@@ -107,7 +107,7 @@ export const GOOGLE_REFUSED_NOTICE =
 /**
  * What to say when a two-factor code is refused.
  *
- * Unlike the two notices above this one is not merely a backstop — it replaces
+ * Unlike the two notices above this one is not merely a backstop. It replaces
  * whatever the server said, which `interpretTwoFactorVerify` is the only
  * function in this module to do. The API folds every 401 into
  * `invalidCredentialsError()`, whose sentence names a username, an email and a
@@ -117,7 +117,7 @@ export const GOOGLE_REFUSED_NOTICE =
  * It also has to cover the case the client cannot see: an expired challenge
  * comes back as the same 401 as a wrong code, because better-auth raises
  * `INVALID_CODE` and `INVALID_TWO_FACTOR_COOKIE` alike as UNAUTHORIZED. "The
- * current code" is therefore the most this can honestly say — the lapse is
+ * current code" is therefore the most this can honestly say. The lapse is
  * announced by the clock in `lib/two-factor-challenge` instead.
  */
 export const CODE_REFUSED_NOTICE =
@@ -320,7 +320,7 @@ export function interpretGoogleSignIn(outcome: HttpOutcome): AuthOutcome {
  *
  * The same interpreter as the three ways in, because the API answers this route
  * with the same shape: the user in an envelope, the Session cookie in a header.
- * It answers 201 rather than 200, which costs nothing here —
+ * It answers 201 rather than 200, which costs nothing here.
  * `interpretIssuedSession` asks whether the status is a success rather than
  * which success it is.
  *

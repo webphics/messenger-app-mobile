@@ -4,8 +4,8 @@
  * Split off `lib/auth-machine` at the same seam every other pure module in this
  * app is split at: the machine decides what a settled attempt *meant*, and this
  * decides whether an attempt is worth making and how long the handshake behind
- * it is good for. Nothing here does I/O and nothing here holds the credential —
- * that lives in the machine state and is discarded with it, per
+ * it is good for. Nothing here does I/O and nothing here holds the credential.
+ * That lives in the machine state and is discarded with it, per
  * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`.
  */
 
@@ -21,7 +21,7 @@
  * it has to be. better-auth raises `INVALID_CODE` and
  * `INVALID_TWO_FACTOR_COOKIE` both as UNAUTHORIZED, and
  * `api/src/modules/auth/auth.error.ts` folds every 401 into one
- * `invalidCredentialsError()` — so a wrong code and a challenge that has lapsed
+ * `invalidCredentialsError()`, so a wrong code and a challenge that has lapsed
  * arrive as the identical response and **the client cannot tell them apart from
  * it**. Either this clock says "sign in again" or nothing ever does.
  */
@@ -76,7 +76,7 @@ export function normaliseCode(typed: string): string {
  * before deliberately does not. A password that fails today's rules may still be
  * a perfectly good older one, so only the server can rule on it; a TOTP code has
  * exactly one shape and always has. Refusing five digits here costs nothing and
- * saves a round trip that could only ever come back refused — and, on an API
+ * saves a round trip that could only ever come back refused, and, on an API
  * that rate limits, saves an attempt as well.
  */
 export function codeError(typed: string): string | null {
@@ -84,9 +84,4 @@ export function codeError(typed: string): string | null {
   if (code === "") return CODE_REQUIRED_NOTICE;
 
   return CODE_SHAPE.test(code) ? null : CODE_SHAPE_NOTICE;
-}
-
-/** Whether the typed code is worth a request. */
-export function isSubmittableCode(typed: string): boolean {
-  return codeError(typed) === null;
 }

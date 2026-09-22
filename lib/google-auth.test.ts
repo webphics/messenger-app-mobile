@@ -157,7 +157,7 @@ describe("what the machine does with a finished attempt", () => {
   // Story 13: succeeding with Google and failing at our API must not be
   // half-signed-in. Every way an attempt can end short of an issued session
   // ends signed-out, from the state a real attempt is in when it settles. The
-  // challenge is deliberately not on this list — it is a sign-in still in
+  // challenge is deliberately not on this list. It is a sign-in still in
   // progress rather than one that ended, and the row below says the only thing
   // that matters about it here, which is that it is not signed-in.
   test.each<GoogleResult>([
@@ -171,7 +171,7 @@ describe("what the machine does with a finished attempt", () => {
     expect(after(result).status).toBe("signed-out");
   });
 
-  test("a challenge is not signed in either — it is a sign-in still owing a code", () => {
+  test("a challenge is not signed in either. It is a sign-in still owing a code", () => {
     expect(
       after({
         kind: "settled",

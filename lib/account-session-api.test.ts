@@ -8,7 +8,7 @@ import { API_BASE_URL } from '@/lib/api-config'
 
 /**
  * The two boundaries this file cannot cross under Jest, both reached through
- * `authenticatedRequest` — the same pair `lib/notification-api.test.ts` mocks,
+ * `authenticatedRequest`, the same pair `lib/notification-api.test.ts` mocks,
  * and for the same reasons. The transport itself is real: this file is about the
  * requests that go out.
  */

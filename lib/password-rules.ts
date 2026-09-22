@@ -4,11 +4,11 @@
  *
  * Pure and table-tested, beside `components/settings/account-password-screen`,
  * which owns the drawing, and `lib/password-api`, which owns the two paths. The
- * same split every rules module here has — `lib/sign-in-steps`,
- * `lib/account-session-rows`, `lib/composer-access` — and for the same reason:
- * nothing in this file imports anything native, so the rules ticket 06 turns on
- * are a table of cases rather than something only a running phone can
- * demonstrate.
+ * same split every rules module here has, `lib/sign-in-steps`,
+ * `lib/account-session-rows` and `lib/composer-access` included, and for the
+ * same reason: nothing in this file imports anything native, so the rules
+ * ticket 06 turns on are a table of cases rather than something only a running
+ * phone can demonstrate.
  *
  * The rules, all from ticket 06 and
  * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`:
@@ -154,7 +154,7 @@ function newPasswordError(value: string): string | null {
  *
  * The current password is checked for presence only. Whether it is the *right*
  * password is the server's answer, and a length complaint about one that is
- * simply wrong would send somebody looking for a problem that is not there — as
+ * simply wrong would send somebody looking for a problem that is not there, as
  * would refusing to submit a password that predates the current rule.
  */
 export function checkPassword(
@@ -207,8 +207,8 @@ export function checkPassword(
  * The success line says the session survived, which is ticket 06's own
  * acceptance criterion and a fact about the API rather than a reassurance this
  * client invented. `auth.service.ts` calls Better Auth's `setPassword` and
- * `changePassword` with the body alone — neither passes `revokeOtherSessions`,
- * and neither controller appends a `Set-Cookie` the way `updateProfile` does —
+ * `changePassword` with the body alone. Neither passes `revokeOtherSessions`,
+ * and neither controller appends a `Set-Cookie` the way `updateProfile` does,
  * so no session is revoked and the session cookie this app holds is not rotated.
  * Read from `api/src/modules/auth/auth.controller.ts` and its service rather
  * than taken on trust.

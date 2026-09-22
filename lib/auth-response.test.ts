@@ -691,8 +691,8 @@ describe("interpretTwoFactorVerify", () => {
   /**
    * The whole reason this route needs an interpreter of its own. The API folds
    * every 401 into `invalidCredentialsError()`, so a wrong code comes back
-   * saying to check a username, an email or a password — three controls nobody
-   * was looking at, one of which was accepted a moment ago.
+   * saying to check a username, an email or a password. Those are three
+   * controls nobody was looking at, one of which was accepted a moment ago.
    */
   test("a wrong code is refused in words about a code, not about a password", () => {
     const outcome = interpretTwoFactorVerify({
@@ -711,10 +711,10 @@ describe("interpretTwoFactorVerify", () => {
   });
 
   /**
-   * An expired challenge is the same 401 as a wrong code — better-auth raises
-   * `INVALID_CODE` and `INVALID_TWO_FACTOR_COOKIE` alike as UNAUTHORIZED — so
-   * this must not claim to tell them apart. The lapse is announced by the clock
-   * in `lib/two-factor-challenge` instead.
+   * An expired challenge is the same 401 as a wrong code, because better-auth
+   * raises `INVALID_CODE` and `INVALID_TWO_FACTOR_COOKIE` alike as
+   * UNAUTHORIZED. This must not claim to tell them apart. The lapse is
+   * announced by the clock in `lib/two-factor-challenge` instead.
    */
   test("a lapsed challenge is indistinguishable from a wrong one, and is not guessed at", () => {
     const lapsed = interpretTwoFactorVerify({

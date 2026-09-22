@@ -108,7 +108,7 @@ async function applyOutcome(
     // A challenge is no longer the end of the road, and the wipe still stands:
     // the password was accepted but nothing was issued, so anything this device
     // was holding from an earlier session is still a credential nobody has
-    // proved they own. What the challenge carries never touches any of this —
+    // proved they own. What the challenge carries never touches any of this.
     // `outcome.challenge` is deliberately not read here, so the challenge cookie
     // is never written to the keychain and never becomes the held Session
     // cookie. It lives in the machine state and nowhere else, which is what
@@ -297,7 +297,7 @@ export async function signInWithPassword(
  * rather than through a mechanism of its own, and it is the whole credential on
  * this request: `POST /auth/two-factor/verify-totp` carries no auth guard,
  * because at challenge time there is no session to guard it with. It comes from
- * the machine state and goes nowhere else — nothing here holds it, and
+ * the machine state and goes nowhere else. Nothing here holds it, and
  * `applyOutcome` never writes it.
  *
  * The code is normalised on the way out for the reason the identifier is trimmed

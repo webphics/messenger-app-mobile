@@ -128,7 +128,7 @@ function FieldError({ message }: { message: string | null }) {
  * The standing message over the form, above whichever controls are on display.
  *
  * A component rather than a block written twice, because the three steps and the
- * code entry both stand under one — and a refused code and a refused password
+ * code entry both stand under one, and a refused code and a refused password
  * should not drift into looking like different kinds of news.
  */
 function FormNotice({ message }: { message: string | null }) {
@@ -167,7 +167,7 @@ export function SignInForm() {
    * that only makes sense mid-flow must not be an address anyone can reach out
    * of order. See
    * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`. The
-   * three steps below are untouched by it — an account without a second factor
+   * three steps below are untouched by it. An account without a second factor
    * never sees this branch at all.
    */
   const challenge = state.status === "two-factor" ? state : null;
@@ -285,7 +285,7 @@ export function SignInForm() {
    * in it behind when the challenge goes.
    *
    * Keyed on whether there is a challenge rather than on which one, so a refused
-   * code leaves the field alone — somebody correcting a typo should not find it
+   * code leaves the field alone. Somebody correcting a typo should not find it
    * emptied under them.
    *
    * Every way *out* clears the code and the password both, which is the half of
@@ -518,7 +518,7 @@ export function SignInForm() {
    * Send the code, having refused to send one that could only come back refused.
    *
    * The one place this screen judges shape where the password field deliberately
-   * does not — `lib/two-factor-challenge` says why. The challenge itself is not
+   * does not. `lib/two-factor-challenge` says why. The challenge itself is not
    * passed: it lives in the machine state, and a screen that had to hand it back
    * could hand back the wrong one.
    */
@@ -539,8 +539,8 @@ export function SignInForm() {
   /**
    * Back out of the challenge, to a sign-in screen with nothing standing on it.
    *
-   * There is no step behind this one to return to — the challenge is not a step
-   * — so it does not go through `goBack`. Everything it leaves behind is
+   * There is no step behind this one to return to. The challenge is not a step,
+   * so it does not go through `goBack`. Everything it leaves behind is
    * discarded by the machine and by the effect above, the challenge cookie
    * included.
    */
@@ -614,9 +614,9 @@ export function SignInForm() {
             <>
               {/*
                 One field, and nothing else on offer. A backup code cannot be
-                redeemed at this moment — `POST /auth/two-factor/verify-backup-code`
+                redeemed at this moment. `POST /auth/two-factor/verify-backup-code`
                 carries `@UseGuards(AuthGuard)` and there is no session here to
-                satisfy it — so a control for one would be a door that opens onto
+                satisfy it, so a control for one would be a door that opens onto
                 a wall. See ADR-0013.
               */}
               <View className="mt-5">

@@ -12,7 +12,7 @@ import { getSessionUser, setSessionUser } from "@/lib/session";
  * What is different here is where the new value comes from. `change-password`
  * answers with the re-read session user, exactly as the profile write does.
  * `set-password` answers a bare `true`, so the updated person is derived from
- * the one already held — which is the one thing in this module that is not read
+ * the one already held, which is the one thing in this module that is not read
  * off a payload, and the reason both halves are tested separately rather than
  * as one table.
  *
@@ -230,8 +230,8 @@ describe("a write that did not happen changes nothing", () => {
   });
 
   test("an expired session is reported rather than written through", async () => {
-    // Nobody is signed out by this module — the expiry listener in
-    // `auth-service` owns that — but nothing may be stored against a session
+    // Nobody is signed out by this module, because the expiry listener in
+    // `auth-service` owns that, but nothing may be stored against a session
     // the API has just refused.
     request.mockResolvedValueOnce({
       reached: true as const,

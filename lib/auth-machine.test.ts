@@ -243,9 +243,9 @@ describe("a settled sign-in attempt", () => {
  * the challenge, refusing a wrong code, expiring, cancelling, and completing.
  *
  * All five are here rather than in a component test because all five are facts
- * about the machine, and because the two that matter most — a refusal that must
- * not end the handshake, and a lapse that has no signal to read — are invisible
- * in a rendered screen and obvious in a table.
+ * about the machine, and because the two that matter most are invisible in a
+ * rendered screen and obvious in a table. Those two are a refusal that must not
+ * end the handshake, and a lapse that has no signal to read.
  */
 describe("the two-factor challenge", () => {
   test("is entered carrying the challenge and nothing else", () => {
@@ -266,7 +266,7 @@ describe("the two-factor challenge", () => {
     });
   });
 
-  test("a correct password says nothing on the way in — there is nothing to accuse anybody of", () => {
+  test("a correct password says nothing on the way in. There is nothing to accuse anybody of", () => {
     expect(
       authTransition(SUBMITTING, { type: "settled", outcome: TWO_FACTOR }),
     ).toMatchObject({ notice: null });
@@ -366,7 +366,7 @@ describe("the two-factor challenge", () => {
       expect(authTransition(lapsed, { type: "code-settled", outcome: SIGNED_IN })).toBe(lapsed);
     });
 
-    test("does nothing anywhere else — nothing but a challenge can lapse", () => {
+    test("does nothing anywhere else. Nothing but a challenge can lapse", () => {
       for (const state of EVERY_STATE.filter((s) => s.status !== "two-factor")) {
         expect(authTransition(state, { type: "challenge-lapsed" })).toBe(state);
       }

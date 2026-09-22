@@ -4,7 +4,6 @@ import {
   CODE_REQUIRED_NOTICE,
   CODE_SHAPE_NOTICE,
   codeError,
-  isSubmittableCode,
   normaliseCode,
 } from "@/lib/two-factor-challenge";
 
@@ -72,10 +71,3 @@ describe("codeError", () => {
   });
 });
 
-describe("isSubmittableCode", () => {
-  test("is exactly the absence of an error", () => {
-    for (const typed of ["", "1", "12345", "123456", "123 456", "abcdef"]) {
-      expect(isSubmittableCode(typed)).toBe(codeError(typed) === null);
-    }
-  });
-});

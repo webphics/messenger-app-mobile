@@ -48,8 +48,8 @@ const SECURE_COOKIE_PREFIX = "__Secure-";
  * names and for the same reason.
  *
  * It is the only thing besides the Session cookie and the CSRF pair this client
- * retains off a response, and it is retained for the length of one handshake —
- * see `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`.
+ * retains off a response, and it is retained for the length of one handshake.
+ * See `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`.
  * Nothing here holds it: unlike the Session cookie there is deliberately no
  * module-level slot for it, because a credential kept in a variable outlives the
  * state it belongs to. It is reported on the outcome and held by the machine
@@ -188,7 +188,7 @@ export function findSessionCookie(setCookie: string | null): string | null {
  * prefixed one first, the pair kept whole so this client never has to know which
  * way the API is running. What differs is how long the answer is worth anything,
  * which is `CHALLENGE_LIFETIME_MS` in `lib/two-factor-challenge` and not a
- * question this module can answer — the cookie's own `Max-Age` is on the header
+ * question this module can answer. The cookie's own `Max-Age` is on the header
  * and is deliberately not read, because a client that trusted it would trust a
  * number it has no way to check.
  */
@@ -468,10 +468,10 @@ export type ApiRequestOptions = {
    * credential locally *before* the server is told, so that a slow logout cannot
    * leave a live cookie attached to whatever the person does next, and hands the
    * ending one down explicitly. Verifying a two-factor code has no Session
-   * cookie to drop — the challenge is the only thing identifying the
-   * half-finished sign-in — and presents it through this same slot rather than
-   * through a second mechanism, because "which cookie goes out on this request"
-   * is one question and deserves one answer.
+   * cookie to drop. The challenge is the only thing identifying the
+   * half-finished sign-in, and this caller presents it through this same slot
+   * rather than through a second mechanism, because "which cookie goes out on
+   * this request" is one question and deserves one answer.
    */
   cookie?: string;
 };

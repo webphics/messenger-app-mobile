@@ -19,6 +19,7 @@ import {
   PASSWORD_COPY,
   PASSWORD_LENGTH_RULE,
   PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
   asksForCurrentPassword,
   passwordMode,
   type PasswordDraft,
@@ -144,7 +145,7 @@ function PasswordInput({
           passwordRules={
             field === "current"
               ? undefined
-              : `minlength: 8; maxlength: ${PASSWORD_MAX_LENGTH};`
+              : `minlength: ${PASSWORD_MIN_LENGTH}; maxlength: ${PASSWORD_MAX_LENGTH};`
           }
           maxLength={PASSWORD_MAX_LENGTH}
           returnKeyType={returnKeyType}

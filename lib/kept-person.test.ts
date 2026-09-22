@@ -21,7 +21,7 @@ test("only the four identity fields are written down", () => {
     ...AGENT,
     // Whatever a session hangs off a person, the keystore is not where it goes:
     // this holds an identity, not a copy of the session payload. Which is why
-    // the two account-state flags are dropped here and come back false — a
+    // the two account-state flags are dropped here and come back false. A
     // Stale session hides the account controls until the API confirms it. See
     // `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
     hasPassword: true,
