@@ -1,6 +1,7 @@
 import { LogOut } from "@/components/icons";
 import { ScrollView, View } from "react-native";
 
+import { AccountCard } from "@/components/settings/account-card";
 import { InvitationsCard } from "@/components/settings/invitations-card";
 import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
 import { PostNotificationsCard } from "@/components/settings/post-notifications-card";
@@ -76,6 +77,16 @@ export function SettingsScreen() {
           on an answer, and it draws nothing at all when there is none. */}
       <View className="mt-4" />
       <InvitationsCard />
+
+      {/* Every role, because nothing here branches on one: governing your own
+          account belongs to the account rather than to the role, and this
+          component is already the one shared screen all three groups render.
+          See `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`
+          and root ADR 0008. Above Application because it is about this person,
+          and above Sign out because the sessions screen behind it is where
+          somebody goes to end a session that is not this device, while Sign out
+          below ends the one that is. */}
+      <AccountCard />
 
       <View
         className="mb-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"

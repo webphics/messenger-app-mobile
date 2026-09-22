@@ -189,6 +189,20 @@ export default function RootLayout() {
                       contentStyle: { backgroundColor: colors.bg },
                     }}
                   />
+                  {/* Where this account is signed in (#05), pushed from the
+                    account card on Settings. Outside the three role groups
+                    rather than inside one, per ADR-0012: governing your own
+                    account belongs to the account and not to the role, and the
+                    Settings screen that pushes here is already the one shared
+                    component all three groups render. Tickets 06 and 07 add
+                    their screens beside this one. */}
+                  <Stack.Screen
+                    name="account/sessions"
+                    options={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  />
                   <Stack.Screen
                     name="(auth)"
                     options={{

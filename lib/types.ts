@@ -913,3 +913,34 @@ export type NotificationSettings = {
   mutedConversationIds: string[]
   postOrganizationIds: string[]
 }
+
+/**
+ * One session on this account, as `GET /sessions` answers it.
+ *
+ * The sessions screen's shape rather than the API's whole row. What is dropped
+ * is what nothing on a phone reads: the raw `userAgent`, which is the string
+ * `deviceName` and `deviceType` were derived from and is 200 characters of
+ * nothing a person recognises themselves by; `expiresAt`, which is the API's
+ * own bookkeeping and not a fact about a device; and `status` with `isRevoked`,
+ * because this screen asks for active sessions only, so every row it holds is
+ * active by construction. See
+ * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
+ *
+ * `isCurrent` is the API's answer to which of these is the device in hand, and
+ * is the only place that answer comes from. `lib/account-session-rows` is what
+ * follows from it, and a phone never guesses at it from a device name.
+ */
+export type AccountSession = {
+  id: string
+  /** What the API made of the user agent, such as `Windows 11 - Chrome`. */
+  deviceName: string
+  /** `desktop`, `mobile`, `tablet` or `unknown`. */
+  deviceType: string
+  ipAddress: string | null
+  /** `email`, `magic-link`, `google`, or null for a session that predates the column. */
+  loginMethod: string | null
+  isCurrent: boolean
+  createdAt: string
+  /** Last touched, which is as close to "last used" as the API keeps. */
+  updatedAt: string
+}
