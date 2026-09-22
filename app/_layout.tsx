@@ -194,10 +194,32 @@ export default function RootLayout() {
                     rather than inside one, per ADR-0012: governing your own
                     account belongs to the account and not to the role, and the
                     Settings screen that pushes here is already the one shared
-                    component all three groups render. Tickets 06 and 07 add
-                    their screens beside this one. */}
+                    component all three groups render. The password and
+                    two-factor screens below are siblings for the same reason. */}
                   <Stack.Screen
                     name="account/sessions"
+                    options={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  />
+                  {/* Setting a first password or changing one (#06). It carries
+                    no mode in its address: which of the two it is doing is read
+                    off the signed-in person, so there is no way to arrive at the
+                    wrong one. */}
+                  <Stack.Screen
+                    name="account/password"
+                    options={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: colors.bg },
+                    }}
+                  />
+                  {/* Two-factor, as far as ADR-0013 lets it go (#07): the state,
+                    turning it off, and fresh backup codes. Turning it on is
+                    ticket 08 and is blocked on backup-code recovery being
+                    confirmed to work. */}
+                  <Stack.Screen
+                    name="account/two-factor"
                     options={{
                       headerShown: false,
                       contentStyle: { backgroundColor: colors.bg },

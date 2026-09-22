@@ -3,13 +3,17 @@ import { View } from "react-native";
 
 import {
   ChevronRight,
+  KeyRound,
   Shield,
+  ShieldCheck,
   User,
   type IconComponent,
 } from "@/components/icons";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { useAuth } from "@/lib/auth-context";
 import { colors } from "@/lib/tokens";
+import type { SessionUser } from "@/lib/types";
 
 /**
  * The account section: the things somebody governs about their own account
@@ -30,13 +34,22 @@ import { colors } from "@/lib/tokens";
  * `community/` for the same reason this card does not branch: they belong to the
  * account.
  *
- * ## One row today, and a list rather than a row
+ * ## Three rows, and a list rather than markup
  *
- * Tickets 06 and 07 add a password row and a two-factor row to this same card,
- * so what varies between rows is data and not markup: a row is an icon, a name,
- * a sentence saying what is behind it, and where it goes. Adding one is adding
- * an entry to `ROWS`. Neither of those two is here yet and neither screen
- * exists, so nothing below hints at them.
+ * What varies between rows is data: a row is an icon, a name, a sentence saying
+ * what is behind it, and where it goes. Adding one is adding an entry to the
+ * list `accountRows` returns.
+ *
+ * Two of the three read the signed-in person, which is why that list is a
+ * function rather than a constant. The password row says which of the two things
+ * its screen will do, and the two-factor row says whether two-factor is on,
+ * because a row that made somebody push to find out the state would be a push
+ * for nothing. Both facts come off `SessionUser` and neither costs a request.
+ *
+ * The rows say it in a few words and the screens behind them say it properly.
+ * That split is deliberate: a card of three rows that each explained themselves
+ * fully would be taller than the profile card above it, and none of it would be
+ * read.
  */
 
 type AccountRow = {
@@ -53,17 +66,59 @@ type AccountRow = {
   open: () => void;
 };
 
-const ROWS: AccountRow[] = [
-  {
-    key: "sessions",
-    icon: Shield,
-    title: "Where you’re signed in",
-    hint: "See every device on your account and end the ones you don’t recognise.",
-    open: () => router.push("/account/sessions"),
-  },
-];
+/**
+ * The rows, for this account.
+ *
+ * `account` is null only between a sign-out and the navigation landing, which is
+ * a frame or two of a screen that is leaving. The rows still draw, worded for an
+ * account this card knows nothing about, rather than the card collapsing and
+ * taking the layout with it on the way out.
+ */
+function accountRows(account: SessionUser | null): AccountRow[] {
+  return [
+    {
+      key: "sessions",
+      icon: Shield,
+      title: "Where you’re signed in",
+      hint: "See every device on your account and end the ones you don’t recognise.",
+      open: () => router.push("/account/sessions"),
+    },
+    {
+      key: "password",
+      icon: KeyRound,
+      // The screen decides this for itself off the same flag, so the row is
+      // reporting what it will find rather than telling it what to be.
+      title: account?.hasPassword ? "Change your password" : "Set a password",
+      hint: account?.hasPassword
+        ? "Replace your password by proving the one you use now."
+        : "This account signs in by link or with Google. Add a password as another way in.",
+      open: () => router.push("/account/password"),
+    },
+    {
+      key: "two-factor",
+      icon: ShieldCheck,
+      title: "Two-factor authentication",
+      // The state, in the row, because it is the thing somebody opens this to
+      // find out. Named in words rather than shown as a tint, so it reaches a
+      // screen reader and anybody not reading colour.
+      hint: account?.twoFactorEnabled
+        ? "On. Turn it off, or generate fresh backup codes."
+        : "Off. Codes from an authenticator app are not required to sign in.",
+      open: () => router.push("/account/two-factor"),
+    },
+  ];
+}
 
 export function AccountCard() {
+  // From the provider rather than the module mirror, for the reason
+  // `components/settings/settings-screen` gives: this card has to redraw when
+  // the person changes in place, and `getSessionUser()` re-renders for nobody.
+  // That is exactly what the password and two-factor screens do to it on their
+  // way back, through `accountUpdated`.
+  const { state } = useAuth();
+  const account = state.status === "signed-in" ? state.user : null;
+  const rows = accountRows(account);
+
   return (
     <View className="mb-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5">
       <View className="mb-3 flex-row items-center gap-2 border-b border-line/60 pb-3">
@@ -73,7 +128,7 @@ export function AccountCard() {
         </Text>
       </View>
 
-      {ROWS.map((row) => {
+      {rows.map((row) => {
         const Icon = row.icon;
         return (
           <TactilePressable
