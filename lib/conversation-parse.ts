@@ -225,9 +225,18 @@ export function parseConversation(value: unknown): Conversation | null {
     }
   }
 
-  if (!organizationId) return null
+  /*
+   * A Support DM without one is the onboarding thread: the Customer belongs to no
+   * organization yet, so there is none to stamp. Admitted for the same reason the
+   * Announcements thread above is -- requiring an organization here would drop the row, and a
+   * dropped row is a thread the app does not hold and a notification pointing at nothing.
+   *
+   * Every other type still requires one, and a row arriving without it is malformed rather
+   * than a shape this list has to draw.
+   */
+  if (!organizationId && type !== 'support_dm') return null
 
-  const base = { ...shared, organizationId }
+  const base = { ...shared, organizationId: organizationId ?? null }
 
   if (Array.isArray(record.labels)) {
     return {
@@ -339,6 +348,11 @@ export function parseMessage(value: unknown): Message | null {
     id,
     body: nullableText(record.body) ?? '',
     messageType: oneOf(record.messageType, MESSAGE_TYPES) ?? ('text' as const),
+    // Set only when true, rather than always written as a boolean: absent is what "internal"
+    // already means here, and it is what an older API sends. Writing `false` onto every
+    // message would also change the shape of every parsed message, which the store compares
+    // by value when it restores a draft.
+    ...(record.addressedToCustomer === true ? { addressedToCustomer: true } : {}),
     createdAt,
     // Absent on a message written before the field existed, and on every message
     // nobody has rewritten — both read as null, which is the same thing here.

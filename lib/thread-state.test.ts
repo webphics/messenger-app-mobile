@@ -12,6 +12,7 @@ import {
   findUnsent,
   isLocalId,
   isMessageVisibleTo,
+  isSystemMessage,
   isOutgoing,
   mergeMessages,
   messageSenderName,
@@ -119,8 +120,21 @@ describe('isMessageVisibleTo', () => {
     },
   )
 
-  test('a Customer never sees a system message in their Support DM', () => {
+  test('a Customer never sees an internal system notice in their Support DM', () => {
     expect(isMessageVisibleTo('customer', 'support_dm', { messageType: 'system' })).toBe(false)
+  })
+
+  test('a Customer does see a system notice addressed to them', () => {
+    expect(
+      isMessageVisibleTo('customer', 'support_dm', {
+        messageType: 'system',
+        addressedToCustomer: true,
+      }),
+    ).toBe(true)
+  })
+
+  test('a notice addressed to the Customer is still not a bubble', () => {
+    expect(isSystemMessage({ messageType: 'system' })).toBe(true)
   })
 })
 

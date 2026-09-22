@@ -209,10 +209,28 @@ describe('parseConversation', () => {
 
   test.each([
     ['no id', { id: '' }],
-    ['no organization', { organizationId: undefined }],
     ['an unknown type', { type: 'smoke_signal' }],
   ])('refuses a row with %s', (_case, overrides) => {
     expect(parseConversation(customerSupportRow(overrides))).toBeNull()
+  })
+
+  /*
+   * The second row that may arrive with no organization, alongside the personal
+   * Announcements thread above: the onboarding Support DM, held by a Customer who belongs
+   * nowhere yet. Refusing it would drop the only conversation such a person has.
+   */
+  test('reads a support row that belongs to no organization', () => {
+    expect(parseConversation(customerSupportRow({ organizationId: undefined }))).toMatchObject({
+      id: 'conv-1',
+      type: 'support_dm',
+      organizationId: null,
+    })
+  })
+
+  test('still refuses a group that belongs to no organization', () => {
+    expect(
+      parseConversation(customerSupportRow({ type: 'group', organizationId: undefined })),
+    ).toBeNull()
   })
 
   test('refuses anything that is not an object', () => {

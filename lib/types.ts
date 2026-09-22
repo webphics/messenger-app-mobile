@@ -138,7 +138,13 @@ export type ConversationStaffPerson = ConversationPerson & { role: UserRole }
 /** What every conversation row reports about its newest message, resolved for the viewer. */
 type ConversationBase = {
   id: string
-  organizationId: string
+  /**
+   * The organization this thread belongs to, or null for the two that belong to none: a
+   * person's own Announcements thread, and the onboarding Support DM a Customer holds
+   * before they belong anywhere. The API stops sending the second the moment they join an
+   * organization.
+   */
+  organizationId: string | null
   /**
    * The Community this thread belongs to, or null for one that belongs to no
    * Community.
@@ -293,6 +299,15 @@ type MessageBase = {
   /** Caption or plain text; empty when the message is only attachments. */
   body: string
   messageType: MessageType
+  /**
+   * Whether a `system` notice is addressed to the Customer rather than recording a staff
+   * action. The onboarding thread's welcome is the one that is; every other system message
+   * the product writes is internal and withheld from a Customer.
+   *
+   * Optional, and absent reads as "internal" -- which is the behaviour every system message
+   * had before the welcome existed, and what a payload from an older API carries.
+   */
+  addressedToCustomer?: boolean
   createdAt: string
   /**
    * Null until the author rewrote it, within the API's fifteen-minute edit window.

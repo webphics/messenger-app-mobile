@@ -274,7 +274,9 @@ describe('parseConversationUpdated', () => {
     ['null', null],
     ['an empty envelope', {}],
     ['a row with no id', { conversation: { organizationId: 'o1', type: 'support_dm' } }],
-    ['a row with no organization', { conversation: { id: 'c1', type: 'support_dm' } }],
+    // A *group* with no organization, not a support DM: an org-less support DM is the
+    // onboarding thread and is read rather than refused.
+    ['a row with no organization', { conversation: { id: 'c1', type: 'group' } }],
     ['a row with an unknown type', { conversation: { id: 'c1', organizationId: 'o1', type: 'dm' } }],
   ]
 
