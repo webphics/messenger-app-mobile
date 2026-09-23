@@ -1,6 +1,15 @@
 # unrs-resolver ships prebuilt per-platform binaries and its install script
 # selects the right one; eslint-config-expo's import resolver needs it, and
 # pnpm 11 blocks install scripts until each is explicitly approved.
+#
+# The two `false` entries arrived with `eas-cli` and are declined rather than
+# left unanswered: pnpm 11 exits non-zero on an unresolved entry, which would
+# fail CI's `pnpm install --frozen-lockfile` before any build ran. Neither is
+# needed to run the CLI — `dtrace-provider` is optional native tracing for
+# bunyan, eas-cli's logger, and falls back to a no-op, and `protobufjs`'s
+# postinstall only sets up its own codegen CLI.
 allowBuilds:
+  dtrace-provider: false
+  protobufjs: false
   unrs-resolver: true
 nodeLinker: hoisted

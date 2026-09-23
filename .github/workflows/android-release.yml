@@ -1,25 +1,71 @@
 # Builds the Android APK on the runner with Gradle, and publishes it as a GitHub
 # Release asset (tag `joychat-v<X.Y.Z>`, asset `joychat-release.apk`).
 #
-# Nothing here touches EAS. `scripts/build-apk.mjs` runs `expo prebuild` and then
-# `gradlew assembleRelease`, which is the same build a developer gets from
-# `pnpm build:apk`, so there is one Android build and CI is only another place
-# it runs. No EXPO_TOKEN, no Expo login, no build credits.
+# The build runs through `eas build --platform android --profile production
+# --local`, which compiles on this runner rather than on EAS's builders: no build
+# credits and no queue, but it does need an Expo login, so EXPO_TOKEN is a
+# repository secret. `eas.json`'s `production` profile is the whole of the build
+# configuration, and `pnpm build:apk:eas` is the same command a developer runs.
+#
+# The project stays *managed*: `android/` is gitignored, EAS runs `expo prebuild`
+# inside the build, and the two config plugins in `plugins/` go on applying
+# themselves. That is load-bearing rather than incidental —
+# `with-system-bar-insets.js` patches MainActivity.kt and
+# `with-store-excluded-from-backup.js` writes the backup rules ADR-0011 depends
+# on, and both are written as prebuild mods precisely because a hand edit to a
+# generated tree is lost. Committing `android/` would freeze both patches where
+# the plugins no longer run and their staleness markers no longer fire.
 #
 # What that costs: a React Native release build compiles reanimated, worklets and
 # screens through the NDK, which is tens of minutes on a 2-core runner rather than
-# the ~1 minute it took to hand the job to EAS. ANDROID_ABIS trims it to the one
-# ABI a phone actually uses, and ~/.gradle is cached between runs.
+# the ~1 minute it took to hand the job to EAS's builders. The profile's
+# `gradleCommand` carries `-PreactNativeArchitectures=arm64-v8a`, which is what
+# trims it to the one ABI a phone actually uses — without it every CMake project
+# in the tree builds twice — and ~/.gradle is cached between runs.
 #
-# What it gives up: `assembleRelease` on an Expo-prebuilt project signs with
-# `android/app/debug.keystore` from the template, which is a fixed, publicly
-# known key. Good for internal distribution and sideloading, and its SHA-1 is
-# stable, so it can be registered against the Android OAuth client. It cannot go
-# to the Play Store — that needs a real upload keystore, which would come in as
-# a base64 secret and a signingConfig rather than as a change here.
+# Two things EAS changes that are easy to be caught by. It builds from a **git
+# archive**, so uncommitted and gitignored files are not in the build: that is
+# why `google-services.json` is tracked at the repo root, and why a local
+# `pnpm build:apk:eas` builds HEAD rather than the working tree. And its prebuild
+# regenerates `android/local.properties`, dropping the `cmake.dir` pin that
+# `build-apk.mjs` wrote; `scripts/eas-local-properties.mjs` puts it back through
+# the `eas-build-post-install` hook, because without it the NDK build loops on
+# "ninja: build.ninja still dirty" until the job times out.
 #
-# A Release rather than an Actions artifact: artifacts expire and count against
-# the repository's storage allowance, and a Release does neither.
+# Three jobs rather than one, because "Re-run failed jobs" works per job: it
+# replays the failed job and everything downstream of it, and leaves the jobs
+# that already passed alone. So a missing repository variable fails in `meta`
+# after ten seconds instead of after the build, and a release that dies on a
+# token, a tag or a bad minute at GitHub is re-run on its own without
+# recompiling the NDK for another 40 minutes. There is no equivalent for a
+# *step*: a single step cannot be re-run by itself, which is why the split is
+# jobs and not just more steps.
+#
+# What a job boundary costs is the runner, which is thrown away at the end of
+# one, so the APK travels to `release` as an Actions artifact. It is kept for a
+# day (retention-days: 1) — long enough to re-run the release, short enough that
+# it is not what the repository's storage allowance goes on. The published
+# Release is still the durable copy; the artifact is only the handoff.
+#
+# `build` stays a single step, because it is a single command. Splitting prebuild
+# from Gradle in YAML would mean reimplementing what build-apk.mjs does between
+# them (local.properties, the CMake 3.30+ pick, the splash drawable), and the two
+# copies would drift. A failed build cannot be resumed part-way in any case: the
+# runner and its Gradle output are gone. The ~/.gradle cache is what makes the
+# retry cheaper.
+#
+# What it gives up: the APK is signed with the template debug keystore, which is
+# a fixed, publicly known key. Good for internal distribution and sideloading,
+# and its SHA-1 is stable, so it is the one registered against the Android OAuth
+# client. It cannot go to the Play Store — that needs a real upload keystore, and
+# what switching to one involves is `credentials/README.md`.
+#
+# EAS will not use `signingConfigs.debug` on its own: it resolves credentials
+# before the build and, under `--non-interactive`, either aborts or signs with
+# whatever keystore is on the EAS servers for this project — a different SHA-1,
+# which breaks Google sign-in. So the profile sets `"credentialsSource": "local"`
+# and `credentials.json` names a committed copy of that same template keystore.
+# It is committed because it is not a secret; a real one would not be.
 #
 # Triggers on every push to main, so the version in app.json is what decides
 # whether a run publishes something new. A push that does not bump
@@ -36,51 +82,63 @@ on:
         description: Override the version (default = expo.version in app.json)
         required: false
         type: string
+      dry_run:
+        description: Build only — upload the APK as a run artifact and publish no Release
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: android-release-${{ github.ref }}
   cancel-in-progress: true
 
-# For creating and updating the Release.
+# Read by default. `release` is the only job that writes, and it raises this for
+# itself.
 permissions:
-  contents: write
+  contents: read
+
+env:
+  # Only a convention today. If an update check is ever added, this is the
+  # prefix it has to look for.
+  RELEASE_TAG_PREFIX: joychat-v
+
+  # One ABI. See ANDROID_ABIS in scripts/build-apk.mjs.
+  ANDROID_ABIS: arm64-v8a
+
+  # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
+  # `build`, inside the Gradle task that embeds the JS. So neither of the two
+  # sources a developer relies on reaches it: `.env` is gitignored and absent
+  # from the checkout, and `eas.json`'s `env` block belongs to `eas build`,
+  # which this workflow no longer calls. Unset, they compile to `undefined`
+  # and `lib/api-config.ts` throws at import — an APK that installs and dies
+  # on launch rather than a build that fails here.
+  #
+  # Repository *variables*, not secrets: an `EXPO_PUBLIC_*` value is inlined
+  # into the shipped bundle by definition, so anyone holding the APK can read
+  # it, and hiding it in the log would only make it harder to check.
+  EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+  EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
 
 jobs:
-  publish:
-    name: Build, sign, release
+  # Everything that can be decided before anything slow starts. Ten seconds, and
+  # both failures it catches — a missing repository variable, a version that is
+  # not X.Y.Z — would otherwise surface at the end of a 40-minute build.
+  meta:
+    name: Check config, resolve version
     runs-on: ubuntu-latest
-    # Generous rather than tight: a cold cache with no Gradle or NDK output to
-    # reuse is the slow case, and a build killed at 45 minutes has produced
-    # nothing that a re-run can start from.
-    timeout-minutes: 90
+    timeout-minutes: 5
 
-    env:
-      # Only a convention today. If an update check is ever added, this is the
-      # prefix it has to look for.
-      RELEASE_TAG_PREFIX: joychat-v
-
-      # One ABI. See ANDROID_ABIS in scripts/build-apk.mjs.
-      ANDROID_ABIS: arm64-v8a
-
-      # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens
-      # here, inside the Gradle task that embeds the JS. So neither of the two
-      # sources a developer relies on reaches it: `.env` is gitignored and absent
-      # from the checkout, and `eas.json`'s `env` block belongs to `eas build`,
-      # which this workflow no longer calls. Unset, they compile to `undefined`
-      # and `lib/api-config.ts` throws at import — an APK that installs and dies
-      # on launch rather than a build that fails here.
-      #
-      # Repository *variables*, not secrets: an `EXPO_PUBLIC_*` value is inlined
-      # into the shipped bundle by definition, so anyone holding the APK can read
-      # it, and hiding it in the log would only make it harder to check.
-      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
-      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      apk: ${{ steps.meta.outputs.apk }}
+      title: ${{ steps.meta.outputs.title }}
 
     steps:
       - uses: actions/checkout@v4
 
-      # Before anything slow, since the failure it prevents is an APK that looks
-      # fine and crashes on the first screen.
+      # The failure this prevents is an APK that looks fine and crashes on the
+      # first screen.
       - name: Require the bundle-time configuration
         run: |
           if [ -z "$EXPO_PUBLIC_API_URL" ]; then
@@ -95,11 +153,15 @@ jobs:
       # and the asset name are all derived from it rather than repeated here.
       - name: Resolve version and names
         id: meta
+        # Through the environment rather than interpolated into the script, so a
+        # dispatch input arrives at `sh` as a string and not as more script.
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
 
-          if [ -n "${{ inputs.version }}" ]; then
-            VERSION="${{ inputs.version }}"
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
           else
             VERSION="$(node -p "require('./app.json').expo.version")"
           fi
@@ -131,6 +193,20 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           echo "Version $VERSION → tag ${RELEASE_TAG_PREFIX}${VERSION}, asset ${APK_BASE}-release.apk"
+
+  # The long one. Nothing here publishes anything, so it can be re-run as often
+  # as a flaky NDK compile needs without touching a Release or a tag.
+  build:
+    name: Build the APK
+    needs: [meta]
+    runs-on: ubuntu-latest
+    # Generous rather than tight: a cold cache with no Gradle or NDK output to
+    # reuse is the slow case, and a build killed at 45 minutes has produced
+    # nothing that a re-run can start from.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
 
       # Version comes from the "packageManager" field in package.json.
       - uses: pnpm/action-setup@v4
@@ -173,41 +249,120 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      # --prebuild, because android/ is gitignored and a fresh checkout has none.
-      # The script insists that prebuild be --clean for the config plugins' sake;
-      # see its comment on plugins/with-system-bar-insets.js.
-      - name: Build the APK
-        run: pnpm exec node scripts/build-apk.mjs --prebuild
-
-      - name: Name the artifact
-        id: apk
+      # EAS runs `expo prebuild` itself, so there is no prebuild step here and
+      # `android/` stays gitignored. --output names the asset directly, which is
+      # why nothing renames it afterwards.
+      #
+      # EXPO_TOKEN rather than `eas login`: --non-interactive cannot answer a
+      # prompt, and even a --local build authenticates to resolve the project
+      # that `extra.eas.projectId` in app.json names.
+      - name: Build the APK with EAS
         env:
-          APK: ${{ steps.meta.outputs.apk }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APK: ${{ needs.meta.outputs.apk }}
         run: |
           set -euo pipefail
-          # The script writes dist/joychat-release.apk. Found by glob rather than
-          # by that name, so the two cannot drift apart silently.
-          BUILT="$(find dist -maxdepth 1 -type f -name '*.apk' 2>/dev/null | head -n 1 || true)"
-          if [ -z "$BUILT" ]; then
-            echo "::error::The build reported success but no APK is in dist/."
-            ls -la dist || true
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::error::EXPO_TOKEN secret is not set. Create one at https://expo.dev/settings/access-tokens and add it with: gh secret set EXPO_TOKEN"
             exit 1
           fi
-          if [ "$BUILT" != "dist/${APK}" ]; then
-            mv "$BUILT" "dist/${APK}"
+          mkdir -p dist
+          pnpm exec eas build \
+            --platform android \
+            --profile production \
+            --local \
+            --non-interactive \
+            --output "dist/${APK}"
+
+      - name: Check the artifact
+        env:
+          APK: ${{ needs.meta.outputs.apk }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "dist/${APK}" ]; then
+            echo "::error::EAS reported success but dist/${APK} is not there."
+            ls -la dist || true
+            exit 1
           fi
           ls -lh "dist/${APK}"
           file "dist/${APK}" || true
 
+      # The failure this catches is the one the meta job cannot: the variables
+      # being set on the runner says nothing about whether EAS forwarded them
+      # into the bundle Metro built. Unset, they compile to `undefined` and
+      # `lib/api-config.ts` throws at import — an APK that installs and dies on
+      # launch. The bundle is stored uncompressed in the APK, so this reads it
+      # straight out rather than unpacking the whole archive.
+      - name: Verify the API URL was inlined into the bundle
+        env:
+          APK: ${{ needs.meta.outputs.apk }}
+        run: |
+          set -euo pipefail
+          if unzip -p "dist/${APK}" assets/index.android.bundle | grep -qF "$EXPO_PUBLIC_API_URL"; then
+            echo "EXPO_PUBLIC_API_URL is present in the JS bundle."
+          else
+            echo "::error::EXPO_PUBLIC_API_URL is not in the bundle. EAS did not forward it, so this APK would crash on launch. Put the value in eas.json's production profile under \"env\"."
+            exit 1
+          fi
+
+      # A fixed artifact name, because `release` downloads it by that name and
+      # the version is already inside the file.
+      #
+      # overwrite, because "Re-run all jobs" is a new attempt on the same run id
+      # and upload-artifact@v4 otherwise refuses a name a previous attempt has
+      # already used.
+      - name: Upload the APK for the release job
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: dist/${{ needs.meta.outputs.apk }}
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+  # Seconds, and the only job that writes anything. Re-run this one alone when a
+  # release fails; the APK it needs is still attached to the run.
+  #
+  # Two guards, and the ref one is the load-bearing half: a dispatch can name any
+  # branch, so a build tried on one publishes nothing and cannot touch a tag.
+  # That also means testing a change to this file needs no new dispatch input —
+  # which matters, because GitHub validates dispatch inputs against the workflow
+  # on the DEFAULT branch, so `dry_run` is not accepted until this file is on
+  # main. `build` still runs in full either way and still uploads the APK, so a
+  # branch run leaves something to install and test.
+  #
+  # dry_run is then the way to suppress a release from main itself. `inputs` is
+  # empty on a push, so the negation leaves an ordinary release alone.
+  release:
+    name: Publish the Release
+    needs: [meta, build]
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # For creating and updating the Release.
+    permissions:
+      contents: write
+
+    steps:
+      # No checkout: `gh release` is given --repo explicitly, so nothing here
+      # needs a working tree.
+      - name: Download the APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: dist
+
       - name: Publish the Release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.meta.outputs.tag }}
-          TITLE: ${{ steps.meta.outputs.title }}
-          VERSION: ${{ steps.meta.outputs.version }}
-          APK: ${{ steps.meta.outputs.apk }}
+          TAG: ${{ needs.meta.outputs.tag }}
+          TITLE: ${{ needs.meta.outputs.title }}
+          VERSION: ${{ needs.meta.outputs.version }}
+          APK: ${{ needs.meta.outputs.apk }}
         run: |
           set -euo pipefail
           NOTES="JoyChat Android ${VERSION} (${ANDROID_ABIS}, debug-signed). Built from ${GITHUB_SHA} on ${GITHUB_REF_NAME}."
