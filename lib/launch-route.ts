@@ -7,7 +7,7 @@ import { needsOnboarding, ONBOARDING_HREF } from "@/lib/onboarding-gate";
 import type { ConversationFetch } from "@/lib/types";
 
 /**
- * Whether the Launch animation may end yet, as a pure function of the two things
+ * Whether the Launch screen may end yet, as a pure function of the two things
  * that decide it: where Hydration landed, and what the first Conversation fetch
  * has done.
  *
@@ -20,8 +20,8 @@ import type { ConversationFetch } from "@/lib/types";
  *
  * The fetch is the second half because Hydration is not the last thing that has
  * to happen before there is a Hub to hand over. The Conversations are fetched
- * *after* it — three requests for a Customer — and they reliably outlast the
- * animation, so leaving on Hydration alone hands over a Hub that fills in
+ * *after* it — three requests for a Customer — so leaving on Hydration alone
+ * hands over a Hub that fills in
  * underneath the person a moment later.
  *
  * How long that wait may run is not decided here and deliberately not: no input
@@ -39,7 +39,7 @@ import type { ConversationFetch } from "@/lib/types";
  */
 
 export type LaunchDestination =
-  /** Hydration has not settled, or the list is still coming. Keep the launch animation up. */
+  /** Hydration has not settled, or the list is still coming. Keep the launch screen up. */
   | { kind: "wait" }
   | {
       kind: "navigate";

@@ -14,7 +14,7 @@ import { SIGN_IN_HREF } from "@/lib/hub-routes";
  *
  * It reads the change rather than the state because "signed out" alone is not the
  * question. A cold start begins signed out, and routing on that would cut the
- * launch animation short and take the decision away from `lib/launch-route`. A
+ * launch screen short and take the decision away from `lib/launch-route`. A
  * refused sign-in ends signed out too, and replacing the route someone is
  * standing on would throw away what they typed.
  */
@@ -34,7 +34,7 @@ export function sessionEndHref({ from, to }: SessionChange): Href | null {
     case "signed-in":
     case "unreachable":
       return SIGN_IN_HREF;
-    // A cold start: `lib/launch-route` owns this, behind the launch animation.
+    // A cold start: `lib/launch-route` owns this, behind the launch screen.
     case "hydrating":
     // A refused sign-in, on the screen it was typed into.
     case "submitting":

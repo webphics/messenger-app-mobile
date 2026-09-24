@@ -79,7 +79,7 @@ export default function RootLayout() {
   });
 
   // Never leave the native splash up if the index loading screen fails to
-  // mount. Do NOT hide it eagerly here: the launch animation owns the handoff.
+  // mount. Do NOT hide it eagerly here: the launch screen owns the handoff.
   useEffect(() => {
     const timer = setTimeout(hideNativeSplash, SPLASH_BACKSTOP_MS);
     return () => clearTimeout(timer);

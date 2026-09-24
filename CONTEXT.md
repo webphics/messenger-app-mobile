@@ -406,20 +406,20 @@ and its link label; a tap on any of them opens the Wall tab, since this app has 
 single Post. Absent entirely when the Wall is empty or could not be read.
 _Avoid_: Feed, highlights (as a product surface), Wall preview
 
-**Launch animation**:
-The looping transparent character animation on the cold-start screen, shown while the session hydrates. Rendered from an animated WebP; the surface behind it is the app background, not part of the asset.
-_Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface this screen dismisses), loading video, chroma-keyed video
+**Launch screen**:
+The still JoyChat mark on the cold-start screen, shown while the session hydrates and the first Conversation fetch runs. It is `components/ui/app-loading-screen`, and it hides the native splash once the mark has decoded.
+_Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface this screen dismisses), launch animation (there is no animation any more)
 
 **Launch gate**:
-What has to be true before the Launch animation ends: it has played its two seconds, *and* the first
+What has to be true before the Launch screen ends: it has hidden the native splash, *and* the first
 Conversation fetch has **settled**. Settled means answered, failed, **or** abandoned on the Launch
-deadline — with the Store there is something to draw whichever it is, and an animation held open on
+deadline — with the Store there is something to draw whichever it is, and a launch screen held open on
 a bad network is the failure the gate exists to prevent. Both halves count in either order. Hydration's Unreachable outcome is not part of
 it: that is a screen with a retry on it rather than a Hub to hand over. What bounds the wait is the
 **Launch deadline**. Where the launch then *lands* takes one more input — a **Pending thread** — but
 the gate itself is unchanged by it: a tapped notification does not shorten the wait, because the Hub
 underneath the thread still has to exist. The decision is `lib/launch-route`.
-_Avoid_: Splash gate, minimum display (that is only the animation's own half), loading gate
+_Avoid_: Splash gate, minimum display (there is none any more), loading gate
 
 **Launch deadline**:
 The bound on the Launch gate's wait: ten seconds from the first Conversation load starting, after
@@ -539,7 +539,7 @@ _Avoid_: Cache (it is not an optimisation the app can ignore), database (that is
 local state, offline store (nothing here composes offline)
 
 **Restore**:
-Reading the Store back from SQLite at cold start, so the first frame after the Launch animation is
+Reading the Store back from SQLite at cold start, so the first frame after the Launch screen is
 the last thing this device knew rather than a spinner. Not Hydration, which is the *session's* cold
 start and belongs to auth: a boot does both, and they answer different questions — Hydration asks who
 this is, Restore asks what they were looking at. Restore has no failure a person sees; an unreadable

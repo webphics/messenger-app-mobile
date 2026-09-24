@@ -22,8 +22,8 @@ describe("leaving a session", () => {
 
 describe("staying put", () => {
   test("a cold start that finds no cookie navigates nowhere", () => {
-    // `lib/launch-route` owns this one, behind the launch animation's minimum
-    // display. Routing here would cut the animation short.
+    // `lib/launch-route` owns this one, behind the launch screen. Routing here
+    // would cut the launch screen short.
     expect(sessionEndHref({ from: "hydrating", to: "signed-out" })).toBeNull();
   });
 

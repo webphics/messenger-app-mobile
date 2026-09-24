@@ -9,7 +9,7 @@ import { join, posix } from 'node:path'
  * layout, a prefetch on the inbox, a tab preloaded so the first tap feels
  * quicker. Every one of those is invisible on a desk and costs exactly the
  * people on a bad network the seconds the Launch deadline exists to bound — the
- * gate would then be waiting on the Launch animation, the first Conversation
+ * gate would then be waiting on the Launch screen, the first Conversation
  * fetch, and a Wall nobody has opened.
  *
  * The gate itself is a table and is tested as one (`lib/launch-route`); what

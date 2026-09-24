@@ -118,7 +118,7 @@ describe("the three Hydration outcomes", () => {
 });
 
 describe("states that are not an outcome yet", () => {
-  test("hydration still running holds the launch animation", () => {
+  test("hydration still running holds the launch screen", () => {
     expect(launchDestination({ status: "hydrating" }, "answered")).toEqual({
       kind: "wait",
     });
@@ -137,7 +137,7 @@ describe("states that are not an outcome yet", () => {
 /**
  * The second half of the gate. Hydration settling is no longer enough: for a
  * signed-in person the Conversations are fetched *after* it — three requests for
- * a Customer — and leaving on the animation's own schedule hands over a Hub that
+ * a Customer — and leaving as soon as Hydration settles hands over a Hub that
  * fills in underneath them a moment later.
  */
 describe("the first Conversation fetch", () => {
@@ -151,7 +151,7 @@ describe("the first Conversation fetch", () => {
     }
   });
 
-  test("still outstanding holds the animation, in every role", () => {
+  test("still outstanding holds the launch screen, in every role", () => {
     const roles: UserRole[] = ["customer", "agent", "admin"];
     for (const role of roles) {
       expect(launchDestination(signedIn(role), "outstanding")).toEqual({
@@ -161,7 +161,7 @@ describe("the first Conversation fetch", () => {
   });
 
   // Settled means answered *or* failed. With the Store there is something to
-  // draw either way, and holding an animation open on a bad network is the
+  // draw either way, and holding the launch screen open on a bad network is the
   // failure this gate exists to prevent — so a failure releases it too.
   test("a fetch that failed releases it exactly as one that answered", () => {
     expect(launchDestination(signedIn("agent"), "failed")).toEqual(
@@ -187,7 +187,7 @@ describe("the first Conversation fetch", () => {
 
   // Unreachable is a screen with a retry on it, not a route, and it must not be
   // folded in with the fetch gate: an outstanding fetch would otherwise turn it
-  // back into the launch animation and take away the one control on it.
+  // back into the launch screen and take away the one control on it.
   test("unreachable is still unreachable whatever the fetch has done", () => {
     for (const fetch of EVERY_FETCH) {
       expect(launchDestination({ status: "unreachable" }, fetch)).toEqual({

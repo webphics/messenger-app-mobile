@@ -19,15 +19,15 @@ import { colors } from "@/lib/tokens";
  * offered too, so this is never a dead end.
  *
  * Stays up while a retry is in flight — see `retrying` — rather than handing the
- * screen back to the launch animation, which would replay two seconds of video
- * in place of an answer about the press that just happened.
+ * screen back to the launch screen, which would show a logo in place of an
+ * answer about the press that just happened.
  */
 export function UnreachableScreen({
   retrying,
   onRetry,
 }: {
   retrying: boolean;
-  /** Owned by `app/index`, which needs to know a retry started to stop the launch animation replaying. */
+  /** Owned by `app/index`, which needs to know a retry started to stop the launch screen coming back. */
   onRetry: () => void;
 }) {
   const insets = useSafeAreaInsets();

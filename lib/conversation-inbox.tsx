@@ -69,7 +69,7 @@ export type ConversationInboxView = ConversationInbox & {
   /** Pull-to-refresh. Distinct from a first load, which has nothing to show yet. */
   refreshing: boolean
   /**
-   * How the fetch behind this list is doing — what the Launch animation waits on.
+   * How the fetch behind this list is doing — what the Launch screen waits on.
    *
    * `outstanding` until a load settles and then whichever way it settled. It
    * only goes back when the viewer does — nothing about *this* person is
@@ -103,7 +103,7 @@ const IDLE: ConversationInbox = { status: 'ready', conversations: [], organizati
  * What this device already knows about this person, before anything is fetched.
  *
  * A cold start Restores the list rather than beginning on a spinner, so the
- * first screen after the Launch animation is the last thing this phone knew —
+ * first screen after the Launch screen is the last thing this phone knew —
  * the same rows, the same Unread counts, the same order — and the fetch running
  * underneath it confirms that rather than being the only thing that can draw
  * anything. With no network the confirmation never comes and the rows stay,
@@ -302,7 +302,7 @@ function useConversationInboxState(): ConversationInboxView {
     if (!list.ok) {
       loadOut.current = false
       readWhileLoading.current.clear()
-      // Settled, which is all the Launch animation asked, so the gate is
+      // Settled, which is all the Launch screen asked, so the gate is
       // released and its clock stops. Recorded for every mode rather than the
       // first load alone: a resync bumps the generation and strands the load it
       // interrupted, so the gate has to be released by whichever one actually

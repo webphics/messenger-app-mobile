@@ -10,30 +10,20 @@ import Animated, {
 } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-import { launchAnimationSize } from "@/lib/launch-animation";
 import { easing } from "@/lib/motion-easing";
 import { colors } from "@/lib/tokens";
 
-/**
- * The JoyChat mark, still, in the same 720x406 box the WebP occupied — so
- * `lib/launch-animation.ts` and its sizing are unchanged.
- *
- * It replaced an animated WebP of the retired brand's character, and it is a
- * PNG because there is no animated JoyChat art to put here yet: shipping the
- * old character recoloured would be the wrong mascot in the right palette.
- * Everything around it still works — `expo-image` treats a still as a
- * one-frame image, `autoplay` is a no-op on it, `onLoad` still fires, and the
- * screen still holds the native splash until it has decoded and still fades
- * out on `isFinishing`.
- *
- * When there is JoyChat motion to use, it goes back to an animated WebP rather
- * than a video: WebP is the only format that renders a real alpha channel on
- * both platforms. `expo-video` composites onto an opaque surface, and
- * AVFoundation cannot demux WebM at all.
- */
-const LAUNCH_ANIMATION = require("@/assets/images/launch-animation.png");
+/** The JoyChat mark, still. Its intrinsic size is 720x406. */
+const LAUNCH_MARK = require("@/assets/images/launch-mark.png");
+const LAUNCH_MARK_ASPECT = 720 / 406;
 
-/** Hide native splash if WebP onLoad never fires (slow tunnel / decode stall). */
+/**
+ * 85% of the screen, capped so the mark never dominates a tablet. Clamped at
+ * zero because the window can report a width of 0 before it is measured.
+ */
+const LAUNCH_MARK_MAX_WIDTH = 360;
+
+/** Hide native splash if the mark's onLoad never fires (slow tunnel / decode stall). */
 const SPLASH_FALLBACK_MS = 2500;
 
 export type AppLoadingScreenProps = {
@@ -42,12 +32,12 @@ export type AppLoadingScreenProps = {
   /** Called when the exit fade animation finishes */
   onFinish?: () => void;
   /**
-   * Called once the launch WebP has decoded and is on screen (or the decode
-   * failsafe fired). The parent starts its minimum-display window from here so
-   * the animation gets its full run instead of being cut short by decode time.
+   * Called once the mark has decoded and the native splash is hidden (or the
+   * decode failsafe fired). Until then the parent must keep this screen
+   * mounted, because this screen is what hides the native splash.
    */
   onReady?: () => void;
-  /** Colour shown behind the transparent animation. */
+  /** Colour shown behind the transparent mark. */
   backgroundColor?: string;
 };
 
@@ -59,7 +49,7 @@ export function AppLoadingScreen({
 }: AppLoadingScreenProps) {
   const reduceMotion = useReducedMotion();
   const { width: screenWidth } = useWindowDimensions();
-  const animation = launchAnimationSize(screenWidth);
+  const markWidth = Math.max(0, Math.min(screenWidth * 0.85, LAUNCH_MARK_MAX_WIDTH));
   const opacity = useSharedValue(1);
   const readyRef = useRef(false);
   // Read through a ref so an inline `onReady` cannot restart the failsafe timer.
@@ -72,9 +62,9 @@ export function AppLoadingScreen({
   });
 
   /**
-   * Hold the native splash until the launch WebP has decoded so the handoff is
-   * icon → character animation, never a blank frame. Root layout has a longer
-   * backstop if this screen never mounts.
+   * Hold the native splash until the mark has decoded so the handoff is
+   * icon → mark, never a blank frame. Root layout has a longer backstop if
+   * this screen never mounts.
    */
   const markReady = useCallback(() => {
     if (readyRef.current) return;
@@ -116,14 +106,10 @@ export function AppLoadingScreen({
       style={[styles.container, { backgroundColor }, animatedStyle]}
     >
       <Image
-        source={LAUNCH_ANIMATION}
-        style={{ width: animation.width, height: animation.height }}
+        source={LAUNCH_MARK}
+        style={{ width: markWidth, height: markWidth / LAUNCH_MARK_ASPECT }}
         contentFit="contain"
-        // Reduced motion holds the first frame instead of looping.
-        autoplay={!reduceMotion}
         transition={0}
-        // Decode straight from the bundled asset; a disk round-trip on a 4 MB
-        // WebP is the difference between a played animation and a flash of one.
         cachePolicy="memory-disk"
         priority="high"
         onLoad={markReady}

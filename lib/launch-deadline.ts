@@ -23,19 +23,19 @@
  */
 
 /**
- * How long the launch animation may hold, from the first load starting.
+ * How long the launch screen may hold, from the first load starting.
  *
  * A number about the person rather than about the network, and deliberately
  * shorter than a single Request deadline. Sizing it to contain whatever is
  * happening underneath — one abandoned load plus its replacement running out
  * its own deadline — only ever moves the number up, and that coupling is what
- * #52 is a report about. Nothing makes ten seconds of a looping animation with
- * no control on it worth watching.
+ * #52 is a report about. Nothing makes ten seconds of a loading screen with no
+ * control on it worth watching.
  *
  * Being cut off is cheap, which is what makes this affordable: with the Store
- * there is a Hub with Restored rows behind the animation the whole time, and a
- * launch with nothing Restored gets the list's own failure state — a screen a
- * person can act on, which an animation is not.
+ * there is a Hub with Restored rows behind the launch screen the whole time, and
+ * a launch with nothing Restored gets the list's own failure state — a screen a
+ * person can act on, which a loading screen is not.
  */
 export const LAUNCH_DEADLINE_MS = 10_000;
 
