@@ -145,10 +145,17 @@ describe('assignmentModeChanged', () => {
 })
 
 describe('assignmentSwitchedOnNotice', () => {
-  const SWITCHED_ON = 'Assignment was switched back on — engage this conversation to reply.'
+  // Each code names a different next move: an Agent engages, an Admin takes
+  // over, and a thread somebody else holds offers the writer nothing.
+  const SWITCHED_ON: Record<string, string> = {
+    must_engage: 'Assignment was switched back on — engage this conversation to reply.',
+    must_take_over: 'Assignment was switched back on — take over this conversation to reply.',
+    already_engaged: 'Assignment was switched back on — someone else is handling this conversation.',
+  }
 
   test.each(SWITCH_ROWS)('%s, with assignment believed off', (_label, failure, _on, off) => {
-    expect(assignmentSwitchedOnNotice(failure, false)).toBe(off ? SWITCHED_ON : null)
+    const code = failure.kind === 'refused' && 'code' in failure ? failure.code : undefined
+    expect(assignmentSwitchedOnNotice(failure, false)).toBe(off ? SWITCHED_ON[code ?? ''] : null)
   })
 
   // Believed on, nothing here speaks: the off-to-on sentence would be false,

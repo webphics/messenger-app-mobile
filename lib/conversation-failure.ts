@@ -15,8 +15,12 @@ const ASSIGNMENT_SWITCHED_OFF =
  * which is why the set is only read while this device thinks assignment is off.
  */
 const ASSIGNMENT_REQUIRED = new Set(['must_engage', 'must_take_over', 'already_engaged'])
-const ASSIGNMENT_SWITCHED_ON =
-  'Assignment was switched back on — engage this conversation to reply.'
+/** The next move each code leaves the writer, once assignment is back on. */
+const ASSIGNMENT_SWITCHED_ON: Record<string, string> = {
+  must_engage: 'Assignment was switched back on — engage this conversation to reply.',
+  must_take_over: 'Assignment was switched back on — take over this conversation to reply.',
+  already_engaged: 'Assignment was switched back on — someone else is handling this conversation.',
+}
 
 /**
  * Whether a refusal says the assignment switch moved after this session read it.
@@ -56,9 +60,9 @@ export function assignmentSwitchedOnNotice(
   failure: ApiFailure,
   supportAssignmentEnabled: boolean,
 ): string | null {
-  return !supportAssignmentEnabled && assignmentModeChanged(failure, false)
-    ? ASSIGNMENT_SWITCHED_ON
-    : null
+  if (supportAssignmentEnabled || failure.kind !== 'refused') return null
+  if (!assignmentModeChanged(failure, false)) return null
+  return ASSIGNMENT_SWITCHED_ON[failure.code ?? ''] ?? null
 }
 
 /**
