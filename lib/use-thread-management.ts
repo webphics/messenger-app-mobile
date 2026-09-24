@@ -7,7 +7,7 @@ import {
 } from '@/lib/conversation-api'
 import type { ApiFailure } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
-import { assignmentRefusal, assignmentSwitchedOff } from '@/lib/conversation-failure'
+import { assignmentModeChanged, assignmentRefusal } from '@/lib/conversation-failure'
 import { transferCandidates } from '@/lib/thread-actions'
 import type { Conversation, StaffDirectoryUser } from '@/lib/types'
 
@@ -126,7 +126,8 @@ export function useThreadManagement(
       // A Transfer is refused like an Engage when assignment went off under
       // this session, and re-reading the session is what takes it away. Before
       // the on-screen check, because the session is stale wherever they went.
-      const switchedOff = !result.ok && assignmentSwitchedOff(result.failure)
+      // `true`: Transfer is only offered while assignment is on.
+      const switchedOff = !result.ok && assignmentModeChanged(result.failure, true)
       if (switchedOff) reconfirmSession()
 
       if (onScreen.current !== id) return
