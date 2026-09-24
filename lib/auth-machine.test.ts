@@ -169,6 +169,31 @@ describe("an account screen writing to the signed-in person", () => {
   });
 });
 
+/**
+ * `saveProfile`: onboarding writes the name, and the answer has to land on the
+ * person in state as well as the snapshot and the Kept person `updateProfile`
+ * writes. Otherwise the state goes on holding the address standing in for a
+ * name, which is exactly what `needsOnboarding` sends back to onboarding.
+ */
+describe("a profile save", () => {
+  const UNNAMED: SessionUser = { ...AGENT, name: AGENT.email };
+  /** What `saveProfile` dispatches with the answer. */
+  const PROFILE_SAVED: AuthEvent = { type: "account-updated", user: AGENT };
+
+  test.each([
+    ["confirmed", false],
+    ["Stale", true],
+  ] as const)("replaces the person on a %s session", (_label, stale) => {
+    const before: AuthState = { status: "signed-in", user: UNNAMED, stale };
+
+    expect(authTransition(before, PROFILE_SAVED)).toEqual({
+      status: "signed-in",
+      user: AGENT,
+      stale,
+    });
+  });
+});
+
 describe("confirming a Stale session", () => {
   test("replaces the kept person with the one the API named, in place", () => {
     expect(authTransition(STALE, { type: "confirmed", user: CUSTOMER })).toEqual({

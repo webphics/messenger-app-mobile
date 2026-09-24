@@ -421,12 +421,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Write the caller's own profile, and take the answer as who they now are.
    *
-   * Dispatched as `confirmed` rather than through a new event, because that is
-   * exactly what this is: the API re-reads the session after the write and
-   * answers with the user it resolved, so the name that lands in state is the
-   * stored one and never the one that was typed. It replaces the person in
-   * place — no navigation and nothing unmounted — which is what lets the
-   * onboarding gate close on this call without the screen routing itself.
+   * Dispatched as `account-updated`, the event the other account writes use:
+   * the API re-reads the session after the write and answers with the user it
+   * resolved, so the name that lands in state is the stored one and never the
+   * one that was typed. It replaces the person in place — no navigation and
+   * nothing unmounted — so `needsOnboarding` stops holding for them.
+   *
+   * Not `confirmed`, which this once was: that event applies only to a Stale
+   * session, and onboarding runs on one that is not, so the name was dropped and
+   * the state went on holding the address standing in for it.
    *
    * Only the success path touches state. A refusal is the caller's to show;
    * nobody has been signed out by a name the server would not take.
@@ -434,7 +437,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const saveProfile = useCallback(
     async (input: { name: string; phone: string | null }) => {
       const result = await updateProfile(input);
-      if (result.ok) dispatch({ type: "confirmed", user: result.value });
+      if (result.ok) dispatch({ type: "account-updated", user: result.value });
 
       return result;
     },
