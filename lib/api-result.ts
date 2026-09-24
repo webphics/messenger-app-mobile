@@ -22,7 +22,12 @@ export type ApiFailure =
   | { kind: 'unreachable' }
   /** The session is gone. Only a 401 means this; a 403 is a verdict on the request. */
   | { kind: 'unauthorised' }
-  | { kind: 'refused'; message: string }
+  /**
+   * `code` is the API's own name for the refusal, where it gave one. Almost
+   * nothing reads it — the message is what a person is shown — but a refusal
+   * whose sentence this client would rather write itself can be told apart by it.
+   */
+  | { kind: 'refused'; message: string; code?: string }
   | { kind: 'malformed' }
 
 export type ApiResult<T> = { ok: true; value: T } | { ok: false; failure: ApiFailure }
@@ -32,6 +37,15 @@ const DEFAULT_REFUSAL = 'The server could not answer that right now. Try again.'
 function refusalMessage(body: unknown): string {
   const message = asRecord(body)?.message
   return typeof message === 'string' && message.trim() !== '' ? message.trim() : DEFAULT_REFUSAL
+}
+
+/** A refusal, carrying the API's code only when it sent one. */
+function refused(body: unknown): ApiFailure {
+  const message = refusalMessage(body)
+  const code = asRecord(body)?.code
+  return typeof code === 'string' && code !== ''
+    ? { kind: 'refused', message, code }
+    : { kind: 'refused', message }
 }
 
 /**
@@ -58,7 +72,7 @@ export function readOutcome<T>(
   if (!outcome.reached) return { ok: false, failure: { kind: 'unreachable' } }
   if (outcome.status === 401) return { ok: false, failure: { kind: 'unauthorised' } }
   if (outcome.status < 200 || outcome.status >= 300) {
-    return { ok: false, failure: { kind: 'refused', message: refusalMessage(outcome.body) } }
+    return { ok: false, failure: refused(outcome.body) }
   }
 
   const envelope = envelopeData(outcome.body)

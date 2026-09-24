@@ -69,9 +69,13 @@ export function canViewConversation(
   }
 }
 
-export function canAccessUnassignedPool(role: UserRole): boolean {
+/**
+ * Staff, and only while Support DMs are worked by assignment: a Shared queue
+ * has no pool, because there is nothing a thread is waiting to be assigned to.
+ */
+export function canAccessUnassignedPool(role: UserRole, supportAssignment: boolean): boolean {
   assertRole(role)
-  return role === 'agent' || role === 'admin'
+  return supportAssignment && (role === 'agent' || role === 'admin')
 }
 
 export function canSeeInternalNotes(role: UserRole): boolean {

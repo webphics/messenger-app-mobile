@@ -17,10 +17,19 @@ import type { SessionUser } from "@/lib/types";
  * Unreachable screen rather than signing anybody in as half a person.
  */
 
-/** The four fields, and nothing incidental that happens to be on the object. */
+/**
+ * The four identity fields and the assignment switch, and nothing incidental
+ * that happens to be on the object.
+ *
+ * The switch is the one field here that is not about who somebody is. It is
+ * kept because it decides the shape of every staff screen — whether there is
+ * an Unassigned tab, whether a thread offers Engage — and a cold start with no
+ * signal should draw the app this person last saw rather than the other one,
+ * until the API confirms which it is.
+ */
 export function serialiseKeptPerson(user: SessionUser): string {
-  const { id, name, email, role } = user;
-  return JSON.stringify({ id, name, email, role });
+  const { id, name, email, role, supportAssignmentEnabled } = user;
+  return JSON.stringify({ id, name, email, role, supportAssignmentEnabled });
 }
 
 /** The kept person, or null when there is none and when what is there is not one. */

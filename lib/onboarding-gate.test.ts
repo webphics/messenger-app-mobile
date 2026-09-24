@@ -15,6 +15,7 @@ function person(overrides: Partial<SessionUser> = {}): SessionUser {
     role: "customer",
     hasPassword: true,
     twoFactorEnabled: false,
+    supportAssignmentEnabled: false,
     ...overrides,
   };
 }

@@ -8,6 +8,7 @@ import {
   labelChipColors,
   offerableLabels,
   orderedLabels,
+  supportStatusLabel,
 } from '@/lib/conversation-details'
 import type { Conversation, Label } from '@/lib/types'
 
@@ -48,6 +49,10 @@ function customer(): Conversation {
   } as Conversation
 }
 
+/** Whether Support DMs are worked by assignment. See `lib/support-assignment`. */
+const ASSIGNMENT = true
+const SHARED_QUEUE = false
+
 function label(over: Partial<Label> = {}): Label {
   return { id: 'l1', name: 'Billing', color: 'blue', archived: false, ...over }
 }
@@ -63,13 +68,13 @@ describe('conversationTypeLabel', () => {
 
 describe('conversationDetailFields', () => {
   test('a Customer is told the type and nothing internal', () => {
-    expect(conversationDetailFields(customer())).toEqual([
+    expect(conversationDetailFields(customer(), ASSIGNMENT)).toEqual([
       { label: 'Type', value: 'Support DM' },
     ])
   })
 
   test('staff see status and the assignee on a Support DM', () => {
-    expect(conversationDetailFields(staff())).toEqual([
+    expect(conversationDetailFields(staff(), ASSIGNMENT)).toEqual([
       { label: 'Type', value: 'Support DM' },
       { label: 'Status', value: 'Assigned' },
       { label: 'Assigned agent', value: 'Ada' },
@@ -79,6 +84,7 @@ describe('conversationDetailFields', () => {
   test('an unheld thread names no agent rather than an empty one', () => {
     const fields = conversationDetailFields(
       staff({ status: 'unassigned', assignedAgent: null }),
+      ASSIGNMENT,
     )
     expect(fields).toContainEqual({ label: 'Assigned agent', value: 'Unassigned' })
     expect(fields).toContainEqual({ label: 'Status', value: 'Unassigned' })
@@ -87,14 +93,14 @@ describe('conversationDetailFields', () => {
   test('the state is named the way the thread header names it', () => {
     // Not the API's `engaged`: the pill one tap away says Assigned, and a state
     // that renames itself between two screens reads as two states.
-    expect(conversationDetailFields(staff({ status: 'engaged' }))).toContainEqual({
+    expect(conversationDetailFields(staff({ status: 'engaged' }), ASSIGNMENT)).toContainEqual({
       label: 'Status',
       value: 'Assigned',
     })
   })
 
   test('closed reads as Resolved, as it does everywhere else', () => {
-    expect(conversationDetailFields(staff({ status: 'closed' }))).toContainEqual({
+    expect(conversationDetailFields(staff({ status: 'closed' }), ASSIGNMENT)).toContainEqual({
       label: 'Status',
       value: 'Resolved',
     })
@@ -110,6 +116,7 @@ describe('conversationDetailFields', () => {
           { id: 'b', name: 'Bo', role: 'admin' },
         ],
       }),
+      ASSIGNMENT,
     )
     expect(fields).toEqual([
       { label: 'Type', value: 'Group' },
@@ -118,8 +125,51 @@ describe('conversationDetailFields', () => {
   })
 
   test('a staff DM has a status but no assignee to name', () => {
-    const fields = conversationDetailFields(staff({ type: 'staff_dm', status: null }))
+    const fields = conversationDetailFields(staff({ type: 'staff_dm', status: null }), ASSIGNMENT)
     expect(fields).toEqual([{ label: 'Type', value: 'Staff 1:1' }])
+  })
+})
+
+/*
+ * Assignment switched off. Nobody holds a Support DM, so its state is Open or
+ * Resolved and there is no assignee to name — not even one left over from
+ * before the switch.
+ */
+describe('conversationDetailFields, in a Shared queue', () => {
+  test.each([
+    ['nobody engaged', staff({ status: 'unassigned', assignedAgent: null })],
+    ['somebody engaged before the switch', staff({ status: 'engaged' })],
+  ])('a thread %s is Open, and names no agent', (_case, conversation) => {
+    expect(conversationDetailFields(conversation, SHARED_QUEUE)).toEqual([
+      { label: 'Type', value: 'Support DM' },
+      { label: 'Status', value: 'Open' },
+    ])
+  })
+
+  test('a closed thread is still Resolved', () => {
+    expect(conversationDetailFields(staff({ status: 'closed' }), SHARED_QUEUE)).toEqual([
+      { label: 'Type', value: 'Support DM' },
+      { label: 'Status', value: 'Resolved' },
+    ])
+  })
+
+  test('a Customer is told the type and nothing internal, as before', () => {
+    expect(conversationDetailFields(customer(), SHARED_QUEUE)).toEqual([
+      { label: 'Type', value: 'Support DM' },
+    ])
+  })
+})
+
+describe('supportStatusLabel', () => {
+  test.each([
+    ['unassigned', ASSIGNMENT, 'Unassigned'],
+    ['engaged', ASSIGNMENT, 'Assigned'],
+    ['closed', ASSIGNMENT, 'Resolved'],
+    ['unassigned', SHARED_QUEUE, 'Open'],
+    ['engaged', SHARED_QUEUE, 'Open'],
+    ['closed', SHARED_QUEUE, 'Resolved'],
+  ] as const)('%s, assignment %s, reads %s', (status, supportAssignment, expected) => {
+    expect(supportStatusLabel(status, supportAssignment)).toBe(expected)
   })
 })
 

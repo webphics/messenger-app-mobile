@@ -130,6 +130,7 @@ const PARSED_USER = {
   role: "agent" as const,
   hasPassword: true,
   twoFactorEnabled: false,
+  supportAssignmentEnabled: false,
 };
 
 function ok(data: unknown, sessionCookie: string | null = null) {

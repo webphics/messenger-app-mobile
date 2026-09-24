@@ -36,6 +36,7 @@ const PROTECTED_PERSON = {
   role: "customer" as const,
   hasPassword: true,
   twoFactorEnabled: true,
+  supportAssignmentEnabled: false,
 };
 
 const answered = (data: unknown, status = 200) => ({

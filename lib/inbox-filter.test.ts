@@ -1,5 +1,7 @@
 import {
+  activeInboxChip,
   filterConversations,
+  inboxChips,
   isResolved,
   latestInboxThread,
   listAssignedConversations,
@@ -204,6 +206,39 @@ describe('filterConversations', () => {
 
   test('Offers stays out when the chip excludes it', () => {
     expect(filterConversations(all, { query: '', chip: 'resolved' }).map((c) => c.id)).not.toContain(offers.id)
+  })
+})
+
+describe('inboxChips', () => {
+  test('with assignment on, every chip, Mine included', () => {
+    expect(inboxChips(true)).toEqual(['all', 'mine', 'open', 'resolved'])
+  })
+
+  test('in a Shared queue, no Mine: nothing is anybody’s', () => {
+    expect(inboxChips(false)).toEqual(['all', 'open', 'resolved'])
+  })
+})
+
+describe('activeInboxChip', () => {
+  test.each([
+    ['all', true, 'all'],
+    ['mine', true, 'mine'],
+    ['open', true, 'open'],
+    ['resolved', true, 'resolved'],
+    ['all', false, 'all'],
+    // Left selected when the switch went off: the chip is gone, so is its filter.
+    ['mine', false, 'all'],
+    ['open', false, 'open'],
+    ['resolved', false, 'resolved'],
+  ] as const)('%s, assignment %s, filters as %s', (chip, supportAssignment, expected) => {
+    expect(activeInboxChip(chip, supportAssignment)).toBe(expected)
+  })
+
+  test('a Mine that fell back filters the whole list, not the viewer’s share of it', () => {
+    const chip = activeInboxChip('mine', false)
+    expect(filterConversations(CONVERSATIONS, { query: '', chip, viewerId: 'agent-1' })).toHaveLength(
+      CONVERSATIONS.length,
+    )
   })
 })
 

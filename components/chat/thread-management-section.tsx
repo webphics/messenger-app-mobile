@@ -11,9 +11,11 @@ import type { ThreadManagement } from '@/lib/use-thread-management'
  * Ending this conversation, and handing it to somebody else.
  *
  * Only ever rendered for the person the API would let do it — see
- * `canManageAssignment` — so nothing here is disabled or greyed: a control
- * that appears is a control that works, and one the rule excludes is not
- * drawn at all.
+ * `threadActions` — so nothing here is disabled or greyed: a control that
+ * appears is a control that works, and one the rule excludes is not drawn at
+ * all. In a Shared queue that is Close alone, since there is nobody holding the
+ * thread to hand it on; an Agent without the `close` capability is the one
+ * exception, refused by the API in its own words underneath.
  *
  * The two are deliberately different weights. Transfer opens a list and is
  * committed by picking a name from it, which is the confirmation. Close is a
@@ -25,9 +27,16 @@ import type { ThreadManagement } from '@/lib/use-thread-management'
 
 type ThreadManagementSectionProps = {
   management: ThreadManagement
+  canTransfer: boolean
+  /** Whether a reopened thread comes back to whoever closed it, or to the team. */
+  supportAssignment: boolean
 }
 
-export function ThreadManagementSection({ management }: ThreadManagementSectionProps) {
+export function ThreadManagementSection({
+  management,
+  canTransfer,
+  supportAssignment,
+}: ThreadManagementSectionProps) {
   const [picking, setPicking] = useState(false)
   const { candidates, candidatesFailed, loadCandidates, pending, error } = management
 
@@ -41,13 +50,15 @@ export function ThreadManagementSection({ management }: ThreadManagementSectionP
   const confirmClose = useCallback(() => {
     Alert.alert(
       'Close this conversation?',
-      'It moves out of your queue. If the customer writes again it reopens and comes back to you.',
+      supportAssignment
+        ? 'It moves out of your queue. If the customer writes again it reopens and comes back to you.'
+        : 'It moves out of the open queue. If the customer writes again it reopens for the team.',
       [
         { text: 'Keep open', style: 'cancel' },
         { text: 'Close', onPress: management.close },
       ],
     )
-  }, [management])
+  }, [management, supportAssignment])
 
   return (
     <View className="gap-3 rounded-2xl border border-line/70 bg-surface p-3.5">
@@ -55,31 +66,33 @@ export function ThreadManagementSection({ management }: ThreadManagementSectionP
         This conversation
       </Text>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Transfer to another agent"
-        accessibilityState={{ expanded: picking }}
-        onPress={toggleTransfer}
-        className="min-h-11 flex-row items-center gap-3 active:opacity-70"
-      >
-        <View className="size-9 items-center justify-center rounded-2xl bg-primary-soft">
-          <ArrowLeftRight color={colors.primary} size={18} />
-        </View>
-        <Text variant="meta" className="min-w-0 flex-1 font-semibold text-ink">
-          Transfer to another agent
-        </Text>
-        {pending === 'transfer' ? (
-          <ActivityIndicator color={colors.primary} />
-        ) : (
-          <ChevronRight
-            color={colors.muted}
-            size={18}
-            style={picking ? { transform: [{ rotate: '90deg' }] } : undefined}
-          />
-        )}
-      </Pressable>
+      {canTransfer ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Transfer to another agent"
+          accessibilityState={{ expanded: picking }}
+          onPress={toggleTransfer}
+          className="min-h-11 flex-row items-center gap-3 active:opacity-70"
+        >
+          <View className="size-9 items-center justify-center rounded-2xl bg-primary-soft">
+            <ArrowLeftRight color={colors.primary} size={18} />
+          </View>
+          <Text variant="meta" className="min-w-0 flex-1 font-semibold text-ink">
+            Transfer to another agent
+          </Text>
+          {pending === 'transfer' ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : (
+            <ChevronRight
+              color={colors.muted}
+              size={18}
+              style={picking ? { transform: [{ rotate: '90deg' }] } : undefined}
+            />
+          )}
+        </Pressable>
+      ) : null}
 
-      {picking ? (
+      {canTransfer && picking ? (
         <View accessibilityLiveRegion="polite" className="gap-1.5 pl-12">
           {candidatesFailed ? (
             <Pressable

@@ -30,6 +30,7 @@ const AGENT: SessionUser = {
   role: "agent",
   hasPassword: false,
   twoFactorEnabled: false,
+  supportAssignmentEnabled: false,
 };
 
 /** What a missing native module actually throws, verbatim enough to be recognisable. */
@@ -121,19 +122,20 @@ describe("clearRetiredCredential", () => {
 });
 
 describe("the Kept person", () => {
-  test("is stored under its own key, as the four fields", async () => {
+  test("is stored under its own key, as the four fields and the assignment switch", async () => {
     store.setItemAsync.mockResolvedValueOnce(undefined);
     await writeKeptPerson(AGENT);
 
     const [key, value] = store.setItemAsync.mock.calls[0];
     expect(key).toBe(KEPT_PERSON_KEY);
-    // The four identity fields and nothing else, which `lib/kept-person` decides
-    // and this only repeats.
+    // The four identity fields and the assignment switch, and nothing else,
+    // which `lib/kept-person` decides and this only repeats.
     expect(JSON.parse(value)).toEqual({
       id: AGENT.id,
       name: AGENT.name,
       email: AGENT.email,
       role: AGENT.role,
+      supportAssignmentEnabled: AGENT.supportAssignmentEnabled,
     });
   });
 

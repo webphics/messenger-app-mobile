@@ -8,6 +8,7 @@ const AGENT: SessionUser = {
   role: "agent",
   hasPassword: true,
   twoFactorEnabled: false,
+  supportAssignmentEnabled: false,
 };
 
 afterEach(() => {

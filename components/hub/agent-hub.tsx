@@ -29,6 +29,7 @@ import {
 } from "@/lib/inbox-filter";
 // import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
 import { getSessionUser } from "@/lib/session";
+import { useSupportAssignment } from "@/lib/use-support-assignment";
 // import { colors } from "@/lib/tokens"; // hidden with Knowledge search
 
 /** Stands in for a count the list has not answered with yet. An em dash, not a zero. */
@@ -50,6 +51,12 @@ export function AgentHub() {
   const recent = counted && me ? latestInboxThread(counted) : undefined;
   const unassignedCount = counted ? listUnassignedConversations(counted).length : null;
   const assignedCount = counted && me ? listAssignedConversations(me.id, counted).length : null;
+  /*
+   * Both halves of the queue card and the pool row are about assignment, so a
+   * Shared queue draws none of them: there is no pool, and nothing is assigned
+   * to anybody.
+   */
+  const supportAssignment = useSupportAssignment();
 
   return (
     <HubScroll>
@@ -66,34 +73,36 @@ export function AgentHub() {
         </View>
 
         {/* Live Queue Overview Card */}
-        <View
-          className="mt-4 overflow-hidden rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
-        >
-          <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
-            <View className="flex-row items-center gap-2">
-              <PresenceDot breathe className="size-2" />
-              <Text variant="label" className="uppercase tracking-wider text-ink-soft">
-                Live Queue Status
-              </Text>
+        {supportAssignment ? (
+          <View
+            className="mt-4 overflow-hidden rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8"
+          >
+            <View className="flex-row items-center justify-between border-b border-line/60 pb-3">
+              <View className="flex-row items-center gap-2">
+                <PresenceDot breathe className="size-2" />
+                <Text variant="label" className="uppercase tracking-wider text-ink-soft">
+                  Live Queue Status
+                </Text>
+              </View>
+              <Pill label="Online" />
             </View>
-            <Pill label="Online" />
-          </View>
 
-          <View className="mt-3 flex-row items-center justify-between gap-3">
-            <StatTile
-              value={assignedCount === null ? PENDING_COUNT : String(assignedCount)}
-              label="Assigned to you"
-              onPress={() => router.navigate("/(agent)/conversations" as Href)}
-            />
-            <StatTile
-              value={unassignedCount === null ? PENDING_COUNT : String(unassignedCount)}
-              label="Unassigned pool"
-              alert={(unassignedCount ?? 0) > 0}
-              accessibilityLabel="Unassigned tickets"
-              onPress={() => router.navigate("/(agent)/unassigned" as Href)}
-            />
+            <View className="mt-3 flex-row items-center justify-between gap-3">
+              <StatTile
+                value={assignedCount === null ? PENDING_COUNT : String(assignedCount)}
+                label="Assigned to you"
+                onPress={() => router.navigate("/(agent)/conversations" as Href)}
+              />
+              <StatTile
+                value={unassignedCount === null ? PENDING_COUNT : String(unassignedCount)}
+                label="Unassigned pool"
+                alert={(unassignedCount ?? 0) > 0}
+                accessibilityLabel="Unassigned tickets"
+                onPress={() => router.navigate("/(agent)/unassigned" as Href)}
+              />
+            </View>
           </View>
-        </View>
+        ) : null}
 
         {/* Quick Actions.
 
@@ -159,24 +168,26 @@ export function AgentHub() {
         </View> */}
 
         {/* Unassigned Pool Row Card */}
-        <ActionRow
-          className="mt-4"
-          icon={Inbox}
-          tone="amber"
-          title="Unassigned Pool"
-          hint={
-            unassignedCount === null
-              ? "Checking the pickup queue…"
-              : `${unassignedCount} ${unassignedCount === 1 ? "ticket" : "tickets"} waiting for pickup`
-          }
-          accessibilityLabel="Unassigned pool"
-          onPress={() => router.navigate("/(agent)/unassigned" as Href)}
-          trailing={
-            unassignedCount !== null && unassignedCount > 0 ? (
-              <Pill label={`${unassignedCount} new`} tone="amber" />
-            ) : null
-          }
-        />
+        {supportAssignment ? (
+          <ActionRow
+            className="mt-4"
+            icon={Inbox}
+            tone="amber"
+            title="Unassigned Pool"
+            hint={
+              unassignedCount === null
+                ? "Checking the pickup queue…"
+                : `${unassignedCount} ${unassignedCount === 1 ? "ticket" : "tickets"} waiting for pickup`
+            }
+            accessibilityLabel="Unassigned pool"
+            onPress={() => router.navigate("/(agent)/unassigned" as Href)}
+            trailing={
+              unassignedCount !== null && unassignedCount > 0 ? (
+                <Pill label={`${unassignedCount} new`} tone="amber" />
+              ) : null
+            }
+          />
+        ) : null}
       </View>
 
       {/* FAQ Row — hidden for now. Restore by uncommenting. */}

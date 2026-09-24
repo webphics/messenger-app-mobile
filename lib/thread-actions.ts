@@ -49,6 +49,38 @@ export function canManageAssignment(
   )
 }
 
+/** Which of the two this person is offered on this thread. */
+export type ThreadActions = { close: boolean; transfer: boolean }
+
+const NEITHER: ThreadActions = { close: false, transfer: false }
+
+/**
+ * Close and Transfer, for whichever way Support DMs are being worked.
+ *
+ * With assignment on, both are `canManageAssignment` and nothing else. In a
+ * Shared queue there is no assignee to ask about: Transfer does not exist,
+ * since there is nothing to hand on, and the API lets an Admin, or an Agent
+ * holding the `close` capability, close any Support DM that is not closed
+ * already. The capability is the half this cannot read, for the reason the
+ * module doc gives, so Close is offered to every staff member on one and an
+ * Agent without it is refused by the API in its own words.
+ */
+export function threadActions(
+  conversation: Conversation,
+  viewer: ThreadViewer,
+  supportAssignment: boolean,
+): ThreadActions {
+  if (supportAssignment) {
+    const manages = canManageAssignment(conversation, viewer)
+    return { close: manages, transfer: manages }
+  }
+
+  if (viewer.role === 'customer') return NEITHER
+  if (!isStaffConversation(conversation) || conversation.type !== 'support_dm') return NEITHER
+  const open = conversation.status === 'unassigned' || conversation.status === 'engaged'
+  return { close: open, transfer: false }
+}
+
 /**
  * Who a transfer may go to.
  *

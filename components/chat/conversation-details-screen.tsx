@@ -46,12 +46,16 @@ type ConversationDetailsScreenProps = {
   viewerRole: UserRole
   organizationNames?: ReadonlyMap<string, string>
   details: ConversationDetails
+  /** Whether Support DMs are worked by assignment. See `lib/support-assignment`. */
+  supportAssignment: boolean
   /**
-   * Closing and transferring, for the one person the API grants them to.
-   * Absent for everybody else, which is how the section stays undrawn rather
-   * than drawn and disabled — see `canManageAssignment`.
+   * Closing and transferring, for whoever the API grants Close to. Absent for
+   * everybody else, which is how the section stays undrawn rather than drawn
+   * and disabled — see `threadActions`.
    */
   management?: ThreadManagement
+  /** Whether Transfer is offered beside Close. Never in a Shared queue. */
+  canTransfer?: boolean
 }
 
 /**
@@ -73,7 +77,9 @@ export function ConversationDetailsScreen({
   viewerRole,
   organizationNames,
   details,
+  supportAssignment,
   management,
+  canTransfer = false,
 }: ConversationDetailsScreenProps) {
   const insets = useSafeAreaInsets()
   const keyboardInset = useKeyboardInset()
@@ -85,7 +91,7 @@ export function ConversationDetailsScreen({
    */
   const [draft, setDraft] = useState('')
   const title = conversationTitle(conversation, organizationNames)
-  const fields = conversationDetailFields(conversation)
+  const fields = conversationDetailFields(conversation, supportAssignment)
   const labels = appliedLabels(conversation)
   const showLabels = canLabel(conversation, viewerRole)
   const showNotes = canReadNotes(conversation, viewerRole)
@@ -215,7 +221,13 @@ export function ConversationDetailsScreen({
           </Section>
         ) : null}
 
-        {management ? <ThreadManagementSection management={management} /> : null}
+        {management ? (
+          <ThreadManagementSection
+            management={management}
+            canTransfer={canTransfer}
+            supportAssignment={supportAssignment}
+          />
+        ) : null}
 
         {showLabels ? (
           <LabelsSection

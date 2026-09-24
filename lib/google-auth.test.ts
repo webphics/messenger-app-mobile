@@ -20,6 +20,7 @@ const CUSTOMER: SessionUser = {
   role: "customer",
   hasPassword: true,
   twoFactorEnabled: false,
+  supportAssignmentEnabled: false,
 };
 
 const SUBMITTING: AuthState = { status: "submitting" };

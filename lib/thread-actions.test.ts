@@ -1,6 +1,7 @@
 import {
   canManageAssignment,
   canManageLabels,
+  threadActions,
   transferCandidates,
 } from '@/lib/thread-actions'
 import type { Conversation, StaffConversation, StaffDirectoryUser } from '@/lib/types'
@@ -74,6 +75,60 @@ describe('canManageAssignment', () => {
       unreadCount: null,
     }
     expect(canManageAssignment(own, { id: 'cust-1', role: 'customer' })).toBe(false)
+  })
+})
+
+describe('threadActions', () => {
+  const OWN: Conversation = {
+    id: 'conv-1',
+    organizationId: 'org-1',
+    type: 'support_dm',
+    lastMessageAt: null,
+    lastMessagePreview: null,
+    lastMessageMine: false,
+    lastMessageReceiptStatus: null,
+    lastMessageRead: true,
+    unreadCount: null,
+  }
+  const CUSTOMER = { id: 'cust-1', role: 'customer' } as const
+
+  describe('with assignment on, both follow canManageAssignment', () => {
+    test.each([
+      ['the assignee', thread(), ASSIGNEE, true],
+      ['another agent', thread(), OTHER_AGENT, false],
+      ['an Admin who does not hold it', thread(), ADMIN, false],
+      ['the assignee of a closed thread', thread({ status: 'closed' }), ASSIGNEE, false],
+      ['anybody on an unassigned thread', thread({ status: 'unassigned', assignedAgent: null }), ADMIN, false],
+    ] as const)('%s', (_case, conversation, viewer, offered) => {
+      expect(threadActions(conversation, viewer, true)).toEqual({ close: offered, transfer: offered })
+    })
+  })
+
+  /*
+   * A Shared queue: nobody holds a thread, so there is nothing to transfer, and
+   * Close is offered to staff on any Support DM that is still open. Whether an
+   * Agent has the `close` capability is the API's to answer.
+   */
+  describe('in a Shared queue', () => {
+    test.each([
+      ['an Agent, on a thread nobody engaged', thread({ status: 'unassigned', assignedAgent: null }), OTHER_AGENT],
+      ['an Admin, on a thread nobody engaged', thread({ status: 'unassigned', assignedAgent: null }), ADMIN],
+      ['an Agent, on a thread somebody engaged before the switch', thread(), OTHER_AGENT],
+      ['whoever engaged it before the switch', thread(), ASSIGNEE],
+      ['an Admin, on a thread somebody engaged before the switch', thread(), ADMIN],
+    ] as const)('%s may close it and may not transfer it', (_case, conversation, viewer) => {
+      expect(threadActions(conversation, viewer, false)).toEqual({ close: true, transfer: false })
+    })
+
+    test.each([
+      ['a closed thread', thread({ status: 'closed' }), ADMIN],
+      ['a thread with no status', thread({ status: null }), ADMIN],
+      ['a staff DM', thread({ type: 'staff_dm', status: null }), ADMIN],
+      ['a group', thread({ type: 'group', status: null }), ADMIN],
+      ["a Customer's own thread", OWN, CUSTOMER],
+    ] as const)('%s offers neither', (_case, conversation, viewer) => {
+      expect(threadActions(conversation, viewer, false)).toEqual({ close: false, transfer: false })
+    })
   })
 })
 

@@ -34,6 +34,7 @@ const NAMED = {
   role: "customer",
   hasPassword: true,
   twoFactorEnabled: false,
+  supportAssignmentEnabled: false,
 };
 
 /** Who the device thought was signed in before the write: the nameless account. */
@@ -46,6 +47,7 @@ const BEFORE = {
   role: "customer" as const,
   hasPassword: true,
   twoFactorEnabled: false,
+  supportAssignmentEnabled: false,
 };
 
 const answered = (data: unknown) => ({

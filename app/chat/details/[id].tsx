@@ -13,9 +13,10 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { canLabel, canReadNotes } from "@/lib/conversation-details";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { getSession } from "@/lib/session";
-import { canManageAssignment } from "@/lib/thread-actions";
+import { threadActions } from "@/lib/thread-actions";
 import { useChatSectionConversation } from "@/lib/use-chat-section-conversation";
 import { useConversationDetails } from "@/lib/use-conversation-details";
+import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useThreadManagement } from "@/lib/use-thread-management";
 
 /**
@@ -75,8 +76,10 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
     ready ? section.conversation : null,
     addConversation,
   );
-  const manageable =
-    ready && canManageAssignment(section.conversation, section.author);
+  const supportAssignment = useSupportAssignment();
+  const actions = ready
+    ? threadActions(section.conversation, section.author, supportAssignment)
+    : null;
 
   if (section.status === "loading") return <AppLoadingScreen />;
   if (section.status === "denied") return <Redirect href={ROLE_HREF[section.home]} />;
@@ -87,7 +90,9 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
       viewerRole={section.viewerRole}
       organizationNames={section.organizationNames}
       details={details}
-      management={manageable ? management : undefined}
+      supportAssignment={supportAssignment}
+      management={actions?.close ? management : undefined}
+      canTransfer={actions?.transfer === true}
     />
   );
 }

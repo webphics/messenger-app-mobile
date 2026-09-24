@@ -36,6 +36,7 @@ const WITHOUT_PASSWORD = {
   role: "customer" as const,
   hasPassword: false,
   twoFactorEnabled: false,
+  supportAssignmentEnabled: false,
 };
 
 const WITH_PASSWORD = { ...WITHOUT_PASSWORD, hasPassword: true };

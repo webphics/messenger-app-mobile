@@ -3,10 +3,16 @@ import { communityConversations, inboxConversations } from "@/lib/conversation-s
 import { listUnassignedConversations } from "@/lib/inbox-filter";
 import type { Conversation } from "@/lib/types";
 
-/** Unassigned pool size for the Unassigned tab badge; omit when empty. */
+/**
+ * Unassigned pool size for the Unassigned tab badge; omit when empty, and in a
+ * Shared queue, which has no pool — a thread there can still say `unassigned`,
+ * and counting it would badge a tab that is not drawn.
+ */
 export function unassignedTabBadge(
   conversations: Conversation[],
+  supportAssignment: boolean,
 ): number | undefined {
+  if (!supportAssignment) return undefined;
   const n = listUnassignedConversations(conversations).length;
   return n > 0 ? n : undefined;
 }

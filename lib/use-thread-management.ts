@@ -12,7 +12,8 @@ import type { Conversation, StaffDirectoryUser } from '@/lib/types'
 /**
  * Ending a thread, and handing it on.
  *
- * The two actions the API grants the assignee of an engaged Support DM, held
+ * The two actions the API grants the assignee of an engaged Support DM — or,
+ * in a Shared queue, Close alone to staff on any open one — held
  * together because they are the same shape — one POST, one conversation back,
  * one row folded into the list every screen shares — and because a screen
  * offering either offers both. Which of them is offered at all is

@@ -803,7 +803,34 @@ describe('the refusals the API answers an assignment with', () => {
 
     expect(await engageConversation('conv-1')).toEqual({
       ok: false,
-      failure: { kind: 'refused', message: 'This chat is already engaged.' },
+      failure: { kind: 'refused', message: 'This chat is already engaged.', code: 'already_engaged' },
+    })
+  })
+
+  /**
+   * Assignment switched off after this session read the switch. The code is
+   * what `assignmentRefusal` tells it apart by, so it has to survive the trip.
+   */
+  test.each([
+    ['engageConversation', engageConversation],
+    ['takeOverConversation', takeOverConversation],
+  ] as const)('%s while assignment is switched off carries the code', async (_name, call) => {
+    enqueue(
+      csrfResponse(),
+      response(409, {
+        statusCode: 409,
+        code: 'support_assignment_disabled',
+        message: 'Assignment is switched off; any staff member can reply.',
+      }),
+    )
+
+    expect(await call('conv-1')).toEqual({
+      ok: false,
+      failure: {
+        kind: 'refused',
+        message: 'Assignment is switched off; any staff member can reply.',
+        code: 'support_assignment_disabled',
+      },
     })
   })
 
@@ -825,7 +852,7 @@ describe('the refusals the API answers an assignment with', () => {
 
     expect(await takeOverConversation('conv-1')).toEqual({
       ok: false,
-      failure: { kind: 'refused', message: "You don't have permission to do that." },
+      failure: { kind: 'refused', message: "You don't have permission to do that.", code: 'forbidden' },
     })
   })
 })
@@ -965,7 +992,11 @@ describe('uploadAttachment', () => {
 
     expect(await uploadAttachment('conv-1', PHOTO)).toEqual({
       ok: false,
-      failure: { kind: 'refused', message: 'File type image/heic is not supported.' },
+      failure: {
+        kind: 'refused',
+        message: 'File type image/heic is not supported.',
+        code: 'unsupported_file_type',
+      },
     })
   })
 
@@ -1152,7 +1183,11 @@ describe('registerPushDevice', () => {
 
     expect(await registerPushDevice('ExponentPushToken[abc]', 'android')).toEqual({
       ok: false,
-      failure: { kind: 'refused', message: 'Too many devices are registered.' },
+      failure: {
+        kind: 'refused',
+        message: 'Too many devices are registered.',
+        code: 'push_device_limit_reached',
+      },
     })
   })
 
