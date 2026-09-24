@@ -11,8 +11,14 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { cn } from "@/lib/cn";
-import { filterConversations, type InboxChip } from "@/lib/inbox-filter";
+import {
+  activeInboxChip,
+  filterConversations,
+  inboxChips,
+  type InboxChip,
+} from "@/lib/inbox-filter";
 import { useCustomInboxes } from "@/lib/use-custom-inboxes";
+import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { settleEnter } from "@/lib/motion-enter";
 import {
   makeRefreshControl,
@@ -23,17 +29,18 @@ import type { Conversation, UserRole } from "@/lib/types";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 
 /**
- * The staff filters, in the order they narrow.
+ * The staff filters' labels. Which of them are offered, and in what order, is
+ * `inboxChips` — Mine is not, in a Shared queue.
  *
  * Short labels because there are four of them and the row does not scroll: "All
  * Messages" was affordable beside two chips and is not beside three.
  */
-const CHIPS: { id: InboxChip; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "mine", label: "Mine" },
-  { id: "open", label: "Open" },
-  { id: "resolved", label: "Resolved" },
-];
+const CHIP_LABEL: Record<InboxChip, string> = {
+  all: "All",
+  mine: "Mine",
+  open: "Open",
+  resolved: "Resolved",
+};
 
 function keyExtractor(item: Conversation) {
   return item.id;
@@ -186,7 +193,11 @@ export function InboxScreen({
   const router = useRouter();
   const navigation = useNavigation();
   const [query, setQuery] = useState("");
-  const [chip, setChip] = useState<InboxChip>("all");
+  const [selectedChip, setChip] = useState<InboxChip>("all");
+  const supportAssignment = useSupportAssignment();
+  const chips = inboxChips(supportAssignment);
+  // A Mine left selected when assignment went off filters as All, and shows as it.
+  const chip = activeInboxChip(selectedChip, supportAssignment);
   const [composeOpen, setComposeOpen] = useState(false);
   const [inboxesOpen, setInboxesOpen] = useState(false);
   /*
@@ -328,15 +339,15 @@ export function InboxScreen({
 
         {showChips ? (
           <View className="mt-3 flex-row gap-2">
-            {CHIPS.map((item) => {
-              const selected = item.id === chip;
+            {chips.map((id) => {
+              const selected = id === chip;
               return (
                 <TactilePressable
-                  key={item.id}
+                  key={id}
                   accessibilityRole="button"
-                  accessibilityLabel={item.label}
+                  accessibilityLabel={CHIP_LABEL[id]}
                   accessibilityState={{ selected }}
-                  onPress={() => setChip(item.id)}
+                  onPress={() => setChip(id)}
                   className={cn(
                     "min-h-9 justify-center rounded-full border px-3.5",
                     selected
@@ -350,7 +361,7 @@ export function InboxScreen({
                       selected ? "text-primary-foreground" : "text-ink-soft"
                     }
                   >
-                    {item.label}
+                    {CHIP_LABEL[id]}
                   </Text>
                 </TactilePressable>
               );

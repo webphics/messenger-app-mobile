@@ -17,6 +17,7 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { motion } from "@/lib/motion";
 import { getSessionUser } from "@/lib/session";
 import { inboxTabBadge, unassignedTabBadge } from "@/lib/tab-badges";
+import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { colors } from "@/lib/tokens";
 
 type FloatingTabBarProps = Parameters<
@@ -42,12 +43,15 @@ const CAPSULE_PAD = 6;
 function badgeForRoute(
   name: string,
   conversations: Conversation[] | null,
+  supportAssignment: boolean,
 ): number | undefined {
   const user = getSessionUser();
   if (!conversations || !user) return undefined;
 
   if (name === "unassigned") {
-    return user.role === "customer" ? undefined : unassignedTabBadge(conversations);
+    return user.role === "customer"
+      ? undefined
+      : unassignedTabBadge(conversations, supportAssignment);
   }
   if (name === "conversations" || name === "messages") return inboxTabBadge(conversations);
   return undefined;
@@ -68,6 +72,7 @@ export function FloatingTabBar({
   const tabCount = state.routes.length;
   const inbox = useConversationInbox();
   const conversations = inbox.status === "ready" ? inbox.conversations : null;
+  const supportAssignment = useSupportAssignment();
 
   const tabWidth = useSharedValue(0);
   const activeIndex = useSharedValue(state.index);
@@ -115,7 +120,7 @@ export function FloatingTabBar({
           const { options } = descriptors[route.key];
           const color = focused ? colors.primary : colors.muted;
           const label = options.title ?? route.name;
-          const badge = badgeForRoute(route.name, conversations);
+          const badge = badgeForRoute(route.name, conversations, supportAssignment);
 
           const onPress = () => {
             const event = navigation.emit({

@@ -128,9 +128,15 @@ describe('canViewConversation', () => {
 
 describe('role matrix', () => {
   test('unassigned pool', () => {
-    expect(canAccessUnassignedPool('customer')).toBe(false)
-    expect(canAccessUnassignedPool('agent')).toBe(true)
-    expect(canAccessUnassignedPool('admin')).toBe(true)
+    expect(canAccessUnassignedPool('customer', true)).toBe(false)
+    expect(canAccessUnassignedPool('agent', true)).toBe(true)
+    expect(canAccessUnassignedPool('admin', true)).toBe(true)
+  })
+
+  test('no unassigned pool in a Shared queue, for anybody', () => {
+    expect(canAccessUnassignedPool('customer', false)).toBe(false)
+    expect(canAccessUnassignedPool('agent', false)).toBe(false)
+    expect(canAccessUnassignedPool('admin', false)).toBe(false)
   })
 
   test('internal notes', () => {

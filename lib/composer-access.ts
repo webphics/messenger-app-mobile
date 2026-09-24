@@ -25,6 +25,12 @@ import type { Conversation, GroupWritePolicy, UserRole } from '@/lib/types'
  * `assertCanTakeOver` begins with `assertAdmin`, so an Agent is told who is
  * handling the thread and offered nothing. A button that always fails is worse
  * than no button.
+ *
+ * All of that is assignment, and assignment can be switched off. In a Shared
+ * queue nobody holds a Support DM, so every staff member who can read one may
+ * write in it until it is closed, and there is nothing to engage or take over.
+ * `supportAssignment` says which of the two this is — see
+ * `lib/support-assignment`.
  */
 
 /** What a staff member may do about a thread they cannot write in yet. */
@@ -83,6 +89,7 @@ function groupWriteAccess(conversation: {
 export function composerAccess(
   conversation: Conversation,
   viewer: ComposerViewer,
+  supportAssignment: boolean,
 ): ComposerAccess {
   /*
    * A Customer's own payload. It carries no status and no assignee — those are
@@ -126,6 +133,9 @@ export function composerAccess(
   if (conversation.status === 'closed') {
     return readOnly('This conversation is closed.')
   }
+
+  // A Shared queue: nobody holds it, so whoever can read it answers it.
+  if (!supportAssignment) return OPEN
 
   if (conversation.status === 'unassigned') {
     // Every staff role may engage: the API asks only that the actor is staff and

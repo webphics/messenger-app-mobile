@@ -49,6 +49,28 @@ describe('assignmentRefusal', () => {
     ).toBe("You don't have permission to do that.")
   })
 
+  test("a code it does not single out is still repeated in the API's words", () => {
+    expect(
+      assignmentRefusal({
+        kind: 'refused',
+        message: 'This chat is already engaged.',
+        code: 'already_engaged',
+      }),
+    ).toBe('This chat is already engaged.')
+  })
+
+  test('assignment switched off since this session read it says so, and what brings the composer back', () => {
+    expect(
+      assignmentRefusal({
+        kind: 'refused',
+        message: 'Assignment is switched off; any staff member can reply.',
+        code: 'support_assignment_disabled',
+      }),
+    ).toBe(
+      'Assignment has been switched off, so anyone on the team can reply here. Restart the app to start replying.',
+    )
+  })
+
   test('offers the retry a request that never arrived deserves', () => {
     expect(assignmentRefusal({ kind: 'unreachable' })).toBe(
       'Could not reach the server. Check your connection and try again.',

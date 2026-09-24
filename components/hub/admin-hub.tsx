@@ -24,6 +24,7 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
 // import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
 import { getSessionUser } from "@/lib/session";
+import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { colors } from "@/lib/tokens";
 
 /** Stands in for a count the list has not answered with yet. An em dash, not a zero. */
@@ -45,6 +46,8 @@ export function AdminHub() {
    * worth waking up to, which the mock user count that stood here never was.
    */
   const unassigned = counted ? listUnassignedConversations(counted).length : null;
+  // No pool in a Shared queue, so no tile counting it; Conversations stands alone.
+  const supportAssignment = useSupportAssignment();
 
   return (
     <HubScroll>
@@ -75,14 +78,16 @@ export function AdminHub() {
           </View>
 
           <View className="mt-3 flex-row items-center justify-between gap-3">
-            <StatTile
-              value={unassigned === null ? PENDING_COUNT : String(unassigned)}
-              label="Unassigned"
-              tone="primary"
-              alert={unassigned !== null && unassigned > 0}
-              accessibilityLabel="Unassigned pool"
-              onPress={() => router.navigate("/(admin)/unassigned" as Href)}
-            />
+            {supportAssignment ? (
+              <StatTile
+                value={unassigned === null ? PENDING_COUNT : String(unassigned)}
+                label="Unassigned"
+                tone="primary"
+                alert={unassigned !== null && unassigned > 0}
+                accessibilityLabel="Unassigned pool"
+                onPress={() => router.navigate("/(admin)/unassigned" as Href)}
+              />
+            ) : null}
             <StatTile
               value={counted === null ? PENDING_COUNT : String(counted.length)}
               label="Conversations"

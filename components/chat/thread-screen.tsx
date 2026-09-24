@@ -68,6 +68,11 @@ type ThreadScreenProps = {
   /** Oldest first. Owned by the caller, which is what fetches and pages it. */
   messages: Message[]
   viewer: ThreadViewer
+  /**
+   * Whether Support DMs are worked by assignment, or as a Shared queue where any
+   * staff member answers one. See `lib/support-assignment`.
+   */
+  supportAssignment: boolean
   organizationNames?: ReadonlyMap<string, string>
   /**
    * What the composer opens holding, read once on mount. Reply on a Post
@@ -352,6 +357,7 @@ export function ThreadScreen({
   conversation,
   messages,
   viewer,
+  supportAssignment,
   organizationNames,
   initialDraft,
   loading = false,
@@ -395,10 +401,11 @@ export function ThreadScreen({
    * Whether this person may write here.
    *
    * Reading and writing are different permissions on the staff side — one Agent
-   * holds a Support DM and the rest read it — so the composer is not a given.
-   * See `lib/composer-access.ts`, which mirrors the rule the API enforces.
+   * holds a Support DM and the rest read it, unless assignment is switched off —
+   * so the composer is not a given. See `lib/composer-access.ts`, which mirrors
+   * the rule the API enforces.
    */
-  const access = composerAccess(conversation, viewer)
+  const access = composerAccess(conversation, viewer, supportAssignment)
   const readOnly = access.kind === 'read-only'
 
   /**
@@ -989,7 +996,11 @@ export function ThreadScreen({
   return (
     <View className="flex-1 bg-bg">
       <InScreenHeader>
-        <ThreadHeader conversation={conversation} organizationNames={organizationNames} />
+        <ThreadHeader
+          conversation={conversation}
+          organizationNames={organizationNames}
+          supportAssignment={supportAssignment}
+        />
       </InScreenHeader>
       {/*
         Android too: edge-to-edge sets `setDecorFitsSystemWindows(false)`, which

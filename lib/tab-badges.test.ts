@@ -4,7 +4,7 @@ import type { Conversation } from "@/lib/types";
 
 describe("unassignedTabBadge", () => {
   it("counts the support threads nobody has engaged", () => {
-    expect(unassignedTabBadge(CONVERSATIONS)).toBe(
+    expect(unassignedTabBadge(CONVERSATIONS, true)).toBe(
       CONVERSATIONS.filter((c) => c.status === "unassigned").length,
     );
   });
@@ -14,7 +14,12 @@ describe("unassignedTabBadge", () => {
       ...c,
       status: c.status === "unassigned" ? ("engaged" as const) : c.status,
     }));
-    expect(unassignedTabBadge(engaged)).toBeUndefined();
+    expect(unassignedTabBadge(engaged, true)).toBeUndefined();
+  });
+
+  it("omits in a Shared queue, however many threads say unassigned", () => {
+    expect(CONVERSATIONS.some((c) => c.status === "unassigned")).toBe(true);
+    expect(unassignedTabBadge(CONVERSATIONS, false)).toBeUndefined();
   });
 });
 

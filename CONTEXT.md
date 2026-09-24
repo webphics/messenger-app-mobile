@@ -226,7 +226,7 @@ Conversations with no assignee, visible to Agent and Admin.
 _Avoid_: Queue (unless referring to ordering), inbox (inbox is the conversation list)
 
 **Engage**:
-An Agent or Admin claiming a conversation from the Unassigned pool, becoming its assignee. The API's `engage` action.
+An Agent or Admin claiming a conversation from the Unassigned pool, becoming its assignee. The API's `engage` action. Does not exist in a Shared queue.
 _Avoid_: Claim, pick up, assign to self (assignment is what results, not the action's name)
 
 **Takeover**:
@@ -234,7 +234,7 @@ An Admin taking assignment of a conversation away from its current assignee. Adm
 Engage: the API's `assertCanTakeOver` begins with `assertAdmin` and answers an Agent `403` whatever
 the thread's state, so an Agent reading a conversation somebody else holds is told who has it and
 offered nothing. Distinct from Transfer (Phase 4b): a Takeover is unilateral and names no destination
-other than the actor; a Transfer hands off to a chosen agent.
+other than the actor; a Transfer hands off to a chosen agent. Does not exist in a Shared queue.
 _Avoid_: Reassign, steal, force-assign
 
 **Reassignment**:
@@ -252,7 +252,8 @@ _Avoid_: Unassign, kicked out, access lost (that is the web client's screen, not
 The assignee of an engaged Support DM handing it to another Agent. The API's `transfer` action, and
 the assignee's alone — `assertCanTransfer` refuses anybody else, an Admin included, so an Admin who
 wants somebody else's thread takes it over first. The target must be an Agent and must not be the
-current holder. Distinct from Takeover, which is unilateral and names no destination but the actor.
+current holder. Distinct from Takeover, which is unilateral and names no destination but the actor. Does not exist
+in a Shared queue.
 _Avoid_: Handover, reassign (that is what the *event* is called), escalate
 
 **Close**:
@@ -261,6 +262,18 @@ writing in reopens it, and it returns to whoever closed it — which is why noth
 destructive. Shown in the thread's state as Resolved, the word the product uses for a thread that is
 done with.
 _Avoid_: Resolve (as the action's name), archive, delete
+
+**Open**:
+A Support DM that is not closed. Not a synonym for Unassigned: a thread somebody holds is Open too.
+The only live state a Shared queue shows, since it has no holder to show.
+_Avoid_: Active, pending, Unassigned
+
+**Shared queue**:
+The way Support DMs are worked while assignment is switched off: every staff member who can see a
+Support DM may answer it, and nobody holds it. Engage, Takeover, Transfer, the Unassigned pool and
+the Mine chip do not exist in it, and Close is open to any staff member allowed to close. Switching
+assignment back on returns each thread to whoever held it before.
+_Avoid_: Shared inbox (inbox is the conversation list), free-for-all, unassigned mode
 
 **Organization**:
 The container everything in this product belongs to — every conversation, every membership, every

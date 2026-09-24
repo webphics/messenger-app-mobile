@@ -390,7 +390,10 @@ describe('listWallPosts', () => {
 
     const result = await listWallPosts({ wall: 'missing-wall' })
 
-    expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Wall not found' } })
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Wall not found', code: 'wall_not_found' },
+    })
   })
 
   test('recent is left off the request entirely, byte-identical to no sort at all', async () => {
@@ -488,7 +491,10 @@ describe('getNamedWall', () => {
 
     const result = await getNamedWall('gone')
 
-    expect(result).toEqual({ ok: false, failure: { kind: 'refused', message: 'Wall not found' } })
+    expect(result).toEqual({
+      ok: false,
+      failure: { kind: 'refused', message: 'Wall not found', code: 'wall_not_found' },
+    })
   })
 })
 

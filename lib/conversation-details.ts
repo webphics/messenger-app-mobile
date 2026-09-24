@@ -1,5 +1,5 @@
 import { isStaffConversation } from '@/lib/types'
-import type { Conversation, Label, LabelColor, UserRole } from '@/lib/types'
+import type { Conversation, Label, LabelColor, SupportStatus, UserRole } from '@/lib/types'
 
 /**
  * What a conversation says about itself, beside the messages in it.
@@ -33,13 +33,27 @@ const TYPE_LABEL: Record<Conversation['type'], string> = {
  * the action, and assignment is what results, so the state is named for the
  * result. Closed reads as Resolved for the same reason, in both places.
  *
- * See `statusPill` in `components/chat/thread-header.tsx`.
+ * In a Shared queue there is no assignment to name, so both live states are
+ * *Open* — CONTEXT.md's word for a Support DM that is not closed — and Resolved
+ * stays Resolved.
+ *
+ * See `statusPill` in `components/chat/thread-header.tsx`, which reads this.
  */
-const STATUS_LABEL = {
+const STATUS_LABEL: Record<SupportStatus, string> = {
   unassigned: 'Unassigned',
   engaged: 'Assigned',
   closed: 'Resolved',
-} as const
+}
+
+const SHARED_QUEUE_STATUS_LABEL: Record<SupportStatus, string> = {
+  unassigned: 'Open',
+  engaged: 'Open',
+  closed: 'Resolved',
+}
+
+export function supportStatusLabel(status: SupportStatus, supportAssignment: boolean): string {
+  return (supportAssignment ? STATUS_LABEL : SHARED_QUEUE_STATUS_LABEL)[status]
+}
 
 export function conversationTypeLabel(conversation: Conversation): string {
   return TYPE_LABEL[conversation.type]
@@ -58,9 +72,14 @@ export type DetailField = { label: string; value: string }
  *
  * A group has no assignment either, whoever is looking: `status` is null on
  * every conversation type but a Support DM, and a row reading "-" for it would
- * be inventing a field the thread does not have.
+ * be inventing a field the thread does not have. Nor does a Support DM in a
+ * Shared queue, where nobody holds it — an assignee left over from before the
+ * switch is history rather than who is handling it now.
  */
-export function conversationDetailFields(conversation: Conversation): DetailField[] {
+export function conversationDetailFields(
+  conversation: Conversation,
+  supportAssignment: boolean,
+): DetailField[] {
   const fields: DetailField[] = [
     { label: 'Type', value: conversationTypeLabel(conversation) },
   ]
@@ -76,9 +95,9 @@ export function conversationDetailFields(conversation: Conversation): DetailFiel
   }
 
   if (conversation.status !== null) {
-    fields.push({ label: 'Status', value: STATUS_LABEL[conversation.status] })
+    fields.push({ label: 'Status', value: supportStatusLabel(conversation.status, supportAssignment) })
   }
-  if (conversation.type === 'support_dm') {
+  if (conversation.type === 'support_dm' && supportAssignment) {
     fields.push({
       label: 'Assigned agent',
       value: conversation.assignedAgent?.name ?? 'Unassigned',

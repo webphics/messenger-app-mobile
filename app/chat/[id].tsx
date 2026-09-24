@@ -29,6 +29,7 @@ import {
 } from "@/lib/realtime-context";
 import { getSession, getSessionUser } from "@/lib/session";
 import { useConversationAssignment } from "@/lib/use-conversation-assignment";
+import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useThreadMessages } from "@/lib/use-thread-messages";
 import type { Conversation, UserRole } from "@/lib/types";
 
@@ -237,6 +238,7 @@ function ConversationScreen({
     user?.id ?? null,
     addConversation,
   );
+  const supportAssignment = useSupportAssignment();
 
   /**
    * Opening a thread reads it.
@@ -307,6 +309,7 @@ function ConversationScreen({
       conversation={conversation}
       messages={thread.messages}
       viewer={{ id: user.id, name: user.name, role: user.role }}
+      supportAssignment={supportAssignment}
       initialDraft={initialDraft}
       organizationNames={inbox.organizationNames}
       loading={thread.loading}

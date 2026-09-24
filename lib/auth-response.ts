@@ -176,6 +176,7 @@ function envelopeData(body: unknown): Record<string, unknown> | null {
  * which hides a control. The other way round would draw one that acts on an
  * assumption the payload never made. See
  * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
+ * `supportAssignmentEnabled` defaults the same way.
  */
 export function parseSessionUser(data: unknown): SessionUser | null {
   const record = asRecord(data);
@@ -198,6 +199,9 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     // understand, which is the case the false default exists for.
     hasPassword: record.hasPassword === true,
     twoFactorEnabled: record.twoFactorEnabled === true,
+    // The same default, for the same reason: anything but `true` is a Shared
+    // queue, which offers nobody an action the API would refuse.
+    supportAssignmentEnabled: record.supportAssignmentEnabled === true,
   };
 }
 

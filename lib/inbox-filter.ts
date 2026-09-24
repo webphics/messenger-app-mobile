@@ -14,6 +14,28 @@ import type { Conversation, UserRole } from '@/lib/types'
  */
 export type InboxChip = 'all' | 'mine' | 'open' | 'resolved'
 
+const CHIPS: readonly InboxChip[] = ['all', 'mine', 'open', 'resolved']
+
+/**
+ * The chips a staff inbox offers, in the order they narrow.
+ *
+ * `mine` only while assignment is on. In a Shared queue nobody holds a thread,
+ * so a chip asking which ones are yours would answer with whatever somebody
+ * held before the switch — true of the data and meaningless to the person.
+ */
+export function inboxChips(supportAssignment: boolean): InboxChip[] {
+  return supportAssignment ? [...CHIPS] : CHIPS.filter((chip) => chip !== 'mine')
+}
+
+/**
+ * The chip actually in force. One that is not offered — `mine`, left selected
+ * when the switch went off underneath it — reads as `all`, rather than as a
+ * filter nobody can see narrowing the list.
+ */
+export function activeInboxChip(chip: InboxChip, supportAssignment: boolean): InboxChip {
+  return inboxChips(supportAssignment).includes(chip) ? chip : 'all'
+}
+
 /**
  * Whether a conversation is done with.
  *

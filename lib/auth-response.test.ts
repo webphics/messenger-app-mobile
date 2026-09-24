@@ -76,6 +76,7 @@ describe("parseSessionUser", () => {
       role: "admin",
       hasPassword: true,
       twoFactorEnabled: false,
+      supportAssignmentEnabled: false,
     });
   });
 
@@ -126,6 +127,34 @@ describe("parseSessionUser", () => {
     });
   });
 
+  /**
+   * The assignment switch, which is server-wide rather than about this person.
+   * It defaults the same way as the account flags and for the same reason:
+   * off is a Shared queue, which offers nobody an Engage the API would refuse.
+   */
+  describe("supportAssignmentEnabled", () => {
+    test.each([
+      ["on", true, true],
+      ["off", false, false],
+      // A session from an API that predates the switch.
+      ["missing", undefined, false],
+      ["a string", "true", false],
+      ["a number", 1, false],
+      ["null", null, false],
+    ])("%s reads as %s", (_label, value, expected) => {
+      const payload = apiUser({ supportAssignmentEnabled: value });
+      if (value === undefined) delete (payload as Record<string, unknown>).supportAssignmentEnabled;
+
+      expect(parseSessionUser(payload)?.supportAssignmentEnabled).toBe(expected);
+    });
+
+    test.each(["admin", "agent", "customer"] as const)("is read for the %s role too", (role) => {
+      expect(
+        parseSessionUser(apiUser({ role, supportAssignmentEnabled: true }))?.supportAssignmentEnabled,
+      ).toBe(true);
+    });
+  });
+
   test.each(["admin", "agent", "customer"] as const)("accepts the %s role", (role) => {
     expect(parseSessionUser(apiUser({ role }))?.role).toBe(role);
   });
@@ -167,6 +196,7 @@ describe("interpretSignIn", () => {
         role: "admin",
         hasPassword: true,
         twoFactorEnabled: false,
+        supportAssignmentEnabled: false,
       },
     });
   });
@@ -331,6 +361,7 @@ describe("interpretSession", () => {
         role: "agent",
         hasPassword: true,
         twoFactorEnabled: false,
+        supportAssignmentEnabled: false,
       },
     });
   });
@@ -421,6 +452,7 @@ describe("interpretMagicLinkVerify", () => {
         role: "customer",
         hasPassword: true,
         twoFactorEnabled: false,
+        supportAssignmentEnabled: false,
       },
     });
   });
@@ -506,6 +538,7 @@ describe("interpretGoogleSignIn", () => {
         role: "customer",
         hasPassword: true,
         twoFactorEnabled: false,
+        supportAssignmentEnabled: false,
       },
     });
   });
@@ -678,6 +711,7 @@ describe("interpretTwoFactorVerify", () => {
         role: "admin",
         hasPassword: true,
         twoFactorEnabled: false,
+        supportAssignmentEnabled: false,
       },
     });
   });

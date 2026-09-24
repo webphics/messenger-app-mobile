@@ -38,6 +38,14 @@ export type SessionUser = {
   hasPassword: boolean
   /** Whether two-factor is on, which is the state the two-factor row reports. */
   twoFactorEnabled: boolean
+  /**
+   * Whether Support DMs are worked by assignment — Engage, Takeover, Transfer,
+   * the Unassigned pool — or as a Shared queue, where any staff member who can
+   * see one answers it. A server-wide switch rather than anything about this
+   * person, sent on every role's session. Read it through
+   * `isSupportAssignmentEnabled` in `lib/support-assignment`.
+   */
+  supportAssignmentEnabled: boolean
 }
 
 /** A mock directory entry. Only the Agent and Admin screens still read this. */

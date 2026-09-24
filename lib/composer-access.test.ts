@@ -13,6 +13,10 @@ const CUSTOMER = { id: 'me', role: 'customer' } as const
 
 const OTHER_AGENT = { id: 'agent-2', name: 'Priya Raman', role: 'agent' as const }
 
+/** Whether Support DMs are worked by assignment. See `lib/support-assignment`. */
+const ASSIGNMENT = true
+const SHARED_QUEUE = false
+
 function staffRow(overrides: Partial<StaffConversation> = {}): Conversation {
   return {
     id: 'conv-1',
@@ -75,25 +79,25 @@ function customerGroupRow(writePolicy: GroupWritePolicy): Conversation {
 describe('composerAccess, on a Support DM', () => {
   test('the agent holding the thread writes in it', () => {
     const mine = staffRow({ assignedAgent: { id: 'me', name: 'Jonah Reed' } })
-    expect(composerAccess(mine, ME)).toEqual({ kind: 'open' })
+    expect(composerAccess(mine, ME, ASSIGNMENT)).toEqual({ kind: 'open' })
   })
 
   test('another agent may read it and is told who has it', () => {
-    expect(composerAccess(staffRow(), ME)).toEqual({
+    expect(composerAccess(staffRow(), ME, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: 'Priya Raman is handling this conversation.',
     })
   })
 
   test('an engaged thread with nobody named still says why it is read-only', () => {
-    expect(composerAccess(staffRow({ assignedAgent: null }), ME)).toEqual({
+    expect(composerAccess(staffRow({ assignedAgent: null }), ME, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: 'Another agent is handling this conversation.',
     })
   })
 
   test('an Admin is offered the Takeover the API would accept from them', () => {
-    expect(composerAccess(staffRow(), ADMIN)).toEqual({
+    expect(composerAccess(staffRow(), ADMIN, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: 'Take over this conversation to reply.',
       action: { kind: 'takeover', label: 'Take over' },
@@ -101,11 +105,11 @@ describe('composerAccess, on a Support DM', () => {
   })
 
   test('an Agent is offered no Takeover, because the API answers theirs 403', () => {
-    expect(composerAccess(staffRow(), ME)).not.toHaveProperty('action')
+    expect(composerAccess(staffRow(), ME, ASSIGNMENT)).not.toHaveProperty('action')
   })
 
   test.each([ME, ADMIN])('either staff role may engage an unassigned thread', (viewer) => {
-    expect(composerAccess(staffRow({ status: 'unassigned', assignedAgent: null }), viewer)).toEqual(
+    expect(composerAccess(staffRow({ status: 'unassigned', assignedAgent: null }), viewer, ASSIGNMENT)).toEqual(
       {
         kind: 'read-only',
         reason: 'Engage this conversation to reply.',
@@ -115,18 +119,66 @@ describe('composerAccess, on a Support DM', () => {
   })
 
   test.each([ME, ADMIN])('a closed thread offers neither role a way in', (viewer) => {
-    expect(composerAccess(staffRow({ status: 'closed', assignedAgent: null }), viewer)).toEqual({
+    expect(composerAccess(staffRow({ status: 'closed', assignedAgent: null }), viewer, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: 'This conversation is closed.',
     })
   })
 
   test('a status the client does not recognise leaves the composer open', () => {
-    expect(composerAccess(staffRow({ status: null }), ME)).toEqual({ kind: 'open' })
+    expect(composerAccess(staffRow({ status: null }), ME, ASSIGNMENT)).toEqual({ kind: 'open' })
   })
 
   test("a Customer writes in their own thread whatever its state, which their payload does not carry", () => {
-    expect(composerAccess(customerRow('support_dm'), CUSTOMER)).toEqual({ kind: 'open' })
+    expect(composerAccess(customerRow('support_dm'), CUSTOMER, ASSIGNMENT)).toEqual({ kind: 'open' })
+  })
+})
+
+/*
+ * Assignment switched off. Nobody holds a Support DM, so the composer is open to
+ * every staff member who can read one until it is closed, and neither action
+ * nor "somebody is handling this" has anything to say.
+ */
+describe('composerAccess, on a Support DM in a Shared queue', () => {
+  test.each([
+    ['an Agent, on a thread nobody engaged', ME, staffRow({ status: 'unassigned', assignedAgent: null })],
+    ['an Admin, on a thread nobody engaged', ADMIN, staffRow({ status: 'unassigned', assignedAgent: null })],
+    ['an Agent, on a thread somebody else engaged before the switch', ME, staffRow()],
+    ['an Admin, on a thread somebody else engaged before the switch', ADMIN, staffRow()],
+    [
+      'the Agent who engaged it before the switch',
+      ME,
+      staffRow({ assignedAgent: { id: 'me', name: 'Jonah Reed' } }),
+    ],
+    ['an Agent, on a thread with no status', ME, staffRow({ status: null })],
+  ])('%s writes in it', (_case, viewer, conversation) => {
+    expect(composerAccess(conversation, viewer, SHARED_QUEUE)).toEqual({ kind: 'open' })
+  })
+
+  test.each([ME, ADMIN])('a closed thread is still read-only, and offers nothing', (viewer) => {
+    expect(composerAccess(staffRow({ status: 'closed', assignedAgent: null }), viewer, SHARED_QUEUE)).toEqual({
+      kind: 'read-only',
+      reason: 'This conversation is closed.',
+    })
+  })
+
+  test('a Customer writes in their own thread exactly as before', () => {
+    expect(composerAccess(customerRow('support_dm'), CUSTOMER, SHARED_QUEUE)).toEqual({ kind: 'open' })
+  })
+
+  test('announcements stay read-only, which has nothing to do with assignment', () => {
+    const announcements = staffRow({ type: 'broadcast_inbox', status: null, title: 'Announcements' })
+    expect(composerAccess(announcements, ADMIN, SHARED_QUEUE)).toEqual({
+      kind: 'read-only',
+      reason: 'Announcements are posted by the team.',
+    })
+  })
+
+  test('a Group locked by its policy stays locked', () => {
+    expect(composerAccess(customerGroupRow('admins'), CUSTOMER, SHARED_QUEUE)).toEqual({
+      kind: 'read-only',
+      reason: "Only this group's admins can send messages here.",
+    })
   })
 })
 
@@ -136,7 +188,7 @@ describe('composerAccess, on the other conversation types', () => {
     ['a staff group', staffRow({ type: 'group', status: null, title: 'QA Group' })],
     ["a Customer's group", customerRow('group')],
   ])('%s is writable by whoever the API sent it to', (_case, conversation) => {
-    expect(composerAccess(conversation, ME)).toEqual({ kind: 'open' })
+    expect(composerAccess(conversation, ME, ASSIGNMENT)).toEqual({ kind: 'open' })
   })
 
   /*
@@ -158,7 +210,7 @@ describe('composerAccess, on the other conversation types', () => {
     ['an Admin', staffRow({ type: 'broadcast_inbox', status: null, title: 'Announcements' }), ADMIN],
     ['a Customer', customerRow('broadcast_inbox'), CUSTOMER],
   ])('%s receives announcements rather than posting in them', (_case, conversation, viewer) => {
-    expect(composerAccess(conversation, viewer)).toEqual({
+    expect(composerAccess(conversation, viewer, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: 'Announcements are posted by the team.',
     })
@@ -167,14 +219,14 @@ describe('composerAccess, on the other conversation types', () => {
 
 describe("composerAccess, on a Group the viewer's own read model locks", () => {
   test('an admins-only Group says so, in its own words', () => {
-    expect(composerAccess(customerGroupRow('admins'), CUSTOMER)).toEqual({
+    expect(composerAccess(customerGroupRow('admins'), CUSTOMER, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: "Only this group's admins can send messages here.",
     })
   })
 
   test('a named-writers Group the viewer is not one of says so, in its own words', () => {
-    expect(composerAccess(customerGroupRow('named'), CUSTOMER)).toEqual({
+    expect(composerAccess(customerGroupRow('named'), CUSTOMER, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: 'Only the members chosen for this group can send messages here.',
     })
@@ -184,14 +236,14 @@ describe("composerAccess, on a Group the viewer's own read model locks", () => {
     // Should not happen from a real payload -- the API resolves `canWrite` against
     // `everyone` as always true -- but a `false` reaching here picks the safer of
     // the two wordings rather than guessing.
-    expect(composerAccess(customerGroupRow('everyone'), CUSTOMER)).toEqual({
+    expect(composerAccess(customerGroupRow('everyone'), CUSTOMER, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: "Only this group's admins can send messages here.",
     })
   })
 
   test('a Group the viewer may write in is unchanged', () => {
-    expect(composerAccess(customerRow('group'), CUSTOMER)).toEqual({ kind: 'open' })
+    expect(composerAccess(customerRow('group'), CUSTOMER, ASSIGNMENT)).toEqual({ kind: 'open' })
   })
 
   /*
@@ -202,6 +254,6 @@ describe("composerAccess, on a Group the viewer's own read model locks", () => {
    */
   test('staff writes through a policy that locks a Customer, because the read model says so', () => {
     const locked = staffRow({ type: 'group', status: null, writePolicy: 'admins', canWrite: true })
-    expect(composerAccess(locked, ME)).toEqual({ kind: 'open' })
+    expect(composerAccess(locked, ME, ASSIGNMENT)).toEqual({ kind: 'open' })
   })
 })

@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatDetailsHref } from "@/lib/chat-route-id";
+import { supportStatusLabel } from "@/lib/conversation-details";
 import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
 import { initials } from "@/lib/display";
 import { colors } from "@/lib/tokens";
@@ -16,6 +17,8 @@ type ThreadHeaderProps = {
   conversation: Conversation;
   /** Names a Customer's own support thread, which carries no title of its own. */
   organizationNames?: ReadonlyMap<string, string>;
+  /** Whether Support DMs are worked by assignment. See `lib/support-assignment`. */
+  supportAssignment: boolean;
 };
 
 /**
@@ -24,20 +27,24 @@ type ThreadHeaderProps = {
  * Staff-only, and null for everyone else: assignment is internal, and a
  * Customer's payload does not carry it — which is the point, not an omission to
  * work around. Closed reads as Resolved because that is the word the product
- * uses for a thread that is done with.
+ * uses for a thread that is done with. In a Shared queue there is no assignment
+ * to show, so every live thread is Open. The words are `supportStatusLabel`'s,
+ * shared with Conversation details one tap away.
  */
 function statusPill(
   conversation: Conversation,
+  supportAssignment: boolean,
 ): { label: string; style: string; textStyle: string } | null {
   if (!isStaffConversation(conversation) || conversation.status === null) return null;
 
+  const label = supportStatusLabel(conversation.status, supportAssignment);
   if (conversation.status === "closed") {
-    return { label: "Resolved", style: "bg-success/15", textStyle: "text-success" };
+    return { label, style: "bg-success/15", textStyle: "text-success" };
   }
-  if (conversation.status === "unassigned") {
-    return { label: "Unassigned", style: "bg-amber/15", textStyle: "text-amber" };
+  if (conversation.status === "unassigned" && supportAssignment) {
+    return { label, style: "bg-amber/15", textStyle: "text-amber" };
   }
-  return { label: "Assigned", style: "bg-primary-soft", textStyle: "text-primary" };
+  return { label, style: "bg-primary-soft", textStyle: "text-primary" };
 }
 
 function memberCount(conversation: Conversation): number | null {
@@ -48,7 +55,11 @@ function memberCount(conversation: Conversation): number | null {
   return conversation.members.length;
 }
 
-export function ThreadHeader({ conversation, organizationNames }: ThreadHeaderProps) {
+export function ThreadHeader({
+  conversation,
+  organizationNames,
+  supportAssignment,
+}: ThreadHeaderProps) {
   const title = conversationTitle(conversation, organizationNames);
   const peer = conversationPeer(conversation);
   const participants = memberCount(conversation);
@@ -59,7 +70,7 @@ export function ThreadHeader({ conversation, organizationNames }: ThreadHeaderPr
       : online
         ? "Active now"
         : "";
-  const pill = statusPill(conversation);
+  const pill = statusPill(conversation, supportAssignment);
 
   return (
     <View className="h-12 min-w-0 flex-1 flex-row items-center gap-2.5 pr-2">

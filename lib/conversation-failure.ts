@@ -2,6 +2,11 @@ import type { ApiFailure } from '@/lib/conversation-api'
 
 export type FailureNotice = { title: string; hint: string }
 
+/** The API's code for an Engage, Takeover or Transfer while assignment is off. */
+const SUPPORT_ASSIGNMENT_DISABLED = 'support_assignment_disabled'
+const ASSIGNMENT_SWITCHED_OFF =
+  'Assignment has been switched off, so anyone on the team can reply here. Restart the app to start replying.'
+
 /**
  * What to put on screen when a conversation request failed.
  *
@@ -75,12 +80,19 @@ export function readRefusal(failure: ApiFailure): string | null {
  * An expired session is the one failure with nothing to say here. The auth layer
  * is already on its way to sign-in, and a sentence about engaging would arrive on
  * a screen that is leaving.
+ *
+ * The one refusal not repeated verbatim is `support_assignment_disabled`: the
+ * switch went off after this session last read it, so the button was offered
+ * by a client that did not know yet — and will go on offering it, since the
+ * session is only read again at launch. So the sentence says what changed and
+ * the one thing that brings the composer back.
  */
 export function assignmentRefusal(failure: ApiFailure): string | null {
   switch (failure.kind) {
     case 'unreachable':
       return 'Could not reach the server. Check your connection and try again.'
     case 'refused':
+      if (failure.code === SUPPORT_ASSIGNMENT_DISABLED) return ASSIGNMENT_SWITCHED_OFF
       return failure.message
     case 'malformed':
       return 'The server answered with something this app did not understand.'
