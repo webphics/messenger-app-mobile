@@ -508,6 +508,13 @@ export type AnalyticsSnapshot = {
   unassigned: number
   engaged: number
   closed: number
+  /**
+   * Support DMs not closed, and of those, the ones whose latest message came
+   * from the Customer. Both answered in either mode, and both null rather than
+   * zero from an API that predates them: unknown is not the same as none.
+   */
+  open: number | null
+  awaitingReply: number | null
   groups: number
   users: AnalyticsUserCounts
 }

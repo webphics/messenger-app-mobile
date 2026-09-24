@@ -14,6 +14,7 @@ import { getSessionUser } from "@/lib/session";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { listUsers } from "@/lib/user-api";
+import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { userDisplayName } from "@/lib/user-directory";
 import type { ManagedUser, OrganizationMember } from "@/lib/types";
 
@@ -58,6 +59,9 @@ export function OrganizationMembersScreen({
   organizationId: string;
 }) {
   const viewer = getSessionUser();
+  // A Shared queue holds nothing on anybody's behalf, so there is nothing of
+  // theirs to reassign and the warning does not claim there is.
+  const supportAssignment = useSupportAssignment();
   const [state, setState] = useState<MembersState>({ status: "loading" });
   const [directory, setDirectory] = useState<ManagedUser[]>([]);
   const [query, setQuery] = useState("");
@@ -159,7 +163,9 @@ export function OrganizationMembersScreen({
     (member: OrganizationMember) => {
       Alert.alert(
         `Remove ${member.name}?`,
-        "They lose access to this organization's conversations, and anything assigned to them is reassigned.",
+        supportAssignment
+          ? "They lose access to this organization's conversations, and anything assigned to them is reassigned."
+          : "They lose access to this organization's conversations.",
         [
           { text: "Cancel", style: "cancel" },
           {
@@ -170,7 +176,7 @@ export function OrganizationMembersScreen({
         ],
       );
     },
-    [remove],
+    [remove, supportAssignment],
   );
 
   const renderItem = useCallback(

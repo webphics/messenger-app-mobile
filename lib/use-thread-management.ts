@@ -6,6 +6,8 @@ import {
   transferConversation,
 } from '@/lib/conversation-api'
 import type { ApiFailure } from '@/lib/api-result'
+import { useAuth } from '@/lib/auth-context'
+import { assignmentRefusal, assignmentSwitchedOff } from '@/lib/conversation-failure'
 import { transferCandidates } from '@/lib/thread-actions'
 import type { Conversation, StaffDirectoryUser } from '@/lib/types'
 
@@ -66,6 +68,7 @@ export function useThreadManagement(
   const [candidatesFailed, setCandidatesFailed] = useState(false)
   const [pending, setPending] = useState<'transfer' | 'close' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { reconfirmSession } = useAuth()
 
   /** Which thread the answers coming back belong to. */
   const onScreen = useRef<string | null>(conversationId)
@@ -120,15 +123,25 @@ export function useThreadManagement(
     setError(null)
 
     void transferConversation(id, agentId).then((result) => {
+      // A Transfer is refused like an Engage when assignment went off under
+      // this session, and re-reading the session is what takes it away. Before
+      // the on-screen check, because the session is stale wherever they went.
+      const switchedOff = !result.ok && assignmentSwitchedOff(result.failure)
+      if (switchedOff) reconfirmSession()
+
       if (onScreen.current !== id) return
       setPending(null)
       if (result.ok) {
         notify.current(result.value)
         return
       }
-      setError(refusal(result.failure, 'The conversation could not be transferred.'))
+      setError(
+        switchedOff
+          ? assignmentRefusal(result.failure)
+          : refusal(result.failure, 'The conversation could not be transferred.'),
+      )
     })
-  }, [])
+  }, [reconfirmSession])
 
   const close = useCallback(() => {
     const id = onScreen.current

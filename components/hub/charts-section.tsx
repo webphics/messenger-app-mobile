@@ -10,7 +10,7 @@ import { CHART_CARD_MIN_HEIGHT, ChartCard } from "@/components/hub/chart-card";
 import { Text } from "@/components/ui/text";
 import { chartHref } from "@/lib/hub-routes";
 import { offerCardMetrics } from "@/lib/offer-metrics";
-import { useAnalytics } from "@/lib/use-analytics";
+import type { AnalyticsView } from "@/lib/use-analytics";
 
 /**
  * The Admin Hub's charts, drawn from `GET /analytics/overview`.
@@ -18,6 +18,10 @@ import { useAnalytics } from "@/lib/use-analytics";
  * What it reads is `lib/use-analytics`; which charts an overview becomes is
  * `lib/analytics-charts`. This is only the strip they are laid out in, and it
  * shares its metrics with the Hub's other carousel so the two scroll alike.
+ *
+ * Handed the read rather than making it, because the Hub draws a number from
+ * the same overview (Awaiting reply) and two reads of one fact on two clocks
+ * would be a request to disagree with itself.
  *
  * Nothing at all when the read failed with nothing behind it — a heading over an
  * empty strip reads as a section that broke, and the Hub is not where a request
@@ -41,10 +45,12 @@ function LoadingCard({ cardWidth }: { cardWidth: number }) {
   );
 }
 
-export function ChartsSection() {
+export function ChartsSection({
+  status,
+  charts,
+}: Pick<AnalyticsView, "status" | "charts">) {
   const { width } = useWindowDimensions();
   const { cardWidth, snap, gap, edgePad } = offerCardMetrics(width);
-  const { status, charts } = useAnalytics();
   const scrollX = useSharedValue(0);
 
   const onScroll = useAnimatedScrollHandler({

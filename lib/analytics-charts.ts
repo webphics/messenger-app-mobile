@@ -1,4 +1,10 @@
-import type { AnalyticsOverview, AnalyticsSeriesPoint, ChartMetric } from '@/lib/types'
+import type {
+  AnalyticsOverview,
+  AnalyticsSeriesPoint,
+  AnalyticsSnapshot,
+  ChartMetric,
+  ChartSlice,
+} from '@/lib/types'
 
 /**
  * One analytics overview, as the cards the Admin Hub already draws.
@@ -65,11 +71,42 @@ function messagesSent(series: readonly AnalyticsSeriesPoint[]): number[] {
   return series.map(point => point.messagesSent)
 }
 
-export function analyticsCharts(overview: AnalyticsOverview): ChartMetric[] {
+/**
+ * The Queue mix in whichever mode the desk is running.
+ *
+ * With assignment on, a Support DM is Unassigned, Engaged or Closed, and the
+ * three are the whole. A Shared queue has no holder, so the first two are not
+ * two states of anything there — they are one, Open (`CONTEXT.md`). `open` is
+ * the API's own count of it; an API that predates the field is answered with
+ * the sum it replaced, which is the same set of threads counted in two parts.
+ */
+function queueSlices(snapshot: AnalyticsSnapshot, supportAssignment: boolean): ChartSlice[] {
+  if (supportAssignment) {
+    return [
+      { label: 'Unassigned', value: snapshot.unassigned },
+      { label: 'Engaged', value: snapshot.engaged },
+      { label: 'Closed', value: snapshot.closed },
+    ]
+  }
+  return [
+    { label: 'Open', value: snapshot.open ?? snapshot.unassigned + snapshot.engaged },
+    { label: 'Closed', value: snapshot.closed },
+  ]
+}
+
+/**
+ * `supportAssignment` is `isSupportAssignmentEnabled` for the viewer, handed in
+ * rather than read here, as every other pure rule that depends on it is.
+ */
+export function analyticsCharts(
+  overview: AnalyticsOverview,
+  supportAssignment: boolean,
+): ChartMetric[] {
   const { series, snapshot, resolution } = overview
   const opened = conversationsOpened(series)
   const messages = messagesSent(series)
   const { admin, agent, customer } = snapshot.users
+  const queue = queueSlices(snapshot, supportAssignment)
 
   return [
     {
@@ -99,15 +136,11 @@ export function analyticsCharts(overview: AnalyticsOverview): ChartMetric[] {
       id: 'queue-mix',
       title: 'Queue mix',
       hint: 'Support conversations right now, by where they stand.',
-      value: String(snapshot.unassigned + snapshot.engaged + snapshot.closed),
+      value: String(total(queue.map(slice => slice.value))),
       deltaLabel: `${snapshot.groups} ${snapshot.groups === 1 ? 'group' : 'groups'}`,
       kind: 'pie',
-      series: [snapshot.unassigned, snapshot.engaged, snapshot.closed],
-      slices: [
-        { label: 'Unassigned', value: snapshot.unassigned },
-        { label: 'Engaged', value: snapshot.engaged },
-        { label: 'Closed', value: snapshot.closed },
-      ],
+      series: queue.map(slice => slice.value),
+      slices: queue,
     },
     {
       /*

@@ -188,6 +188,34 @@ describe("confirming a Stale session", () => {
   });
 });
 
+/**
+ * A session re-read because something the API answered said this device's copy
+ * of the person was out of date — assignment switched off under it. The flag is
+ * the field that moves, so the rows are about the flag.
+ */
+describe("re-reading a session already in use", () => {
+  const ASSIGNING: SessionUser = { ...AGENT, supportAssignmentEnabled: true };
+  const SHARED: SessionUser = { ...AGENT, supportAssignmentEnabled: false };
+
+  test.each([
+    ["confirmed, assignment switched off", { status: "signed-in", user: ASSIGNING, stale: false }, SHARED],
+    ["confirmed, assignment switched on", { status: "signed-in", user: SHARED, stale: false }, ASSIGNING],
+    ["Stale, which the answer confirms", { status: "signed-in", user: ASSIGNING, stale: true }, SHARED],
+  ] as const)("replaces the person on a %s session", (_label, before, user) => {
+    expect(authTransition(before, { type: "reconfirmed", user })).toEqual({
+      status: "signed-in",
+      user,
+      stale: false,
+    });
+  });
+
+  test("does nothing anywhere but signed-in", () => {
+    for (const state of EVERY_STATE.filter((s) => s.status !== "signed-in")) {
+      expect(authTransition(state, { type: "reconfirmed", user: SHARED })).toBe(state);
+    }
+  });
+});
+
 describe("submitting", () => {
   test("a submit from the sign-in screen starts a request", () => {
     expect(authTransition(SIGNED_OUT, { type: "submit" })).toEqual(SUBMITTING);
@@ -471,6 +499,7 @@ describe("as a whole", () => {
     { type: "cancel-challenge" },
     { type: "challenge-lapsed" },
     { type: "account-updated", user: CUSTOMER },
+    { type: "reconfirmed", user: CUSTOMER },
   ];
 
   test("every state/event pair lands on a state, and none mutates its input", () => {

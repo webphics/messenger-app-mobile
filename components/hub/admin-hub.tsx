@@ -24,6 +24,7 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
 // import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
 import { getSessionUser } from "@/lib/session";
+import { useAnalytics } from "@/lib/use-analytics";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { colors } from "@/lib/tokens";
 
@@ -46,8 +47,16 @@ export function AdminHub() {
    * worth waking up to, which the mock user count that stood here never was.
    */
   const unassigned = counted ? listUnassignedConversations(counted).length : null;
-  // No pool in a Shared queue, so no tile counting it; Conversations stands alone.
+  // No pool in a Shared queue, so no tile counting it.
   const supportAssignment = useSupportAssignment();
+  /*
+   * Read once here and handed to the carousel, because the tile below draws
+   * from the same overview. Awaiting reply is the API's count rather than the
+   * list's: which message came last is not something every row this device
+   * holds can say, and the question means the same thing in both modes.
+   */
+  const analytics = useAnalytics();
+  const { awaitingReply } = analytics;
 
   return (
     <HubScroll>
@@ -77,7 +86,7 @@ export function AdminHub() {
             <Pill label="Operational" tone="success" dot />
           </View>
 
-          <View className="mt-3 flex-row items-center justify-between gap-3">
+          <View className="mt-3 flex-row gap-3">
             {supportAssignment ? (
               <StatTile
                 value={unassigned === null ? PENDING_COUNT : String(unassigned)}
@@ -88,6 +97,16 @@ export function AdminHub() {
                 onPress={() => router.navigate("/(admin)/unassigned" as Href)}
               />
             ) : null}
+            {/* Where Unassigned sits when there is no pool: the first thing
+                worth waking up to in a Shared queue. */}
+            <StatTile
+              value={awaitingReply === null ? PENDING_COUNT : String(awaitingReply)}
+              label="Awaiting reply"
+              tone="primary"
+              alert={awaitingReply !== null && awaitingReply > 0}
+              accessibilityLabel="Conversations awaiting a reply"
+              onPress={() => router.navigate("/(admin)/conversations" as Href)}
+            />
             <StatTile
               value={counted === null ? PENDING_COUNT : String(counted.length)}
               label="Conversations"
@@ -145,7 +164,7 @@ export function AdminHub() {
       </View>
 
       {/* Analytics & Charts Carousel */}
-      <ChartsSection />
+      <ChartsSection status={analytics.status} charts={analytics.charts} />
 
       {/* Administration — the org-wide settings, as opposed to any one thread */}
       <View className="mt-5 gap-3 px-4">

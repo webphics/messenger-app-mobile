@@ -16,7 +16,9 @@ import type { AnalyticsOverview } from '@/lib/types'
  * right now, and the Hub already has those numbers without a request: the
  * Unassigned and Conversations tiles count the conversation list this device is
  * holding anyway (`components/hub/admin-hub`). A second read of the same fact on
- * its own clock would be a request to disagree with the tile above it.
+ * its own clock would be a request to disagree with the tile above it. The
+ * Awaiting reply tile is the exception and reads this overview's snapshot, since
+ * whose message came last is the API's to count, not the list's.
  */
 
 /**

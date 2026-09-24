@@ -116,6 +116,17 @@ type AuthContextValue = {
    */
   confirmStaleSession: () => void;
   /**
+   * Ask the API who this is again, whether or not this session is Stale.
+   *
+   * For the moment something the API answered says this device's copy of the
+   * person is out of date — a refusal naming the assignment switch
+   * (`assignmentSwitchedOff`). The switch is read off the session, so a screen
+   * reading it (`useSupportAssignment`) moves once the answer lands, without a
+   * restart. Shares `confirmStaleSession`'s guard, so it is never a second
+   * question while one is already out.
+   */
+  reconfirmSession: () => void;
+  /**
    * Write the caller's own name and phone, and replace the signed-in person
    * with whoever the API says they are afterwards.
    *
@@ -193,6 +204,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // still unconfirmed, still drawing what this device holds.
         if (outcome?.kind === "signed-in") {
           dispatch({ type: "confirmed", user: outcome.user });
+        }
+      })
+      .finally(() => {
+        confirming.current = false;
+      });
+  }, []);
+
+  const reconfirmSession = useCallback(() => {
+    if (confirming.current) return;
+    confirming.current = true;
+
+    void confirmSession()
+      .then((outcome) => {
+        // A refusal is already announced by the expiry listener, and anything
+        // else leaves the person as they were, which is no worse than before.
+        if (outcome?.kind === "signed-in") {
+          dispatch({ type: "reconfirmed", user: outcome.user });
         }
       })
       .finally(() => {
@@ -426,6 +454,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       retry,
       confirmStaleSession,
+      reconfirmSession,
       saveProfile,
     }),
     [
@@ -440,6 +469,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       retry,
       confirmStaleSession,
+      reconfirmSession,
       saveProfile,
     ],
   );

@@ -268,6 +268,12 @@ A Support DM that is not closed. Not a synonym for Unassigned: a thread somebody
 The only live state a Shared queue shows, since it has no holder to show.
 _Avoid_: Active, pending, Unassigned
 
+**Awaiting reply**:
+An Open Support DM whose latest message came from the Customer — the one the team owes an answer.
+Counted by the API in either mode, and the Admin Hub's first tile in a Shared queue, where no pool
+stands in front of it.
+_Avoid_: Unanswered, pending, Unassigned
+
 **Shared queue**:
 The way Support DMs are worked while assignment is switched off: every staff member who can see a
 Support DM may answer it, and nobody holds it. Engage, Takeover, Transfer, the Unassigned pool and
@@ -409,7 +415,8 @@ and messages sent per day over the API's default thirty UTC days, the queue's cu
 against closed for the range, and every account by role. A tap opens that one chart full-screen,
 where pull-to-refresh re-reads the overview. Staff-only server-side; absent entirely when the read
 failed with nothing already drawn. **Opened and closed are never drawn as one whole** — the API
-permits `closed` to exceed `opened` when a team works down a backlog.
+permits `closed` to exceed `opened` when a team works down a backlog. In a Shared queue the queue
+mix is Open against Closed, since Unassigned and Engaged are not two states of anything there.
 _Avoid_: Dashboard, metrics, reports, KPIs
 
 **Latest on the Wall**:
