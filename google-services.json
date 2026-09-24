@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "753090717715",
+    "project_id": "messenger-app-508309",
+    "storage_bucket": "messenger-app-508309.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753090717715:android:e6e166cba81e8642e2b7e6",
+        "android_client_info": {
+          "package_name": "com.zeestglobal.joychat"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753090717715-vtk6in9mcbhfjsls3v60qlk6f5h5bc83.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzqPxxbFQZNaFuggaVMDezPwVcDQno1O4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753090717715-vtk6in9mcbhfjsls3v60qlk6f5h5bc83.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
