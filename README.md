@@ -162,6 +162,8 @@ rather than the browser subscription route beside it.
 
 The iOS IPA will not install via TestFlight or the App Store. Sideload it with AltStore or Sideloadly; on a free Apple ID the signature expires after 7 days. A signed build needs a paid Apple Developer account, at which point iOS should move to EAS too.
 
+The release APK is `arm64-v8a` only — right for a phone, and it crashes on launch on an x86_64 emulator. For an emulator use `pnpm build:apk:emulator` (the `emulator` EAS profile: production plus `x86_64`) or `pnpm build:apk`, which builds both ABIs by default.
+
 `pnpm build:apk` still builds an APK locally on Windows (needs JDK 17 + Android SDK) and is the escape hatch when the EAS quota runs out.
 
 ### Native configuration

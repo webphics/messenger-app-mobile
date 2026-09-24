@@ -28,12 +28,23 @@
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "753090717715-vtk6in9mcbhfjsls3v60qlk6f5h5bc83.apps.googleusercontent.com"
       }
     },
+    "emulator": {
+      "extends": "production",
+      "android": {
+        "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a,x86_64",
+        "applicationArchivePath": "android/app/build/outputs/apk/release/app-release.apk"
+      }
+    },
     "production": {
       "distribution": "internal",
       "credentialsSource": "local",
       "android": {
         "gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a",
         "applicationArchivePath": "android/app/build/outputs/apk/release/app-release.apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "753090717715-vtk6in9mcbhfjsls3v60qlk6f5h5bc83.apps.googleusercontent.com"
       }
     }
   }
