@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useFocusEffect } from 'expo-router'
 
 import { getAnalyticsOverview } from '@/lib/analytics-api'
 import { analyticsCharts } from '@/lib/analytics-charts'
 import { useAuth } from '@/lib/auth-context'
-import type { ChartMetric } from '@/lib/types'
+import type { AnalyticsOverview, ChartMetric } from '@/lib/types'
+import { useSupportAssignment } from '@/lib/use-support-assignment'
 
 /**
  * The Admin Hub's charts, read from `GET /analytics/overview`.
@@ -25,12 +26,22 @@ import type { ChartMetric } from '@/lib/types'
  * request — the screen it replaced ran `useSimulatedRefresh(() => {})`, a
  * spinner over a function that did nothing, which was honest only while the
  * numbers underneath it were invented.
+ *
+ * The overview is held and the charts derived from it, rather than mapped once
+ * on arrival, because which charts it becomes depends on the Shared queue
+ * switch — and that can move under a Hub already drawn, when a session is
+ * re-read, without anything being fetched again.
  */
 
 export type AnalyticsView = {
   status: 'loading' | 'ready' | 'unavailable'
   /** Every chart the overview produced, empty until one has been read. */
   charts: ChartMetric[]
+  /**
+   * Open Support DMs whose latest message is the Customer's, right now. Null
+   * until an overview has been read, and from an API that does not send it.
+   */
+  awaitingReply: number | null
   /** True while a pull-to-refresh is in flight, never for the first read. */
   refreshing: boolean
   refresh: () => void
@@ -41,7 +52,8 @@ export function useAnalytics(): AnalyticsView {
   const signedIn = state.status === 'signed-in'
 
   const [status, setStatus] = useState<AnalyticsView['status']>('loading')
-  const [charts, setCharts] = useState<ChartMetric[]>([])
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
+  const supportAssignment = useSupportAssignment()
   const [refreshing, setRefreshing] = useState(false)
 
   /**
@@ -57,7 +69,7 @@ export function useAnalytics(): AnalyticsView {
     if (id !== readId.current) return
 
     if (result.ok) {
-      setCharts(analyticsCharts(result.value))
+      setOverview(result.value)
       setStatus('ready')
       return
     }
@@ -70,7 +82,7 @@ export function useAnalytics(): AnalyticsView {
     useCallback(() => {
       if (!signedIn) {
         setStatus('loading')
-        setCharts([])
+        setOverview(null)
         return
       }
 
@@ -87,5 +99,11 @@ export function useAnalytics(): AnalyticsView {
     void read().finally(() => setRefreshing(false))
   }, [signedIn, read])
 
-  return { status, charts, refreshing, refresh }
+  const charts = useMemo(
+    () => (overview ? analyticsCharts(overview, supportAssignment) : []),
+    [overview, supportAssignment],
+  )
+  const awaitingReply = overview?.snapshot.awaitingReply ?? null
+
+  return { status, charts, awaitingReply, refreshing, refresh }
 }

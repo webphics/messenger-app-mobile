@@ -7,6 +7,8 @@ function payload(patch: Record<string, unknown> = {}) {
       unassigned: 2,
       engaged: 5,
       closed: 9,
+      open: 7,
+      awaitingReply: 3,
       groups: 3,
       users: { admin: 1, agent: 4, customer: 25 },
     },
@@ -51,6 +53,23 @@ describe('parseAnalyticsOverview', () => {
     ['range', { range: { from: '2026-08-21T00:00:00.000Z' } }],
   ])('refuses the whole overview when %s is incomplete, rather than zeroing it', (_l, patch) => {
     expect(parseAnalyticsOverview(payload(patch))).toBeNull()
+  })
+
+  /**
+   * `open` and `awaitingReply` arrived after the rest of the snapshot, so an API
+   * that predates them is not an unreadable one. Unknown is null, never zero,
+   * and the overview around it still draws.
+   */
+  it.each([
+    ['both missing, from an API that predates them', {}, { open: null, awaitingReply: null }],
+    ['open alone missing', { awaitingReply: 3 }, { open: null, awaitingReply: 3 }],
+    ['awaitingReply alone missing', { open: 7 }, { open: 7, awaitingReply: null }],
+    ['both unreadable', { open: '7', awaitingReply: -1 }, { open: null, awaitingReply: null }],
+    ['both really zero', { open: 0, awaitingReply: 0 }, { open: 0, awaitingReply: 0 }],
+  ])('reads the later snapshot counts with %s', (_label, fields, expected) => {
+    const base = { unassigned: 2, engaged: 5, closed: 9, groups: 3, users: { admin: 1, agent: 4, customer: 25 } }
+    const parsed = parseAnalyticsOverview(payload({ snapshot: { ...base, ...fields } }))
+    expect(parsed?.snapshot).toEqual({ ...base, ...expected })
   })
 
   it('refuses a body that is not an envelope payload', () => {

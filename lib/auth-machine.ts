@@ -118,6 +118,17 @@ export type AuthEvent =
    */
   | { type: "confirmed"; user: SessionUser }
   /**
+   * The API was asked again about a session already in use, because something
+   * it answered said this device's copy of the person is out of date — today,
+   * a refusal saying assignment has been switched off.
+   *
+   * Separate from `confirmed` because that one applies only to a Stale session
+   * and this applies to either: the point is to replace a person nobody doubted.
+   * Separate from `account-updated` because this *is* a verification — the
+   * session endpoint answered — so a Stale one stops being Stale.
+   */
+  | { type: "reconfirmed"; user: SessionUser }
+  /**
    * An account screen wrote something about this person, and this is who the API
    * says they now are.
    *
@@ -345,6 +356,13 @@ export function authTransition(state: AuthState, event: AuthEvent): AuthState {
     // a response that outlived its request.
     case "confirmed":
       return state.status === "signed-in" && state.stale
+        ? { status: "signed-in", user: event.user, stale: false }
+        : state;
+
+    // Any signed-in session, and nowhere else: an answer landing after a
+    // sign-out or an expiry must not sign anybody back in.
+    case "reconfirmed":
+      return state.status === "signed-in"
         ? { status: "signed-in", user: event.user, stale: false }
         : state;
 

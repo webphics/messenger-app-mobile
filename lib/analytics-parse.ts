@@ -24,7 +24,10 @@ import type {
  *
  * A day in `series` is the exception, and only within itself: a point missing
  * either of its two counts is dropped from the series rather than failing the
- * whole overview, exactly as one unreadable Post does not empty a Wall.
+ * whole overview, exactly as one unreadable Post does not empty a Wall. The
+ * snapshot's `open` and `awaitingReply` are the other: they arrived after the
+ * rest, so one missing or unreadable is null — unknown, never zero — and the
+ * overview around it still draws.
  */
 
 function count(value: unknown): number | null {
@@ -64,7 +67,13 @@ function parseSnapshot(data: unknown): AnalyticsSnapshot | null {
     return null
   }
 
-  return { unassigned, engaged, closed, groups, users }
+  // Later additions, so not required: an API that predates them, or sends one
+  // this client cannot read, leaves it unknown rather than refusing the whole
+  // overview — the rule a day in `series` follows, applied to one field.
+  const open = count(record.open)
+  const awaitingReply = count(record.awaitingReply)
+
+  return { unassigned, engaged, closed, open, awaitingReply, groups, users }
 }
 
 function parseResolution(data: unknown): AnalyticsResolution | null {

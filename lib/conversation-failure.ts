@@ -5,7 +5,20 @@ export type FailureNotice = { title: string; hint: string }
 /** The API's code for an Engage, Takeover or Transfer while assignment is off. */
 const SUPPORT_ASSIGNMENT_DISABLED = 'support_assignment_disabled'
 const ASSIGNMENT_SWITCHED_OFF =
-  'Assignment has been switched off, so anyone on the team can reply here. Restart the app to start replying.'
+  'Assignment has been switched off, so anyone on the team can reply here.'
+
+/**
+ * Whether a refusal says assignment was switched off after this session read it.
+ *
+ * The one refusal that is about this device rather than the request: the
+ * switch is read off the session, and the session is otherwise read again only
+ * at launch or while Stale. So a caller seeing true re-reads the session
+ * (`reconfirmSession` in `lib/auth-context`), which is what moves the screens
+ * to the Shared queue without a restart.
+ */
+export function assignmentSwitchedOff(failure: ApiFailure): boolean {
+  return failure.kind === 'refused' && failure.code === SUPPORT_ASSIGNMENT_DISABLED
+}
 
 /**
  * What to put on screen when a conversation request failed.
@@ -83,16 +96,16 @@ export function readRefusal(failure: ApiFailure): string | null {
  *
  * The one refusal not repeated verbatim is `support_assignment_disabled`: the
  * switch went off after this session last read it, so the button was offered
- * by a client that did not know yet — and will go on offering it, since the
- * session is only read again at launch. So the sentence says what changed and
- * the one thing that brings the composer back.
+ * by a client that did not know yet. The caller re-reads the session on it
+ * (`assignmentSwitchedOff`), and the composer opens once that lands — so the
+ * sentence says what changed and nothing about what to do.
  */
 export function assignmentRefusal(failure: ApiFailure): string | null {
   switch (failure.kind) {
     case 'unreachable':
       return 'Could not reach the server. Check your connection and try again.'
     case 'refused':
-      if (failure.code === SUPPORT_ASSIGNMENT_DISABLED) return ASSIGNMENT_SWITCHED_OFF
+      if (assignmentSwitchedOff(failure)) return ASSIGNMENT_SWITCHED_OFF
       return failure.message
     case 'malformed':
       return 'The server answered with something this app did not understand.'

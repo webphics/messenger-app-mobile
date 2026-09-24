@@ -1,4 +1,9 @@
-import { assignmentRefusal, failureNotice, readRefusal } from '@/lib/conversation-failure'
+import {
+  assignmentRefusal,
+  assignmentSwitchedOff,
+  failureNotice,
+  readRefusal,
+} from '@/lib/conversation-failure'
 
 describe('failureNotice', () => {
   test('offers a retry for a request that never arrived', () => {
@@ -59,16 +64,14 @@ describe('assignmentRefusal', () => {
     ).toBe('This chat is already engaged.')
   })
 
-  test('assignment switched off since this session read it says so, and what brings the composer back', () => {
+  test('assignment switched off since this session read it says so, and no longer asks for a restart', () => {
     expect(
       assignmentRefusal({
         kind: 'refused',
         message: 'Assignment is switched off; any staff member can reply.',
         code: 'support_assignment_disabled',
       }),
-    ).toBe(
-      'Assignment has been switched off, so anyone on the team can reply here. Restart the app to start replying.',
-    )
+    ).toBe('Assignment has been switched off, so anyone on the team can reply here.')
   })
 
   test('offers the retry a request that never arrived deserves', () => {
@@ -109,5 +112,31 @@ describe('readRefusal', () => {
 
   test('says nothing about an expired session over a thread that is already leaving', () => {
     expect(readRefusal({ kind: 'unauthorised' })).toBeNull()
+  })
+})
+
+describe('assignmentSwitchedOff', () => {
+  test.each([
+    [
+      'the refusal that says the switch moved',
+      { kind: 'refused', message: 'Assignment is switched off.', code: 'support_assignment_disabled' },
+      true,
+    ],
+    [
+      'a lost race, which is about the thread and not the session',
+      { kind: 'refused', message: 'This chat is already engaged.', code: 'already_engaged' },
+      false,
+    ],
+    ['a refusal with no code', { kind: 'refused', message: 'Forbidden.' }, false],
+    [
+      'the code in the words and not the code',
+      { kind: 'refused', message: 'support_assignment_disabled' },
+      false,
+    ],
+    ['a request that never arrived', { kind: 'unreachable' }, false],
+    ['a body it could not read', { kind: 'malformed' }, false],
+    ['an expired session, which the auth layer already handles', { kind: 'unauthorised' }, false],
+  ] as const)('answers whether to re-read the session for %s', (_label, failure, expected) => {
+    expect(assignmentSwitchedOff(failure)).toBe(expected)
   })
 })

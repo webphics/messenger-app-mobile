@@ -6,7 +6,8 @@ import {
   takeOverConversation,
 } from '@/lib/conversation-api'
 import { assignmentPrecheck } from '@/lib/assignment-precheck'
-import { assignmentRefusal } from '@/lib/conversation-failure'
+import { useAuth } from '@/lib/auth-context'
+import { assignmentRefusal, assignmentSwitchedOff } from '@/lib/conversation-failure'
 import type { ComposerAction } from '@/lib/composer-access'
 import type { Conversation } from '@/lib/types'
 
@@ -77,6 +78,7 @@ export function useConversationAssignment(
 ): ConversationAssignment {
   const [assigning, setAssigning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { reconfirmSession } = useAuth()
 
   /**
    * Which thread the answer coming back belongs to. An engage answered after the
@@ -140,6 +142,12 @@ export function useConversationAssignment(
             ? await engageConversation(id)
             : await takeOverConversation(id)
 
+        // The button was offered by a session that did not know the switch
+        // moved. Re-reading it is what takes the button away and opens the
+        // composer — before the on-screen check, because the session is out of
+        // date wherever the person has gone since.
+        if (!result.ok && assignmentSwitchedOff(result.failure)) reconfirmSession()
+
         if (onScreen.current !== id) return
         setAssigning(false)
 
@@ -150,7 +158,7 @@ export function useConversationAssignment(
         setError(assignmentRefusal(result.failure))
       })()
     },
-    [conversationId, viewerId],
+    [conversationId, viewerId, reconfirmSession],
   )
 
   return { assign, assigning, error }
