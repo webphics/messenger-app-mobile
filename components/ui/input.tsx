@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { colors } from '@/lib/tokens';
 import * as React from 'react';
 import { Platform, TextInput } from 'react-native';
 
@@ -27,10 +28,12 @@ const Input = React.forwardRef(function Input(
             'focus-visible:border-primary focus-visible:ring-primary/20 focus-visible:ring-[3px]',
             'aria-invalid:ring-danger/20 aria-invalid:border-danger'
           ),
-          native: 'placeholder:text-muted',
         }),
         className
       )}
+      // Uniwind reads no `placeholder:` variant on native, so the class alone left Android's
+      // default hint color, which is near-white when the phone is in dark mode.
+      placeholderTextColor={colors.muted}
       {...props}
     />
   );
