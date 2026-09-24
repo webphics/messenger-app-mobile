@@ -8,16 +8,57 @@ const ASSIGNMENT_SWITCHED_OFF =
   'Assignment has been switched off, so anyone on the team can reply here.'
 
 /**
- * Whether a refusal says assignment was switched off after this session read it.
- *
- * The one refusal that is about this device rather than the request: the
- * switch is read off the session, and the session is otherwise read again only
- * at launch or while Stale. So a caller seeing true re-reads the session
- * (`reconfirmSession` in `lib/auth-context`), which is what moves the screens
- * to the Shared queue without a restart.
+ * The API's codes for a staff write — a send, an upload, a reaction, an edit —
+ * in a Support DM the writer does not hold while assignment is on
+ * (`ConversationsPolicy.assertCanSend`): nobody holds it, an Admin must take it
+ * over, or another Agent holds it. `already_engaged` is also a lost Engage race,
+ * which is why the set is only read while this device thinks assignment is off.
  */
-export function assignmentSwitchedOff(failure: ApiFailure): boolean {
-  return failure.kind === 'refused' && failure.code === SUPPORT_ASSIGNMENT_DISABLED
+const ASSIGNMENT_REQUIRED = new Set(['must_engage', 'must_take_over', 'already_engaged'])
+const ASSIGNMENT_SWITCHED_ON =
+  'Assignment was switched back on — engage this conversation to reply.'
+
+/**
+ * Whether a refusal says the assignment switch moved after this session read it.
+ *
+ * The refusals that are about this device rather than the request. With the
+ * switch believed on, `support_assignment_disabled` says it went off. With it
+ * believed off, the assignment codes say it came back on — none of them can
+ * arrive in a Shared queue. Anything else, including those same codes while the
+ * switch is believed on, is an ordinary refusal of the request.
+ *
+ * The switch is read off the session, and the session is otherwise read again
+ * only at launch or while Stale. So a caller seeing true re-reads the session
+ * (`reconfirmSession` in `lib/auth-context`), which is what moves the screens
+ * between the two modes without a restart.
+ */
+export function assignmentModeChanged(
+  failure: ApiFailure,
+  supportAssignmentEnabled: boolean,
+): boolean {
+  if (failure.kind !== 'refused' || failure.code === undefined) return false
+  return supportAssignmentEnabled
+    ? failure.code === SUPPORT_ASSIGNMENT_DISABLED
+    : ASSIGNMENT_REQUIRED.has(failure.code)
+}
+
+/**
+ * The sentence a refused write shows when assignment came back on under it, or
+ * null for every other refusal — which keeps whatever its caller already says.
+ *
+ * Only the off-to-on direction has one here: a write refused because the
+ * switch went *off* cannot happen, since a Shared queue refuses no staff member
+ * a write that assignment would have allowed. The API's own sentence ("Engage
+ * this conversation before sending a message.") is not wrong, but it reads as
+ * a rule this person broke rather than a rule that changed under them.
+ */
+export function assignmentSwitchedOnNotice(
+  failure: ApiFailure,
+  supportAssignmentEnabled: boolean,
+): string | null {
+  return !supportAssignmentEnabled && assignmentModeChanged(failure, false)
+    ? ASSIGNMENT_SWITCHED_ON
+    : null
 }
 
 /**
@@ -97,7 +138,7 @@ export function readRefusal(failure: ApiFailure): string | null {
  * The one refusal not repeated verbatim is `support_assignment_disabled`: the
  * switch went off after this session last read it, so the button was offered
  * by a client that did not know yet. The caller re-reads the session on it
- * (`assignmentSwitchedOff`), and the composer opens once that lands — so the
+ * (`assignmentModeChanged`), and the composer opens once that lands — so the
  * sentence says what changed and nothing about what to do.
  */
 export function assignmentRefusal(failure: ApiFailure): string | null {
@@ -105,7 +146,7 @@ export function assignmentRefusal(failure: ApiFailure): string | null {
     case 'unreachable':
       return 'Could not reach the server. Check your connection and try again.'
     case 'refused':
-      if (assignmentSwitchedOff(failure)) return ASSIGNMENT_SWITCHED_OFF
+      if (assignmentModeChanged(failure, true)) return ASSIGNMENT_SWITCHED_OFF
       return failure.message
     case 'malformed':
       return 'The server answered with something this app did not understand.'

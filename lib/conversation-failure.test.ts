@@ -1,6 +1,7 @@
 import {
+  assignmentModeChanged,
   assignmentRefusal,
-  assignmentSwitchedOff,
+  assignmentSwitchedOnNotice,
   failureNotice,
   readRefusal,
 } from '@/lib/conversation-failure'
@@ -115,28 +116,44 @@ describe('readRefusal', () => {
   })
 })
 
-describe('assignmentSwitchedOff', () => {
-  test.each([
-    [
-      'the refusal that says the switch moved',
-      { kind: 'refused', message: 'Assignment is switched off.', code: 'support_assignment_disabled' },
-      true,
-    ],
-    [
-      'a lost race, which is about the thread and not the session',
-      { kind: 'refused', message: 'This chat is already engaged.', code: 'already_engaged' },
-      false,
-    ],
-    ['a refusal with no code', { kind: 'refused', message: 'Forbidden.' }, false],
-    [
-      'the code in the words and not the code',
-      { kind: 'refused', message: 'support_assignment_disabled' },
-      false,
-    ],
-    ['a request that never arrived', { kind: 'unreachable' }, false],
-    ['a body it could not read', { kind: 'malformed' }, false],
-    ['an expired session, which the auth layer already handles', { kind: 'unauthorised' }, false],
-  ] as const)('answers whether to re-read the session for %s', (_label, failure, expected) => {
-    expect(assignmentSwitchedOff(failure)).toBe(expected)
+/** Every refusal the two switch rules have to sort, once each. */
+const refused = (code?: string) =>
+  ({ kind: 'refused', message: 'The API says no.', ...(code ? { code } : {}) }) as const
+
+const SWITCH_ROWS = [
+  // [label, failure, believed on, believed off]
+  ['support_assignment_disabled', refused('support_assignment_disabled'), true, false],
+  ['must_engage', refused('must_engage'), false, true],
+  ['must_take_over', refused('must_take_over'), false, true],
+  ['already_engaged, a lost Engage race while on', refused('already_engaged'), false, true],
+  ['an unrelated code', refused('conversation_not_found'), false, false],
+  ['a refusal with no code', refused(), false, false],
+  ['the code in the words and not the code', { kind: 'refused', message: 'must_engage' }, false, false],
+  ['a request that never arrived', { kind: 'unreachable' }, false, false],
+  ['a body it could not read', { kind: 'malformed' }, false, false],
+  ['an expired session, which the auth layer already handles', { kind: 'unauthorised' }, false, false],
+] as const
+
+describe('assignmentModeChanged', () => {
+  test.each(SWITCH_ROWS)('%s, with assignment believed on', (_label, failure, on) => {
+    expect(assignmentModeChanged(failure, true)).toBe(on)
+  })
+
+  test.each(SWITCH_ROWS)('%s, with assignment believed off', (_label, failure, _on, off) => {
+    expect(assignmentModeChanged(failure, false)).toBe(off)
+  })
+})
+
+describe('assignmentSwitchedOnNotice', () => {
+  const SWITCHED_ON = 'Assignment was switched back on — engage this conversation to reply.'
+
+  test.each(SWITCH_ROWS)('%s, with assignment believed off', (_label, failure, _on, off) => {
+    expect(assignmentSwitchedOnNotice(failure, false)).toBe(off ? SWITCHED_ON : null)
+  })
+
+  // Believed on, nothing here speaks: the off-to-on sentence would be false,
+  // and an Engage's own refusals are `assignmentRefusal`'s.
+  test.each(SWITCH_ROWS)('%s, with assignment believed on', (_label, failure) => {
+    expect(assignmentSwitchedOnNotice(failure, true)).toBeNull()
   })
 })

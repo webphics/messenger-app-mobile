@@ -7,7 +7,7 @@ import {
 } from '@/lib/conversation-api'
 import { assignmentPrecheck } from '@/lib/assignment-precheck'
 import { useAuth } from '@/lib/auth-context'
-import { assignmentRefusal, assignmentSwitchedOff } from '@/lib/conversation-failure'
+import { assignmentModeChanged, assignmentRefusal } from '@/lib/conversation-failure'
 import type { ComposerAction } from '@/lib/composer-access'
 import type { Conversation } from '@/lib/types'
 
@@ -146,7 +146,8 @@ export function useConversationAssignment(
         // moved. Re-reading it is what takes the button away and opens the
         // composer — before the on-screen check, because the session is out of
         // date wherever the person has gone since.
-        if (!result.ok && assignmentSwitchedOff(result.failure)) reconfirmSession()
+        // `true`: Engage and Takeover are only offered while assignment is on.
+        if (!result.ok && assignmentModeChanged(result.failure, true)) reconfirmSession()
 
         if (onScreen.current !== id) return
         setAssigning(false)

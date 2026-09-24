@@ -120,7 +120,7 @@ type AuthContextValue = {
    *
    * For the moment something the API answered says this device's copy of the
    * person is out of date — a refusal naming the assignment switch
-   * (`assignmentSwitchedOff`). The switch is read off the session, so a screen
+   * (`assignmentModeChanged`). The switch is read off the session, so a screen
    * reading it (`useSupportAssignment`) moves once the answer lands, without a
    * restart. Shares `confirmStaleSession`'s guard, so it is never a second
    * question while one is already out.

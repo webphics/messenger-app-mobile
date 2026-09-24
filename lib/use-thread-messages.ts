@@ -10,6 +10,8 @@ import {
   MESSAGE_PAGE_LIMIT,
   type ApiFailure,
 } from '@/lib/conversation-api'
+import { useAuth } from '@/lib/auth-context'
+import { assignmentModeChanged, assignmentSwitchedOnNotice } from '@/lib/conversation-failure'
 import { messageEditRefusal, withRefreshedQuotes } from '@/lib/message-edit'
 import { restoreOlderMessages, restoreThread, saveThread } from '@/lib/conversation-store'
 import { missingStagedFiles } from '@/lib/staged-file'
@@ -44,6 +46,7 @@ import {
 } from '@/lib/thread-state'
 import { toggleReaction } from '@/lib/message-react'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
+import { useSupportAssignment } from '@/lib/use-support-assignment'
 import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
 
 /**
@@ -261,6 +264,30 @@ export function useThreadMessages(
   useEffect(() => {
     held.current = state
   }, [state])
+
+  /**
+   * The assignment switch as this session read it, for the same callbacks. A
+   * staff write this device thought allowed can be refused because the switch
+   * moved on the server: then the session is re-read, which is what reopens or
+   * closes the composer, whether or not the person is still on this thread.
+   */
+  const supportAssignment = useSupportAssignment()
+  const { reconfirmSession } = useAuth()
+  const assignment = useRef({ enabled: supportAssignment, reconfirm: reconfirmSession })
+  useEffect(() => {
+    assignment.current = { enabled: supportAssignment, reconfirm: reconfirmSession }
+  }, [supportAssignment, reconfirmSession])
+
+  /**
+   * Read a refused write for a moved switch: re-reads the session if it moved,
+   * and answers the sentence to show instead of the usual one, or null to keep
+   * the usual one. Called before any on-screen check, for the reason above.
+   */
+  const assignmentRefused = useCallback((failure: ApiFailure): string | null => {
+    const { enabled, reconfirm } = assignment.current
+    if (assignmentModeChanged(failure, enabled)) reconfirm()
+    return assignmentSwitchedOnNotice(failure, enabled)
+  }, [])
   /**
    * The Message this device turned out to hold nothing before.
    *
@@ -505,6 +532,7 @@ export function useThreadMessages(
       setState((thread) => beginUpload(thread, message))
 
       const uploaded = await uploadFiles(id, message.attachments)
+      const uploadNotice = uploaded.ok ? null : assignmentRefused(uploaded.failure)
       if (onScreen.current !== id) {
         delivering.current.delete(message.id)
         return
@@ -517,7 +545,7 @@ export function useThreadMessages(
         setState((thread) =>
           failSend(thread, message.id, { ...message, attachments: uploaded.value }),
         )
-        setSendError(sendFailureMessage(uploaded.failure))
+        setSendError(uploadNotice ?? sendFailureMessage(uploaded.failure))
         return
       }
       carried = { ...message, attachments: uploaded.value }
@@ -536,6 +564,7 @@ export function useThreadMessages(
     })
 
     delivering.current.delete(message.id)
+    const sendNotice = sent.ok ? null : assignmentRefused(sent.failure)
     if (onScreen.current !== id) return
 
     if (sent.ok) {
@@ -543,8 +572,8 @@ export function useThreadMessages(
       return
     }
     setState((thread) => failSend(thread, message.id))
-    setSendError(sendFailureMessage(sent.failure))
-  }, [])
+    setSendError(sendNotice ?? sendFailureMessage(sent.failure))
+  }, [assignmentRefused])
 
   const send = useCallback(
     (draft: SendDraft) => {
@@ -633,6 +662,7 @@ export function useThreadMessages(
         const answer = added
           ? await addReaction(conversationId, messageId, emoji)
           : await removeReaction(conversationId, messageId)
+        const notice = answer.ok ? null : assignmentRefused(answer.failure)
 
         if (onScreen.current !== conversationId) return
         // A later tap on the same bubble is already on screen, and its own
@@ -660,9 +690,12 @@ export function useThreadMessages(
               }
           return { ...thread, messages: mergeMessages(thread.messages, [settled]) }
         })
+        // A reaction's refusal is otherwise silent — the bubble going back says
+        // it — but a switch that moved is news, and the strip is where it goes.
+        if (notice) setSendError(notice)
       })()
     },
-    [author, conversationId],
+    [author, conversationId, assignmentRefused],
   )
 
   /**
@@ -703,6 +736,7 @@ export function useThreadMessages(
       }))
 
       const answer = await editMessage(conversationId, messageId, body)
+      const notice = answer.ok ? null : assignmentRefused(answer.failure)
 
       if (onScreen.current !== conversationId) return null
       // A later edit of the same bubble is already on screen and its own answer
@@ -727,9 +761,9 @@ export function useThreadMessages(
         }
       })
 
-      return answer.ok ? null : messageEditRefusal(answer.failure)
+      return answer.ok ? null : (notice ?? messageEditRefusal(answer.failure))
     },
-    [author, conversationId],
+    [author, conversationId, assignmentRefused],
   )
 
   /**
