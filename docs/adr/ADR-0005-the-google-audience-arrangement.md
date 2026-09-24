@@ -1,5 +1,12 @@
 # The Google audience arrangement
 
+> **Amended 2026-09-24.** The API now also accepts the native client IDs listed in its optional
+> `GOOGLE_APP_CLIENT_IDS` as ID token audiences, next to `GOOGLE_CLIENT_ID`. This reverses the
+> rejected alternative below by owner decision. The mobile side is unchanged: it still passes the
+> web client ID, so its tokens still carry the web client as `aud`, and everything below about the
+> web client staying in the mobile configuration still holds. The wider list is a fallback for a
+> token minted without it.
+
 Google sign-in on mobile configures the native library with a **web** OAuth client identifier
 alongside the platform one. This looks like a mistake. It is not, and it is the whole reason mobile
 Google sign-in ships without an API change.

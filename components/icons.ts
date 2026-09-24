@@ -8,7 +8,9 @@
  *
  * Adding an icon: add a line below, kebab-case file name. Aliased names differ
  * from their module (AlertCircle -> circle-alert, HelpCircle -> circle-question-mark,
- * FileQuestion -> file-question-mark); check `dist/esm/icons/` when unsure.
+ * FileQuestion -> file-question-mark, Building2 -> building-complex, Trash2 -> trash);
+ * check `dist/esm/icons/` when unsure. Lucide renames modules in minor releases and keeps
+ * the old `.d.ts`, so a stale path typechecks and fails only in Metro.
  */
 
 import type { LucideProps } from "lucide-react-native";
@@ -28,7 +30,7 @@ export { default as BellOff } from "lucide-react-native/icons/bell-off";
 export { default as Bookmark } from "lucide-react-native/icons/bookmark";
 export { default as BookOpen } from "lucide-react-native/icons/book-open";
 export { default as Building } from "lucide-react-native/icons/building";
-export { default as Building2 } from "lucide-react-native/icons/building-2";
+export { default as Building2 } from "lucide-react-native/icons/building-complex";
 export { default as Camera } from "lucide-react-native/icons/camera";
 export { default as Check } from "lucide-react-native/icons/check";
 export { default as CheckCheck } from "lucide-react-native/icons/check-check";
@@ -85,7 +87,7 @@ export { default as Square } from "lucide-react-native/icons/square";
 export { default as SquarePen } from "lucide-react-native/icons/square-pen";
 export { default as Tag } from "lucide-react-native/icons/tag";
 export { default as Tags } from "lucide-react-native/icons/tags";
-export { default as Trash2 } from "lucide-react-native/icons/trash-2";
+export { default as Trash2 } from "lucide-react-native/icons/trash";
 export { default as User } from "lucide-react-native/icons/user";
 export { default as UserCog } from "lucide-react-native/icons/user-cog";
 export { default as UserPlus } from "lucide-react-native/icons/user-plus";
