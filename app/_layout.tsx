@@ -135,6 +135,17 @@ export default function RootLayout() {
                     gestureEnabled: true,
                   }}
                 >
+                  {/* First, and named, because a route group is not part of a
+                    path: each role's `(home)/index` is `/` exactly as this one
+                    is, and every native launch starts at `/`. Left to the file
+                    system, expo-router broke that tie for the Customer Hub, so
+                    a cold start opened on the Hub with nobody signed in and the
+                    Launch gate never ran. Declared first, with the three groups
+                    named after it, the launch screen is the match. */}
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="(customer)" />
+                  <Stack.Screen name="(agent)" />
+                  <Stack.Screen name="(admin)" />
                   <Stack.Screen
                     name="chat/[id]"
                     options={{

@@ -1,3 +1,5 @@
+import { conversationPeer } from '@/lib/conversation-title'
+import { formatRelativeTime } from '@/lib/display'
 import { isStaffConversation } from '@/lib/types'
 import type { Conversation, Label, LabelColor, SupportStatus, UserRole } from '@/lib/types'
 
@@ -59,8 +61,48 @@ export function conversationTypeLabel(conversation: Conversation): string {
   return TYPE_LABEL[conversation.type]
 }
 
-/** One line of the Conversation Info block. */
-export type DetailField = { label: string; value: string }
+/**
+ * How loudly a state is drawn, wherever it is drawn: the thread header's pill
+ * and the Status row one tap away.
+ *
+ * Resolved is done with, so it reads as success. An unheld thread is the one
+ * that wants somebody, but only where somebody is meant to hold it. In a Shared
+ * queue every live thread is Open and none of them is more urgent for it.
+ */
+export type StatusTone = 'success' | 'attention' | 'neutral'
+
+export function supportStatusTone(status: SupportStatus, supportAssignment: boolean): StatusTone {
+  if (status === 'closed') return 'success'
+  if (status === 'unassigned' && supportAssignment) return 'attention'
+  return 'neutral'
+}
+
+/**
+ * The line under the other person's name: here now, or when they last were.
+ *
+ * Null where the payload says nothing about presence. A Customer's payload
+ * never does, and an absent field is not a report that somebody is offline.
+ */
+export function peerPresence(conversation: Conversation, nowMs = Date.now()): string | null {
+  const peer = conversationPeer(conversation)
+  if (!peer) return null
+  if (peer.isOnline) return 'Active now'
+  if (!peer.lastOnlineAt) return null
+  const ago = formatRelativeTime(peer.lastOnlineAt, nowMs)
+  return ago ? `Active ${ago}` : null
+}
+
+/**
+ * One line of the Conversation Info block.
+ *
+ * `key` is what the screen draws an icon and a tone from, so that neither is
+ * keyed off wording that may change.
+ */
+export type DetailField = {
+  key: 'type' | 'members' | 'status' | 'assignee'
+  label: string
+  value: string
+}
 
 /**
  * Type, status and assignee, for whoever is reading.
@@ -81,13 +123,14 @@ export function conversationDetailFields(
   supportAssignment: boolean,
 ): DetailField[] {
   const fields: DetailField[] = [
-    { label: 'Type', value: conversationTypeLabel(conversation) },
+    { key: 'type', label: 'Type', value: conversationTypeLabel(conversation) },
   ]
 
   if (!isStaffConversation(conversation)) return fields
 
   if (conversation.type === 'group') {
     fields.push({
+      key: 'members',
       label: 'Members',
       value: `${conversation.members.length}`,
     })
@@ -95,10 +138,15 @@ export function conversationDetailFields(
   }
 
   if (conversation.status !== null) {
-    fields.push({ label: 'Status', value: supportStatusLabel(conversation.status, supportAssignment) })
+    fields.push({
+      key: 'status',
+      label: 'Status',
+      value: supportStatusLabel(conversation.status, supportAssignment),
+    })
   }
   if (conversation.type === 'support_dm' && supportAssignment) {
     fields.push({
+      key: 'assignee',
       label: 'Assigned agent',
       value: conversation.assignedAgent?.name ?? 'Unassigned',
     })

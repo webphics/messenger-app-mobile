@@ -8,7 +8,9 @@ import {
   labelChipColors,
   offerableLabels,
   orderedLabels,
+  peerPresence,
   supportStatusLabel,
+  supportStatusTone,
 } from '@/lib/conversation-details'
 import type { Conversation, Label } from '@/lib/types'
 
@@ -69,15 +71,15 @@ describe('conversationTypeLabel', () => {
 describe('conversationDetailFields', () => {
   test('a Customer is told the type and nothing internal', () => {
     expect(conversationDetailFields(customer(), ASSIGNMENT)).toEqual([
-      { label: 'Type', value: 'Support DM' },
+      { key: 'type', label: 'Type', value: 'Support DM' },
     ])
   })
 
   test('staff see status and the assignee on a Support DM', () => {
     expect(conversationDetailFields(staff(), ASSIGNMENT)).toEqual([
-      { label: 'Type', value: 'Support DM' },
-      { label: 'Status', value: 'Assigned' },
-      { label: 'Assigned agent', value: 'Ada' },
+      { key: 'type', label: 'Type', value: 'Support DM' },
+      { key: 'status', label: 'Status', value: 'Assigned' },
+      { key: 'assignee', label: 'Assigned agent', value: 'Ada' },
     ])
   })
 
@@ -86,14 +88,15 @@ describe('conversationDetailFields', () => {
       staff({ status: 'unassigned', assignedAgent: null }),
       ASSIGNMENT,
     )
-    expect(fields).toContainEqual({ label: 'Assigned agent', value: 'Unassigned' })
-    expect(fields).toContainEqual({ label: 'Status', value: 'Unassigned' })
+    expect(fields).toContainEqual({ key: 'assignee', label: 'Assigned agent', value: 'Unassigned' })
+    expect(fields).toContainEqual({ key: 'status', label: 'Status', value: 'Unassigned' })
   })
 
   test('the state is named the way the thread header names it', () => {
     // Not the API's `engaged`: the pill one tap away says Assigned, and a state
     // that renames itself between two screens reads as two states.
     expect(conversationDetailFields(staff({ status: 'engaged' }), ASSIGNMENT)).toContainEqual({
+      key: 'status',
       label: 'Status',
       value: 'Assigned',
     })
@@ -101,6 +104,7 @@ describe('conversationDetailFields', () => {
 
   test('closed reads as Resolved, as it does everywhere else', () => {
     expect(conversationDetailFields(staff({ status: 'closed' }), ASSIGNMENT)).toContainEqual({
+      key: 'status',
       label: 'Status',
       value: 'Resolved',
     })
@@ -119,14 +123,14 @@ describe('conversationDetailFields', () => {
       ASSIGNMENT,
     )
     expect(fields).toEqual([
-      { label: 'Type', value: 'Group' },
-      { label: 'Members', value: '2' },
+      { key: 'type', label: 'Type', value: 'Group' },
+      { key: 'members', label: 'Members', value: '2' },
     ])
   })
 
   test('a staff DM has a status but no assignee to name', () => {
     const fields = conversationDetailFields(staff({ type: 'staff_dm', status: null }), ASSIGNMENT)
-    expect(fields).toEqual([{ label: 'Type', value: 'Staff 1:1' }])
+    expect(fields).toEqual([{ key: 'type', label: 'Type', value: 'Staff 1:1' }])
   })
 })
 
@@ -141,21 +145,21 @@ describe('conversationDetailFields, in a Shared queue', () => {
     ['somebody engaged before the switch', staff({ status: 'engaged' })],
   ])('a thread %s is Open, and names no agent', (_case, conversation) => {
     expect(conversationDetailFields(conversation, SHARED_QUEUE)).toEqual([
-      { label: 'Type', value: 'Support DM' },
-      { label: 'Status', value: 'Open' },
+      { key: 'type', label: 'Type', value: 'Support DM' },
+      { key: 'status', label: 'Status', value: 'Open' },
     ])
   })
 
   test('a closed thread is still Resolved', () => {
     expect(conversationDetailFields(staff({ status: 'closed' }), SHARED_QUEUE)).toEqual([
-      { label: 'Type', value: 'Support DM' },
-      { label: 'Status', value: 'Resolved' },
+      { key: 'type', label: 'Type', value: 'Support DM' },
+      { key: 'status', label: 'Status', value: 'Resolved' },
     ])
   })
 
   test('a Customer is told the type and nothing internal, as before', () => {
     expect(conversationDetailFields(customer(), SHARED_QUEUE)).toEqual([
-      { label: 'Type', value: 'Support DM' },
+      { key: 'type', label: 'Type', value: 'Support DM' },
     ])
   })
 })
@@ -290,5 +294,51 @@ describe('orderedLabels', () => {
     const rows = [label({ id: '1', name: 'Zeta' }), label({ id: '2', name: 'Alpha' })]
     orderedLabels(rows)
     expect(rows.map((row) => row.id)).toEqual(['1', '2'])
+  })
+})
+
+describe('supportStatusTone', () => {
+  test('Resolved reads as done, whichever way the queue is worked', () => {
+    expect(supportStatusTone('closed', ASSIGNMENT)).toBe('success')
+    expect(supportStatusTone('closed', SHARED_QUEUE)).toBe('success')
+  })
+
+  test('an unheld thread asks for attention only where somebody is meant to hold it', () => {
+    expect(supportStatusTone('unassigned', ASSIGNMENT)).toBe('attention')
+    expect(supportStatusTone('unassigned', SHARED_QUEUE)).toBe('neutral')
+  })
+
+  test('a held thread is quiet', () => {
+    expect(supportStatusTone('engaged', ASSIGNMENT)).toBe('neutral')
+  })
+})
+
+describe('peerPresence', () => {
+  const NOW = Date.parse('2026-09-25T12:00:00Z')
+
+  test('somebody online is active now', () => {
+    const conversation = staff({ customer: { id: 'u1', name: 'Amanda', isOnline: true } })
+    expect(peerPresence(conversation, NOW)).toBe('Active now')
+  })
+
+  test('somebody offline says when they were last here', () => {
+    const conversation = staff({
+      customer: {
+        id: 'u1',
+        name: 'Amanda',
+        isOnline: false,
+        lastOnlineAt: '2026-09-25T11:55:00Z',
+      },
+    })
+    expect(peerPresence(conversation, NOW)).toBe('Active 5m ago')
+  })
+
+  test('no presence on the payload claims nothing', () => {
+    expect(peerPresence(staff(), NOW)).toBeNull()
+    expect(peerPresence(customer(), NOW)).toBeNull()
+  })
+
+  test('a group has nobody single to report on', () => {
+    expect(peerPresence(staff({ type: 'group', status: null }), NOW)).toBeNull()
   })
 })

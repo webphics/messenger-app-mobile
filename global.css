@@ -105,7 +105,13 @@
   }
 }
 
-/* RN ignores fontWeight on a single Manrope face — map utilities to loaded keys. */
+/* RN ignores fontWeight on a single Manrope face — map utilities to loaded keys.
+   Android: expo-font registers each face under Typeface.NORMAL only, and RN's
+   ReactFontManager looks a family up under BOLD once fontWeight reaches 700, so
+   the lookup misses and falls back to the system font. The Bold faces pin 400
+   on Android to stay in the NORMAL slot; the face name already carries the
+   weight. iOS keeps the real weight, since RCTFont picks the face within the
+   family by it. */
 @utility font-normal {
   font-family: Manrope;
   font-weight: 400;
@@ -121,10 +127,16 @@
 @utility font-bold {
   font-family: Manrope-Bold;
   font-weight: 700;
+  @variant android {
+    font-weight: 400;
+  }
 }
 @utility font-extrabold {
   font-family: Manrope-ExtraBold;
   font-weight: 800;
+  @variant android {
+    font-weight: 400;
+  }
 }
 /* JetBrains Mono: RN needs the loaded face key; Bold is a separate utility so
    font-bold (Manrope) never clobber mono. */
@@ -135,4 +147,7 @@
 @utility font-mono-bold {
   font-family: "JetBrains Mono-Bold";
   font-weight: 700;
+  @variant android {
+    font-weight: 400;
+  }
 }

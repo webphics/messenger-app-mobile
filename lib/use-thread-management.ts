@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   closeConversation,
+  reopenConversation,
   listStaffDirectory,
   transferConversation,
 } from '@/lib/conversation-api'
@@ -40,9 +41,16 @@ export type ThreadManagement = {
   candidates: StaffDirectoryUser[] | null
   candidatesFailed: boolean
   transfer: (agentId: string) => void
-  close: () => void
+  /**
+   * Close with a summary of the support given. Answers the refusal to show, or
+   * null when it landed, so the sheet the summary was written in can stay open
+   * with the draft rather than lose it.
+   */
+  close: (summary: string) => Promise<string | null>
+  /** Reopen a closed thread. No sheet: there is nothing to collect. */
+  reopen: () => void
   /** Which action has a request out, so its control can say it is working. */
-  pending: 'transfer' | 'close' | null
+  pending: 'transfer' | 'close' | 'reopen' | null
   /** Why the last attempt was refused, or null. Cleared when the next one starts. */
   error: string | null
 }
@@ -66,7 +74,7 @@ export function useThreadManagement(
 ): ThreadManagement {
   const [candidates, setCandidates] = useState<StaffDirectoryUser[] | null>(null)
   const [candidatesFailed, setCandidatesFailed] = useState(false)
-  const [pending, setPending] = useState<'transfer' | 'close' | null>(null)
+  const [pending, setPending] = useState<'transfer' | 'close' | 'reopen' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { reconfirmSession } = useAuth()
 
@@ -144,23 +152,44 @@ export function useThreadManagement(
     })
   }, [reconfirmSession])
 
-  const close = useCallback(() => {
+  const close = useCallback(async (summary: string): Promise<string | null> => {
     const id = onScreen.current
-    if (!id) return
+    if (!id) return null
 
     setPending('close')
     setError(null)
 
-    void closeConversation(id).then((result) => {
+    const result = await closeConversation(id, summary)
+    if (onScreen.current !== id) return null
+    setPending(null)
+    if (result.ok) {
+      notify.current(result.value)
+      return null
+    }
+    return refusal(result.failure, 'The conversation could not be closed.')
+  }, [])
+
+  const reopen = useCallback(() => {
+    const id = onScreen.current
+    if (!id) return
+
+    setPending('reopen')
+    setError(null)
+
+    void reopenConversation(id).then((result) => {
       if (onScreen.current !== id) return
       setPending(null)
       if (result.ok) {
         notify.current(result.value)
         return
       }
-      setError(refusal(result.failure, 'The conversation could not be closed.'))
+      setError(
+        result.failure.kind === 'refused' && result.failure.code === 'conversation_not_closed'
+          ? 'This conversation is already open.'
+          : refusal(result.failure, 'The conversation could not be reopened.'),
+      )
     })
   }, [])
 
-  return { loadCandidates, candidates, candidatesFailed, transfer, close, pending, error }
+  return { loadCandidates, candidates, candidatesFailed, transfer, close, reopen, pending, error }
 }

@@ -118,10 +118,11 @@ describe('composerAccess, on a Support DM', () => {
     )
   })
 
-  test.each([ME, ADMIN])('a closed thread offers neither role a way in', (viewer) => {
+  test.each([ME, ADMIN])('a closed thread offers either role a Reopen', (viewer) => {
     expect(composerAccess(staffRow({ status: 'closed', assignedAgent: null }), viewer, ASSIGNMENT)).toEqual({
       kind: 'read-only',
       reason: 'This conversation is closed.',
+      action: { kind: 'reopen', label: 'Reopen conversation' },
     })
   })
 
@@ -155,10 +156,11 @@ describe('composerAccess, on a Support DM in a Shared queue', () => {
     expect(composerAccess(conversation, viewer, SHARED_QUEUE)).toEqual({ kind: 'open' })
   })
 
-  test.each([ME, ADMIN])('a closed thread is still read-only, and offers nothing', (viewer) => {
+  test.each([ME, ADMIN])('a closed thread is still read-only, and offers a Reopen', (viewer) => {
     expect(composerAccess(staffRow({ status: 'closed', assignedAgent: null }), viewer, SHARED_QUEUE)).toEqual({
       kind: 'read-only',
       reason: 'This conversation is closed.',
+      action: { kind: 'reopen', label: 'Reopen conversation' },
     })
   })
 

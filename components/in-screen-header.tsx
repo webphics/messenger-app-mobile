@@ -27,7 +27,7 @@ export function InScreenHeader({ children, onBack }: InScreenHeaderProps) {
       className="border-b border-line/40 bg-surface"
       style={{ paddingTop: screenTopPad(insets.top) }}
     >
-      <View className="h-12 flex-row items-center px-1">
+      <View className="min-h-12 flex-row items-center px-1">
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Back"

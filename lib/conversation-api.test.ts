@@ -2,6 +2,7 @@ import { API_BASE_URL } from '@/lib/api-config'
 import { clearCsrfPair, setSessionCookie } from '@/lib/api-client'
 import {
   addReaction,
+  closeConversation,
   createStaffDm,
   engageConversation,
   ensureSupportConversation,
@@ -702,6 +703,22 @@ describe('createStaffDm', () => {
         message: 'You and this person do not share an organization.',
       },
     })
+  })
+})
+
+describe('closeConversation', () => {
+  test('posts the summary the API requires, with the CSRF pair a mutation needs', async () => {
+    enqueue(csrfResponse(), envelope({ ...SUPPORT_ROW, status: 'closed' }))
+
+    const result = await closeConversation('conv-1', 'Reset the password.')
+
+    expect(calls[1]?.url).toBe(`${API_BASE_URL}/conversations/conv-1/close`)
+    expect(calls[1]?.init.method).toBe('POST')
+    expect(calls[1]?.init.body).toBe(JSON.stringify({ summary: 'Reset the password.' }))
+    expect((calls[1]?.init.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'csrf-token-value',
+    )
+    expect(result).toEqual({ ok: true, value: expect.objectContaining({ id: 'conv-1' }) })
   })
 })
 

@@ -1,7 +1,15 @@
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native'
+import { ActivityIndicator, Pressable, View } from 'react-native'
 
-import { ArrowLeftRight, CheckCircle, ChevronRight } from '@/components/icons'
+import { CloseConversationSheet } from '@/components/chat/close-conversation-sheet'
+import { DetailsCard } from '@/components/chat/details-card'
+import {
+  ArrowLeftRight,
+  CheckCircle,
+  ChevronRight,
+  RotateCcw,
+  Settings,
+} from '@/components/icons'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
 import { colors } from '@/lib/tokens'
@@ -18,15 +26,18 @@ import type { ThreadManagement } from '@/lib/use-thread-management'
  * exception, refused by the API in its own words underneath.
  *
  * The two are deliberately different weights. Transfer opens a list and is
- * committed by picking a name from it, which is the confirmation. Close is a
- * single tap that ends the work, so it asks first — and because closing is
- * reversible (the Customer writing in reopens the thread, and it comes back to
- * whoever closed it) the confirmation is a plain one rather than a destructive
- * one.
+ * committed by picking a name from it, which is the confirmation. Close opens
+ * a sheet that asks for a summary of the support given, which the API requires,
+ * and writing it is the confirmation. Closing is reversible (the Customer
+ * writing in reopens the thread), so the sheet is a plain form rather than a
+ * destructive prompt.
  */
 
 type ThreadManagementSectionProps = {
   management: ThreadManagement
+  canClose: boolean
+  /** A closed thread offers Reopen in Close's place. */
+  canReopen: boolean
   canTransfer: boolean
   /** Whether a reopened thread comes back to whoever closed it, or to the team. */
   supportAssignment: boolean
@@ -34,10 +45,13 @@ type ThreadManagementSectionProps = {
 
 export function ThreadManagementSection({
   management,
+  canClose,
+  canReopen,
   canTransfer,
   supportAssignment,
 }: ThreadManagementSectionProps) {
   const [picking, setPicking] = useState(false)
+  const [summarising, setSummarising] = useState(false)
   const { candidates, candidatesFailed, loadCandidates, pending, error } = management
 
   const toggleTransfer = useCallback(() => {
@@ -47,24 +61,9 @@ export function ThreadManagementSection({
     })
   }, [loadCandidates])
 
-  const confirmClose = useCallback(() => {
-    Alert.alert(
-      'Close this conversation?',
-      supportAssignment
-        ? 'It moves out of your queue. If the customer writes again it reopens and comes back to you.'
-        : 'It moves out of the open queue. If the customer writes again it reopens for the team.',
-      [
-        { text: 'Keep open', style: 'cancel' },
-        { text: 'Close', onPress: management.close },
-      ],
-    )
-  }, [management, supportAssignment])
 
   return (
-    <View className="gap-3 rounded-2xl border border-line/70 bg-surface p-3.5">
-      <Text variant="label" className="uppercase tracking-wide text-muted">
-        This conversation
-      </Text>
+    <DetailsCard icon={Settings} title="Manage conversation">
 
       {canTransfer ? (
         <Pressable
@@ -133,35 +132,76 @@ export function ThreadManagementSection({
         </View>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close this conversation"
-        disabled={pending !== null}
-        onPress={confirmClose}
-        className={cn(
-          'min-h-11 flex-row items-center gap-3 active:opacity-70',
-          pending !== null && 'opacity-60',
-        )}
-      >
-        <View className="size-9 items-center justify-center rounded-2xl bg-success/15">
-          <CheckCircle color={colors.success} size={18} />
-        </View>
-        <View className="min-w-0 flex-1">
-          <Text variant="meta" className="font-semibold text-ink">
-            Close conversation
-          </Text>
-          <Text variant="label" className="mt-0.5 font-normal text-muted">
-            Reopens if the customer writes again
-          </Text>
-        </View>
-        {pending === 'close' ? <ActivityIndicator color={colors.success} /> : null}
-      </Pressable>
+      {canReopen ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reopen this conversation"
+          disabled={pending !== null}
+          onPress={management.reopen}
+          className={cn(
+            'min-h-11 flex-row items-center gap-3 active:opacity-70',
+            pending !== null && 'opacity-60',
+          )}
+        >
+          <View className="size-9 items-center justify-center rounded-2xl bg-primary-soft">
+            <RotateCcw color={colors.primary} size={18} />
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text variant="meta" className="font-semibold text-ink">
+              Reopen conversation
+            </Text>
+            <Text variant="label" className="mt-0.5 font-normal text-muted">
+              {supportAssignment
+                ? 'Returns to whoever closed it, or to the queue'
+                : 'Returns to the open queue'}
+            </Text>
+          </View>
+          {pending === 'reopen' ? <ActivityIndicator color={colors.primary} /> : null}
+        </Pressable>
+      ) : null}
+
+      {canClose ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close this conversation"
+          disabled={pending !== null}
+          onPress={() => setSummarising(true)}
+          className={cn(
+            'min-h-11 flex-row items-center gap-3 active:opacity-70',
+            pending !== null && 'opacity-60',
+          )}
+        >
+          <View className="size-9 items-center justify-center rounded-2xl bg-success/15">
+            <CheckCircle color={colors.success} size={18} />
+          </View>
+          <View className="min-w-0 flex-1">
+            <Text variant="meta" className="font-semibold text-ink">
+              Close conversation
+            </Text>
+            <Text variant="label" className="mt-0.5 font-normal text-muted">
+              Reopens if the customer writes again
+            </Text>
+          </View>
+          {pending === 'close' ? <ActivityIndicator color={colors.success} /> : null}
+        </Pressable>
+      ) : null}
 
       {error ? (
         <Text accessibilityLiveRegion="polite" variant="label" className="text-danger">
           {error}
         </Text>
       ) : null}
-    </View>
+
+      <CloseConversationSheet
+        visible={summarising}
+        reopenNote={
+          supportAssignment
+            ? 'If the customer writes again it reopens and comes back to you.'
+            : 'If the customer writes again it reopens for the team.'
+        }
+        onClose={() => setSummarising(false)}
+        onConfirm={management.close}
+      />
+    </DetailsCard>
   )
 }

@@ -35,7 +35,7 @@ import type { Conversation, GroupWritePolicy, UserRole } from '@/lib/types'
 
 /** What a staff member may do about a thread they cannot write in yet. */
 export type ComposerAction = {
-  kind: 'engage' | 'takeover'
+  kind: 'engage' | 'takeover' | 'reopen'
   /** The words on the button. The web client's, so the two products agree. */
   label: string
 }
@@ -48,6 +48,7 @@ const OPEN: ComposerAccess = { kind: 'open' }
 
 const ENGAGE: ComposerAction = { kind: 'engage', label: 'Engage chat' }
 const TAKE_OVER: ComposerAction = { kind: 'takeover', label: 'Take over' }
+const REOPEN: ComposerAction = { kind: 'reopen', label: 'Reopen conversation' }
 
 function readOnly(reason: string, action?: ComposerAction): ComposerAccess {
   return action ? { kind: 'read-only', reason, action } : { kind: 'read-only', reason }
@@ -130,8 +131,11 @@ export function composerAccess(
   // A staff DM is writable by anyone the API sent them to.
   if (conversation.type !== 'support_dm') return OPEN
 
+  // Offered to every staff role in both modes, as the web client does: the API
+  // gates it on the `close` capability, which this client cannot read, so an
+  // Agent without it is refused in the API's own words.
   if (conversation.status === 'closed') {
-    return readOnly('This conversation is closed.')
+    return readOnly('This conversation is closed.', REOPEN)
   }
 
   // A Shared queue: nobody holds it, so whoever can read it answers it.

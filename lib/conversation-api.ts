@@ -418,10 +418,34 @@ export async function transferConversation(
  * and the person who did the work is the one who knows it is done. Not final —
  * the Customer writing in reopens it, and it returns to whoever closed it —
  * which is why nothing here treats it as destructive.
+ *
+ * The summary is required: the API rejects a close without one (`min: 1`) and
+ * keeps it with the thread for staff, never for the Customer. Trimmed by the
+ * caller, as the web client does.
  */
-export async function closeConversation(id: string): Promise<ApiResult<Conversation>> {
+export async function closeConversation(
+  id: string,
+  summary: string,
+): Promise<ApiResult<Conversation>> {
   const outcome = await authenticatedRequest(
     `/conversations/${encodeURIComponent(id)}/close`,
+    { method: 'POST', body: { summary } },
+  )
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * Reopen a closed Support DM. The API's `reopen` action.
+ *
+ * No body: closing asks what the support was, reopening only says the thread is
+ * not finished. Gated on the `close` capability rather than on holding the
+ * thread, because the close most worth undoing may be one whose author has
+ * left. A thread somebody else reopened first is refused with
+ * `conversation_not_closed`.
+ */
+export async function reopenConversation(id: string): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/reopen`,
     { method: 'POST' },
   )
   return readOutcome(outcome, parseConversation)

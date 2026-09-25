@@ -52,7 +52,7 @@ function stop(message: string): AssignmentPrecheck {
  * in every branch below: nothing is ever "already yours" when there is no you.
  */
 export function assignmentPrecheck(
-  kind: ComposerAction['kind'],
+  kind: Exclude<ComposerAction['kind'], 'reopen'>,
   conversation: Conversation,
   viewer: { id: string | null },
 ): AssignmentPrecheck {

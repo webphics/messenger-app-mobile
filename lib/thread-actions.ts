@@ -49,10 +49,22 @@ export function canManageAssignment(
   )
 }
 
-/** Which of the two this person is offered on this thread. */
-export type ThreadActions = { close: boolean; transfer: boolean }
+/** Which of the three this person is offered on this thread. */
+export type ThreadActions = { close: boolean; transfer: boolean; reopen: boolean }
 
-const NEITHER: ThreadActions = { close: false, transfer: false }
+const NONE: ThreadActions = { close: false, transfer: false, reopen: false }
+
+/**
+ * Reopen, in either mode: any staff member on a closed Support DM. Not the
+ * assignee's alone, unlike Close, because a close does not guarantee a
+ * reachable assignee survives it. The API holds the real bar, the `close`
+ * capability inside the thread's organization.
+ */
+function canReopen(conversation: Conversation, viewer: ThreadViewer): boolean {
+  if (viewer.role === 'customer') return false
+  if (!isStaffConversation(conversation)) return false
+  return conversation.type === 'support_dm' && conversation.status === 'closed'
+}
 
 /**
  * Close and Transfer, for whichever way Support DMs are being worked.
@@ -70,15 +82,17 @@ export function threadActions(
   viewer: ThreadViewer,
   supportAssignment: boolean,
 ): ThreadActions {
+  const reopen = canReopen(conversation, viewer)
+
   if (supportAssignment) {
     const manages = canManageAssignment(conversation, viewer)
-    return { close: manages, transfer: manages }
+    return { close: manages, transfer: manages, reopen }
   }
 
-  if (viewer.role === 'customer') return NEITHER
-  if (!isStaffConversation(conversation) || conversation.type !== 'support_dm') return NEITHER
+  if (viewer.role === 'customer') return NONE
+  if (!isStaffConversation(conversation) || conversation.type !== 'support_dm') return NONE
   const open = conversation.status === 'unassigned' || conversation.status === 'engaged'
-  return { close: open, transfer: false }
+  return { close: open, transfer: false, reopen }
 }
 
 /**

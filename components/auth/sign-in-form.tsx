@@ -25,6 +25,7 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { GOOGLE_CONFIG } from "@/lib/google-config";
+import { GOOGLE_NATIVE_NOTICE } from "@/lib/google-session";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { magicLinkRequestNotice } from "@/lib/magic-link-route";
@@ -186,11 +187,12 @@ export function SignInForm() {
   /**
    * The sentence explaining why Google is not on offer, or null when it is. A
    * build with no OAuth client cannot sign anyone in with Google, and naming the
-   * variable beats an enabled button that fails at the account sheet. Read once
-   * at module load, so this never changes while the screen is up.
+   * variable beats an enabled button that fails at the account sheet. The same
+   * goes for a binary without the native module, such as Expo Go. Read once at
+   * module load, so this never changes while the screen is up.
    */
   const googleUnavailable =
-    GOOGLE_CONFIG.kind === "unconfigured" ? GOOGLE_CONFIG.notice : null;
+    GOOGLE_CONFIG.kind === "unconfigured" ? GOOGLE_CONFIG.notice : GOOGLE_NATIVE_NOTICE;
   const passwordBusy = pending === "password";
   const googleBusy = pending === "google";
   /**

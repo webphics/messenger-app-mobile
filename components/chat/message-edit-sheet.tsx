@@ -138,7 +138,7 @@ function EditSheet({
             accessibilityLabel="Message text"
             editable={!saving}
             autoFocus
-            className="min-h-28 rounded-xl border border-line/70 bg-bg px-3 py-2.5 text-base text-ink"
+            className="min-h-28 rounded-xl border border-line/70 bg-bg px-3 py-2.5 font-normal text-base text-ink"
             style={{ textAlignVertical: 'top' }}
           />
 

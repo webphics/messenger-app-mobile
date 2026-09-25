@@ -1,17 +1,24 @@
 import { router } from "expo-router";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { Info } from "@/components/icons";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatDetailsHref } from "@/lib/chat-route-id";
-import { supportStatusLabel } from "@/lib/conversation-details";
+import {
+  conversationPeerRole,
+  peerPresence,
+  supportStatusLabel,
+  supportStatusTone,
+  type StatusTone,
+} from "@/lib/conversation-details";
 import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
 import { initials } from "@/lib/display";
 import { colors } from "@/lib/tokens";
 import { isStaffConversation } from "@/lib/types";
 import type { Conversation } from "@/lib/types";
+import { userRoleLabel } from "@/lib/user-directory";
 
 type ThreadHeaderProps = {
   conversation: Conversation;
@@ -21,30 +28,39 @@ type ThreadHeaderProps = {
   supportAssignment: boolean;
 };
 
+const PILL_STYLE: Record<StatusTone, { style: string; textStyle: string }> = {
+  success: { style: "bg-success/15", textStyle: "text-success" },
+  attention: { style: "bg-amber/15", textStyle: "text-amber" },
+  neutral: { style: "bg-primary-soft", textStyle: "text-primary" },
+};
+
 /**
- * The assignment pill.
+ * The pill beside the name: the assignment state where it says something, and
+ * otherwise who the other side is.
  *
  * Staff-only, and null for everyone else: assignment is internal, and a
- * Customer's payload does not carry it — which is the point, not an omission to
- * work around. Closed reads as Resolved because that is the word the product
- * uses for a thread that is done with. In a Shared queue there is no assignment
- * to show, so every live thread is Open. The words are `supportStatusLabel`'s,
- * shared with Conversation details one tap away.
+ * Customer's payload does not carry it, which is the point rather than an
+ * omission to work around. In a Shared queue nobody holds a thread, so every
+ * live one would read Open, which tells nobody anything. There the pill names
+ * the other side's role instead, and a resolved thread still says Resolved.
+ * The status words and tone are shared with Conversation details one tap away.
  */
-function statusPill(
+function headerPill(
   conversation: Conversation,
   supportAssignment: boolean,
 ): { label: string; style: string; textStyle: string } | null {
-  if (!isStaffConversation(conversation) || conversation.status === null) return null;
+  if (!isStaffConversation(conversation)) return null;
 
-  const label = supportStatusLabel(conversation.status, supportAssignment);
-  if (conversation.status === "closed") {
-    return { label, style: "bg-success/15", textStyle: "text-success" };
+  const status = conversation.status;
+  if (status !== null && (supportAssignment || status === "closed")) {
+    return {
+      label: supportStatusLabel(status, supportAssignment),
+      ...PILL_STYLE[supportStatusTone(status, supportAssignment)],
+    };
   }
-  if (conversation.status === "unassigned" && supportAssignment) {
-    return { label, style: "bg-amber/15", textStyle: "text-amber" };
-  }
-  return { label, style: "bg-primary-soft", textStyle: "text-primary" };
+
+  const role = conversationPeerRole(conversation);
+  return role ? { label: userRoleLabel(role), ...PILL_STYLE.neutral } : null;
 }
 
 function memberCount(conversation: Conversation): number | null {
@@ -64,41 +80,64 @@ export function ThreadHeader({
   const peer = conversationPeer(conversation);
   const participants = memberCount(conversation);
   const online = peer?.isOnline === true;
+  // The name is the way into details, so a thread with nothing else to say
+  // under it says that, the way Messenger and WhatsApp do.
   const subtitle =
     participants !== null
       ? `${participants} participants`
-      : online
-        ? "Active now"
-        : "";
-  const pill = statusPill(conversation, supportAssignment);
+      : (peerPresence(conversation) ?? "Tap for details");
+  const pill = headerPill(conversation, supportAssignment);
+  const openDetails = () => router.push(chatDetailsHref(conversation.id));
 
   return (
-    <View className="h-12 min-w-0 flex-1 flex-row items-center gap-2.5 pr-2">
-      <View className="relative">
-        <Avatar alt={title} className="size-9">
-          <AvatarFallback className="bg-primary-soft">
-            <Text variant="label" className="font-bold text-primary">
-              {initials(title)}
-            </Text>
-          </AvatarFallback>
-        </Avatar>
-        {online && participants === null ? (
-          <View className="absolute bottom-0 right-0 size-2.5 rounded-full border border-surface bg-success" />
-        ) : null}
-      </View>
-      <View className="min-w-0 flex-1">
-        <Text variant="body" className="font-semibold text-ink" numberOfLines={1}>
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
-            {subtitle}
+    <View className="min-w-0 flex-1 flex-row items-center gap-2.5 py-1.5 pr-2">
+      {/*
+        The avatar and the name are one control, as in Messenger and WhatsApp:
+        the person at the top of a thread is where people tap to find out more
+        about it. The info button beside it goes to the same screen for anyone
+        who does not know that.
+      */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, conversation details`}
+        onPress={openDetails}
+        hitSlop={{ top: 4, bottom: 4 }}
+        className="min-w-0 flex-1 flex-row items-center gap-2.5 active:opacity-70"
+      >
+        <View className="relative">
+          <Avatar alt={title} className="size-9">
+            <AvatarFallback className="bg-primary-soft">
+              <Text variant="label" className="font-semibold text-primary">
+                {initials(title)}
+              </Text>
+            </AvatarFallback>
+          </Avatar>
+          {online && participants === null ? (
+            <View className="absolute bottom-0 right-0 size-2.5 rounded-full border border-surface bg-success" />
+          ) : null}
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text
+            variant="body"
+            className="font-semibold text-ink"
+            numberOfLines={1}
+          >
+            {title}
           </Text>
-        ) : null}
-      </View>
+          {subtitle ? (
+            <Text
+              variant="label"
+              className="font-normal text-muted"
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
       {pill ? (
         <View className={`rounded-full px-2.5 py-0.5 ${pill.style}`}>
-          <Text variant="label" className={`font-bold ${pill.textStyle}`}>
+          <Text variant="label" className={`font-semibold ${pill.textStyle}`}>
             {pill.label}
           </Text>
         </View>
@@ -116,7 +155,7 @@ export function ThreadHeader({
       <TactilePressable
         accessibilityRole="button"
         accessibilityLabel="Conversation details"
-        onPress={() => router.push(chatDetailsHref(conversation.id))}
+        onPress={openDetails}
         className="size-11 shrink-0 items-center justify-center rounded-full"
       >
         <Info color={colors.ink} size={20} />

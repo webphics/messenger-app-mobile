@@ -91,7 +91,9 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
       organizationNames={section.organizationNames}
       details={details}
       supportAssignment={supportAssignment}
-      management={actions?.close ? management : undefined}
+      management={actions?.close || actions?.reopen ? management : undefined}
+      canClose={actions?.close === true}
+      canReopen={actions?.reopen === true}
       canTransfer={actions?.transfer === true}
     />
   );

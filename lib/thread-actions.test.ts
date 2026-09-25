@@ -100,7 +100,7 @@ describe('threadActions', () => {
       ['the assignee of a closed thread', thread({ status: 'closed' }), ASSIGNEE, false],
       ['anybody on an unassigned thread', thread({ status: 'unassigned', assignedAgent: null }), ADMIN, false],
     ] as const)('%s', (_case, conversation, viewer, offered) => {
-      expect(threadActions(conversation, viewer, true)).toEqual({ close: offered, transfer: offered })
+      expect(threadActions(conversation, viewer, true)).toMatchObject({ close: offered, transfer: offered })
     })
   })
 
@@ -117,17 +117,45 @@ describe('threadActions', () => {
       ['whoever engaged it before the switch', thread(), ASSIGNEE],
       ['an Admin, on a thread somebody engaged before the switch', thread(), ADMIN],
     ] as const)('%s may close it and may not transfer it', (_case, conversation, viewer) => {
-      expect(threadActions(conversation, viewer, false)).toEqual({ close: true, transfer: false })
+      expect(threadActions(conversation, viewer, false)).toEqual({ close: true, transfer: false, reopen: false })
     })
 
     test.each([
-      ['a closed thread', thread({ status: 'closed' }), ADMIN],
       ['a thread with no status', thread({ status: null }), ADMIN],
       ['a staff DM', thread({ type: 'staff_dm', status: null }), ADMIN],
       ['a group', thread({ type: 'group', status: null }), ADMIN],
       ["a Customer's own thread", OWN, CUSTOMER],
-    ] as const)('%s offers neither', (_case, conversation, viewer) => {
-      expect(threadActions(conversation, viewer, false)).toEqual({ close: false, transfer: false })
+    ] as const)('%s offers nothing', (_case, conversation, viewer) => {
+      expect(threadActions(conversation, viewer, false)).toEqual({ close: false, transfer: false, reopen: false })
+    })
+  })
+
+  /*
+   * Reopen is not the assignee's alone, in either mode: a close does not
+   * guarantee a reachable assignee survives it, so any staff member is offered
+   * it on a closed Support DM and the API holds the `close` capability bar.
+   */
+  describe('reopen', () => {
+    test.each([
+      ['the agent who closed it, with assignment on', ASSIGNEE, true],
+      ['another agent, with assignment on', OTHER_AGENT, true],
+      ['an Admin, with assignment on', ADMIN, true],
+      ['an Agent, in a Shared queue', OTHER_AGENT, false],
+      ['an Admin, in a Shared queue', ADMIN, false],
+    ] as const)('%s is offered Reopen and not Close', (_case, viewer, supportAssignment) => {
+      expect(threadActions(thread({ status: 'closed' }), viewer, supportAssignment)).toEqual({
+        close: false,
+        transfer: false,
+        reopen: true,
+      })
+    })
+
+    test.each([
+      ['an open thread', thread(), ADMIN],
+      ['a staff DM', thread({ type: 'staff_dm', status: null }), ADMIN],
+      ["a Customer's own thread", OWN, CUSTOMER],
+    ] as const)('%s offers no Reopen', (_case, conversation, viewer) => {
+      expect(threadActions(conversation, viewer, false).reopen).toBe(false)
     })
   })
 })

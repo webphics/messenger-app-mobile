@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   engageConversation,
   getConversation,
+  reopenConversation,
   takeOverConversation,
 } from '@/lib/conversation-api'
 import { assignmentPrecheck } from '@/lib/assignment-precheck'
@@ -105,6 +106,36 @@ export function useConversationAssignment(
     notify.current = onAssigned
   }, [onAssigned])
 
+  /**
+   * Reopen skips the re-read Engage and Takeover make first. Those guard a race
+   * over who holds the thread; a reopen has only one race, somebody reopening
+   * it first, and the API answers that one itself with `conversation_not_closed`.
+   * On that answer the thread is re-read, because it is already in the state the
+   * person asked for and the composer should open rather than show a refusal.
+   */
+  const reopen = useCallback(async (id: string) => {
+    const result = await reopenConversation(id)
+    if (onScreen.current !== id) return
+
+    if (result.ok) {
+      setAssigning(false)
+      notify.current(result.value)
+      return
+    }
+
+    if (result.failure.kind === 'refused' && result.failure.code === 'conversation_not_closed') {
+      const fresh = await getConversation(id)
+      if (onScreen.current !== id) return
+      setAssigning(false)
+      if (fresh.ok) notify.current(fresh.value)
+      else setError(assignmentRefusal(fresh.failure))
+      return
+    }
+
+    setAssigning(false)
+    setError(assignmentRefusal(result.failure))
+  }, [])
+
   const assign = useCallback(
     (action: ComposerAction) => {
       const id = conversationId
@@ -112,6 +143,12 @@ export function useConversationAssignment(
 
       setAssigning(true)
       setError(null)
+
+      if (action.kind === 'reopen') {
+        void reopen(id)
+        return
+      }
+      const kind = action.kind
 
       void (async () => {
         const fresh = await getConversation(id)
@@ -130,7 +167,7 @@ export function useConversationAssignment(
 
         notify.current(fresh.value)
 
-        const verdict = assignmentPrecheck(action.kind, fresh.value, { id: viewerId })
+        const verdict = assignmentPrecheck(kind, fresh.value, { id: viewerId })
         if (verdict.kind === 'stop') {
           setAssigning(false)
           setError(verdict.message)
@@ -138,7 +175,7 @@ export function useConversationAssignment(
         }
 
         const result =
-          action.kind === 'engage'
+          kind === 'engage'
             ? await engageConversation(id)
             : await takeOverConversation(id)
 
@@ -159,7 +196,7 @@ export function useConversationAssignment(
         setError(assignmentRefusal(result.failure))
       })()
     },
-    [conversationId, viewerId, reconfirmSession],
+    [conversationId, viewerId, reconfirmSession, reopen],
   )
 
   return { assign, assigning, error }

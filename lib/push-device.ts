@@ -1,5 +1,6 @@
+import { isRunningInExpoGo } from 'expo'
 import { File, Paths } from 'expo-file-system'
-import * as Notifications from 'expo-notifications'
+import type * as NotificationsModule from 'expo-notifications'
 import { Linking, Platform } from 'react-native'
 
 import type { PushPlatform } from '@/lib/conversation-api'
@@ -32,6 +33,25 @@ import {
  */
 
 /**
+ * The library, or null where importing it would take the app down.
+ *
+ * `expo-notifications` registers a push-token listener as a side effect of its
+ * own index, and on Android in Expo Go (SDK 53 on) that listener throws rather
+ * than warns. A static import put the throw at app start, through
+ * `conversation-inbox` into every tab layout, so Expo Go could not open the app
+ * at all. The condition is the library's own, from `warnOfExpoGoPushUsage`: on
+ * iOS it only warns, and local notification calls still answer there.
+ *
+ * Null is one more build with no native side, which everything below already
+ * handles by doing nothing.
+ */
+const Notifications: typeof NotificationsModule | null =
+  Platform.OS === 'android' && isRunningInExpoGo()
+    ? null
+    : // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('expo-notifications')
+
+/**
  * Nothing the operating system draws while this app is in front of the person.
  *
  * The handler is asked about a dispatch that arrives in the foreground and
@@ -53,7 +73,7 @@ import {
  * native side has no handler to set and is not failed by saying so.
  */
 try {
-  Notifications.setNotificationHandler({
+  Notifications?.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowBanner: false,
       shouldShowList: false,
@@ -127,6 +147,7 @@ type PermissionState = { status: PushPermission; canAskAgain: boolean }
 const UNREADABLE: PermissionState = { status: 'undetermined', canAskAgain: true }
 
 async function readPermission(): Promise<PermissionState> {
+  if (Notifications === null) return UNREADABLE
   try {
     const answer = await Notifications.getPermissionsAsync()
     return { status: asPermission(answer.status), canAskAgain: answer.canAskAgain }
@@ -168,6 +189,8 @@ export async function ensurePushPermission(
   if (!shouldAskForPermission({ status, canAskAgain, trigger, askedBefore: hasAsked() })) {
     return status
   }
+
+  if (Notifications === null) return status
 
   let answered: PushPermission
   try {
@@ -244,6 +267,7 @@ export async function openSystemNotificationSettings(): Promise<void> {
  * dispatches into nothing.
  */
 export async function readPushToken(): Promise<string | null> {
+  if (Notifications === null) return null
   try {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: 'Messages',
@@ -286,6 +310,7 @@ let launchTap: string | null = null
  * never happens, a worse failure than a tap that lands on the Hub.
  */
 export function takeTappedConversation(): string | null {
+  if (Notifications === null) return null
   try {
     const response = Notifications.getLastNotificationResponse()
     const conversationId = conversationIdFromPush(response)
@@ -308,6 +333,7 @@ export function takeTappedConversation(): string | null {
 export function addPushTapListener(
   onTap: (conversationId: string) => void,
 ): () => void {
+  if (Notifications === null) return () => {}
   try {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       (response) => {
@@ -355,6 +381,7 @@ export function addPushTapListener(
 export async function dismissConversationNotifications(
   conversationId: string,
 ): Promise<void> {
+  if (Notifications === null) return
   try {
     const presented = await Notifications.getPresentedNotificationsAsync()
     await Promise.all(

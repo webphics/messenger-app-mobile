@@ -11,8 +11,19 @@ import {
 import { router, useNavigation } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { AlertCircle, ChevronRight, Image as ImageIcon, Plus, X } from '@/components/icons'
+import {
+  AlertCircle,
+  ChevronRight,
+  FileText,
+  Image as ImageIcon,
+  Plus,
+  Shield,
+  Tag,
+  Users,
+  X,
+} from '@/components/icons'
 import { InScreenHeader } from '@/components/in-screen-header'
+import { DetailsCard } from '@/components/chat/details-card'
 import { ThreadManagementSection } from '@/components/chat/thread-management-section'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -27,6 +38,10 @@ import {
   conversationPeerRole,
   labelChipColors,
   offerableLabels,
+  peerPresence,
+  supportStatusTone,
+  type DetailField,
+  type StatusTone,
 } from '@/lib/conversation-details'
 import { conversationPeer, conversationTitle } from '@/lib/conversation-title'
 import { initials } from '@/lib/display'
@@ -39,7 +54,13 @@ import type {
 } from '@/lib/use-conversation-details'
 import type { ThreadManagement } from '@/lib/use-thread-management'
 import { isStaffConversation } from '@/lib/types'
-import type { Conversation, ConversationNote, Label, UserRole } from '@/lib/types'
+import type {
+  Conversation,
+  ConversationNote,
+  ConversationStaffPerson,
+  Label,
+  UserRole,
+} from '@/lib/types'
 
 type ConversationDetailsScreenProps = {
   conversation: Conversation
@@ -49,11 +70,15 @@ type ConversationDetailsScreenProps = {
   /** Whether Support DMs are worked by assignment. See `lib/support-assignment`. */
   supportAssignment: boolean
   /**
-   * Closing and transferring, for whoever the API grants Close to. Absent for
-   * everybody else, which is how the section stays undrawn rather than drawn
-   * and disabled — see `threadActions`.
+   * Closing, reopening and transferring, for whoever the API grants one of them
+   * to. Absent for everybody else, which is how the section stays undrawn rather
+   * than drawn and disabled — see `threadActions`.
    */
   management?: ThreadManagement
+  /** Whether Close is offered. False on a closed thread, where Reopen is. */
+  canClose?: boolean
+  /** Whether Reopen is offered: staff, on a closed Support DM. */
+  canReopen?: boolean
   /** Whether Transfer is offered beside Close. Never in a Shared queue. */
   canTransfer?: boolean
 }
@@ -71,6 +96,10 @@ type ConversationDetailsScreenProps = {
  * API refuses all three to a Customer who asks — so the screen shows a Customer
  * who they are talking to and what has been shared, and nothing that would be a
  * lie or a 403. See `lib/conversation-details`.
+ *
+ * Laid out the way WhatsApp's and Messenger's contact screens are: the person
+ * first and large, the shared media right under them, then one white card per
+ * section, each headed by an icon and a title so the eye can jump between them.
  */
 export function ConversationDetailsScreen({
   conversation,
@@ -79,6 +108,8 @@ export function ConversationDetailsScreen({
   details,
   supportAssignment,
   management,
+  canClose = false,
+  canReopen = false,
   canTransfer = false,
 }: ConversationDetailsScreenProps) {
   const insets = useSafeAreaInsets()
@@ -92,12 +123,17 @@ export function ConversationDetailsScreen({
   const [draft, setDraft] = useState('')
   const title = conversationTitle(conversation, organizationNames)
   const fields = conversationDetailFields(conversation, supportAssignment)
+  const field = (key: DetailField['key']) => fields.find((f) => f.key === key)?.value ?? null
   const labels = appliedLabels(conversation)
   const showLabels = canLabel(conversation, viewerRole)
   const showNotes = canReadNotes(conversation, viewerRole)
   const members = isStaffConversation(conversation) ? conversation.members : []
   // A broadcast thread carries no members, so a group is the only many-person shape left.
   const isGroup = conversation.type === 'group'
+  const statusTone: StatusTone =
+    isStaffConversation(conversation) && conversation.status !== null
+      ? supportStatusTone(conversation.status, supportAssignment)
+      : 'neutral'
 
   /**
    * Leaving with a note half-written.
@@ -153,30 +189,29 @@ export function ConversationDetailsScreen({
 
   return (
     <View className="flex-1 bg-bg">
+      {/*
+        One line. The name is the first thing in the card underneath, so a
+        second copy of it here only made the header taller.
+      */}
       <InScreenHeader onBack={confirmLeave}>
-        <View className="min-w-0 flex-1 pr-2">
-          <Text variant="body" className="font-semibold text-ink" numberOfLines={1}>
-            Conversation details
-          </Text>
-          <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
-            {title}
-          </Text>
-        </View>
+        <Text variant="title" numberOfLines={1} className="min-w-0 flex-1 pr-2 text-ink">
+          {isGroup ? 'Group details' : 'Conversation details'}
+        </Text>
       </InScreenHeader>
 
       {/*
         Android too: edge-to-edge sets `setDecorFitsSystemWindows(false)`, so the
         window never resizes for the IME and the note field this screen ends in
-        would sit behind the keyboard the moment it is tapped — nothing visible
-        of what is being typed. The thread's composer is lifted the same way; see
-        lib/keyboard-inset.ts.
+        would sit behind the keyboard the moment it is tapped, with nothing
+        visible of what is being typed. The thread's composer is lifted the same
+        way; see lib/keyboard-inset.ts.
       */}
       <View className="flex-1" style={{ paddingBottom: keyboardInset }}>
         <ScrollView
           className="flex-1"
           contentContainerStyle={{
             padding: 16,
-            gap: 12,
+            gap: 14,
             paddingBottom: screenBottomPad(insets.bottom, 24),
           }}
           keyboardShouldPersistTaps="handled"
@@ -184,148 +219,170 @@ export function ConversationDetailsScreen({
           // opens over it has to be able to be scrolled out from under.
           keyboardDismissMode="on-drag"
         >
-        <IdentityCard conversation={conversation} title={title} />
-
-        <Section title="Conversation info">
-          {fields.map((field) => (
-            <View key={field.label} className="gap-0.5">
-              <Text variant="label" className="uppercase tracking-wide text-muted">
-                {field.label}
-              </Text>
-              <Text variant="meta" className="font-semibold text-ink">
-                {field.value}
-              </Text>
-            </View>
-          ))}
-        </Section>
-
-        {isGroup && members.length > 0 ? (
-          <Section title={`Members · ${members.length}`}>
-            {members.map((member) => (
-              <View
-                key={member.id}
-                className="min-h-11 flex-row items-center justify-between gap-2"
-              >
-                <Text
-                  variant="meta"
-                  numberOfLines={1}
-                  className="min-w-0 flex-1 font-semibold text-ink"
-                >
-                  {member.name}
-                </Text>
-                <Text variant="label" className="uppercase tracking-wide text-muted">
-                  {member.role}
-                </Text>
-              </View>
-            ))}
-          </Section>
-        ) : null}
-
-        {management ? (
-          <ThreadManagementSection
-            management={management}
-            canTransfer={canTransfer}
-            supportAssignment={supportAssignment}
-          />
-        ) : null}
-
-        {showLabels ? (
-          <LabelsSection
-            applied={labels}
-            labels={details.labels}
+          <IdentityCard
             conversation={conversation}
-            busy={details.labelBusy}
-            error={details.labelError}
-            onAttach={details.attach}
-            onDetach={details.detach}
-            onReloadLabels={details.reloadLabels}
+            title={title}
+            type={field('type')}
+            status={field('status')}
+            statusTone={statusTone}
+            assignee={field('assignee')}
           />
-        ) : null}
 
-        {showNotes ? (
-          <NotesSection
-            notes={details.notes}
-            onReload={details.reloadNotes}
-            onAdd={details.addNote}
-            adding={details.addingNote}
-            error={details.noteError}
-            draft={draft}
-            onChangeDraft={setDraft}
-          />
-        ) : null}
+          <SharedInChatRow conversationId={conversation.id} />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Shared in chat"
-          onPress={() => router.push(chatMediaHref(conversation.id))}
-          className="min-h-11 flex-row items-center gap-3 rounded-2xl border border-line/70 bg-surface px-3 py-3 active:opacity-70"
-        >
-          <View className="size-10 items-center justify-center rounded-2xl bg-primary-soft">
-            <ImageIcon color={colors.primary} size={20} />
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text variant="meta" className="font-semibold text-ink">
-              Shared in chat
-            </Text>
-            {/* No count. What is shared lives a page fetch away, and a number
-                here would either cost that fetch on the way into this screen or
-                report only the page the thread happened to hold. */}
-            <Text variant="label" className="mt-0.5 font-normal text-muted">
-              Photos, videos, voice notes, documents and links
-            </Text>
-          </View>
-          <ChevronRight color={colors.muted} size={18} />
-        </Pressable>
+          {isGroup && members.length > 0 ? <MembersSection members={members} /> : null}
+
+          {management ? (
+            <ThreadManagementSection
+              management={management}
+              canClose={canClose}
+              canReopen={canReopen}
+              canTransfer={canTransfer}
+              supportAssignment={supportAssignment}
+            />
+          ) : null}
+
+          {showLabels ? (
+            <LabelsSection
+              applied={labels}
+              labels={details.labels}
+              conversation={conversation}
+              busy={details.labelBusy}
+              error={details.labelError}
+              onAttach={details.attach}
+              onDetach={details.detach}
+              onReloadLabels={details.reloadLabels}
+            />
+          ) : null}
+
+          {showNotes ? (
+            <NotesSection
+              notes={details.notes}
+              onReload={details.reloadNotes}
+              onAdd={details.addNote}
+              adding={details.addingNote}
+              error={details.noteError}
+              draft={draft}
+              onChangeDraft={setDraft}
+            />
+          ) : null}
         </ScrollView>
       </View>
     </View>
   )
 }
 
+const TONE_PILL: Record<StatusTone, { wash: string; ink: string; dot: string }> = {
+  success: { wash: 'bg-success/15', ink: 'text-success', dot: 'bg-success' },
+  attention: { wash: 'bg-amber/15', ink: 'text-amber', dot: 'bg-amber' },
+  neutral: { wash: 'bg-primary-soft', ink: 'text-primary', dot: 'bg-primary' },
+}
+
 /**
- * Who the thread is with.
+ * Who the thread is with, and what state it is in, in one glance.
  *
  * The peer where there is one, and the title where the thread is a group or a
- * Customer's own support line — `conversationTitle` already knows the
- * difference, and this only draws it larger than the header does.
+ * Customer's own support line; `conversationTitle` already knows the
+ * difference. Type and status sit under the name as pills rather than as rows
+ * further down, because they are the two facts somebody opens this screen to
+ * check, and a pill is read without reading a label beside it.
+ *
+ * Nothing here is `font-bold`. On Android that weight skips the loaded Manrope
+ * face for the system one, which on a phone with a custom system font draws
+ * the name in somebody else's handwriting.
  */
 function IdentityCard({
   conversation,
   title,
+  type,
+  status,
+  statusTone,
+  assignee,
 }: {
   conversation: Conversation
   title: string
+  type: string | null
+  status: string | null
+  statusTone: StatusTone
+  /** Only where Support DMs are worked by assignment. */
+  assignee: string | null
 }) {
   const peer = conversationPeer(conversation)
   const online = peer?.isOnline === true
+  const presence = peerPresence(conversation)
   const role = conversationPeerRole(conversation)
+  const tone = TONE_PILL[statusTone]
 
   return (
-    <View className="items-center gap-2 rounded-2xl bg-line/25 px-4 py-5">
+    <View className="items-center rounded-3xl border border-line/70 bg-surface px-5 pb-6 pt-7 shadow-md shadow-black/8">
       <View className="relative">
-        <Avatar alt={title} className="size-16">
+        <Avatar alt={title} className="size-24">
           <AvatarFallback className="bg-primary-soft">
-            <Text variant="headline" className="font-bold text-primary">
+            <Text variant="display" className="font-semibold text-primary">
               {initials(title)}
             </Text>
           </AvatarFallback>
         </Avatar>
         {online ? (
-          <View className="absolute bottom-0.5 right-0.5 size-3.5 rounded-full border-2 border-bg bg-success" />
+          <View className="absolute bottom-1 right-1 size-5 rounded-full border-2 border-surface bg-success" />
         ) : null}
       </View>
-      <Text variant="title" className="text-center text-ink">
+
+      <Text variant="headline" className="mt-4 text-center font-semibold text-ink">
         {title}
       </Text>
-      {role ? (
-        <View className="rounded-full bg-primary-soft px-2.5 py-0.5">
-          <Text variant="label" className="font-bold uppercase tracking-wide text-primary">
-            {role}
-          </Text>
+
+      {presence ? (
+        <Text
+          variant="meta"
+          className={cn('mt-1 text-center', online ? 'text-success' : 'text-muted')}
+        >
+          {presence}
+        </Text>
+      ) : null}
+
+      {role || type || status ? (
+        <View className="mt-3.5 flex-row flex-wrap justify-center gap-1.5">
+          {role ? (
+            <View className="rounded-full bg-primary-soft px-3 py-1">
+              <Text variant="label" className="uppercase tracking-wide text-primary">
+                {role}
+              </Text>
+            </View>
+          ) : null}
+          {type ? (
+            <View className="rounded-full bg-bg px-3 py-1">
+              <Text variant="label" className="text-ink-soft">
+                {type}
+              </Text>
+            </View>
+          ) : null}
+          {status ? (
+            <View
+              accessible
+              accessibilityLabel={`Status: ${status}`}
+              className={cn('flex-row items-center gap-1.5 rounded-full px-3 py-1', tone.wash)}
+            >
+              <View className={cn('size-1.5 rounded-full', tone.dot)} />
+              <Text variant="label" className={tone.ink}>
+                {status}
+              </Text>
+            </View>
+          ) : null}
         </View>
       ) : null}
+
+      {assignee ? (
+        <Text variant="meta" className="mt-3 text-center text-muted">
+          Assigned to{' '}
+          <Text variant="meta" className="font-semibold text-ink">
+            {assignee}
+          </Text>
+        </Text>
+      ) : null}
+
       {isStaffConversation(conversation) && conversation.description ? (
-        <Text variant="meta" className="text-center text-muted">
+        <Text variant="meta" className="mt-3 text-center text-ink-soft">
           {conversation.description}
         </Text>
       ) : null}
@@ -333,24 +390,78 @@ function IdentityCard({
   )
 }
 
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string
-  action?: React.ReactNode
-  children: React.ReactNode
-}) {
+/**
+ * The way into everything shared in the thread.
+ *
+ * Second on the screen, right under who the thread is with, where WhatsApp and
+ * Messenger both put their media row: it is what people most often open this
+ * screen to reach.
+ */
+function SharedInChatRow({ conversationId }: { conversationId: string }) {
   return (
-    <View className="gap-3 rounded-2xl bg-line/25 px-3.5 py-3.5">
-      <View className="flex-row items-center justify-between gap-2">
-        <Text variant="label" className="uppercase tracking-wide text-muted">
-          {title}
-        </Text>
-        {action}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Shared in chat"
+      onPress={() => router.push(chatMediaHref(conversationId))}
+      className="min-h-11 flex-row items-center gap-3 rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8 active:opacity-70"
+    >
+      <View className="size-11 items-center justify-center rounded-2xl bg-primary-soft">
+        <ImageIcon color={colors.primary} size={20} />
       </View>
-      {children}
+      <View className="min-w-0 flex-1">
+        <Text variant="title" className="text-ink">
+          Shared in chat
+        </Text>
+        {/* No count. What is shared lives a page fetch away, and a number
+            here would either cost that fetch on the way into this screen or
+            report only the page the thread happened to hold. */}
+        <Text variant="meta" className="mt-0.5 text-muted">
+          Photos, videos, voice notes, docs and links
+        </Text>
+      </View>
+      <ChevronRight color={colors.muted} size={20} />
+    </Pressable>
+  )
+}
+
+function MembersSection({ members }: { members: ConversationStaffPerson[] }) {
+  return (
+    <DetailsCard icon={Users} title="Members" trailing={<CountBadge count={members.length} />}>
+      <View>
+        {members.map((member, index) => (
+          <View
+            key={member.id}
+            className={cn(
+              'min-h-12 flex-row items-center gap-3 py-2',
+              index > 0 && 'border-t border-line/60',
+            )}
+          >
+            <Avatar alt={member.name} className="size-9">
+              <AvatarFallback className="bg-primary-soft">
+                <Text variant="label" className="font-semibold text-primary">
+                  {initials(member.name)}
+                </Text>
+              </AvatarFallback>
+            </Avatar>
+            <Text variant="body" numberOfLines={1} className="min-w-0 flex-1 text-ink">
+              {member.name}
+            </Text>
+            <Text variant="label" className="uppercase tracking-wide text-muted">
+              {member.role}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </DetailsCard>
+  )
+}
+
+function CountBadge({ count }: { count: number }) {
+  return (
+    <View className="min-w-7 items-center rounded-full bg-bg px-2 py-0.5">
+      <Text variant="label" className="text-ink-soft" style={{ fontVariant: ['tabular-nums'] }}>
+        {count}
+      </Text>
     </View>
   )
 }
@@ -363,7 +474,7 @@ function Section({
  * affordance beside each would be a second control for a reversible action.
  * The × says so, because a chip that reads as a badge is not obviously a button.
  *
- * No confirm on removal, deliberately: the chip reappears under *Add a label*
+ * No confirm on removal, deliberately: the chip reappears under the add tray
  * the moment it comes off, so undoing is the same one tap that did it. A dialog
  * in front of that would cost more than the mistake it prevents.
  */
@@ -391,47 +502,52 @@ function LabelsSection({
     labels.status === 'ready' ? offerableLabels(labels.labels, conversation) : []
 
   return (
-    <Section
+    <DetailsCard
+      icon={Tag}
       title="Labels"
-      action={
+      trailing={
         offerable.length > 0 ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={adding ? 'Done adding labels' : 'Add a label'}
             accessibilityState={{ expanded: adding }}
             onPress={() => setAdding((open) => !open)}
-            hitSlop={12}
-            className="flex-row items-center gap-1 active:opacity-60"
+            hitSlop={8}
+            className={cn(
+              'min-h-8 flex-row items-center gap-1 rounded-full px-3 active:opacity-70',
+              adding ? 'bg-bg' : 'bg-primary-soft',
+            )}
           >
             {adding ? (
-              <X color={colors.primary} size={14} />
+              <X color={colors.inkSoft} size={14} />
             ) : (
               <Plus color={colors.primary} size={14} />
             )}
-            <Text variant="label" className="font-bold text-primary">
+            <Text variant="label" className={adding ? 'text-ink-soft' : 'text-primary'}>
               {adding ? 'Done' : 'Add'}
             </Text>
           </Pressable>
         ) : null
       }
     >
-      <View className="flex-row flex-wrap gap-1.5">
-        {applied.map((label) => (
-          <LabelChip
-            key={label.id}
-            label={label}
-            action="remove"
-            busy={busy === label.id}
-            disabled={busy !== null}
-            onPress={onDetach}
-          />
-        ))}
-        {applied.length === 0 ? (
-          <Text variant="meta" className="text-muted">
-            No labels attached
-          </Text>
-        ) : null}
-      </View>
+      {applied.length > 0 ? (
+        <View className="flex-row flex-wrap gap-2">
+          {applied.map((label) => (
+            <LabelChip
+              key={label.id}
+              label={label}
+              action="remove"
+              busy={busy === label.id}
+              disabled={busy !== null}
+              onPress={onDetach}
+            />
+          ))}
+        </View>
+      ) : (
+        <Text variant="meta" className="text-muted">
+          No labels yet.
+        </Text>
+      )}
 
       {/*
         A list that would not load is not an organization with no labels in it,
@@ -454,11 +570,11 @@ function LabelsSection({
       ) : null}
 
       {adding && offerable.length > 0 ? (
-        <View className="gap-1.5 border-t border-line/70 pt-3">
-          <Text variant="label" className="uppercase tracking-wide text-muted">
-            Add a label
+        <View className="gap-2.5 rounded-2xl bg-bg p-3">
+          <Text variant="label" className="text-muted">
+            Tap a label to add it
           </Text>
-          <View className="flex-row flex-wrap gap-1.5">
+          <View className="flex-row flex-wrap gap-2">
             {offerable.map((label) => (
               <LabelChip
                 key={label.id}
@@ -478,7 +594,7 @@ function LabelsSection({
           {error}
         </Text>
       ) : null}
-    </Section>
+    </DetailsCard>
   )
 }
 
@@ -514,23 +630,26 @@ function LabelChip({
       accessibilityLabel={`${removing ? 'Remove' : 'Add'} label ${label.name}`}
       accessibilityState={{ busy, disabled }}
       disabled={disabled}
-      hitSlop={{ top: 10, bottom: 10, left: 3, right: 3 }}
+      hitSlop={{ top: 8, bottom: 8, left: 3, right: 3 }}
       onPress={() => onPress(label.id)}
       style={{ backgroundColor: chip.wash }}
       className={cn(
-        'min-h-8 flex-row items-center gap-1.5 rounded-full px-3 py-1.5 active:opacity-70',
+        'min-h-9 flex-row items-center gap-1.5 rounded-full px-3.5 py-1.5 active:opacity-70',
         busy && 'opacity-60',
       )}
     >
-      {removing ? null : <Plus color={chip.ink} size={12} />}
-      <Text variant="label" style={{ color: chip.ink }} className="font-semibold">
+      {removing ? (
+        <View className="size-2 rounded-full" style={{ backgroundColor: chip.ink }} />
+      ) : (
+        <Plus color={chip.ink} size={13} />
+      )}
+      <Text variant="meta" style={{ color: chip.ink }} className="font-semibold">
         {label.name}
       </Text>
-      {removing ? <X color={chip.ink} size={12} /> : null}
+      {removing ? <X color={chip.ink} size={13} /> : null}
     </Pressable>
   )
 }
-
 
 /**
  * The notes staff have written about this thread.
@@ -579,7 +698,24 @@ function NotesSection({
   }
 
   return (
-    <Section title="Internal staff notes">
+    <DetailsCard
+      icon={FileText}
+      title="Internal notes"
+      trailing={
+        // Said once, at the top, rather than in the empty state: it is as true
+        // of the fifth note as of the first.
+        <View
+          accessible
+          accessibilityLabel="Staff only, never shown to the Customer"
+          className="flex-row items-center gap-1 rounded-full bg-amber/15 px-2.5 py-1"
+        >
+          <Shield color={colors.amber} size={12} />
+          <Text variant="label" className="text-amber">
+            Staff only
+          </Text>
+        </View>
+      }
+    >
       {notes.status === 'loading' ? (
         <ActivityIndicator accessibilityLabel="Loading notes…" />
       ) : notes.status === 'failed' ? (
@@ -596,28 +732,31 @@ function NotesSection({
         </View>
       ) : notes.status === 'ready' && notes.notes.length === 0 ? (
         <Text variant="meta" className="text-muted">
-          No notes yet. A note is staff-only and is never shown to the Customer.
+          No notes yet. The Customer never sees what is written here.
         </Text>
       ) : notes.status === 'ready' ? (
-        <View className="gap-2">
+        <View className="gap-2.5">
           {notes.notes.map((note) => (
             <NoteCard key={note.id} note={note} />
           ))}
         </View>
       ) : null}
 
-      <View className="gap-2 border-t border-line/70 pt-3">
+      <View className="gap-2.5">
         <TextInput
           value={draft}
           onChangeText={setDraft}
-          placeholder="Write an internal note…"
+          placeholder="Write a note for the team…"
           placeholderTextColor={colors.muted}
           multiline
           // ⌘/Ctrl+Enter is a desktop gesture; on a phone the button is the
           // submit, and Enter has to stay a newline in a field that takes
           // paragraphs.
           accessibilityLabel="Internal note, never shown to the Customer"
-          className="min-h-20 rounded-xl border border-line/70 bg-surface px-3 py-2.5 text-base text-ink"
+          // `font-normal` names the Manrope face. Without it the field draws in
+          // the system font, which on a phone with a custom system font is
+          // whatever that font happens to be.
+          className="min-h-24 rounded-2xl border border-line/80 bg-line/35 px-3.5 py-3 font-normal text-base text-ink"
           style={{ textAlignVertical: 'top' }}
         />
         {error ? (
@@ -640,19 +779,34 @@ function NotesSection({
           <Text>Add note</Text>
         </Button>
       </View>
-    </Section>
+    </DetailsCard>
   )
 }
 
+/** One note: who wrote it and when on the first line, what they wrote under it. */
 function NoteCard({ note }: { note: ConversationNote }) {
   return (
-    <View className="gap-1 rounded-xl border border-line/70 bg-surface px-3 py-2.5">
-      <Text variant="meta" className="text-ink">
-        {note.text}
-      </Text>
-      <Text variant="label" className="font-normal text-muted">
-        {note.author.name} · {formatDayLabel(note.createdAt)}
-      </Text>
+    <View className="flex-row gap-3 rounded-2xl bg-bg p-3">
+      <Avatar alt={note.author.name} className="size-8">
+        <AvatarFallback className="bg-surface">
+          <Text variant="label" className="font-semibold text-ink-soft">
+            {initials(note.author.name)}
+          </Text>
+        </AvatarFallback>
+      </Avatar>
+      <View className="min-w-0 flex-1 gap-1">
+        <View className="flex-row items-baseline gap-2">
+          <Text variant="meta" numberOfLines={1} className="min-w-0 shrink font-semibold text-ink">
+            {note.author.name}
+          </Text>
+          <Text variant="label" className="font-normal text-muted">
+            {formatDayLabel(note.createdAt)}
+          </Text>
+        </View>
+        <Text variant="meta" className="text-ink">
+          {note.text}
+        </Text>
+      </View>
     </View>
   )
 }

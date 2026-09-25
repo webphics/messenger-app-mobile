@@ -400,7 +400,7 @@ function ComposeSheet({
                   placeholderTextColor={colors.muted}
                   accessibilityLabel="Post title"
                   editable={!submitting}
-                  className="min-h-12 rounded-xl border border-line/70 bg-bg px-3 py-2.5 text-base text-ink"
+                  className="min-h-12 rounded-xl border border-line/70 bg-bg px-3 py-2.5 font-normal text-base text-ink"
                 />
                 {titleError ? (
                   <Text variant="label" accessibilityLiveRegion="polite" className="text-danger">
@@ -495,7 +495,7 @@ function ComposeSheet({
                   placeholderTextColor={colors.muted}
                   accessibilityLabel="Post text"
                   editable={!submitting}
-                  className="min-h-28 rounded-xl border border-line/70 bg-bg px-3 py-2.5 text-base text-ink"
+                  className="min-h-28 rounded-xl border border-line/70 bg-bg px-3 py-2.5 font-normal text-base text-ink"
                   style={{ textAlignVertical: 'top' }}
                 />
               </View>
