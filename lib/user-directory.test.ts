@@ -127,14 +127,3 @@ describe('invitableOrganizations', () => {
     expect(invitableOrganizations([TALO], row)).toEqual([TALO])
   })
 })
-
-describe('a developer account', () => {
-  test('is labelled as one rather than dropped or relabelled', () => {
-    expect(userRoleLabel('developer')).toBe('Developer')
-  })
-
-  test('can be changed out of that role, but nobody can be changed into it here', () => {
-    expect(otherRoles('developer')).toEqual(['admin', 'agent', 'customer'])
-    expect(otherRoles('agent')).not.toContain('developer')
-  })
-})

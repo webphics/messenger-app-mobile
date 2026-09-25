@@ -173,39 +173,17 @@ describe('what a row says', () => {
 })
 
 /**
- * The API's role enum has four values and this client routes on three. A
- * `developer` therefore arrives in the directory looking like staff — and
- * `getOrCreateStaffDm` refuses any target that is not an admin or an agent,
- * so offering the DM was offering a request that always 404s.
+ * A staff-kind row whose role this client could not read arrives with a null
+ * role, and `getOrCreateStaffDm` refuses any target that is not an admin or an
+ * agent, so offering the DM would be offering a request that always 404s.
  */
 describe('a role this app does not route on', () => {
-  test('a developer cannot be sent a staff DM, and is told why', () => {
-    const row = contact({ kind: 'staff', role: 'developer' })
-    expect(contactIntent(row, [TALO])).toEqual({
-      kind: 'unavailable',
-      reason: 'Not a staff account',
-    })
-  })
-
-  test('a role the client has never heard of is refused by the same test', () => {
+  test('a role the client has never heard of cannot be sent a staff DM', () => {
     const row = contact({ kind: 'staff', role: null })
     expect(contactIntent(row, [TALO])).toEqual({
       kind: 'unavailable',
       reason: 'Not a staff account',
     })
-  })
-
-  test('a developer who already has a thread still opens it', () => {
-    const row = contact({ kind: 'staff', role: 'developer', conversationId: 'conv-1' })
-    expect(contactIntent(row)).toEqual({ kind: 'open', conversationId: 'conv-1' })
-  })
-
-  test('a developer is labelled a developer, never defaulted to Customer', () => {
-    const row = contact({ kind: 'staff', role: 'developer' })
-    expect(contactSubtitle(row, contactIntent(row))).toBe('Not a staff account')
-    // And where the intent is not the story, the role itself is.
-    const held = contact({ kind: 'staff', role: 'developer', conversationId: 'conv-1' })
-    expect(contactSubtitle(held, contactIntent(held))).toBe('Developer')
   })
 
   test('a row whose role never arrived says nothing rather than guessing', () => {

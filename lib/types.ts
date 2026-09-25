@@ -1,21 +1,6 @@
 export type UserRole = 'admin' | 'agent' | 'customer'
 
 /**
- * A role as it may arrive in somebody *else's* row.
- *
- * The API's enum is `['admin', 'agent', 'customer', 'developer']` — four, not
- * three. `UserRole` stays at three deliberately, because it is the role this
- * app routes on: there is no developer Hub, and `lib/auth-response` refuses a
- * session whose role this client cannot place.
- *
- * But a directory lists other people, and one of them being a developer is not
- * a reason to drop their row or to relabel them as something they are not.
- * That is what this is for, and it is only ever read — nothing here routes on
- * it.
- */
-export type DirectoryRole = UserRole | 'developer'
-
-/**
  * The signed-in person as the API reports them. The role is server-owned: it
  * arrives on this payload and the client has no way to set it.
  */
@@ -564,7 +549,7 @@ export type Contact = {
   name: string
   kind: ContactKind
   /** Null on a company, which is an organization rather than somebody. */
-  role: DirectoryRole | null
+  role: UserRole | null
   conversationId: string | null
 }
 
@@ -641,7 +626,7 @@ export type ManagedUser = {
   name: string | null
   email: string
   phone: string | null
-  role: DirectoryRole
+  role: UserRole
   emailVerified: boolean
   is2faEnabled: boolean
   isBanned: boolean

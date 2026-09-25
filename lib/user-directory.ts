@@ -1,4 +1,4 @@
-import type { DirectoryRole, ManagedUser, UserRole } from '@/lib/types'
+import type { ManagedUser, UserRole } from '@/lib/types'
 
 /**
  * Reading the Admin user directory: what a row says about somebody, and which
@@ -18,14 +18,13 @@ export function userDisplayName(user: ManagedUser): string {
   return user.name?.trim() || user.email
 }
 
-const ROLE_LABEL: Record<DirectoryRole, string> = {
+const ROLE_LABEL: Record<UserRole, string> = {
   admin: 'Admin',
   agent: 'Agent',
   customer: 'Customer',
-  developer: 'Developer',
 }
 
-export function userRoleLabel(role: DirectoryRole): string {
+export function userRoleLabel(role: UserRole): string {
   return ROLE_LABEL[role]
 }
 
@@ -100,13 +99,9 @@ export function isSelf(user: ManagedUser, viewerId: string | null): boolean {
 /**
  * Which roles a row may be changed to.
  *
- * The three this app has a Hub for, minus whatever the row already is. A
- * `developer` account is listed and can be changed *out* of that role, but
- * cannot be changed *into* it from here: `lib/auth-response` refuses a session
- * whose role this client cannot place, so offering it would be offering to
- * lock somebody out of this app. That role is set on web.
+ * The three roles there are, minus whatever the row already is.
  */
-export function otherRoles(role: DirectoryRole): UserRole[] {
+export function otherRoles(role: UserRole): UserRole[] {
   return (['admin', 'agent', 'customer'] as const).filter((other) => other !== role)
 }
 

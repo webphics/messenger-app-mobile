@@ -1,5 +1,7 @@
 # The developer console is not a mobile surface
 
+> Update, 2026-09-25: root ADR 0014 (`docs/adr/0014-the-developer-becomes-a-super-admin-who-alone-uses-the-console.md`) turns the developer into a super admin, who signs in on mobile as an ordinary admin, so `DirectoryRole` and every developer branch are gone from this client. The Console is still not a mobile surface.
+
 Email logs, email providers, email templates and their editor, developer logs and the developer
 profile page are web-only and stay web-only. This client builds none of them, and a screen here
 never renders for the developer role.

@@ -32,7 +32,7 @@ import {
   userRoleLabel,
 } from "@/lib/user-directory";
 import type { UserDirectoryView } from "@/lib/use-user-directory";
-import type { DirectoryRole, ManagedUser, OrganizationSummary } from "@/lib/types";
+import type { ManagedUser, OrganizationSummary, UserRole } from "@/lib/types";
 
 /**
  * One account, and everything an Admin can do to it.
@@ -55,11 +55,10 @@ const FLAG_STYLE = {
   neutral: { chip: "bg-line/70", ink: "text-muted" },
 } as const;
 
-const ROLE_STYLE: Record<DirectoryRole, { chip: string; ink: string }> = {
+const ROLE_STYLE: Record<UserRole, { chip: string; ink: string }> = {
   admin: { chip: "bg-primary-soft", ink: "text-primary" },
   agent: { chip: "bg-amber/15", ink: "text-amber" },
   customer: { chip: "bg-line/70", ink: "text-muted" },
-  developer: { chip: "bg-line/70", ink: "text-muted" },
 };
 
 type UserDirectoryRowProps = {

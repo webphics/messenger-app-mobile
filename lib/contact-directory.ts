@@ -2,9 +2,9 @@ import { staffDmIntent } from '@/lib/staff-directory'
 import type {
   Contact,
   ContactKind,
-  DirectoryRole,
   Organization,
   StaffDirectoryUser,
+  UserRole,
 } from '@/lib/types'
 
 /**
@@ -73,13 +73,11 @@ export function contactIntent(
   /*
    * A staff-kind row whose role is not one of the two that can hold a DM.
    *
-   * The API's enum has four roles and `getOrCreateStaffDm` refuses a target
-   * that is not an admin or an agent — it answers `conversationNotFoundError`,
-   * which would reach somebody as a bare "not found" about a person plainly in
-   * front of them. `toContact` calls every non-Customer `staff`, so a
-   * `developer` arrives here looking exactly like a colleague.
-   *
-   * An unknown role is refused for the same reason and by the same test: this
+   * `getOrCreateStaffDm` refuses a target that is not an admin or an agent. It
+   * answers `conversationNotFoundError`, which would reach somebody as a bare
+   * "not found" about a person plainly in front of them. `toContact` calls
+   * every non-Customer `staff`, so a role this client could not read arrives
+   * here as null on a row that looks like a colleague, and is refused: this
    * client knows which roles the API accepts, and a role it has never heard of
    * is not one of them.
    */
@@ -161,11 +159,10 @@ export function contactChipLabel(chip: ContactChip): string {
   return CHIP_LABEL[chip]
 }
 
-const ROLE_LABEL: Record<DirectoryRole, string> = {
+const ROLE_LABEL: Record<UserRole, string> = {
   admin: 'Admin',
   agent: 'Agent',
   customer: 'Customer',
-  developer: 'Developer',
 }
 
 /**
@@ -178,9 +175,8 @@ const ROLE_LABEL: Record<DirectoryRole, string> = {
  *
  * Every role is spelled out rather than defaulted. This used to end
  * `: 'Customer'`, which meant a role the client did not recognise was labelled
- * as the one role it is least likely to be — a `developer` read as a Customer
- * on screen. A row that cannot say what somebody is says nothing rather than
- * guessing.
+ * as the one role it is least likely to be. A row that cannot say what
+ * somebody is says nothing rather than guessing.
  */
 export function contactSubtitle(contact: Contact, intent: ContactIntent): string {
   if (intent.kind === 'unavailable') return intent.reason
