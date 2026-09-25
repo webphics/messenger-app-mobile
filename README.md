@@ -191,7 +191,7 @@ eas build --platform android --profile preview
 Answer *yes* to generate a keystore — EAS refuses to create one in `--non-interactive` mode, so CI cannot do this for you. Then add the CI token from **expo.dev → Account Settings → Access Tokens**:
 
 ```bash
-gh secret set EXPO_TOKEN
+gh secret set EXPO_TOKEN --env Production
 ```
 
-A token in a local `.env` does not reach CI; it has to be a repository secret. Confirm with `gh secret list` before dispatching.
+A token in a local `.env` does not reach CI; it has to be a secret on the Production environment, beside the `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` variables. Confirm with `gh secret list --env Production` before dispatching.

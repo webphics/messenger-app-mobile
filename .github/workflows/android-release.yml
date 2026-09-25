@@ -1,11 +1,13 @@
-# Builds the Android APK on the runner with Gradle, and publishes it as a GitHub
-# Release asset (tag `joychat-v<X.Y.Z>`, asset `joychat-release.apk`).
+# Builds the Android APK on the runner with Gradle, publishes it as a GitHub
+# Release asset (tag `joychat-v<X.Y.Z>`, asset `joychat-release.apk`), and
+# uploads the same file to the project's builds page at expo.dev.
 #
 # The build runs through `eas build --platform android --profile production
 # --local`, which compiles on this runner rather than on EAS's builders: no build
 # credits and no queue, but it does need an Expo login, so EXPO_TOKEN is a
-# repository secret. `eas.json`'s `production` profile is the whole of the build
-# configuration, and `pnpm build:apk:eas` is the same command a developer runs.
+# secret on the Production environment. `eas.json`'s `production` profile is
+# the whole of the build configuration, and `pnpm build:apk:eas` is the same
+# command a developer runs.
 #
 # The project stays *managed*: `android/` is gitignored, EAS runs `expo prebuild`
 # inside the build, and the two config plugins in `plugins/` go on applying
@@ -32,20 +34,21 @@
 # the `eas-build-post-install` hook, because without it the NDK build loops on
 # "ninja: build.ninja still dirty" until the job times out.
 #
-# Three jobs rather than one, because "Re-run failed jobs" works per job: it
+# Four jobs rather than one, because "Re-run failed jobs" works per job: it
 # replays the failed job and everything downstream of it, and leaves the jobs
-# that already passed alone. So a missing repository variable fails in `meta`
+# that already passed alone. So a missing Production variable fails in `meta`
 # after ten seconds instead of after the build, and a release that dies on a
-# token, a tag or a bad minute at GitHub is re-run on its own without
-# recompiling the NDK for another 40 minutes. There is no equivalent for a
-# *step*: a single step cannot be re-run by itself, which is why the split is
-# jobs and not just more steps.
+# token, a tag or a bad minute at GitHub, or an upload that dies at Expo, is
+# re-run on its own without recompiling the NDK for another 40 minutes. There
+# is no equivalent for a *step*: a single step cannot be re-run by itself,
+# which is why the split is jobs and not just more steps.
 #
 # What a job boundary costs is the runner, which is thrown away at the end of
-# one, so the APK travels to `release` as an Actions artifact. It is kept for a
-# day (retention-days: 1) — long enough to re-run the release, short enough that
-# it is not what the repository's storage allowance goes on. The published
-# Release is still the durable copy; the artifact is only the handoff.
+# one, so the APK travels to `release` and `expo-upload` as an Actions artifact.
+# It is kept for a day (retention-days: 1) — long enough to re-run either,
+# short enough that it is not what the repository's storage allowance goes on.
+# The published Release is still the durable copy; the artifact is only the
+# handoff.
 #
 # `build` stays a single step, because it is a single command. Splitting prebuild
 # from Gradle in YAML would mean reimplementing what build-apk.mjs does between
@@ -105,28 +108,38 @@ env:
   # One ABI. See ANDROID_ABIS in scripts/build-apk.mjs.
   ANDROID_ABIS: arm64-v8a
 
-  # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
-  # `build`, inside the Gradle task that embeds the JS. So neither of the two
-  # sources a developer relies on reaches it: `.env` is gitignored and absent
-  # from the checkout, and `eas.json`'s `env` block belongs to `eas build`,
-  # which this workflow no longer calls. Unset, they compile to `undefined`
-  # and `lib/api-config.ts` throws at import — an APK that installs and dies
-  # on launch rather than a build that fails here.
-  #
-  # Repository *variables*, not secrets: an `EXPO_PUBLIC_*` value is inlined
-  # into the shipped bundle by definition, so anyone holding the APK can read
-  # it, and hiding it in the log would only make it harder to check.
-  EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
-  EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+# Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
+# `build`, inside the Gradle task that embeds the JS. So neither of the two
+# sources a developer relies on reaches it: `.env` is gitignored and absent
+# from the checkout, and `eas.json`'s `env` block belongs to `eas build`,
+# which this workflow no longer calls. Unset, they compile to `undefined`
+# and `lib/api-config.ts` throws at import, giving an APK that installs and
+# dies on launch rather than a build that fails here.
+#
+# They are *variables* on the Production environment, not secrets: an
+# `EXPO_PUBLIC_*` value is inlined into the shipped bundle by definition, so
+# anyone holding the APK can read it, and hiding it in the log would only make
+# it harder to check. A job sees an environment's values only when it names
+# that environment, so `meta` and `build` each name it and carry the two
+# variables in their own `env` rather than in the workflow-level block above.
+# `deployment: false` lets them read the values without each adding a
+# deployment record; `release` is the one that counts as the deployment.
 
 jobs:
   # Everything that can be decided before anything slow starts. Ten seconds, and
-  # both failures it catches — a missing repository variable, a version that is
+  # both failures it catches — a missing Production variable, a version that is
   # not X.Y.Z — would otherwise surface at the end of a 40-minute build.
   meta:
     name: Check config, resolve version
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    environment:
+      name: Production
+      deployment: false
+
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
 
     outputs:
       version: ${{ steps.meta.outputs.version }}
@@ -142,11 +155,11 @@ jobs:
       - name: Require the bundle-time configuration
         run: |
           if [ -z "$EXPO_PUBLIC_API_URL" ]; then
-            echo "::error::EXPO_PUBLIC_API_URL repository variable is not set. Run: gh variable set EXPO_PUBLIC_API_URL"
+            echo "::error::EXPO_PUBLIC_API_URL is not set on the Production environment. Run: gh variable set EXPO_PUBLIC_API_URL --env Production"
             exit 1
           fi
           if [ -z "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" ]; then
-            echo "::warning::EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set. The build succeeds and Google sign-in is disabled in it."
+            echo "::warning::EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set on the Production environment. The build succeeds and Google sign-in is disabled in it."
           fi
 
       # app.json is the one place a version is written, so the tag, the title
@@ -204,6 +217,13 @@ jobs:
     # reuse is the slow case, and a build killed at 45 minutes has produced
     # nothing that a re-run can start from.
     timeout-minutes: 90
+    environment:
+      name: Production
+      deployment: false
+
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -266,7 +286,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo "::error::EXPO_TOKEN secret is not set. Create one at https://expo.dev/settings/access-tokens and add it with: gh secret set EXPO_TOKEN"
+            echo "::error::EXPO_TOKEN is not set on the Production environment. Create one at https://expo.dev/settings/access-tokens and add it with: gh secret set EXPO_TOKEN --env Production"
             exit 1
           fi
           mkdir -p dist
@@ -308,13 +328,13 @@ jobs:
             exit 1
           fi
 
-      # A fixed artifact name, because `release` downloads it by that name and
-      # the version is already inside the file.
+      # A fixed artifact name, because `release` and `expo-upload` download it
+      # by that name and the version is already inside the file.
       #
       # overwrite, because "Re-run all jobs" is a new attempt on the same run id
       # and upload-artifact@v4 otherwise refuses a name a previous attempt has
       # already used.
-      - name: Upload the APK for the release job
+      - name: Upload the APK for the publishing jobs
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
@@ -323,8 +343,8 @@ jobs:
           retention-days: 1
           overwrite: true
 
-  # Seconds, and the only job that writes anything. Re-run this one alone when a
-  # release fails; the APK it needs is still attached to the run.
+  # Seconds, and the only job that writes anything to GitHub. Re-run this one
+  # alone when a release fails; the APK it needs is still attached to the run.
   #
   # Two guards, and the ref one is the load-bearing half: a dispatch can name any
   # branch, so a build tried on one publishes nothing and cannot touch a tag.
@@ -342,6 +362,10 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Reads nothing from the environment. Naming it is what records a published
+    # Release as a Production deployment, the way `deploy` does in the web
+    # repos.
+    environment: Production
 
     # For creating and updating the Release.
     permissions:
@@ -383,4 +407,81 @@ jobs:
             echo "### $TITLE"
             echo
             echo "[Download ${APK}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Puts the same APK on the project's builds page at expo.dev, next to the
+  # GitHub Release rather than instead of it, and prints the install link Expo
+  # issues for it. A job of its own for the reason `release` is one: an upload
+  # that fails at Expo is re-run alone, without rebuilding and without touching
+  # the Release, and a Release that fails does not hold this one back. Same two
+  # guards as `release`, so a branch run or a dry run sends nothing to Expo.
+  #
+  # Expo does not learn the version from this. For an APK, `eas upload` reads
+  # only whether it is a development client and its fingerprint, and there is
+  # no fingerprint without expo-updates, which this project does not use. The
+  # entry on expo.dev is dated rather than versioned, so the version is written
+  # into this run's summary beside the link.
+  expo-upload:
+    name: Upload the APK to Expo
+    needs: [meta, build]
+    if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # For EXPO_TOKEN. Not a deployment of its own; `release` is the one.
+    environment:
+      name: Production
+      deployment: false
+
+    steps:
+      # A checkout and an install, unlike `release`: eas finds the project from
+      # `extra.eas.projectId` in app.json, and resolving the app config loads
+      # the plugins it names. The install also pins eas-cli to the lockfile.
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download the APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk
+          path: dist
+
+      - name: Upload the APK to Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APK: ${{ needs.meta.outputs.apk }}
+          TITLE: ${{ needs.meta.outputs.title }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::error::EXPO_TOKEN is not set on the Production environment. Add it with: gh secret set EXPO_TOKEN --env Production"
+            exit 1
+          fi
+
+          # --json prints only `{"url": ...}` on stdout; progress goes to
+          # stderr and stays in the log.
+          RESULT="$(pnpm exec eas upload \
+            --platform android \
+            --build-path "dist/${APK}" \
+            --non-interactive \
+            --json)"
+          URL="$(printf '%s' "$RESULT" | jq -r '.url // empty')"
+          if [ -z "$URL" ]; then
+            echo "::error::eas upload finished without a build link. It printed: ${RESULT}"
+            exit 1
+          fi
+
+          echo "Uploaded to Expo: ${URL}"
+          {
+            echo "### ${TITLE} on Expo"
+            echo
+            echo "[Install ${APK} from expo.dev](${URL})"
           } >> "$GITHUB_STEP_SUMMARY"
