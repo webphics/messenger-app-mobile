@@ -5,7 +5,7 @@
 # The build runs through `eas build --platform android --profile production
 # --local`, which compiles on this runner rather than on EAS's builders: no build
 # credits and no queue, but it does need an Expo login, so EXPO_TOKEN is a
-# secret on the Production environment. `eas.json`'s `production` profile is
+# secret on each environment. `eas.json`'s `production` profile is
 # the whole of the build configuration, and `pnpm build:apk:eas` is the same
 # command a developer runs.
 #
@@ -34,9 +34,9 @@
 # the `eas-build-post-install` hook, because without it the NDK build loops on
 # "ninja: build.ninja still dirty" until the job times out.
 #
-# Four jobs rather than one, because "Re-run failed jobs" works per job: it
+# Five jobs rather than one, because "Re-run failed jobs" works per job: it
 # replays the failed job and everything downstream of it, and leaves the jobs
-# that already passed alone. So a missing Production variable fails in `meta`
+# that already passed alone. So a missing environment variable fails in `meta`
 # after ten seconds instead of after the build, and a release that dies on a
 # token, a tag or a bad minute at GitHub, or an upload that dies at Expo, is
 # re-run on its own without recompiling the NDK for another 40 minutes. There
@@ -70,15 +70,17 @@
 # and `credentials.json` names a committed copy of that same template keystore.
 # It is committed because it is not a secret; a real one would not be.
 #
-# Triggers on every push to main, so the version in app.json is what decides
-# whether a run publishes something new. A push that does not bump
-# `expo.version` replaces the APK on the tag that is already there.
+# Triggers on every push to main, dev and release, and the branch picks the
+# environment the build reads its values from (see `target`). Within a branch,
+# the version in app.json is what decides whether a run publishes something
+# new. A push that does not bump `expo.version` replaces the APK on the tag that
+# is already there.
 
 name: Android Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev, release]
   workflow_dispatch:
     inputs:
       version:
@@ -102,21 +104,24 @@ permissions:
 
 env:
   # Only a convention today. If an update check is ever added, this is the
-  # prefix it has to look for.
+  # prefix it has to look for. Production's tags use it as it is; `target`
+  # puts the environment in front of the `v` for the others, so no Development
+  # or Release tag starts with it.
   RELEASE_TAG_PREFIX: joychat-v
 
   # One ABI. See ANDROID_ABIS in scripts/build-apk.mjs.
   ANDROID_ABIS: arm64-v8a
 
 # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
-# `build`, inside the Gradle task that embeds the JS. So neither of the two
-# sources a developer relies on reaches it: `.env` is gitignored and absent
-# from the checkout, and `eas.json`'s `env` block belongs to `eas build`,
-# which this workflow no longer calls. Unset, they compile to `undefined`
-# and `lib/api-config.ts` throws at import, giving an APK that installs and
-# dies on launch rather than a build that fails here.
+# `build`, inside the Gradle task that embeds the JS. `.env` is gitignored and
+# absent from the checkout, so it never reaches the bundle. `eas.json`'s
+# `production` profile does, and it wins: EAS lays a profile's `env` over the
+# runner's. So `build` writes this environment's values into that profile
+# before it builds. Unset, they compile to `undefined` and `lib/api-config.ts`
+# throws at import, giving an APK that installs and dies on launch rather than
+# a build that fails here.
 #
-# They are *variables* on the Production environment, not secrets: an
+# They are *variables* on the branch's environment, not secrets: an
 # `EXPO_PUBLIC_*` value is inlined into the shipped bundle by definition, so
 # anyone holding the APK can read it, and hiding it in the log would only make
 # it harder to check. A job sees an environment's values only when it names
@@ -126,15 +131,75 @@ env:
 # deployment record; `release` is the one that counts as the deployment.
 
 jobs:
+  # The branch decides the environment:
+  #
+  #   main    -> Production   tag joychat-v<X.Y.Z>
+  #   dev     -> Development  tag joychat-development-v<X.Y.Z>, a pre-release
+  #   release -> Release      tag joychat-release-v<X.Y.Z>, a pre-release
+  #
+  # Separate tags, because `release` replaces the asset on a tag that already
+  # exists, so a shared tag would let a dev push overwrite the Production APK.
+  # Pre-releases, so the repository's "latest" Release stays Production's.
+  #
+  # A dispatch from any other branch builds with Development's values and
+  # publishes nothing, so a change to this file can still be tried on a branch
+  # without reaching any environment's Release or Expo.
+  target:
+    name: Resolve environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      environment: ${{ steps.pick.outputs.environment }}
+      publish: ${{ steps.pick.outputs.publish }}
+      tag_prefix: ${{ steps.pick.outputs.tag_prefix }}
+      label: ${{ steps.pick.outputs.label }}
+      prerelease: ${{ steps.pick.outputs.prerelease }}
+    steps:
+      - id: pick
+        run: |
+          set -euo pipefail
+          PUBLISH=true
+          case "$GITHUB_REF_NAME" in
+            main)    ENVIRONMENT=Production ;;
+            dev)     ENVIRONMENT=Development ;;
+            release) ENVIRONMENT=Release ;;
+            *)
+              ENVIRONMENT=Development
+              PUBLISH=false
+              echo "::notice::Branch ${GITHUB_REF_NAME} has no environment. Building with Development's values and publishing nothing."
+              ;;
+          esac
+
+          if [ "$ENVIRONMENT" = Production ]; then
+            TAG_PREFIX="$RELEASE_TAG_PREFIX"
+            LABEL=""
+            PRERELEASE=false
+          else
+            LOWER="$(printf '%s' "$ENVIRONMENT" | tr '[:upper:]' '[:lower:]')"
+            TAG_PREFIX="${RELEASE_TAG_PREFIX%v}${LOWER}-v"
+            LABEL=" (${ENVIRONMENT})"
+            PRERELEASE=true
+          fi
+
+          {
+            echo "environment=${ENVIRONMENT}"
+            echo "publish=${PUBLISH}"
+            echo "tag_prefix=${TAG_PREFIX}"
+            echo "label=${LABEL}"
+            echo "prerelease=${PRERELEASE}"
+          } >> "$GITHUB_OUTPUT"
+          echo "${GITHUB_REF_NAME} builds for ${ENVIRONMENT}, tag prefix ${TAG_PREFIX}, publish ${PUBLISH}"
+
   # Everything that can be decided before anything slow starts. Ten seconds, and
-  # both failures it catches — a missing Production variable, a version that is
-  # not X.Y.Z — would otherwise surface at the end of a 40-minute build.
+  # both failures it catches — a missing environment variable, a version that
+  # is not X.Y.Z — would otherwise surface at the end of a 40-minute build.
   meta:
     name: Check config, resolve version
+    needs: [target]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment:
-      name: Production
+      name: ${{ needs.target.outputs.environment }}
       deployment: false
 
     env:
@@ -153,13 +218,15 @@ jobs:
       # The failure this prevents is an APK that looks fine and crashes on the
       # first screen.
       - name: Require the bundle-time configuration
+        env:
+          ENVIRONMENT: ${{ needs.target.outputs.environment }}
         run: |
           if [ -z "$EXPO_PUBLIC_API_URL" ]; then
-            echo "::error::EXPO_PUBLIC_API_URL is not set on the Production environment. Run: gh variable set EXPO_PUBLIC_API_URL --env Production"
+            echo "::error::EXPO_PUBLIC_API_URL is not set on the ${ENVIRONMENT} environment. Run: gh variable set EXPO_PUBLIC_API_URL --env ${ENVIRONMENT}"
             exit 1
           fi
           if [ -z "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" ]; then
-            echo "::warning::EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set on the Production environment. The build succeeds and Google sign-in is disabled in it."
+            echo "::warning::EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set on the ${ENVIRONMENT} environment. The build succeeds and Google sign-in is disabled in it."
           fi
 
       # app.json is the one place a version is written, so the tag, the title
@@ -170,6 +237,8 @@ jobs:
         # dispatch input arrives at `sh` as a string and not as more script.
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          TAG_PREFIX: ${{ needs.target.outputs.tag_prefix }}
+          LABEL: ${{ needs.target.outputs.label }}
         run: |
           set -euo pipefail
 
@@ -200,25 +269,25 @@ jobs:
 
           {
             echo "version=$VERSION"
-            echo "tag=${RELEASE_TAG_PREFIX}${VERSION}"
+            echo "tag=${TAG_PREFIX}${VERSION}"
             echo "apk=${APK_BASE}-release.apk"
-            echo "title=${APP_NAME} Android ${VERSION}"
+            echo "title=${APP_NAME} Android ${VERSION}${LABEL}"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Version $VERSION → tag ${RELEASE_TAG_PREFIX}${VERSION}, asset ${APK_BASE}-release.apk"
+          echo "Version $VERSION → tag ${TAG_PREFIX}${VERSION}, asset ${APK_BASE}-release.apk"
 
   # The long one. Nothing here publishes anything, so it can be re-run as often
   # as a flaky NDK compile needs without touching a Release or a tag.
   build:
     name: Build the APK
-    needs: [meta]
+    needs: [target, meta]
     runs-on: ubuntu-latest
     # Generous rather than tight: a cold cache with no Gradle or NDK output to
     # reuse is the slow case, and a build killed at 45 minutes has produced
     # nothing that a re-run can start from.
     timeout-minutes: 90
     environment:
-      name: Production
+      name: ${{ needs.target.outputs.environment }}
       deployment: false
 
     env:
@@ -272,6 +341,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The `production` profile in eas.json carries its own EXPO_PUBLIC_*
+      # values, and EAS spreads a profile's `env` over the runner's
+      # (`@expo/build-tools`, dist/context.js), so without this every branch
+      # would bundle what eas.json says. This rewrites the profile in the
+      # runner's checkout only. Nothing is committed, and a local
+      # `pnpm build:apk:eas` still reads eas.json as it is.
+      #
+      # A Google client ID that is not set is removed rather than written as an
+      # empty string, which is the "Google sign-in is disabled" case `meta`
+      # warns about.
+      - name: Point the production profile at this environment
+        run: |
+          set -euo pipefail
+          jq --arg api "$EXPO_PUBLIC_API_URL" \
+             --arg google "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" \
+            '.build.production.env.EXPO_PUBLIC_API_URL = $api
+             | if $google == ""
+               then del(.build.production.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
+               else .build.production.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = $google
+               end' \
+            eas.json > "$RUNNER_TEMP/eas.json"
+          mv "$RUNNER_TEMP/eas.json" eas.json
+          jq '.build.production.env' eas.json
+
       # EAS runs `expo prebuild` itself, so there is no prebuild step here and
       # `android/` stays gitignored. --output names the asset directly, which is
       # why nothing renames it afterwards.
@@ -283,10 +376,11 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           APK: ${{ needs.meta.outputs.apk }}
+          ENVIRONMENT: ${{ needs.target.outputs.environment }}
         run: |
           set -euo pipefail
           if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo "::error::EXPO_TOKEN is not set on the Production environment. Create one at https://expo.dev/settings/access-tokens and add it with: gh secret set EXPO_TOKEN --env Production"
+            echo "::error::EXPO_TOKEN is not set on the ${ENVIRONMENT} environment. Create one at https://expo.dev/settings/access-tokens and add it with: gh secret set EXPO_TOKEN --env ${ENVIRONMENT}"
             exit 1
           fi
           mkdir -p dist
@@ -324,7 +418,7 @@ jobs:
           if unzip -p "dist/${APK}" assets/index.android.bundle | grep -qF "$EXPO_PUBLIC_API_URL"; then
             echo "EXPO_PUBLIC_API_URL is present in the JS bundle."
           else
-            echo "::error::EXPO_PUBLIC_API_URL is not in the bundle. EAS did not forward it, so this APK would crash on launch. Put the value in eas.json's production profile under \"env\"."
+            echo "::error::EXPO_PUBLIC_API_URL is not in the bundle, so this APK would crash on launch or talk to the wrong API. Check that the step pointing eas.json's production profile at this environment ran."
             exit 1
           fi
 
@@ -346,26 +440,28 @@ jobs:
   # Seconds, and the only job that writes anything to GitHub. Re-run this one
   # alone when a release fails; the APK it needs is still attached to the run.
   #
-  # Two guards, and the ref one is the load-bearing half: a dispatch can name any
-  # branch, so a build tried on one publishes nothing and cannot touch a tag.
-  # That also means testing a change to this file needs no new dispatch input —
-  # which matters, because GitHub validates dispatch inputs against the workflow
-  # on the DEFAULT branch, so `dry_run` is not accepted until this file is on
-  # main. `build` still runs in full either way and still uploads the APK, so a
-  # branch run leaves something to install and test.
+  # Two guards, and the branch one is the load-bearing half: a dispatch can name
+  # any branch, so a build tried on one that `target` does not map publishes
+  # nothing and cannot touch a tag. That also means testing a change to this
+  # file needs no new dispatch input — which matters, because GitHub validates
+  # dispatch inputs against the workflow on the DEFAULT branch, so `dry_run` is
+  # not accepted until this file is on main. `build` still runs in full either
+  # way and still uploads the APK, so a branch run leaves something to install
+  # and test.
   #
-  # dry_run is then the way to suppress a release from main itself. `inputs` is
-  # empty on a push, so the negation leaves an ordinary release alone.
+  # dry_run is then the way to suppress a release from main, dev or release
+  # itself. `inputs` is empty on a push, so the negation leaves an ordinary
+  # release alone.
   release:
     name: Publish the Release
-    needs: [meta, build]
-    if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+    needs: [target, meta, build]
+    if: ${{ needs.target.outputs.publish == 'true' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Reads nothing from the environment. Naming it is what records a published
-    # Release as a Production deployment, the way `deploy` does in the web
-    # repos.
-    environment: Production
+    # Release as a deployment to the branch's environment, the way `deploy`
+    # does in the web repos.
+    environment: ${{ needs.target.outputs.environment }}
 
     # For creating and updating the Release.
     permissions:
@@ -387,20 +483,32 @@ jobs:
           TITLE: ${{ needs.meta.outputs.title }}
           VERSION: ${{ needs.meta.outputs.version }}
           APK: ${{ needs.meta.outputs.apk }}
+          PRERELEASE: ${{ needs.target.outputs.prerelease }}
         run: |
           set -euo pipefail
           NOTES="JoyChat Android ${VERSION} (${ANDROID_ABIS}, debug-signed). Built from ${GITHUB_SHA} on ${GITHUB_REF_NAME}."
 
+          FLAGS=()
+          if [ "$PRERELEASE" = true ]; then
+            FLAGS+=(--prerelease)
+          fi
+
           # --clobber, so a second push on an unchanged version replaces the
           # asset rather than failing on a name that is already taken.
+          #
+          # --target, because a tag that does not exist yet is otherwise cut
+          # from the default branch, which for a dev or release push is not the
+          # commit that was built.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "dist/${APK}" --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES" "${FLAGS[@]}"
           else
             gh release create "$TAG" "dist/${APK}" \
               --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
               --title "$TITLE" \
-              --notes "$NOTES"
+              --notes "$NOTES" \
+              "${FLAGS[@]}"
           fi
 
           {
@@ -414,7 +522,9 @@ jobs:
   # issues for it. A job of its own for the reason `release` is one: an upload
   # that fails at Expo is re-run alone, without rebuilding and without touching
   # the Release, and a Release that fails does not hold this one back. Same two
-  # guards as `release`, so a branch run or a dry run sends nothing to Expo.
+  # guards as `release`, so an unmapped branch or a dry run sends nothing to
+  # Expo. Every environment uploads to the same Expo project; the title in the
+  # run summary names which one a build is.
   #
   # Expo does not learn the version from this. For an APK, `eas upload` reads
   # only whether it is a development client and its fingerprint, and there is
@@ -423,13 +533,13 @@ jobs:
   # into this run's summary beside the link.
   expo-upload:
     name: Upload the APK to Expo
-    needs: [meta, build]
-    if: ${{ github.ref == 'refs/heads/main' && !inputs.dry_run }}
+    needs: [target, meta, build]
+    if: ${{ needs.target.outputs.publish == 'true' && !inputs.dry_run }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # For EXPO_TOKEN. Not a deployment of its own; `release` is the one.
     environment:
-      name: Production
+      name: ${{ needs.target.outputs.environment }}
       deployment: false
 
     steps:
@@ -459,10 +569,11 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           APK: ${{ needs.meta.outputs.apk }}
           TITLE: ${{ needs.meta.outputs.title }}
+          ENVIRONMENT: ${{ needs.target.outputs.environment }}
         run: |
           set -euo pipefail
           if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo "::error::EXPO_TOKEN is not set on the Production environment. Add it with: gh secret set EXPO_TOKEN --env Production"
+            echo "::error::EXPO_TOKEN is not set on the ${ENVIRONMENT} environment. Add it with: gh secret set EXPO_TOKEN --env ${ENVIRONMENT}"
             exit 1
           fi
 

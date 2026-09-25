@@ -192,6 +192,8 @@ Answer *yes* to generate a keystore — EAS refuses to create one in `--non-inte
 
 ```bash
 gh secret set EXPO_TOKEN --env Production
+gh secret set EXPO_TOKEN --env Development
+gh secret set EXPO_TOKEN --env Release
 ```
 
-A token in a local `.env` does not reach CI; it has to be a secret on the Production environment, beside the `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` variables. Confirm with `gh secret list --env Production` before dispatching.
+A token in a local `.env` does not reach CI; it has to be a secret on each environment, beside the `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` variables. The branch picks the environment: `main` builds with Production, `dev` with Development, `release` with Release. Confirm with `gh secret list --env <environment>` before pushing to that branch.
