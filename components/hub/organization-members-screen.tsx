@@ -15,7 +15,7 @@ import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { listUsers } from "@/lib/user-api";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
-import { userDisplayName } from "@/lib/user-directory";
+import { unmanageableIds, userDisplayName } from "@/lib/user-directory";
 import type { ManagedUser, OrganizationMember } from "@/lib/types";
 
 /**
@@ -110,6 +110,14 @@ export function OrganizationMembersScreen({
 
   const memberCount = state.status === "ready" ? state.members.length : 0;
 
+  /**
+   * The people the API will not let an Admin add or remove. A member row has
+   * no flag of its own, so it is looked up in the directory loaded beside it.
+   * Someone missing from that page keeps their button, and the API's refusal
+   * shows through `problem` like any other.
+   */
+  const locked = useMemo(() => unmanageableIds(directory), [directory]);
+
   const invite = useCallback(
     (user: ManagedUser) => {
       setBusyId(user.id);
@@ -185,6 +193,7 @@ export function OrganizationMembersScreen({
         const { member } = item;
         const busy = busyId === member.id;
         const own = viewer?.id === member.id;
+        const fixed = locked.has(member.id);
         return (
           <View
             className={cn(
@@ -215,7 +224,7 @@ export function OrganizationMembersScreen({
               <Text variant="label" className="text-muted">
                 You
               </Text>
-            ) : (
+            ) : fixed ? null : (
               <TactilePressable
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${member.name}`}
@@ -259,7 +268,7 @@ export function OrganizationMembersScreen({
             <Text variant="label" className="text-muted">
               Invited
             </Text>
-          ) : (
+          ) : !user.manageable ? null : (
             <TactilePressable
               accessibilityRole="button"
               accessibilityLabel={`Invite ${name}`}
@@ -275,7 +284,7 @@ export function OrganizationMembersScreen({
         </View>
       );
     },
-    [busyId, confirmRemove, invite, invited, organizationId, viewer?.id],
+    [busyId, confirmRemove, invite, invited, locked, organizationId, viewer?.id],
   );
 
   return (

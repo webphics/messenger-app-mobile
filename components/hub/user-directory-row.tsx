@@ -30,6 +30,7 @@ import {
   userDisplayName,
   userFlags,
   userRoleLabel,
+  userRowActions,
 } from "@/lib/user-directory";
 import type { UserDirectoryView } from "@/lib/use-user-directory";
 import type { ManagedUser, OrganizationSummary, UserRole } from "@/lib/types";
@@ -46,6 +47,10 @@ import type { ManagedUser, OrganizationSummary, UserRole } from "@/lib/types";
  * self-ban and self-delete — it asks only that the actor is an Admin — and a
  * phone is the worst place to discover that, so this is a rule the client
  * adds. See `isSelf`.
+ *
+ * A row the API marks `manageable: false` carries none either, and cannot be
+ * removed from or invited to an organization. Its organizations still list,
+ * read-only, and nothing says why. See `userRowActions`.
  */
 
 const FLAG_STYLE = {
@@ -120,6 +125,7 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
   const flags = userFlags(user);
   const role = ROLE_STYLE[user.role];
   const own = isSelf(user, viewerId);
+  const allowed = userRowActions(user, viewerId);
   const busy = actions.busyId === user.id;
   const problem = actions.refusal?.id === user.id ? actions.refusal.message : null;
   const invitable = invitableOrganizations(organizations, user);
@@ -257,7 +263,7 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
                   <Text variant="label" className="min-w-0 flex-1 text-ink-soft">
                     {organization.name}
                   </Text>
-                  {own ? null : (
+                  {allowed.removeMembership ? (
                     <TactilePressable
                       accessibilityRole="button"
                       accessibilityLabel={`Remove from ${organization.name}`}
@@ -280,7 +286,7 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
                     >
                       <Trash2 color={colors.muted} size={14} />
                     </TactilePressable>
-                  )}
+                  ) : null}
                 </View>
               ))}
               {user.pendingInvitations.map((invitation) => (
@@ -294,7 +300,7 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
             </View>
           ) : null}
 
-          {invitable.length > 0 ? (
+          {allowed.invite && invitable.length > 0 ? (
             <View className="gap-1.5">
               <Text variant="label" className="uppercase tracking-wide text-muted">
                 {joinsOnInvite ? "Add to" : "Invite to"}
@@ -323,7 +329,7 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
               This is your own account. Role, ban and deletion are managed from
               another Admin&#8217;s session.
             </Text>
-          ) : (
+          ) : allowed.account ? (
             <>
               <View className="gap-1.5">
                 <Text variant="label" className="uppercase tracking-wide text-muted">
@@ -434,7 +440,7 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
                 onPress={confirmDelete}
               />
             </>
-          )}
+          ) : null}
 
           {problem ? (
             <Text

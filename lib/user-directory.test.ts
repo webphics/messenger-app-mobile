@@ -3,10 +3,13 @@ import {
   isSelf,
   membershipSummary,
   otherRoles,
+  unmanageableIds,
   userDisplayName,
   userFlags,
   userRoleLabel,
+  userRowActions,
 } from '@/lib/user-directory'
+import { parseManagedUser } from '@/lib/user-parse'
 import type { ManagedUser } from '@/lib/types'
 
 function user(overrides: Partial<ManagedUser> = {}): ManagedUser {
@@ -27,6 +30,7 @@ function user(overrides: Partial<ManagedUser> = {}): ManagedUser {
     declinedInvitations: [],
     createdAt: '',
     updatedAt: '',
+    manageable: true,
     ...overrides,
   }
 }
@@ -98,6 +102,65 @@ describe('isSelf', () => {
 
   test('a viewer nobody has identified is nobody', () => {
     expect(isSelf(user(), null)).toBe(false)
+  })
+})
+
+describe('userRowActions', () => {
+  test('an ordinary row offers every action', () => {
+    expect(userRowActions(user({ id: 'other' }), 'me')).toEqual({
+      account: true,
+      removeMembership: true,
+      invite: true,
+    })
+  })
+
+  test('a row the API will not let anyone manage offers nothing that changes it', () => {
+    expect(userRowActions(user({ id: 'other', manageable: false }), 'me')).toEqual({
+      account: false,
+      removeMembership: false,
+      invite: false,
+    })
+  })
+
+  test('the flag wins over a viewer nobody has identified', () => {
+    expect(userRowActions(user({ manageable: false }), null)).toEqual({
+      account: false,
+      removeMembership: false,
+      invite: false,
+    })
+  })
+
+  test('your own row keeps invite and drops the rest, as before', () => {
+    expect(userRowActions(user({ id: 'me' }), 'me')).toEqual({
+      account: false,
+      removeMembership: false,
+      invite: true,
+    })
+  })
+
+  test('a row from an API that sends no flag is managed as before', () => {
+    const row = parseManagedUser({ id: 'other', email: 'a@talo.test', role: 'admin' })
+    expect(row).not.toBeNull()
+    expect(userRowActions(row!, 'me')).toEqual({
+      account: true,
+      removeMembership: true,
+      invite: true,
+    })
+  })
+})
+
+describe('unmanageableIds', () => {
+  test('only the rows the API marks, so a members list can drop their buttons', () => {
+    const rows = [
+      user({ id: 'a' }),
+      user({ id: 'b', manageable: false }),
+      user({ id: 'c' }),
+    ]
+    expect([...unmanageableIds(rows)]).toEqual(['b'])
+  })
+
+  test('nobody when the directory has not loaded', () => {
+    expect(unmanageableIds([]).size).toBe(0)
   })
 })
 

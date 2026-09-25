@@ -639,6 +639,12 @@ export type ManagedUser = {
   declinedInvitations: { id: string; organization: Organization }[]
   createdAt: string
   updatedAt: string
+  /**
+   * Whether the API lets an Admin act on this account at all. The server
+   * decides it and gives no reason, so the client hides the actions and
+   * says nothing about why.
+   */
+  manageable: boolean
 }
 
 /**

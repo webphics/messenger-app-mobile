@@ -94,6 +94,9 @@ export function parseManagedUser(value: unknown): ManagedUser | null {
     declinedInvitations: invitations(record.declinedInvitations),
     createdAt: text(record.createdAt) ?? '',
     updatedAt: text(record.updatedAt) ?? '',
+    // Only an explicit false locks a row. An older API sends no flag, and
+    // reading its absence as false would take every action off every row.
+    manageable: record.manageable !== false,
   }
 }
 

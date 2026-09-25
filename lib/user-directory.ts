@@ -96,6 +96,44 @@ export function isSelf(user: ManagedUser, viewerId: string | null): boolean {
   return viewerId !== null && user.id === viewerId
 }
 
+/** Which of the row's actions to draw. */
+export type UserRowActions = {
+  /** Role, sign out, 2FA reset, password, ban or unban, delete. */
+  account: boolean
+  /** Taking them out of an organization they are in. */
+  removeMembership: boolean
+  /** Inviting or adding them to another organization. */
+  invite: boolean
+}
+
+/**
+ * Which actions a row offers.
+ *
+ * Two rules, and the server's comes first. A row the API marks
+ * `manageable: false` refuses every change an Admin could make to it, the
+ * membership ones included, so it offers none and the list of where they
+ * belong stays read-only. Nothing on screen says why: the flag carries no
+ * reason and neither does the row.
+ *
+ * Then the client's own rule, `isSelf`: the viewer's own row drops the
+ * account actions and removal, and keeps invite.
+ */
+export function userRowActions(user: ManagedUser, viewerId: string | null): UserRowActions {
+  if (!user.manageable) return { account: false, removeMembership: false, invite: false }
+  const own = isSelf(user, viewerId)
+  return { account: !own, removeMembership: !own, invite: true }
+}
+
+/**
+ * The ids of every row the API will not let an Admin manage.
+ *
+ * For a screen that lists people by a shape without the flag, such as an
+ * organization's members, and has the directory beside it to look them up in.
+ */
+export function unmanageableIds(users: ManagedUser[]): Set<string> {
+  return new Set(users.filter((user) => !user.manageable).map((user) => user.id))
+}
+
 /**
  * Which roles a row may be changed to.
  *
