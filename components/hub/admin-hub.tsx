@@ -6,7 +6,7 @@ import {
   Building2,
   MessageCircle,
   MessageSquare,
-  Plus,
+  // Plus, // hidden with Create New Offer
   ShieldCheck,
   Tags,
   Users,
@@ -220,7 +220,8 @@ export function AdminHub() {
         ) : null}
       </View>
 
-      {/* Admin Actions */}
+      {/* Admin Actions. Hidden because offer-add writes to the mock catalog,
+          which no screen reads and no API backs. Put it back when offers are real.
       <View className="mt-5 px-4">
         <ActionRow
           icon={Plus}
@@ -230,7 +231,7 @@ export function AdminHub() {
           accessibilityLabel="Add offer"
           onPress={() => router.push("/(admin)/offer-add" as Href)}
         />
-      </View>
+      </View> */}
     </HubScroll>
   );
 }
