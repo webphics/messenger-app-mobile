@@ -1,7 +1,5 @@
 import {
   appliedLabels,
-  canLabel,
-  canReadNotes,
   conversationDetailFields,
   conversationPeerRole,
   conversationTypeLabel,
@@ -206,28 +204,6 @@ describe('offerableLabels', () => {
 
   test('offers nothing on a conversation that carries no labels at all', () => {
     expect(offerableLabels(all, customer())).toEqual([...all.slice(0, 2)])
-  })
-})
-
-describe('canLabel', () => {
-  test('staff on a staff payload, and nobody else', () => {
-    expect(canLabel(staff(), 'agent')).toBe(true)
-    expect(canLabel(staff(), 'admin')).toBe(true)
-    expect(canLabel(staff(), 'customer')).toBe(false)
-    expect(canLabel(customer(), 'customer')).toBe(false)
-  })
-})
-
-describe('canReadNotes', () => {
-  test('staff, and only on a Support DM', () => {
-    expect(canReadNotes(staff(), 'agent')).toBe(true)
-    expect(canReadNotes(staff({ type: 'staff_dm' }), 'agent')).toBe(false)
-    expect(canReadNotes(staff({ type: 'group' }), 'admin')).toBe(false)
-  })
-
-  test('never a Customer, whose payload has no notes on it either', () => {
-    expect(canReadNotes(customer(), 'customer')).toBe(false)
-    expect(canReadNotes(staff(), 'customer')).toBe(false)
   })
 })
 

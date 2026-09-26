@@ -29,12 +29,15 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { chatMediaHref } from '@/lib/chat-route-id'
-import { threadActionsView, type ThreadActionsView } from '@/lib/conversation-access'
+import {
+  detailsView,
+  threadActionsView,
+  type DetailsView,
+  type ThreadActionsView,
+} from '@/lib/conversation-access'
 import { cn } from '@/lib/cn'
 import {
   appliedLabels,
-  canLabel,
-  canReadNotes,
   conversationDetailFields,
   conversationPeerRole,
   labelChipColors,
@@ -60,12 +63,10 @@ import type {
   ConversationNote,
   ConversationStaffPerson,
   Label,
-  UserRole,
 } from '@/lib/types'
 
 type ConversationDetailsScreenProps = {
   conversation: Conversation
-  viewerRole: UserRole
   organizationNames?: ReadonlyMap<string, string>
   details: ConversationDetails
   /** Whether Support DMs are worked by assignment. See `lib/support-assignment`. */
@@ -78,6 +79,8 @@ type ConversationDetailsScreenProps = {
   management?: ThreadManagement
   /** Which of Transfer, Close and Reopen the API offers. None when absent. */
   threadActions?: ThreadActionsView
+  /** Whether the API offers labels, the notes, and the field to add one. None when absent. */
+  offered?: DetailsView
 }
 
 /**
@@ -89,10 +92,10 @@ type ConversationDetailsScreenProps = {
  * written about it, and the way into everything shared in it.
  *
  * Every block is conditional, and none of the conditions are invented here.
- * A Customer's payload carries no assignment, no labels and no notes, and the
- * API refuses all three to a Customer who asks — so the screen shows a Customer
- * who they are talking to and what has been shared, and nothing that would be a
- * lie or a 403. See `lib/conversation-details`.
+ * Labels, notes and the thread actions draw from what the API offers this
+ * viewer (`detailsView` and `threadActionsView` in `lib/conversation-access`),
+ * which is nothing for a Customer. So a Customer sees who they are talking to
+ * and what has been shared, and nothing that would be a lie or a 403.
  *
  * Laid out the way WhatsApp's and Messenger's contact screens are: the person
  * first and large, the shared media right under them, then one white card per
@@ -100,12 +103,12 @@ type ConversationDetailsScreenProps = {
  */
 export function ConversationDetailsScreen({
   conversation,
-  viewerRole,
   organizationNames,
   details,
   supportAssignment,
   management,
   threadActions = threadActionsView(undefined),
+  offered = detailsView(undefined),
 }: ConversationDetailsScreenProps) {
   const insets = useSafeAreaInsets()
   const keyboardInset = useKeyboardInset()
@@ -120,8 +123,12 @@ export function ConversationDetailsScreen({
   const fields = conversationDetailFields(conversation, supportAssignment)
   const field = (key: DetailField['key']) => fields.find((f) => f.key === key)?.value ?? null
   const labels = appliedLabels(conversation)
-  const showLabels = canLabel(conversation, viewerRole)
-  const showNotes = canReadNotes(conversation, viewerRole)
+  /**
+   * Applied labels are shown to anyone whose payload carries them (staff
+   * shapes only, see `appliedLabels`). Attaching and detaching are the API's
+   * `manageLabels`, so without the label Capability the chips are read-only.
+   */
+  const showLabels = offered.labels || labels.length > 0
   const members = isStaffConversation(conversation) ? conversation.members : []
   // A broadcast thread carries no members, so a group is the only many-person shape left.
   const isGroup = conversation.type === 'group'
@@ -238,6 +245,7 @@ export function ConversationDetailsScreen({
           {showLabels ? (
             <LabelsSection
               applied={labels}
+              editable={offered.labels}
               labels={details.labels}
               conversation={conversation}
               busy={details.labelBusy}
@@ -248,10 +256,11 @@ export function ConversationDetailsScreen({
             />
           ) : null}
 
-          {showNotes ? (
+          {offered.readNotes ? (
             <NotesSection
               notes={details.notes}
               onReload={details.reloadNotes}
+              writable={offered.writeNotes}
               onAdd={details.addNote}
               adding={details.addingNote}
               error={details.noteError}
@@ -462,6 +471,9 @@ function CountBadge({ count }: { count: number }) {
 /**
  * The labels on this thread, and the ones it could wear.
  *
+ * Read-only when `editable` is off: the chips without their ×, and no Add.
+ * The catalogue is not fetched then either, since it only feeds the Add tray.
+ *
  * A chip is the control that removes it, which is how the web client does it
  * too — a label is one tap to add and one to take off, and a separate delete
  * affordance beside each would be a second control for a reversible action.
@@ -473,6 +485,7 @@ function CountBadge({ count }: { count: number }) {
  */
 function LabelsSection({
   applied,
+  editable,
   labels,
   conversation,
   busy,
@@ -482,6 +495,8 @@ function LabelsSection({
   onReloadLabels,
 }: {
   applied: Label[]
+  /** The API's `manageLabels`: attach and detach are offered only when it is on. */
+  editable: boolean
   labels: LabelsState
   conversation: Conversation
   busy: string | null
@@ -492,7 +507,7 @@ function LabelsSection({
 }) {
   const [adding, setAdding] = useState(false)
   const offerable =
-    labels.status === 'ready' ? offerableLabels(labels.labels, conversation) : []
+    editable && labels.status === 'ready' ? offerableLabels(labels.labels, conversation) : []
 
   return (
     <DetailsCard
@@ -525,16 +540,20 @@ function LabelsSection({
     >
       {applied.length > 0 ? (
         <View className="flex-row flex-wrap gap-2">
-          {applied.map((label) => (
-            <LabelChip
-              key={label.id}
-              label={label}
-              action="remove"
-              busy={busy === label.id}
-              disabled={busy !== null}
-              onPress={onDetach}
-            />
-          ))}
+          {applied.map((label) =>
+            editable ? (
+              <LabelChip
+                key={label.id}
+                label={label}
+                action="remove"
+                busy={busy === label.id}
+                disabled={busy !== null}
+                onPress={onDetach}
+              />
+            ) : (
+              <LabelBadge key={label.id} label={label} />
+            ),
+          )}
         </View>
       ) : (
         <Text variant="meta" className="text-muted">
@@ -588,6 +607,25 @@ function LabelsSection({
         </Text>
       ) : null}
     </DetailsCard>
+  )
+}
+
+/** One label, as a chip with no control on it, for a viewer who may not edit labels. */
+function LabelBadge({ label }: { label: Label }) {
+  const chip = labelChipColors(label.color)
+
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Label ${label.name}`}
+      style={{ backgroundColor: chip.wash }}
+      className="min-h-9 flex-row items-center gap-1.5 rounded-full px-3.5 py-1.5"
+    >
+      <View className="size-2 rounded-full" style={{ backgroundColor: chip.ink }} />
+      <Text variant="meta" style={{ color: chip.ink }} className="font-semibold">
+        {label.name}
+      </Text>
+    </View>
   )
 }
 
@@ -655,6 +693,7 @@ function LabelChip({
 function NotesSection({
   notes,
   onReload,
+  writable,
   onAdd,
   adding,
   error,
@@ -663,6 +702,8 @@ function NotesSection({
 }: {
   notes: ConversationDetails['notes']
   onReload: () => void
+  /** Whether the API lets this viewer add a note. Without it the notes are read-only. */
+  writable: boolean
   onAdd: (text: string) => void
   adding: boolean
   error: string | null
@@ -735,43 +776,45 @@ function NotesSection({
         </View>
       ) : null}
 
-      <View className="gap-2.5">
-        <TextInput
-          value={draft}
-          onChangeText={setDraft}
-          placeholder="Write a note for the team…"
-          placeholderTextColor={colors.muted}
-          multiline
-          // ⌘/Ctrl+Enter is a desktop gesture; on a phone the button is the
-          // submit, and Enter has to stay a newline in a field that takes
-          // paragraphs.
-          accessibilityLabel="Internal note, never shown to the Customer"
-          // `font-normal` names the Manrope face. Without it the field draws in
-          // the system font, which on a phone with a custom system font is
-          // whatever that font happens to be.
-          className="min-h-24 rounded-2xl border border-line/80 bg-line/35 px-3.5 py-3 font-normal text-base text-ink"
-          style={{ textAlignVertical: 'top' }}
-        />
-        {error ? (
-          <Text variant="meta" accessibilityLiveRegion="polite" className="text-danger">
-            {error}
-          </Text>
-        ) : null}
-        <Button
-          // Kept enabled until the request starts, then disabled with a spinner
-          // beside the label it already had.
-          disabled={draft.trim() === '' || adding}
-          accessibilityState={{ disabled: draft.trim() === '' || adding, busy: adding }}
-          className="self-end"
-          size="sm"
-          onPress={submit}
-        >
-          {adding ? (
-            <ActivityIndicator color={colors.primaryForeground} size="small" />
+      {writable ? (
+        <View className="gap-2.5">
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            placeholder="Write a note for the team…"
+            placeholderTextColor={colors.muted}
+            multiline
+            // ⌘/Ctrl+Enter is a desktop gesture; on a phone the button is the
+            // submit, and Enter has to stay a newline in a field that takes
+            // paragraphs.
+            accessibilityLabel="Internal note, never shown to the Customer"
+            // `font-normal` names the Manrope face. Without it the field draws in
+            // the system font, which on a phone with a custom system font is
+            // whatever that font happens to be.
+            className="min-h-24 rounded-2xl border border-line/80 bg-line/35 px-3.5 py-3 font-normal text-base text-ink"
+            style={{ textAlignVertical: 'top' }}
+          />
+          {error ? (
+            <Text variant="meta" accessibilityLiveRegion="polite" className="text-danger">
+              {error}
+            </Text>
           ) : null}
-          <Text>Add note</Text>
-        </Button>
-      </View>
+          <Button
+            // Kept enabled until the request starts, then disabled with a spinner
+            // beside the label it already had.
+            disabled={draft.trim() === '' || adding}
+            accessibilityState={{ disabled: draft.trim() === '' || adding, busy: adding }}
+            className="self-end"
+            size="sm"
+            onPress={submit}
+          >
+            {adding ? (
+              <ActivityIndicator color={colors.primaryForeground} size="small" />
+            ) : null}
+            <Text>Add note</Text>
+          </Button>
+        </View>
+      ) : null}
     </DetailsCard>
   )
 }

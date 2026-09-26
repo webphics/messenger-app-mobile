@@ -10,8 +10,7 @@ import { ConversationDetailsScreen } from "@/components/chat/conversation-detail
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { chatDetailsIdFromRoute } from "@/lib/chat-route-id";
 import { useConversationInbox } from "@/lib/conversation-inbox";
-import { threadActionsView } from "@/lib/conversation-access";
-import { canLabel, canReadNotes } from "@/lib/conversation-details";
+import { detailsView, threadActionsView } from "@/lib/conversation-access";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { getSession } from "@/lib/session";
 import { useChatSectionConversation } from "@/lib/use-chat-section-conversation";
@@ -59,10 +58,15 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
    * gains it in the same update, without either screen refetching.
    */
   const { addConversation } = useConversationInbox();
+  /**
+   * Labels and notes as the API offers them to this viewer, with the label
+   * Capability this client cannot see already applied.
+   */
+  const offered = detailsView(ready ? section.conversation.access : undefined);
   const details = useConversationDetails({
     conversationId: ready ? conversationId : null,
-    wantsLabels: ready && canLabel(section.conversation, section.viewerRole),
-    wantsNotes: ready && canReadNotes(section.conversation, section.viewerRole),
+    wantsLabels: offered.labels,
+    wantsNotes: offered.readNotes,
     onUpdated: addConversation,
   });
 
@@ -90,12 +94,12 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
   return (
     <ConversationDetailsScreen
       conversation={section.conversation}
-      viewerRole={section.viewerRole}
       organizationNames={section.organizationNames}
       details={details}
       supportAssignment={supportAssignment}
       management={manages ? management : undefined}
       threadActions={actions}
+      offered={offered}
     />
   );
 }

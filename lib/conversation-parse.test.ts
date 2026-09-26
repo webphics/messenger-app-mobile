@@ -507,10 +507,10 @@ describe('parseConversation, reading access', () => {
       holder: { id: 'agent-2', name: 'Priya Raman' },
       wayOut: null,
     },
-    actions: { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: true },
+    actions: { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: true, manageLabels: true, readNotes: true, writeNotes: true, setWritePolicy: false, setJoinPolicy: false, deleteMessages: false, deleteConversation: false },
   }
-  const OPEN = { write: { state: 'open' }, actions: { editMessages: true, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: false } }
-  const NO_ACTIONS = { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: false }
+  const OPEN = { write: { state: 'open' }, actions: { editMessages: true, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: false, manageLabels: false, readNotes: false, writeNotes: false, setWritePolicy: false, setJoinPolicy: false, deleteMessages: false, deleteConversation: false } }
+  const NO_ACTIONS = { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: false, manageLabels: false, readNotes: false, writeNotes: false, setWritePolicy: false, setJoinPolicy: false, deleteMessages: false, deleteConversation: false }
 
   const customerGroupRow = (overrides: Record<string, unknown> = {}) => ({
     ...customerSupportRow(),

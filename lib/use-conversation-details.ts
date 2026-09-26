@@ -15,9 +15,10 @@ import type { Conversation, ConversationNote, Label } from '@/lib/types'
  * staff have written about it.
  *
  * Two fetches and three mutations, held together because they are one screen and
- * share its lifetime. Which of them are *allowed* is not decided here —
- * `lib/conversation-details` mirrors the API's rules and answers that, and the
- * caller passes the answer in as `wantsLabels` and `wantsNotes`. A hook that
+ * share its lifetime. Which of them are *allowed* is not decided here. The API
+ * says so on the conversation's `access.actions`, `detailsView` in
+ * `lib/conversation-access` reads it, and the caller passes the answer in as
+ * `wantsLabels` (`manageLabels`) and `wantsNotes` (`readNotes`). A hook that
  * asked anyway would turn a rule the API states plainly into a 403 on screen.
  *
  * A label change answers with the whole conversation, which goes into the shared
@@ -26,7 +27,7 @@ import type { Conversation, ConversationNote, Label } from '@/lib/types'
  */
 
 export type NotesState =
-  /** Not a thread that has notes, or not a person who may read them. */
+  /** The API offers this viewer no notes here (`readNotes` off). */
   | { status: 'unavailable' }
   | { status: 'loading' }
   /**
@@ -48,7 +49,7 @@ export type NotesState =
  * One of those is worth a retry and the other is not.
  */
 export type LabelsState =
-  /** Not a thread this person may label. */
+  /** The API offers this viewer no label editing here (`manageLabels` off). */
   | { status: 'unavailable' }
   | { status: 'loading' }
   | { status: 'failed' }

@@ -188,26 +188,6 @@ export function offerableLabels(all: Label[], conversation: Conversation): Label
   return all.filter((label) => !label.archived && !applied.has(label.id))
 }
 
-/** Whether this person may put labels on this thread at all. */
-export function canLabel(conversation: Conversation, role: UserRole): boolean {
-  return role !== 'customer' && isStaffConversation(conversation)
-}
-
-/**
- * Whether this thread has internal notes to read.
- *
- * Staff only, and Support DMs only: the API answers `404` for a note request on
- * any other conversation type, and asking anyway would turn a rule into an error
- * message.
- */
-export function canReadNotes(conversation: Conversation, role: UserRole): boolean {
-  return (
-    role !== 'customer' &&
-    isStaffConversation(conversation) &&
-    conversation.type === 'support_dm'
-  )
-}
-
 /**
  * A label chip's colours.
  *

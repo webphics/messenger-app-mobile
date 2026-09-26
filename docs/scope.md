@@ -97,6 +97,9 @@ Broadcasts are in-inbox announcements (later), not stories.
      A Customer's payload carries no assignment, no labels and no notes, so a Customer's details
      screen is the identity, the type and Shared in chat. Notes are Support DMs only, because the API
      answers `404` for one anywhere else.
+     (Superseded by conversation-access ticket 11: the API now sends `manageLabels`, `readNotes` and
+     `writeNotes` on `access.actions`, with the label Capability applied, and `detailsView` in
+     `lib/conversation-access` reads them. `canLabel` and `canReadNotes` are gone.)
 
      Still web-only: creating, renaming and archiving a label, and jumping from a gallery item back
      to the message that carried it.

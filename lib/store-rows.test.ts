@@ -280,7 +280,7 @@ describe('fromConversationRows', () => {
         holder: { id: 'agent-1', name: 'Grace Hopper' },
         wayOut: 'take_over' as const,
       },
-      actions: { editMessages: false, engage: false, takeOver: true, transfer: false, close: false, reopen: false, setPriority: true },
+      actions: { editMessages: false, engage: false, takeOver: true, transfer: false, close: false, reopen: false, setPriority: true, manageLabels: true, readNotes: true, writeNotes: false, setWritePolicy: false, setJoinPolicy: false, deleteMessages: true, deleteConversation: true },
     }
 
     const { conversations } = fromConversationRows(

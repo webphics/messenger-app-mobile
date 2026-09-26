@@ -28,8 +28,8 @@ import type { GroupWritePolicy, Message } from '@/lib/types'
  *
  * Two entry points: `parseAccess` for the payload, and a view per surface:
  * `composerView` for the composer, `threadActionsView` for what may be done
- * to the thread, and `messageActions` for what one message offers. A later
- * ticket adds Delete here.
+ * to the thread, `detailsView` for labels and notes on Conversation details,
+ * and `messageActions` for what one message offers.
  */
 
 /** Why a viewer may only read, in the API's own refusal codes. */
@@ -71,6 +71,16 @@ export type WriteAccess =
  * Support DM. All of them are off for a Customer, and `engage`, `takeOver` and
  * `transfer` are off in a Shared queue. This client has no priority control, so
  * `setPriority` is read and offered nowhere.
+ *
+ * `manageLabels` needs the label Capability and means attaching and detaching
+ * labels on this conversation. `readNotes` and `writeNotes` are on only in a
+ * Support DM, for staff who can see its notes. Every staff action is off for a
+ * Customer.
+ *
+ * `setWritePolicy`, `setJoinPolicy`, `deleteMessages` and `deleteConversation`
+ * are parsed and offered nowhere: this client has no Group policy control and
+ * no delete control. They are still required, like every action here, so an
+ * answer this build reads is always a whole one.
  */
 export const ACCESS_ACTIONS = [
   'editMessages',
@@ -80,6 +90,13 @@ export const ACCESS_ACTIONS = [
   'close',
   'reopen',
   'setPriority',
+  'manageLabels',
+  'readNotes',
+  'writeNotes',
+  'setWritePolicy',
+  'setJoinPolicy',
+  'deleteMessages',
+  'deleteConversation',
 ] as const
 export type AccessAction = (typeof ACCESS_ACTIONS)[number]
 export type AccessActions = Record<AccessAction, boolean>
@@ -291,7 +308,42 @@ export function threadActionsView(access: ConversationAccess | undefined): Threa
   return { engage, takeOver, transfer, close, reopen }
 }
 
-/** What one message offers in the long-press menu. Later tickets add Delete. */
+/**
+ * What Conversation details offers beside the thread actions: editing labels,
+ * the notes on the thread, and the field to add one.
+ *
+ * `labels` is the API's `manageLabels`, which offers attaching and detaching.
+ * It does not decide whether applied labels are shown: those are drawn
+ * read-only from the payload for anyone it carries them to. Reading notes and
+ * writing them are separate answers, so a viewer who may read and not write
+ * sees the notes without the field.
+ */
+export type DetailsView = {
+  labels: boolean
+  readNotes: boolean
+  writeNotes: boolean
+}
+
+const NO_DETAILS: DetailsView = { labels: false, readNotes: false, writeNotes: false }
+
+/**
+ * The labels and notes the API offers this viewer on this conversation.
+ *
+ * No role or conversation type goes in. The label Capability is one this
+ * client never sees, and whether a conversation keeps notes is the API's rule
+ * (Support DMs only). Unknown access, or none, offers nothing.
+ */
+export function detailsView(access: ConversationAccess | undefined): DetailsView {
+  if (!access || !isKnownAccess(access)) return NO_DETAILS
+
+  const { manageLabels, readNotes, writeNotes } = access.actions
+  return { labels: manageLabels, readNotes, writeNotes }
+}
+
+/**
+ * What one message offers in the long-press menu. This client has no Delete,
+ * so `deleteMessages` is not read here.
+ */
 export type MessageActionsView = { edit: boolean }
 
 /**

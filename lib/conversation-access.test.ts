@@ -1,5 +1,6 @@
 import {
   composerView,
+  detailsView,
   messageActions,
   parseAccess,
   threadActionsView,
@@ -17,6 +18,13 @@ function actions(on: Record<string, unknown> = {}) {
     close: false,
     reopen: false,
     setPriority: false,
+    manageLabels: false,
+    readNotes: false,
+    writeNotes: false,
+    setWritePolicy: false,
+    setJoinPolicy: false,
+    deleteMessages: false,
+    deleteConversation: false,
     ...on,
   }
 }
@@ -101,6 +109,13 @@ describe('parseAccess', () => {
       close: true,
       reopen: false,
       setPriority: true,
+      manageLabels: true,
+      readNotes: true,
+      writeNotes: false,
+      setWritePolicy: false,
+      setJoinPolicy: true,
+      deleteMessages: true,
+      deleteConversation: false,
     }
 
     expect(parseAccess({ write: { state: 'open' }, actions })).toEqual({
@@ -166,6 +181,13 @@ describe('parseAccess', () => {
     ...malformedActions('close'),
     ...malformedActions('reopen'),
     ...malformedActions('setPriority'),
+    ...malformedActions('manageLabels'),
+    ...malformedActions('readNotes'),
+    ...malformedActions('writeNotes'),
+    ...malformedActions('setWritePolicy'),
+    ...malformedActions('setJoinPolicy'),
+    ...malformedActions('deleteMessages'),
+    ...malformedActions('deleteConversation'),
     ['the unknown marker itself', UNKNOWN_ACCESS],
   ])('reads %s as unknown', (_case, payload) => {
     expect(parseAccess(payload)).toEqual({ kind: 'unknown' })
@@ -460,5 +482,94 @@ describe('threadActionsView', () => {
 
   test('a missing access field offers nothing', () => {
     expect(threadActionsView(undefined)).toEqual(NONE)
+  })
+})
+
+describe('detailsView', () => {
+  /** What Conversation details offers for a payload, read the way the screen reads it. */
+  function offered(payload: unknown) {
+    return detailsView(parseAccess(payload))
+  }
+
+  test('an Agent with the label Capability on a Support DM they can see is offered labels and notes', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, manageLabels: true, readNotes: true, writeNotes: true }),
+    }
+
+    expect(offered(payload)).toEqual({ labels: true, readNotes: true, writeNotes: true })
+  })
+
+  const NONE = { labels: false, readNotes: false, writeNotes: false }
+
+  test('an Agent without the label Capability is offered notes and no label editing', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, readNotes: true, writeNotes: true, setPriority: true }),
+    }
+
+    expect(offered(payload)).toEqual({ ...NONE, readNotes: true, writeNotes: true })
+  })
+
+  /* An Agent may read a Support DM's notes without holding it, and still add one. */
+  test('an Agent reading a Support DM another agent holds is offered its notes', () => {
+    const payload = readOnlyPayload({ reason: 'already_engaged', holder: PRIYA })
+    payload.actions = actions({ manageLabels: true, readNotes: true, writeNotes: true })
+
+    expect(offered(payload)).toEqual({ labels: true, readNotes: true, writeNotes: true })
+  })
+
+  test('notes the API lets a viewer read and not write are shown without the field', () => {
+    const payload = { write: { state: 'open' }, actions: actions({ readNotes: true }) }
+
+    expect(offered(payload)).toEqual({ ...NONE, readNotes: true })
+  })
+
+  /* Notes live on Support DMs only, so a Group and a Staff DM never offer them. */
+  test('a Group offers labels to an Agent with the Capability, and no notes', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, manageLabels: true, setWritePolicy: true, setJoinPolicy: true }),
+    }
+
+    expect(offered(payload)).toEqual({ ...NONE, labels: true })
+  })
+
+  test('a Staff DM offers labels to an Agent with the Capability, and no notes', () => {
+    const payload = { write: { state: 'open' }, actions: actions({ editMessages: true, manageLabels: true }) }
+
+    expect(offered(payload)).toEqual({ ...NONE, labels: true })
+  })
+
+  test('a Customer is offered neither labels nor notes, with an open composer', () => {
+    const payload = { write: { state: 'open' }, actions: actions({ editMessages: true }) }
+
+    expect(offered(payload)).toEqual(NONE)
+  })
+
+  /* This client has no Group policy or delete control, so those actions offer nothing here. */
+  test('policy and delete actions alone offer nothing on details', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({
+        setWritePolicy: true,
+        setJoinPolicy: true,
+        deleteMessages: true,
+        deleteConversation: true,
+      }),
+    }
+
+    expect(offered(payload)).toEqual(NONE)
+  })
+
+  test('unknown access offers nothing', () => {
+    expect(detailsView(UNKNOWN_ACCESS)).toEqual(NONE)
+    expect(
+      offered({ write: { state: 'open' }, actions: actions({ manageLabels: true, readNotes: 'yes' }) }),
+    ).toEqual(NONE)
+  })
+
+  test('a missing access field offers nothing', () => {
+    expect(detailsView(undefined)).toEqual(NONE)
   })
 })

@@ -39,13 +39,29 @@ function refusalMessage(body: unknown): string {
   return typeof message === 'string' && message.trim() !== '' ? message.trim() : DEFAULT_REFUSAL
 }
 
+/**
+ * Refusal codes whose sentence this client writes itself, in place of the
+ * API's. Every refusal passes through `refused` below, so a code worded here
+ * reads the same on every screen that shows it.
+ *
+ * Only the codes that need it. The API's sentences are already written for a
+ * person and most screens repeat them; the conversation reasons a composer
+ * shows before anything is sent are worded in `lib/conversation-access`.
+ *
+ * `message_not_deletable` answers a delete of a system notice, or of an
+ * attachment on one. This client has no Delete, so nothing sends one today.
+ */
+const CLIENT_WORDING: ReadonlyMap<string, string> = new Map([
+  ['message_not_deletable', 'System notices cannot be deleted, and neither can their attachments.'],
+])
+
 /** A refusal, carrying the API's code only when it sent one. */
 function refused(body: unknown): ApiFailure {
-  const message = refusalMessage(body)
   const code = asRecord(body)?.code
-  return typeof code === 'string' && code !== ''
-    ? { kind: 'refused', message, code }
-    : { kind: 'refused', message }
+  if (typeof code !== 'string' || code === '') {
+    return { kind: 'refused', message: refusalMessage(body) }
+  }
+  return { kind: 'refused', message: CLIENT_WORDING.get(code) ?? refusalMessage(body), code }
 }
 
 /**
