@@ -637,8 +637,16 @@ export type CustomInbox = {
   organizationIds: string[]
 }
 
-/** What an Agent may do beyond reading and writing. Admin bypasses all four. */
-export type AgentPermission = 'transfer' | 'close' | 'manage_labels' | 'staff_dm'
+/**
+ * `/users/:id/permissions`: the target's role, the capabilities they hold, and
+ * the ones this viewer may toggle on them (empty when the viewer may not edit
+ * them at all).
+ */
+export type StaffPermissions = {
+  role: UserRole
+  capabilities: Capability[]
+  editable: Capability[]
+}
 
 /**
  * A person as the Admin directory holds them, which is a great deal more than

@@ -1,6 +1,7 @@
 import { asRecord } from '@/lib/api-envelope'
+import { parseCapabilities } from '@/lib/capabilities'
 import { parseOrganization } from '@/lib/org-parse'
-import type { AgentPermission, ManagedUser, Organization, UserRole } from '@/lib/types'
+import type { ManagedUser, Organization, StaffPermissions, UserRole } from '@/lib/types'
 
 /**
  * Reading the Admin user-management payloads.
@@ -17,12 +18,6 @@ import type { AgentPermission, ManagedUser, Organization, UserRole } from '@/lib
  */
 
 const ROLES: readonly UserRole[] = ['admin', 'agent', 'customer']
-const PERMISSIONS: readonly AgentPermission[] = [
-  'transfer',
-  'close',
-  'manage_labels',
-  'staff_dm',
-]
 
 function text(value: unknown): string | null {
   return typeof value === 'string' && value !== '' ? value : null
@@ -113,13 +108,21 @@ export function parseUserTotal(value: unknown): number {
   return count(asRecord(value)?.total)
 }
 
-export function parseAgentPermissions(value: unknown): AgentPermission[] | null {
+/**
+ * `GET` and `PATCH /users/:id/permissions`. A body with no known role or no
+ * held list is not this payload. A missing `editable` reads as nothing
+ * editable, which fails towards offering no toggle the API would refuse.
+ */
+export function parseStaffPermissions(value: unknown): StaffPermissions | null {
   const record = asRecord(value)
-  if (!record || !Array.isArray(record.agentPermissions)) return null
-  return record.agentPermissions.flatMap((item) => {
-    const capability = oneOf(item, PERMISSIONS)
-    return capability ? [capability] : []
-  })
+  if (!record || !Array.isArray(record.capabilities)) return null
+  const role = oneOf(record.role, ROLES)
+  if (!role) return null
+  return {
+    role,
+    capabilities: parseCapabilities(record.capabilities),
+    editable: parseCapabilities(record.editable),
+  }
 }
 
 /**

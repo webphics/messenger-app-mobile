@@ -2,12 +2,13 @@ import { query, readOutcome } from '@/lib/api-result'
 import type { ApiResult } from '@/lib/api-result'
 import { authenticatedRequest } from '@/lib/auth-service'
 import {
-  parseAgentPermissions,
   parseManagedUser,
   parseManagedUsers,
+  parseStaffPermissions,
   parseUserAcknowledgement,
 } from '@/lib/user-parse'
-import type { AgentPermission, ManagedUser, UserRole } from '@/lib/types'
+import type { Capability } from '@/lib/capabilities'
+import type { ManagedUser, StaffPermissions, UserRole } from '@/lib/types'
 
 /**
  * The Admin user directory.
@@ -188,21 +189,29 @@ export async function deleteUser(id: string): Promise<ApiResult<true>> {
   )
 }
 
-/** What an Agent may do beyond reading and writing. Meaningless for the other two roles. */
-export async function getAgentPermissions(
+/**
+ * A staff member's capabilities, and which of them this viewer may toggle.
+ * Nothing on mobile edits them yet; the web Users page does.
+ */
+export async function getStaffPermissions(
   id: string,
-): Promise<ApiResult<AgentPermission[]>> {
+): Promise<ApiResult<StaffPermissions>> {
   const path = `/users/${encodeURIComponent(id)}/permissions`
-  return readOutcome(await authenticatedRequest(path), parseAgentPermissions)
+  return readOutcome(await authenticatedRequest(path), parseStaffPermissions)
 }
 
-export async function setAgentPermissions(
+/**
+ * Sends the full desired set: a capability left out is revoked. A change
+ * outside what this viewer may edit refuses the whole request with a 403,
+ * which arrives as `refused` carrying the API's message.
+ */
+export async function setStaffPermissions(
   id: string,
-  agentPermissions: AgentPermission[],
-): Promise<ApiResult<AgentPermission[]>> {
+  capabilities: Capability[],
+): Promise<ApiResult<StaffPermissions>> {
   const outcome = await authenticatedRequest(
     `/users/${encodeURIComponent(id)}/permissions`,
-    { method: 'PATCH', body: { agentPermissions } },
+    { method: 'PATCH', body: { capabilities } },
   )
-  return readOutcome(outcome, parseAgentPermissions)
+  return readOutcome(outcome, parseStaffPermissions)
 }
