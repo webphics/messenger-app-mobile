@@ -24,7 +24,7 @@ export const CAPABILITY_GROUPS = {
     'delete_any_note',
   ],
   groups: ['create_groups', 'manage_group', 'set_group_policies', 'create_communities'],
-  publishing: [
+  broadcasts: [
     'send_broadcasts',
     'view_acknowledgements',
     'pin_wall_posts',
@@ -49,6 +49,31 @@ export type Capability = (typeof CAPABILITY_GROUPS)[CapabilityGroup][number]
 
 /** Every capability, in group order. */
 export const CAPABILITIES: readonly Capability[] = Object.values(CAPABILITY_GROUPS).flat()
+
+/**
+ * Never held by an agent, whatever the API stores. The workspace four, plus
+ * managing memberships and Wall contributors, which are reached only from the
+ * Users page. In group order, as the web client lists them.
+ */
+export const ADMIN_ONLY_CAPABILITIES: readonly Capability[] = [
+  'manage_wall_contributors',
+  'manage_memberships',
+  'manage_users',
+  'change_roles',
+  'manage_permissions',
+  'manage_team',
+]
+
+/**
+ * The capabilities that act on people. Holding any one of them opens the
+ * Accounts screen, as it opens the web Users page. Each action there checks
+ * its own.
+ */
+export const USERS_SCREEN_CAPABILITIES: readonly Capability[] = [
+  'manage_users',
+  'change_roles',
+  'manage_permissions',
+]
 
 const KNOWN: ReadonlySet<string> = new Set(CAPABILITIES)
 

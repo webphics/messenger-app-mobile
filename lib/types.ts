@@ -680,6 +680,12 @@ export type ManagedUser = {
    * says nothing about why.
    */
   manageable: boolean
+  /**
+   * Whether the API lets this viewer change this account's role. False
+   * without `change_roles`, and on an admin who holds `manage_permissions`
+   * unless the viewer is the super admin.
+   */
+  roleEditable: boolean
 }
 
 /**

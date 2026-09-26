@@ -19,7 +19,7 @@ import { HubScroll } from "@/components/hub/hub-scroll";
 import { Pill } from "@/components/hub/pill";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { Text } from "@/components/ui/text";
-import { can, canAny } from "@/lib/capabilities";
+import { USERS_SCREEN_CAPABILITIES, can, canAny } from "@/lib/capabilities";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { useConversationInbox } from "@/lib/conversation-inbox";
@@ -175,7 +175,7 @@ export function AdminHub() {
         </Text>
         {/* Organizations carry editing (`manage_organizations`) and their members
             (`manage_memberships`). Holding neither leaves nothing to do there. */}
-        {can(me, "manage_organizations") || can(me, "manage_memberships") ? (
+        {canAny(me, ["manage_organizations", "manage_memberships"]) ? (
           <ActionRow
             icon={Building2}
             tone="neutral"
@@ -186,7 +186,7 @@ export function AdminHub() {
           />
         ) : null}
         {/* The Users API answers holders of any of these three, as the web Users page does. */}
-        {canAny(me, ["manage_users", "change_roles", "manage_permissions"]) ? (
+        {canAny(me, USERS_SCREEN_CAPABILITIES) ? (
           <ActionRow
             icon={Users}
             tone="neutral"

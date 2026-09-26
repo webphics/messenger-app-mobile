@@ -71,7 +71,7 @@ describe('who may edit and delete', () => {
     expect(wallPostActions(post(), author)).toEqual(['edit', 'delete'])
   })
 
-  it('offers a stranger neither, and no takedown either — they do not hold remove_wall_posts', () => {
+  it('offers a stranger neither, and no takedown either, since they do not hold remove_wall_posts', () => {
     expect(wallPostActions(post(), stranger)).toEqual([])
   })
 

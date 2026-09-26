@@ -53,12 +53,13 @@ export type SharedOrganizations = Organization[] | null
 /**
  * `canStartStaffDm` is whether the viewer holds `staff_dm`, without which
  * `POST /conversations/staff` refuses them. A thread that already exists still
- * opens; only a new one is out of reach.
+ * opens; only a new one is out of reach. Required, so a caller that forgets it
+ * fails to compile rather than offering a DM the API would refuse.
  */
 export function contactIntent(
   contact: Contact,
-  shared: SharedOrganizations = null,
-  canStartStaffDm = true,
+  shared: SharedOrganizations,
+  canStartStaffDm: boolean,
 ): ContactIntent {
   // The API already resolved this, for every kind. A row that names a thread is
   // a row with nothing left to decide, and that includes a Customer — whose

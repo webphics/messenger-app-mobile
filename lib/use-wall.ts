@@ -179,7 +179,7 @@ export type WallView = {
   createPost: (input: WallPostCreateInput) => Promise<ApiResult<WallPost>>
   /** The author's own edit. Patches the Post on success; the caller decides what a refusal means on screen. */
   editPost: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
-  /** The author's delete, or a `remove_wall_posts` holder's takedown — the API tells them apart by who is asking, not by a different route. */
+  /** The author's delete, or a `remove_wall_posts` holder's takedown. The API tells them apart by who is asking, not by a different route. */
   removePost: (postId: string) => Promise<ApiResult<{ id: string }>>
 }
 

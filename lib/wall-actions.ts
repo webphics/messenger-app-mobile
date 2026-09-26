@@ -34,7 +34,7 @@ export type WallPostAction = 'copy-body' | 'copy-link' | 'edit' | 'delete' | 'ta
  * `edit` and `delete` are the author's, and only the author's — mirrors
  * `WallPolicy.assertCanEdit`, which has no Admin exception. `takedown` needs
  * `remove_wall_posts` (`assertCanRemove`), whatever the role: a holder acting
- * on somebody *else's* Post. A holder's own Post still reads as `delete` — a
+ * on somebody *else's* Post. A holder's own Post still reads as `delete`. A
  * takedown is what happens to somebody else's writing, never to your own.
  */
 export function wallPostActions(post: WallPost, viewer: WallPostViewer): WallPostAction[] {

@@ -8,7 +8,9 @@ import {
   userFlags,
   userRoleLabel,
   userRowActions,
+  canCreateAccounts,
 } from '@/lib/user-directory'
+import { CAPABILITIES, type Capability } from '@/lib/capabilities'
 import { parseManagedUser } from '@/lib/user-parse'
 import type { ManagedUser } from '@/lib/types'
 
@@ -31,9 +33,16 @@ function user(overrides: Partial<ManagedUser> = {}): ManagedUser {
     createdAt: '',
     updatedAt: '',
     manageable: true,
+    roleEditable: true,
     ...overrides,
   }
 }
+
+function viewer(id: string, ...capabilities: Capability[]) {
+  return { id, capabilities }
+}
+
+const EVERYTHING = CAPABILITIES
 
 const TALO = { id: 'org-1', name: 'Talo' }
 const NORTHWIND = { id: 'org-2', name: 'Northwind' }
@@ -106,46 +115,101 @@ describe('isSelf', () => {
 })
 
 describe('userRowActions', () => {
-  test('an ordinary row offers every action', () => {
-    expect(userRowActions(user({ id: 'other' }), 'me')).toEqual({
+  test('a viewer holding everything is offered every action on an ordinary row', () => {
+    expect(userRowActions(user({ id: 'other' }), viewer('me', ...EVERYTHING))).toEqual({
       account: true,
+      changeRole: true,
       removeMembership: true,
       invite: true,
     })
   })
 
-  test('a row the API will not let anyone manage offers nothing that changes it', () => {
-    expect(userRowActions(user({ id: 'other', manageable: false }), 'me')).toEqual({
-      account: false,
+  test('the account actions need manage_users', () => {
+    expect(userRowActions(user({ id: 'other' }), viewer('me', 'manage_users'))).toEqual({
+      account: true,
+      changeRole: false,
       removeMembership: false,
       invite: false,
     })
   })
 
-  test('the flag wins over a viewer nobody has identified', () => {
-    expect(userRowActions(user({ manageable: false }), null)).toEqual({
+  test('the role change needs change_roles', () => {
+    expect(userRowActions(user({ id: 'other' }), viewer('me', 'change_roles'))).toEqual({
       account: false,
+      changeRole: true,
+      removeMembership: false,
+      invite: false,
+    })
+  })
+
+  test('the role change also needs the row to say the viewer may change it', () => {
+    const row = user({ id: 'other', roleEditable: false })
+    expect(userRowActions(row, viewer('me', ...EVERYTHING)).changeRole).toBe(false)
+  })
+
+  test('removing and inviting need manage_memberships', () => {
+    expect(userRowActions(user({ id: 'other' }), viewer('me', 'manage_memberships'))).toEqual({
+      account: false,
+      changeRole: false,
+      removeMembership: true,
+      invite: true,
+    })
+  })
+
+  test('a viewer holding only manage_permissions is offered nothing here', () => {
+    expect(userRowActions(user({ id: 'other' }), viewer('me', 'manage_permissions'))).toEqual({
+      account: false,
+      changeRole: false,
+      removeMembership: false,
+      invite: false,
+    })
+  })
+
+  test('a row the API will not let anyone manage offers nothing that changes it', () => {
+    const row = user({ id: 'other', manageable: false })
+    expect(userRowActions(row, viewer('me', ...EVERYTHING))).toEqual({
+      account: false,
+      changeRole: false,
+      removeMembership: false,
+      invite: false,
+    })
+  })
+
+  test('nobody signed in is offered nothing', () => {
+    expect(userRowActions(user(), null)).toEqual({
+      account: false,
+      changeRole: false,
       removeMembership: false,
       invite: false,
     })
   })
 
   test('your own row keeps invite and drops the rest, as before', () => {
-    expect(userRowActions(user({ id: 'me' }), 'me')).toEqual({
+    expect(userRowActions(user({ id: 'me' }), viewer('me', ...EVERYTHING))).toEqual({
       account: false,
+      changeRole: false,
       removeMembership: false,
       invite: true,
     })
   })
 
-  test('a row from an API that sends no flag is managed as before', () => {
+  test('a row from an API that sends no roleEditable offers no role change', () => {
     const row = parseManagedUser({ id: 'other', email: 'a@talo.test', role: 'admin' })
     expect(row).not.toBeNull()
-    expect(userRowActions(row!, 'me')).toEqual({
+    expect(userRowActions(row!, viewer('me', ...EVERYTHING))).toEqual({
       account: true,
+      changeRole: false,
       removeMembership: true,
       invite: true,
     })
+  })
+})
+
+describe('canCreateAccounts', () => {
+  test('needs manage_users', () => {
+    expect(canCreateAccounts(viewer('me', 'manage_users'))).toBe(true)
+    expect(canCreateAccounts(viewer('me', 'change_roles', 'manage_permissions'))).toBe(false)
+    expect(canCreateAccounts(null)).toBe(false)
   })
 })
 

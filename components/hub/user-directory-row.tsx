@@ -31,6 +31,7 @@ import {
   userFlags,
   userRoleLabel,
   userRowActions,
+  type UserRowViewer,
 } from "@/lib/user-directory";
 import type { UserDirectoryView } from "@/lib/use-user-directory";
 import type { ManagedUser, OrganizationSummary, UserRole } from "@/lib/types";
@@ -50,7 +51,8 @@ import type { ManagedUser, OrganizationSummary, UserRole } from "@/lib/types";
  *
  * A row the API marks `manageable: false` carries none either, and cannot be
  * removed from or invited to an organization. Its organizations still list,
- * read-only, and nothing says why. See `userRowActions`.
+ * read-only, and nothing says why. Every other action is drawn only for a
+ * viewer holding its capability, as on the web. See `userRowActions`.
  */
 
 const FLAG_STYLE = {
@@ -70,7 +72,7 @@ type UserDirectoryRowProps = {
   user: ManagedUser;
   open: boolean;
   onToggle: (userId: string) => void;
-  viewerId: string | null;
+  viewer: UserRowViewer;
   organizations: OrganizationSummary[];
   actions: UserDirectoryView;
 };
@@ -113,7 +115,7 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
   user,
   open,
   onToggle,
-  viewerId,
+  viewer,
   organizations,
   actions,
 }: UserDirectoryRowProps) {
@@ -124,8 +126,8 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
   const name = userDisplayName(user);
   const flags = userFlags(user);
   const role = ROLE_STYLE[user.role];
-  const own = isSelf(user, viewerId);
-  const allowed = userRowActions(user, viewerId);
+  const own = isSelf(user, viewer?.id ?? null);
+  const allowed = userRowActions(user, viewer);
   const busy = actions.busyId === user.id;
   const problem = actions.refusal?.id === user.id ? actions.refusal.message : null;
   const invitable = invitableOrganizations(organizations, user);
@@ -329,118 +331,122 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
               This is your own account. Role, ban and deletion are managed from
               another Admin&#8217;s session.
             </Text>
-          ) : allowed.account ? (
+          ) : (
             <>
-              <View className="gap-1.5">
-                <Text variant="label" className="uppercase tracking-wide text-muted">
-                  Change role
-                </Text>
-                <View className="flex-row gap-2">
-                  {otherRoles(user.role).map((next) => (
-                    <TactilePressable
-                      key={next}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Make ${userRoleLabel(next)}`}
-                      onPress={() =>
-                        Alert.alert(
-                          `Make ${name} an ${userRoleLabel(next).toLowerCase()}?`,
-                          next === "agent"
-                            ? "They gain every agent capability."
-                            : next === "admin"
-                              ? "Admins can see and manage everything."
-                              : "They lose every staff capability.",
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: userRoleLabel(next),
-                              onPress: () => actions.changeRole(user, next),
-                            },
-                          ],
-                        )
-                      }
-                      className="min-h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-line/80 bg-line/35 px-3"
-                    >
-                      <UserCog color={colors.ink} size={15} />
-                      <Text variant="label" className="text-ink">
-                        {userRoleLabel(next)}
-                      </Text>
-                    </TactilePressable>
-                  ))}
+              {allowed.changeRole ? (
+                <View className="gap-1.5">
+                  <Text variant="label" className="uppercase tracking-wide text-muted">
+                    Change role
+                  </Text>
+                  <View className="flex-row gap-2">
+                    {otherRoles(user.role).map((next) => (
+                      <TactilePressable
+                        key={next}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Make ${userRoleLabel(next)}`}
+                        onPress={() =>
+                          Alert.alert(
+                            `Make ${name} an ${userRoleLabel(next).toLowerCase()}?`,
+                            next === "customer"
+                              ? "They lose every staff permission."
+                              : `Their permissions reset to the ${userRoleLabel(next).toLowerCase()} default, limited to the permissions you hold.`,
+                            [
+                              { text: "Cancel", style: "cancel" },
+                              {
+                                text: userRoleLabel(next),
+                                onPress: () => actions.changeRole(user, next),
+                              },
+                            ],
+                          )
+                        }
+                        className="min-h-11 flex-1 flex-row items-center justify-center gap-1.5 rounded-xl border border-line/80 bg-line/35 px-3"
+                      >
+                        <UserCog color={colors.ink} size={15} />
+                        <Text variant="label" className="text-ink">
+                          {userRoleLabel(next)}
+                        </Text>
+                      </TactilePressable>
+                    ))}
+                  </View>
                 </View>
-              </View>
+              ) : null}
 
-              <View className="flex-row gap-2">
-                <ActionButton
-                  label="Sign out"
-                  icon={LogOut}
-                  onPress={confirmRevoke}
-                />
-                <ActionButton
-                  label="Reset 2FA"
-                  icon={ShieldCheck}
-                  onPress={confirmTwoFactor}
-                />
-              </View>
-
-              {settingPassword ? (
-                <View className="gap-2">
-                  <Input
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="New password…"
-                    accessibilityLabel="New password"
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    textContentType="newPassword"
-                    className="h-11 rounded-2xl border-line/80 bg-line/35 px-3.5 font-sans text-base text-ink"
-                  />
+              {allowed.account ? (
+                <>
                   <View className="flex-row gap-2">
                     <ActionButton
-                      label="Cancel"
-                      icon={KeyRound}
-                      onPress={() => {
-                        setPassword("");
-                        setSettingPassword(false);
-                      }}
+                      label="Sign out"
+                      icon={LogOut}
+                      onPress={confirmRevoke}
                     />
                     <ActionButton
-                      label="Set password"
-                      icon={KeyRound}
-                      onPress={submitPassword}
+                      label="Reset 2FA"
+                      icon={ShieldCheck}
+                      onPress={confirmTwoFactor}
                     />
                   </View>
-                  <Text variant="label" className="text-muted">
-                    They are signed out everywhere when it changes.
-                  </Text>
-                </View>
-              ) : (
-                <View className="flex-row gap-2">
-                  <ActionButton
-                    label="Set password"
-                    icon={KeyRound}
-                    onPress={() => setSettingPassword(true)}
-                  />
-                  <ActionButton
-                    label={user.isBanned ? "Lift ban" : "Ban"}
-                    icon={Ban}
-                    tone={user.isBanned ? "neutral" : "danger"}
-                    onPress={
-                      user.isBanned ? () => actions.unban(user) : confirmBan
-                    }
-                  />
-                </View>
-              )}
 
-              <ActionButton
-                label="Delete account"
-                icon={Trash2}
-                tone="danger"
-                onPress={confirmDelete}
-              />
+                  {settingPassword ? (
+                    <View className="gap-2">
+                      <Input
+                        value={password}
+                        onChangeText={setPassword}
+                        placeholder="New password…"
+                        accessibilityLabel="New password"
+                        secureTextEntry
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        spellCheck={false}
+                        textContentType="newPassword"
+                        className="h-11 rounded-2xl border-line/80 bg-line/35 px-3.5 font-sans text-base text-ink"
+                      />
+                      <View className="flex-row gap-2">
+                        <ActionButton
+                          label="Cancel"
+                          icon={KeyRound}
+                          onPress={() => {
+                            setPassword("");
+                            setSettingPassword(false);
+                          }}
+                        />
+                        <ActionButton
+                          label="Set password"
+                          icon={KeyRound}
+                          onPress={submitPassword}
+                        />
+                      </View>
+                      <Text variant="label" className="text-muted">
+                        They are signed out everywhere when it changes.
+                      </Text>
+                    </View>
+                  ) : (
+                    <View className="flex-row gap-2">
+                      <ActionButton
+                        label="Set password"
+                        icon={KeyRound}
+                        onPress={() => setSettingPassword(true)}
+                      />
+                      <ActionButton
+                        label={user.isBanned ? "Lift ban" : "Ban"}
+                        icon={Ban}
+                        tone={user.isBanned ? "neutral" : "danger"}
+                        onPress={
+                          user.isBanned ? () => actions.unban(user) : confirmBan
+                        }
+                      />
+                    </View>
+                  )}
+
+                  <ActionButton
+                    label="Delete account"
+                    icon={Trash2}
+                    tone="danger"
+                    onPress={confirmDelete}
+                  />
+                </>
+              ) : null}
             </>
-          ) : null}
+          )}
 
           {problem ? (
             <Text

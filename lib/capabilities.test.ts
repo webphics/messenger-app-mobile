@@ -1,6 +1,8 @@
 import {
+  ADMIN_ONLY_CAPABILITIES,
   CAPABILITIES,
   CAPABILITY_GROUPS,
+  USERS_SCREEN_CAPABILITIES,
   can,
   canAny,
   isCapability,
@@ -18,7 +20,7 @@ describe('CAPABILITIES', () => {
     expect(Object.keys(CAPABILITY_GROUPS)).toEqual([
       'support',
       'groups',
-      'publishing',
+      'broadcasts',
       'reporting',
       'workspace',
     ])
@@ -27,6 +29,21 @@ describe('CAPABILITIES', () => {
 
   test('no name appears twice', () => {
     expect(new Set(CAPABILITIES).size).toBe(CAPABILITIES.length)
+  })
+
+  test('six are admin-only: the workspace four and the two reached only from the Users page', () => {
+    expect(ADMIN_ONLY_CAPABILITIES).toEqual([
+      'manage_wall_contributors',
+      'manage_memberships',
+      'manage_users',
+      'change_roles',
+      'manage_permissions',
+      'manage_team',
+    ])
+  })
+
+  test('the Accounts screen opens on any of the three that act on people', () => {
+    expect(USERS_SCREEN_CAPABILITIES).toEqual(['manage_users', 'change_roles', 'manage_permissions'])
   })
 
   test('create_labels is gone, folded into manage_labels', () => {

@@ -1,3 +1,4 @@
+import { can, type CapabilityViewer } from '@/lib/capabilities'
 import type { ManagedUser, UserRole } from '@/lib/types'
 
 /**
@@ -98,30 +99,54 @@ export function isSelf(user: ManagedUser, viewerId: string | null): boolean {
 
 /** Which of the row's actions to draw. */
 export type UserRowActions = {
-  /** Role, sign out, 2FA reset, password, ban or unban, delete. */
+  /** Sign out, 2FA reset, password, ban or unban, delete. Needs `manage_users`. */
   account: boolean
-  /** Taking them out of an organization they are in. */
+  /** Needs `change_roles`, and the API's `roleEditable` on the row. */
+  changeRole: boolean
+  /** Taking them out of an organization they are in. Needs `manage_memberships`. */
   removeMembership: boolean
-  /** Inviting or adding them to another organization. */
+  /** Inviting or adding them to another organization. Needs `manage_memberships`. */
   invite: boolean
 }
 
+/** The signed-in viewer as a row needs them: who they are and what they hold. */
+export type UserRowViewer = (CapabilityViewer & { readonly id: string }) | null | undefined
+
+const NO_ACTIONS: UserRowActions = {
+  account: false,
+  changeRole: false,
+  removeMembership: false,
+  invite: false,
+}
+
 /**
- * Which actions a row offers.
+ * Which actions a row offers, hidden as the web hides them.
  *
- * Two rules, and the server's comes first. A row the API marks
- * `manageable: false` refuses every change an Admin could make to it, the
- * membership ones included, so it offers none and the list of where they
- * belong stays read-only. Nothing on screen says why: the flag carries no
- * reason and neither does the row.
+ * The server's rules come first. A row the API marks `manageable: false`
+ * refuses every change anyone could make to it, the membership ones included,
+ * so it offers none and the list of where they belong stays read-only.
+ * Nothing on screen says why: the flag carries no reason and neither does the
+ * row. Then each action needs its capability, and the role change also needs
+ * the row's `roleEditable`.
  *
  * Then the client's own rule, `isSelf`: the viewer's own row drops the
- * account actions and removal, and keeps invite.
+ * account actions, the role change and removal, and keeps invite.
  */
-export function userRowActions(user: ManagedUser, viewerId: string | null): UserRowActions {
-  if (!user.manageable) return { account: false, removeMembership: false, invite: false }
-  const own = isSelf(user, viewerId)
-  return { account: !own, removeMembership: !own, invite: true }
+export function userRowActions(user: ManagedUser, viewer: UserRowViewer): UserRowActions {
+  if (!viewer || !user.manageable) return NO_ACTIONS
+  const own = isSelf(user, viewer.id)
+  const memberships = can(viewer, 'manage_memberships')
+  return {
+    account: !own && can(viewer, 'manage_users'),
+    changeRole: !own && user.roleEditable && can(viewer, 'change_roles'),
+    removeMembership: !own && memberships,
+    invite: memberships,
+  }
+}
+
+/** Whether the Accounts screen offers New account. Creating one needs `manage_users`. */
+export function canCreateAccounts(viewer: CapabilityViewer): boolean {
+  return can(viewer, 'manage_users')
 }
 
 /**

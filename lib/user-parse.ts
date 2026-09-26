@@ -92,6 +92,9 @@ export function parseManagedUser(value: unknown): ManagedUser | null {
     // Only an explicit false locks a row. An older API sends no flag, and
     // reading its absence as false would take every action off every row.
     manageable: record.manageable !== false,
+    // Only an explicit true offers a role change. The API always sends the
+    // flag, and a row without it fails towards hiding the control.
+    roleEditable: record.roleEditable === true,
   }
 }
 

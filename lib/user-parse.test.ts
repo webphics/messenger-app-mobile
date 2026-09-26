@@ -21,6 +21,20 @@ describe('parseManagedUser manageable', () => {
   })
 })
 
+describe('parseManagedUser roleEditable', () => {
+  test('a row without the flag offers no role change', () => {
+    expect(parseManagedUser(ROW)?.roleEditable).toBe(false)
+  })
+
+  test('true is read as true', () => {
+    expect(parseManagedUser({ ...ROW, roleEditable: true })?.roleEditable).toBe(true)
+  })
+
+  test('anything but true is read as false', () => {
+    expect(parseManagedUser({ ...ROW, roleEditable: 'yes' })?.roleEditable).toBe(false)
+  })
+})
+
 describe('parseStaffPermissions', () => {
   test('reads the role, the held set and the editable set', () => {
     expect(

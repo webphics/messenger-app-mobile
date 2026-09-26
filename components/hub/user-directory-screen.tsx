@@ -15,7 +15,7 @@ import { getSessionUser } from "@/lib/session";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { useUserDirectory } from "@/lib/use-user-directory";
-import { userRoleLabel } from "@/lib/user-directory";
+import { canCreateAccounts, userRoleLabel } from "@/lib/user-directory";
 import type { ManagedUser, UserRole } from "@/lib/types";
 
 /**
@@ -50,21 +50,25 @@ export function UserDirectoryScreen() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
+  const mayCreate = canCreateAccounts(viewer);
+
   useEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="New account"
-          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-          className="mr-2 size-10 items-center justify-center rounded-full bg-primary-soft/80"
-          onPress={() => setCreating(true)}
-        >
-          <UserPlus color={colors.primary} size={20} />
-        </TactilePressable>
-      ),
+      // Creating an account needs `manage_users`. Without it the header is left empty.
+      headerRight: () =>
+        mayCreate ? (
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel="New account"
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            className="mr-2 size-10 items-center justify-center rounded-full bg-primary-soft/80"
+            onPress={() => setCreating(true)}
+          >
+            <UserPlus color={colors.primary} size={20} />
+          </TactilePressable>
+        ) : null,
     });
-  }, [navigation]);
+  }, [navigation, mayCreate]);
 
   const toggle = useCallback((userId: string) => {
     setOpenId((current) => (current === userId ? null : userId));
@@ -76,12 +80,12 @@ export function UserDirectoryScreen() {
         user={item}
         open={item.id === openId}
         onToggle={toggle}
-        viewerId={viewer?.id ?? null}
+        viewer={viewer}
         organizations={view.organizations}
         actions={view}
       />
     ),
-    [openId, toggle, view, viewer?.id],
+    [openId, toggle, view, viewer],
   );
 
   const { directory } = view;
