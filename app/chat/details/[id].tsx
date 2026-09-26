@@ -10,10 +10,10 @@ import { ConversationDetailsScreen } from "@/components/chat/conversation-detail
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { chatDetailsIdFromRoute } from "@/lib/chat-route-id";
 import { useConversationInbox } from "@/lib/conversation-inbox";
+import { threadActionsView } from "@/lib/conversation-access";
 import { canLabel, canReadNotes } from "@/lib/conversation-details";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { getSession } from "@/lib/session";
-import { threadActions } from "@/lib/thread-actions";
 import { useChatSectionConversation } from "@/lib/use-chat-section-conversation";
 import { useConversationDetails } from "@/lib/use-conversation-details";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
@@ -77,9 +77,12 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
     addConversation,
   );
   const supportAssignment = useSupportAssignment();
-  const actions = ready
-    ? threadActions(section.conversation, section.author, supportAssignment)
-    : null;
+  /**
+   * Transfer, Close and Reopen as the API offers them to this viewer, with
+   * the Capabilities this client cannot see already applied.
+   */
+  const actions = threadActionsView(ready ? section.conversation.access : undefined);
+  const manages = actions.transfer || actions.close || actions.reopen;
 
   if (section.status === "loading") return <AppLoadingScreen />;
   if (section.status === "denied") return <Redirect href={ROLE_HREF[section.home]} />;
@@ -91,10 +94,8 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
       organizationNames={section.organizationNames}
       details={details}
       supportAssignment={supportAssignment}
-      management={actions?.close || actions?.reopen ? management : undefined}
-      canClose={actions?.close === true}
-      canReopen={actions?.reopen === true}
-      canTransfer={actions?.transfer === true}
+      management={manages ? management : undefined}
+      threadActions={actions}
     />
   );
 }

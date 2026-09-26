@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { chatMediaHref } from '@/lib/chat-route-id'
+import { threadActionsView, type ThreadActionsView } from '@/lib/conversation-access'
 import { cn } from '@/lib/cn'
 import {
   appliedLabels,
@@ -70,17 +71,13 @@ type ConversationDetailsScreenProps = {
   /** Whether Support DMs are worked by assignment. See `lib/support-assignment`. */
   supportAssignment: boolean
   /**
-   * Closing, reopening and transferring, for whoever the API grants one of them
+   * Closing, reopening and transferring, for whoever the API offers one of them
    * to. Absent for everybody else, which is how the section stays undrawn rather
-   * than drawn and disabled — see `threadActions`.
+   * than drawn and disabled. See `threadActionsView`.
    */
   management?: ThreadManagement
-  /** Whether Close is offered. False on a closed thread, where Reopen is. */
-  canClose?: boolean
-  /** Whether Reopen is offered: staff, on a closed Support DM. */
-  canReopen?: boolean
-  /** Whether Transfer is offered beside Close. Never in a Shared queue. */
-  canTransfer?: boolean
+  /** Which of Transfer, Close and Reopen the API offers. None when absent. */
+  threadActions?: ThreadActionsView
 }
 
 /**
@@ -108,9 +105,7 @@ export function ConversationDetailsScreen({
   details,
   supportAssignment,
   management,
-  canClose = false,
-  canReopen = false,
-  canTransfer = false,
+  threadActions = threadActionsView(undefined),
 }: ConversationDetailsScreenProps) {
   const insets = useSafeAreaInsets()
   const keyboardInset = useKeyboardInset()
@@ -235,9 +230,7 @@ export function ConversationDetailsScreen({
           {management ? (
             <ThreadManagementSection
               management={management}
-              canClose={canClose}
-              canReopen={canReopen}
-              canTransfer={canTransfer}
+              actions={threadActions}
               supportAssignment={supportAssignment}
             />
           ) : null}

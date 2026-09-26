@@ -1,17 +1,55 @@
-import { composerView, messageActions, parseAccess, UNKNOWN_ACCESS } from '@/lib/conversation-access'
+import {
+  composerView,
+  messageActions,
+  parseAccess,
+  threadActionsView,
+  UNKNOWN_ACCESS,
+} from '@/lib/conversation-access'
 import type { Message } from '@/lib/types'
+
+/** Every action the API sends, all off, with the ones a case turns on. */
+function actions(on: Record<string, unknown> = {}) {
+  return {
+    editMessages: false,
+    engage: false,
+    takeOver: false,
+    transfer: false,
+    close: false,
+    reopen: false,
+    setPriority: false,
+    ...on,
+  }
+}
 
 /** `access` as the API sends it on a conversation this viewer may write in. */
 function openPayload() {
-  return { write: { state: 'open' }, actions: { editMessages: true } }
+  return { write: { state: 'open' }, actions: actions({ editMessages: true }) }
 }
 
 /** `access` as the API sends it on a conversation this viewer may only read. */
 function readOnlyPayload(write: Record<string, unknown>) {
   return {
     write: { state: 'read_only', holder: null, wayOut: null, ...write },
-    actions: { editMessages: false },
+    actions: actions(),
   }
+}
+
+/**
+ * One action missing, null, a string or a number. Each is a rule this build
+ * cannot read, so each makes the whole answer unknown.
+ */
+function malformedActions(action: string): [string, unknown][] {
+  const payload = (value: unknown) => {
+    const sent: Record<string, unknown> = actions({ [action]: value })
+    if (value === undefined) delete sent[action]
+    return { write: { state: 'open' }, actions: sent }
+  }
+  return [
+    [`actions with no ${action}`, payload(undefined)],
+    [`a ${action} that is null`, payload(null)],
+    [`a ${action} that is a string`, payload('true')],
+    [`a ${action} that is a number`, payload(1)],
+  ]
 }
 
 const PRIYA = { id: 'agent-2', name: 'Priya Raman' }
@@ -25,7 +63,7 @@ describe('parseAccess', () => {
   test('reads an open composer', () => {
     expect(parseAccess(openPayload())).toEqual({
       write: { state: 'open' },
-      actions: { editMessages: true },
+      actions: actions({ editMessages: true }),
     })
   })
 
@@ -34,7 +72,7 @@ describe('parseAccess', () => {
 
     expect(parseAccess(payload)).toEqual({
       write: { state: 'read_only', reason: 'must_take_over', holder: PRIYA, wayOut: 'take_over' },
-      actions: { editMessages: false },
+      actions: actions(),
     })
   })
 
@@ -42,11 +80,11 @@ describe('parseAccess', () => {
     expect(
       parseAccess({
         write: { state: 'read_only', reason: 'conversation_closed' },
-        actions: { editMessages: false },
+        actions: actions(),
       }),
     ).toEqual({
       write: { state: 'read_only', reason: 'conversation_closed', holder: null, wayOut: null },
-      actions: { editMessages: false },
+      actions: actions(),
     })
   })
 
@@ -54,16 +92,33 @@ describe('parseAccess', () => {
    * A Customer may still send in a closed Support DM, and may not edit there.
    * The API says so with an open write and Edit off, and the two read apart.
    */
+  test('reads the thread actions the API offers', () => {
+    const actions = {
+      editMessages: true,
+      engage: false,
+      takeOver: false,
+      transfer: true,
+      close: true,
+      reopen: false,
+      setPriority: true,
+    }
+
+    expect(parseAccess({ write: { state: 'open' }, actions })).toEqual({
+      write: { state: 'open' },
+      actions,
+    })
+  })
+
   test('reads an open write with editing off', () => {
     expect(
-      parseAccess({ write: { state: 'open' }, actions: { editMessages: false } }),
-    ).toEqual({ write: { state: 'open' }, actions: { editMessages: false } })
+      parseAccess({ write: { state: 'open' }, actions: actions() }),
+    ).toEqual({ write: { state: 'open' }, actions: actions() })
   })
 
   test('keeps only the actions it knows', () => {
-    const payload = { write: { state: 'open' }, actions: { editMessages: true, pinMessages: true } }
+    const payload = { write: { state: 'open' }, actions: actions({ editMessages: true, pinMessages: true }) }
 
-    expect(parseAccess(payload)).toEqual({ write: { state: 'open' }, actions: { editMessages: true } })
+    expect(parseAccess(payload)).toEqual({ write: { state: 'open' }, actions: actions({ editMessages: true }) })
   })
 
   test('keeps only the holder fields it knows', () => {
@@ -92,10 +147,10 @@ describe('parseAccess', () => {
     ['null', null],
     ['a string', 'open'],
     ['an array', []],
-    ['no write', { actions: { editMessages: true } }],
-    ['a write that is not an object', { write: 'open', actions: { editMessages: true } }],
-    ['a write state it does not know', { write: { state: 'maybe' }, actions: { editMessages: true } }],
-    ['a read-only write with no reason', { write: { state: 'read_only' }, actions: { editMessages: false } }],
+    ['no write', { actions: actions({ editMessages: true }) }],
+    ['a write that is not an object', { write: 'open', actions: actions({ editMessages: true }) }],
+    ['a write state it does not know', { write: { state: 'maybe' }, actions: actions({ editMessages: true }) }],
+    ['a read-only write with no reason', { write: { state: 'read_only' }, actions: actions() }],
     ['a reason it does not know', readOnlyPayload({ reason: 'must_wait' })],
     ['a way out it does not know', readOnlyPayload({ reason: 'must_engage', wayOut: 'claim' })],
     ['a way out that is not a string', readOnlyPayload({ reason: 'must_engage', wayOut: true })],
@@ -103,10 +158,14 @@ describe('parseAccess', () => {
     ['a holder that is not an object', readOnlyPayload({ reason: 'already_engaged', holder: 'Priya' })],
     ['no actions', { write: { state: 'open' } }],
     ['actions that are not an object', { write: { state: 'open' }, actions: [] }],
-    ['actions with no editMessages', { write: { state: 'open' }, actions: {} }],
-    ['an editMessages that is null', { write: { state: 'open' }, actions: { editMessages: null } }],
-    ['an editMessages that is a string', { write: { state: 'open' }, actions: { editMessages: 'true' } }],
-    ['an editMessages that is a number', { write: { state: 'open' }, actions: { editMessages: 1 } }],
+    ['empty actions', { write: { state: 'open' }, actions: {} }],
+    ...malformedActions('editMessages'),
+    ...malformedActions('engage'),
+    ...malformedActions('takeOver'),
+    ...malformedActions('transfer'),
+    ...malformedActions('close'),
+    ...malformedActions('reopen'),
+    ...malformedActions('setPriority'),
     ['the unknown marker itself', UNKNOWN_ACCESS],
   ])('reads %s as unknown', (_case, payload) => {
     expect(parseAccess(payload)).toEqual({ kind: 'unknown' })
@@ -269,7 +328,7 @@ describe('messageActions', () => {
 
   /* The Customer in a closed Support DM: still open to write, and not to edit. */
   test('does not offer Edit when editing is off, even with an open composer', () => {
-    expect(offersEdit({ write: { state: 'open' }, actions: { editMessages: false } })).toBe(false)
+    expect(offersEdit({ write: { state: 'open' }, actions: actions() })).toBe(false)
   })
 
   test('does not offer Edit in a thread this viewer may only read', () => {
@@ -283,5 +342,123 @@ describe('messageActions', () => {
 
   test('does not offer Edit on a window end it cannot read', () => {
     expect(offersEdit(openPayload(), { editableUntil: 'soon' })).toBe(false)
+  })
+})
+
+describe('threadActionsView', () => {
+  /** What the details screen offers for a payload, read the way the screen reads it. */
+  function offered(payload: unknown) {
+    return threadActionsView(parseAccess(payload))
+  }
+
+  test('an Agent holding a Support DM, with both Capabilities, is offered Transfer and Close', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, transfer: true, close: true, setPriority: true }),
+    }
+
+    expect(offered(payload)).toEqual({
+      engage: false,
+      takeOver: false,
+      transfer: true,
+      close: true,
+      reopen: false,
+    })
+  })
+
+  const NONE = { engage: false, takeOver: false, transfer: false, close: false, reopen: false }
+
+  test('an Agent holding a Support DM without the Close Capability is offered Transfer alone', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, transfer: true, setPriority: true }),
+    }
+
+    expect(offered(payload)).toEqual({ ...NONE, transfer: true })
+  })
+
+  test('an Agent holding a Support DM without the Transfer Capability is offered Close alone', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, close: true, setPriority: true }),
+    }
+
+    expect(offered(payload)).toEqual({ ...NONE, close: true })
+  })
+
+  test('an Agent looking at a Support DM another agent holds is offered nothing', () => {
+    const payload = readOnlyPayload({ reason: 'already_engaged', holder: PRIYA })
+    payload.actions = actions({ setPriority: true })
+
+    expect(offered(payload)).toEqual(NONE)
+  })
+
+  test('an Agent on an Unassigned Support DM is offered Engage', () => {
+    const payload = readOnlyPayload({ reason: 'must_engage', wayOut: 'engage' })
+    payload.actions = actions({ engage: true, setPriority: true })
+
+    expect(offered(payload)).toEqual({ ...NONE, engage: true })
+  })
+
+  test('an Agent with the Close Capability is offered Reopen on a closed Support DM', () => {
+    const payload = readOnlyPayload({ reason: 'conversation_closed', wayOut: 'reopen' })
+    payload.actions = actions({ reopen: true, setPriority: true })
+
+    expect(offered(payload)).toEqual({ ...NONE, reopen: true })
+  })
+
+  test('an Agent without the Close Capability is offered nothing on a closed Support DM', () => {
+    const payload = readOnlyPayload({ reason: 'conversation_closed' })
+    payload.actions = actions({ setPriority: true })
+
+    expect(offered(payload)).toEqual(NONE)
+  })
+
+  test('an Admin on a Support DM another agent holds is offered Take over, and not Close or Transfer', () => {
+    const payload = readOnlyPayload({ reason: 'must_take_over', holder: PRIYA, wayOut: 'take_over' })
+    payload.actions = actions({ takeOver: true, setPriority: true })
+
+    expect(offered(payload)).toEqual({ ...NONE, takeOver: true })
+  })
+
+  test('an Admin holding a Support DM is offered Transfer and Close', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, transfer: true, close: true, setPriority: true }),
+    }
+
+    expect(offered(payload)).toEqual({ ...NONE, transfer: true, close: true })
+  })
+
+  /* A Customer may write in their own Support DM, closed or not, and act on it never. */
+  test('a Customer is offered nothing, with an open composer', () => {
+    const payload = { write: { state: 'open' }, actions: actions({ editMessages: true }) }
+
+    expect(offered(payload)).toEqual(NONE)
+  })
+
+  /* A Shared queue has no assignee: nothing to engage, take over or hand on. */
+  test('a Shared queue offers Close and nothing to claim or hand on', () => {
+    const payload = {
+      write: { state: 'open' },
+      actions: actions({ editMessages: true, close: true, setPriority: true }),
+    }
+
+    expect(offered(payload)).toEqual({ ...NONE, close: true })
+  })
+
+  test('priority alone offers nothing here, since this client has no priority control', () => {
+    const payload = { write: { state: 'open' }, actions: actions({ setPriority: true }) }
+
+    expect(offered(payload)).toEqual(NONE)
+  })
+
+  test('unknown access offers nothing', () => {
+    expect(threadActionsView(UNKNOWN_ACCESS)).toEqual(NONE)
+    expect(offered({ write: { state: 'open' }, actions: actions({ close: 'yes' }) })).toEqual(NONE)
+  })
+
+  test('a missing access field offers nothing', () => {
+    expect(threadActionsView(undefined)).toEqual(NONE)
   })
 })

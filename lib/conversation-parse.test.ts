@@ -507,9 +507,10 @@ describe('parseConversation, reading access', () => {
       holder: { id: 'agent-2', name: 'Priya Raman' },
       wayOut: null,
     },
-    actions: { editMessages: false },
+    actions: { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: true },
   }
-  const OPEN = { write: { state: 'open' }, actions: { editMessages: true } }
+  const OPEN = { write: { state: 'open' }, actions: { editMessages: true, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: false } }
+  const NO_ACTIONS = { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: false }
 
   const customerGroupRow = (overrides: Record<string, unknown> = {}) => ({
     ...customerSupportRow(),
@@ -529,21 +530,21 @@ describe('parseConversation, reading access', () => {
     [
       "a Customer's group",
       customerGroupRow({
-        access: { write: { state: 'read_only', reason: 'group_write_restricted' }, actions: { editMessages: false } },
+        access: { write: { state: 'read_only', reason: 'group_write_restricted' }, actions: NO_ACTIONS },
       }),
       {
         write: { state: 'read_only', reason: 'group_write_restricted', holder: null, wayOut: null },
-        actions: { editMessages: false },
+        actions: NO_ACTIONS,
       },
     ],
     [
       'an Announcements thread',
       broadcastInboxRow({
-        access: { write: { state: 'read_only', reason: 'broadcast_inbox_read_only' }, actions: { editMessages: false } },
+        access: { write: { state: 'read_only', reason: 'broadcast_inbox_read_only' }, actions: NO_ACTIONS },
       }),
       {
         write: { state: 'read_only', reason: 'broadcast_inbox_read_only', holder: null, wayOut: null },
-        actions: { editMessages: false },
+        actions: NO_ACTIONS,
       },
     ],
   ])('keeps the access on %s', (_case, payload, access) => {
@@ -561,7 +562,7 @@ describe('parseConversation, reading access', () => {
 
   test('reads a malformed access as unknown and keeps the row', () => {
     const conversation = parseConversation(
-      staffRow({ access: { write: { state: 'read_only', reason: 'must_wait' }, actions: { editMessages: false } } }),
+      staffRow({ access: { write: { state: 'read_only', reason: 'must_wait' }, actions: NO_ACTIONS } }),
     )
 
     expect(conversation).toMatchObject({ id: 'conv-1', access: { kind: 'unknown' } })

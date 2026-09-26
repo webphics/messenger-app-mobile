@@ -15,13 +15,12 @@ import type { Conversation, StaffDirectoryUser } from '@/lib/types'
 /**
  * Ending a thread, and handing it on.
  *
- * The two actions the API grants the assignee of an engaged Support DM — or,
- * in a Shared queue, Close alone to staff on any open one — held
- * together because they are the same shape — one POST, one conversation back,
- * one row folded into the list every screen shares — and because a screen
- * offering either offers both. Which of them is offered at all is
- * `lib/thread-actions`, mirrored from the API's policy; this only carries out
- * what came back.
+ * Transfer, Close and Reopen, held together because they are the same shape:
+ * one POST, one conversation back, one row folded into the list every screen
+ * shares. Which of them is offered at all is the conversation's `access`, read
+ * through `threadActionsView` in `lib/conversation-access`, so an Agent with
+ * the Transfer Capability and not the Close one is offered one and not the
+ * other. This only carries out what came back.
  *
  * Unlike Engage and Takeover, neither re-reads the thread first. That carve-out
  * exists for the one surface several staff compete over the same rows on — the

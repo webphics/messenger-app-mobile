@@ -506,7 +506,7 @@ describe('parseConversationUpdated, reading access', () => {
   it('keeps the access the per-viewer event carries', () => {
     const access = {
       write: { state: 'read_only', reason: 'conversation_closed', holder: null, wayOut: 'reopen' },
-      actions: { editMessages: false },
+      actions: { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: true, setPriority: true },
     }
     const payload = { conversation: { ...STAFF_CONVERSATION_UPDATED.conversation, access } }
 

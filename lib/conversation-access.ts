@@ -27,8 +27,9 @@ import type { GroupWritePolicy, Message } from '@/lib/types'
  * old client-side rules.
  *
  * Two entry points: `parseAccess` for the payload, and a view per surface:
- * `composerView` for the composer and `messageActions` for what one message
- * offers. Later tickets add the thread actions and Delete here.
+ * `composerView` for the composer, `threadActionsView` for what may be done
+ * to the thread, and `messageActions` for what one message offers. A later
+ * ticket adds Delete here.
  */
 
 /** Why a viewer may only read, in the API's own refusal codes. */
@@ -59,11 +60,29 @@ export type WriteAccess =
     }
 
 /**
- * The offered actions, one boolean each. `editMessages` is the first: on when
- * the viewer may write here and the conversation is not a closed Support DM.
- * Later tickets add the rest.
+ * The offered actions this build knows, one boolean each, in the API's names.
+ *
+ * `editMessages` is on when the viewer may write here and the conversation is
+ * not a closed Support DM. The thread actions come from the API's rulings with
+ * the viewer's Capabilities, which this client never sees: `close` and
+ * `reopen` need the Close Capability, `transfer` the Transfer Capability and
+ * being the assignee, `engage` an Unassigned Support DM, `takeOver` an Admin on
+ * one somebody else holds, and `setPriority` any staff member who can see a
+ * Support DM. All of them are off for a Customer, and `engage`, `takeOver` and
+ * `transfer` are off in a Shared queue. This client has no priority control, so
+ * `setPriority` is read and offered nowhere.
  */
-export type AccessActions = { editMessages: boolean }
+export const ACCESS_ACTIONS = [
+  'editMessages',
+  'engage',
+  'takeOver',
+  'transfer',
+  'close',
+  'reopen',
+  'setPriority',
+] as const
+export type AccessAction = (typeof ACCESS_ACTIONS)[number]
+export type AccessActions = Record<AccessAction, boolean>
 
 /** `access` as the API sends it, read into this client's type. */
 export type KnownAccess = { write: WriteAccess; actions: AccessActions }
@@ -123,8 +142,15 @@ function writeAccess(value: unknown): WriteAccess | null {
  */
 function accessActions(value: unknown): AccessActions | null {
   const record = asRecord(value)
-  if (!record || typeof record.editMessages !== 'boolean') return null
-  return { editMessages: record.editMessages }
+  if (!record) return null
+
+  const actions = {} as AccessActions
+  for (const action of ACCESS_ACTIONS) {
+    const offered = record[action]
+    if (typeof offered !== 'boolean') return null
+    actions[action] = offered
+  }
+  return actions
 }
 
 /**
@@ -225,6 +251,44 @@ export function composerView(
     reason: reasonText(write, presentation),
     wayOut: write.wayOut ? { wayOut: write.wayOut, label: WAY_OUT_LABELS[write.wayOut] } : null,
   }
+}
+
+/**
+ * What a staff member may do to a thread, as opposed to in it. Engage and
+ * Take over are offered where the composer goes, as its way out; Transfer,
+ * Close and Reopen on Conversation details. Priority is not here: this client
+ * has no control for it.
+ */
+export type ThreadActionsView = {
+  engage: boolean
+  takeOver: boolean
+  transfer: boolean
+  close: boolean
+  reopen: boolean
+}
+
+const NO_THREAD_ACTIONS: ThreadActionsView = {
+  engage: false,
+  takeOver: false,
+  transfer: false,
+  close: false,
+  reopen: false,
+}
+
+/**
+ * The thread actions the API offers this viewer, and nothing else.
+ *
+ * No role, viewer id or Shared queue switch goes in: the API already asked
+ * those questions, and the Capabilities behind Close and Transfer are ones this
+ * client cannot see. A button drawn from this answer is one the API accepts
+ * when the conversation has not changed underneath it. Unknown access, or none,
+ * offers nothing.
+ */
+export function threadActionsView(access: ConversationAccess | undefined): ThreadActionsView {
+  if (!access || !isKnownAccess(access)) return NO_THREAD_ACTIONS
+
+  const { engage, takeOver, transfer, close, reopen } = access.actions
+  return { engage, takeOver, transfer, close, reopen }
 }
 
 /** What one message offers in the long-press menu. Later tickets add Delete. */

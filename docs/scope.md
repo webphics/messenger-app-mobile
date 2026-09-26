@@ -309,6 +309,9 @@ Broadcasts are in-inbox announcements (later), not stories.
      mirror the capability check underneath: an Agent's grants are not on the session payload, so an
      Agent whose `transfer` grant was revoked is offered a control the API refuses and gets its own
      sentence back. Withholding both from every Agent for the sake of the few was the alternative.
+     (Superseded by conversation-access ticket 09: the API now sends `transfer`, `close` and `reopen`
+     on `access.actions` with the Capabilities applied, `threadActionsView` reads them, and
+     `lib/thread-actions` keeps only `transferCandidates`.)
      Neither action re-reads the thread first; ADR-0008's carve-out is for the pool several staff
      compete over, and these are about a thread this person already holds.
 

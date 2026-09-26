@@ -393,10 +393,11 @@ export async function takeOverConversation(id: string): Promise<ApiResult<Conver
  * Hand a Support DM to another Agent. The API's `transfer` action.
  *
  * Only the assignee may, only while the thread is engaged, and only to an
- * Agent who is not already holding it — `assertCanTransfer`, mirrored in
- * `lib/thread-actions` so nothing offers what the API would refuse. An Admin
- * bypasses the capability check but not the assignee one: an Admin who wants
- * somebody else's thread takes it over first.
+ * Agent who is not already holding it — `assertCanTransfer`. Whether this
+ * viewer is offered it arrives as `access.actions.transfer`, read through
+ * `threadActionsView` in `lib/conversation-access`. An Admin bypasses the
+ * capability check but not the assignee one: an Admin who wants somebody
+ * else's thread takes it over first.
  *
  * Answers with the conversation as it now stands, so the row goes into the
  * shared list and the composer closes behind the person who gave it away.

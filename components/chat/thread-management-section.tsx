@@ -12,18 +12,19 @@ import {
 } from '@/components/icons'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
+import type { ThreadActionsView } from '@/lib/conversation-access'
 import { colors } from '@/lib/tokens'
 import type { ThreadManagement } from '@/lib/use-thread-management'
 
 /**
  * Ending this conversation, and handing it to somebody else.
  *
- * Only ever rendered for the person the API would let do it — see
- * `threadActions` — so nothing here is disabled or greyed: a control that
- * appears is a control that works, and one the rule excludes is not drawn at
- * all. In a Shared queue that is Close alone, since there is nobody holding the
- * thread to hand it on; an Agent without the `close` capability is the one
- * exception, refused by the API in its own words underneath.
+ * Each control is drawn only when the conversation's `access` offers it (see
+ * `threadActionsView`), so nothing here is disabled or greyed: a control that
+ * appears is a control the API accepts, and one it does not offer is not drawn
+ * at all. The API has already applied the Close and Transfer Capabilities,
+ * which this client never sees, and the Shared queue switch, where Close is
+ * offered and Transfer is not.
  *
  * The two are deliberately different weights. Transfer opens a list and is
  * committed by picking a name from it, which is the confirmation. Close opens
@@ -35,21 +36,18 @@ import type { ThreadManagement } from '@/lib/use-thread-management'
 
 type ThreadManagementSectionProps = {
   management: ThreadManagement
-  canClose: boolean
-  /** A closed thread offers Reopen in Close's place. */
-  canReopen: boolean
-  canTransfer: boolean
+  /** What the API offers. A closed thread offers Reopen in Close's place. */
+  actions: Pick<ThreadActionsView, 'transfer' | 'close' | 'reopen'>
   /** Whether a reopened thread comes back to whoever closed it, or to the team. */
   supportAssignment: boolean
 }
 
 export function ThreadManagementSection({
   management,
-  canClose,
-  canReopen,
-  canTransfer,
+  actions,
   supportAssignment,
 }: ThreadManagementSectionProps) {
+  const { transfer: canTransfer, close: canClose, reopen: canReopen } = actions
   const [picking, setPicking] = useState(false)
   const [summarising, setSummarising] = useState(false)
   const { candidates, candidatesFailed, loadCandidates, pending, error } = management
