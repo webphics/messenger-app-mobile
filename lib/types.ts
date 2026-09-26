@@ -1,3 +1,5 @@
+import type { ConversationAccess } from '@/lib/conversation-access'
+
 export type UserRole = 'admin' | 'agent' | 'customer'
 
 /**
@@ -176,6 +178,15 @@ type ConversationBase = {
   lastMessageRead: boolean
   /** Null outside the list endpoint, where the API declines to count. */
   unreadCount: number | null
+  /**
+   * What this viewer may do here, as the API computed it (ADR 0015). Read and
+   * rendered through `lib/conversation-access`, never inspected directly.
+   *
+   * Optional for the reason `communityId` above is: the fixtures in this
+   * codebase predate it. `parseConversation` always supplies it, and an absent
+   * one renders as unknown.
+   */
+  access?: ConversationAccess
 }
 
 /** What an Agent or an Admin receives, for any conversation type. */
@@ -191,13 +202,12 @@ export type StaffConversation = ConversationBase & {
   members: ConversationStaffPerson[]
   labels: Label[]
   /**
-   * Group-only; `null` for every other type. Always resolves `true` for
-   * Staff on the API's own mapper — an Admin or a participating Agent bypasses
-   * the policy entirely — so nothing on this client's staff screens ever reads
-   * a group as locked. Optional because most fixtures in this codebase predate
-   * it and carry no group at all; a real payload always sends it.
+   * Group-only; `null` for every other type. Optional because most fixtures in
+   * this codebase predate it and carry no group at all; a real payload always
+   * sends it.
    */
   writePolicy?: GroupWritePolicy | null
+  /** @deprecated Kept while installed builds read it. The composer reads `access`. */
   canWrite?: boolean
 }
 
@@ -212,8 +222,9 @@ export type CustomerGroupConversation = ConversationBase & {
   description: string | null
   avatarUrl: string | null
   members: ConversationStaffPerson[]
-  /** Whether this Customer may write here, resolved by the API against the policy below. */
+  /** Who may write here. Words a restricted composer; whether it is restricted is `access`. */
   writePolicy: GroupWritePolicy
+  /** @deprecated Kept while installed builds read it. The composer reads `access`. */
   canWrite: boolean
 }
 

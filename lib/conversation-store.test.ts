@@ -355,6 +355,7 @@ function conversation(id: string, overrides: Partial<Conversation> = {}): Conver
     lastMessageReceiptStatus: null,
     lastMessageRead: true,
     unreadCount: 0,
+    access: { kind: 'unknown' },
     ...overrides,
   } as Conversation
 }

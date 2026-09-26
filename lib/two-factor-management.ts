@@ -5,7 +5,7 @@
  * Pure and table-tested, beside `components/settings/account-two-factor-screen`,
  * which owns the drawing, and `lib/two-factor-api`, which owns the two paths.
  * The same split every rules module here has, `lib/password-rules`,
- * `lib/account-session-rows`, `lib/composer-access`, and for the same reason:
+ * `lib/account-session-rows`, `lib/conversation-access`, and for the same reason:
  * nothing in this file imports anything native, so the rules ticket 07 turns on
  * are a table of cases rather than something only a running phone can
  * demonstrate.

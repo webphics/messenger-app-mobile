@@ -4,7 +4,7 @@ import type { Conversation, StaffDirectoryUser, UserRole } from '@/lib/types'
 /**
  * What a staff member may do *to* a thread, as opposed to in it.
  *
- * Writing in a thread is `lib/composer-access`; this is the pair of actions
+ * Writing in a thread is `lib/conversation-access`; this is the pair of actions
  * that end or redirect the work — Close and Transfer — plus the question of
  * who a transfer may go to. They are kept apart because they answer different
  * questions off the same payload: an Admin looking at somebody else's engaged

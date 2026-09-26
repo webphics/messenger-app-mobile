@@ -248,6 +248,7 @@ describe('parseConversationUpdated', () => {
       lastMessageReceiptStatus: null,
       lastMessageRead: false,
       unreadCount: null,
+      access: { kind: 'unknown' },
     })
   })
 
@@ -497,5 +498,17 @@ describe('createCountedMessages', () => {
 
     expect(counted.isFirst('m1')).toBe(false)
     expect(counted.isFirst('m2')).toBe(false)
+  })
+})
+
+describe('parseConversationUpdated, reading access', () => {
+  it('keeps the access the per-viewer event carries', () => {
+    const access = {
+      write: { state: 'read_only', reason: 'conversation_closed', holder: null, wayOut: 'reopen' },
+      actions: {},
+    }
+    const payload = { conversation: { ...STAFF_CONVERSATION_UPDATED.conversation, access } }
+
+    expect(parseConversationUpdated(payload)?.access).toEqual(access)
   })
 })

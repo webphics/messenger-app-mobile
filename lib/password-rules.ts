@@ -5,7 +5,7 @@
  * Pure and table-tested, beside `components/settings/account-password-screen`,
  * which owns the drawing, and `lib/password-api`, which owns the two paths. The
  * same split every rules module here has, `lib/sign-in-steps`,
- * `lib/account-session-rows` and `lib/composer-access` included, and for the
+ * `lib/account-session-rows` and `lib/conversation-access` included, and for the
  * same reason: nothing in this file imports anything native, so the rules
  * ticket 06 turns on are a table of cases rather than something only a running
  * phone can demonstrate.

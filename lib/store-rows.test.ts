@@ -38,6 +38,9 @@ function customerConversation(overrides: Partial<CustomerConversation> = {}): Co
     lastMessageReceiptStatus: null,
     lastMessageRead: true,
     unreadCount: 0,
+    // Present for the same reason: the parser supplies `access` on every row, as
+    // unknown where the payload carried none.
+    access: { kind: 'unknown' },
     ...overrides,
   } as Conversation
 }
@@ -69,6 +72,7 @@ function staffConversation(overrides: Partial<StaffConversation> = {}): Conversa
     lastMessageReceiptStatus: null,
     lastMessageRead: false,
     unreadCount: 3,
+    access: { kind: 'unknown' },
     ...overrides,
   } as Conversation
 }
@@ -261,6 +265,43 @@ describe('fromConversationRows', () => {
     const typed: ConversationRow = toConversationRows('viewer-1', [customerConversation()])[0]
 
     expect(fromConversationRows([typed]).conversations).toHaveLength(1)
+  })
+
+  /*
+   * `access` rides in the payload column like every other field the parser
+   * reads, so persisting it needed no schema change and no version bump. A
+   * version bump deletes the database, the Outbox with it.
+   */
+  it('keeps the access a conversation was written with', () => {
+    const access = {
+      write: {
+        state: 'read_only' as const,
+        reason: 'must_take_over' as const,
+        holder: { id: 'agent-1', name: 'Grace Hopper' },
+        wayOut: 'take_over' as const,
+      },
+      actions: {},
+    }
+
+    const { conversations } = fromConversationRows(
+      toConversationRows('viewer-1', [staffConversation({ access })]),
+    )
+
+    expect(conversations[0].access).toEqual(access)
+  })
+
+  /*
+   * A row written by a build from before `access` existed. It still draws, and
+   * reads as unknown, so the composer says it is updating until the launch
+   * refetch replaces the row.
+   */
+  it('reads a row written without access as unknown', () => {
+    const { access: _dropped, ...older } = staffConversation() as StaffConversation
+
+    const { conversations } = fromConversationRows([rowFor(older as Conversation)])
+
+    expect(conversations).toHaveLength(1)
+    expect(conversations[0].access).toEqual({ kind: 'unknown' })
   })
 })
 

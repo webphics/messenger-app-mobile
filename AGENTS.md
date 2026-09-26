@@ -24,7 +24,7 @@ Engage and Takeover re-read the conversation from the API before they fire, so a
 claimed while this phone held an older row leaves the Unassigned pool on the tap that lost the race,
 and the person is told who has it in words rather than shown a bare `403`. The verdict is pure
 (`assignment-precheck`) and judges the thread's state only — who may take a thread over stays the
-API's rule, mirrored once in `composer-access`. #43 stopped the screen jumping after the Launch
+API's rule, which the API now sends as the conversation's `access` (root ADR 0015), read through `conversation-access`. #43 stopped the screen jumping after the Launch
 animation: it now ends when it has played *and* the first Conversation fetch has settled — answered
 or failed, since with the Store there is something to draw either way — so the Hub arrives complete
 rather than filling in underneath the person a moment later. #44 took the Store from Conversations

@@ -172,9 +172,9 @@ function ConversationScreen({
   /**
    * Engaging a thread, and taking one over.
    *
-   * The row the API answers with goes straight into the shared list, which is
-   * where `composerAccess` reads the assignment from — so the composer replaces
-   * the button without a refetch, and the pool screen behind loses the row in
+   * The row the API answers with goes straight into the shared list, and it
+   * carries this viewer's `access` (see `lib/conversation-access`), so the
+   * composer replaces the button without a refetch, and the pool screen behind loses the row in
    * the same update. Every other staff session learns the same thing from the
    * `conversation.updated` the API broadcasts.
    *

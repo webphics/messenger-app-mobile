@@ -26,7 +26,7 @@ import { chatMessageInfoHref } from '@/lib/chat-route-id'
 import { readStampLabel } from '@/lib/message-read-stamp'
 import { useMessageReceipts } from '@/lib/use-message-receipts'
 import { rejectUploadReason } from '@/lib/attachment-upload'
-import { composerAccess, type ComposerAction } from '@/lib/composer-access'
+import { composerView, type WayOut, type WayOutButton } from '@/lib/conversation-access'
 import type { ApiFailure } from '@/lib/conversation-api'
 import { canEditMessage } from '@/lib/message-edit'
 import { conversationTitle } from '@/lib/conversation-title'
@@ -136,13 +136,14 @@ type ThreadScreenProps = {
    */
   onEditMessage: (messageId: string, body: string) => Promise<string | null>
   /**
-   * Claim this thread, or take it from whoever holds it.
+   * Take the way out of a read-only thread the API offered: engage it, take it
+   * over, or reopen it.
    *
-   * Absent where nothing can be done about a read-only thread, which is the
-   * common case: a closed thread, an announcement, and an Agent looking at a
-   * conversation another Agent engaged all have a reason and no way out of it.
+   * Which one, and whether there is one at all, is the conversation's `access`.
+   * An announcement, a restricted Group and an Agent looking at a conversation
+   * another Agent engaged all have a reason and no way out of it.
    */
-  onAssign?: (action: ComposerAction) => void
+  onAssign?: (wayOut: WayOut) => void
   /** True from the tap until the API answers, so the button says it is working. */
   assigning?: boolean
   /** What the API said when the last attempt was refused. */
@@ -183,19 +184,19 @@ const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 }
  */
 function ReadOnlyNotice({
   reason,
-  action,
+  wayOut,
   onAssign,
   assigning = false,
   error = null,
 }: {
   reason: string
-  action?: ComposerAction
-  onAssign?: (action: ComposerAction) => void
+  wayOut: WayOutButton | null
+  onAssign?: (wayOut: WayOut) => void
   assigning?: boolean
   error?: string | null
 }) {
   const insets = useSafeAreaInsets()
-  const offered = action && onAssign ? action : null
+  const offered = wayOut && onAssign ? wayOut : null
 
   return (
     <View
@@ -220,7 +221,7 @@ function ReadOnlyNotice({
           accessibilityLabel={offered.label}
           accessibilityState={{ disabled: assigning, busy: assigning }}
           className="mt-3"
-          onPress={() => onAssign?.(offered)}
+          onPress={() => onAssign?.(offered.wayOut)}
         >
           {assigning ? (
             <ActivityIndicator color={colors.primaryForeground} size="small" />
@@ -398,14 +399,16 @@ export function ThreadScreen({
   const [refusal, setRefusal] = useState<string | null>(null)
 
   /**
-   * Whether this person may write here.
+   * Whether this person may write here, as the API said in the conversation's
+   * `access`. See `lib/conversation-access`.
    *
-   * Reading and writing are different permissions on the staff side — one Agent
-   * holds a Support DM and the rest read it, unless assignment is switched off —
-   * so the composer is not a given. See `lib/composer-access.ts`, which mirrors
-   * the rule the API enforces.
+   * Read-only covers every surface that writes, not only the composer: replies,
+   * reactions and edits all follow it. An `access` this build could not read is
+   * read-only too, until the refetch replaces the row.
    */
-  const access = composerAccess(conversation, viewer, supportAssignment)
+  const access = composerView(conversation.access, {
+    writePolicy: 'writePolicy' in conversation ? conversation.writePolicy : null,
+  })
   const readOnly = access.kind === 'read-only'
 
   /**
@@ -948,7 +951,7 @@ export function ThreadScreen({
       {access.kind === 'read-only' ? (
         <ReadOnlyNotice
           reason={access.reason}
-          action={access.action}
+          wayOut={access.wayOut}
           onAssign={onAssign}
           assigning={assigning}
           error={assignError}

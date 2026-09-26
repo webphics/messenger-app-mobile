@@ -373,8 +373,8 @@ export async function engageConversation(id: string): Promise<ApiResult<Conversa
  *
  * Admin only — `assertCanTakeOver` in the API's `conversations.policy.ts` begins
  * with `assertAdmin`, and an Agent asking for this is answered `403` whatever
- * the thread's state. So nothing offers it to an Agent; see
- * `lib/composer-access.ts`, which is where that rule is written down.
+ * the thread's state. So the API never sends an Agent the `take_over` way out
+ * in the conversation's `access`; see `lib/conversation-access.ts`.
  *
  * The dispossessed assignee is told separately and directly, over
  * `conversation.reassigned` — see `lib/realtime-events.ts`.

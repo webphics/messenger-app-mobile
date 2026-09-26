@@ -9,17 +9,17 @@ import {
 import { assignmentPrecheck } from '@/lib/assignment-precheck'
 import { useAuth } from '@/lib/auth-context'
 import { assignmentModeChanged, assignmentRefusal } from '@/lib/conversation-failure'
-import type { ComposerAction } from '@/lib/composer-access'
+import type { WayOut } from '@/lib/conversation-access'
 import type { Conversation } from '@/lib/types'
 
 /**
- * Engaging a thread, and taking one over.
+ * Engaging a thread, taking one over, and reopening one.
  *
- * Both are the same shape — one re-read, one POST, one conversation back, one
- * row folded into the list every screen shares — so they are one hook with the
- * action naming which. Which action is *offered* is not decided here:
- * `lib/composer-access` mirrors the API's policy and answers that, and this
- * carries out whatever came back.
+ * All three are the same shape — one POST, one conversation back, one row
+ * folded into the list every screen shares — so they are one hook with the way
+ * out naming which. Which way out is *offered* is not decided here: the API
+ * sends it in the conversation's `access`, `lib/conversation-access` turns it
+ * into a button, and this carries out whichever one was tapped.
  *
  * Neither fires against the row on screen. That row is old between any two
  * fetches, and the Store can restore one older still, so both actions re-read
@@ -47,8 +47,8 @@ import type { Conversation } from '@/lib/types'
  */
 
 export type ConversationAssignment = {
-  /** Carry an offered action to the API. Answers nothing; the outcome arrives as state. */
-  assign: (action: ComposerAction) => void
+  /** Carry an offered way out to the API. Answers nothing; the outcome arrives as state. */
+  assign: (wayOut: WayOut) => void
   /** True from the tap until the API answers — the re-read included. */
   assigning: boolean
   /**
@@ -137,18 +137,18 @@ export function useConversationAssignment(
   }, [])
 
   const assign = useCallback(
-    (action: ComposerAction) => {
+    (wayOut: WayOut) => {
       const id = conversationId
       if (!id) return
 
       setAssigning(true)
       setError(null)
 
-      if (action.kind === 'reopen') {
+      if (wayOut === 'reopen') {
         void reopen(id)
         return
       }
-      const kind = action.kind
+      const kind = wayOut
 
       void (async () => {
         const fresh = await getConversation(id)

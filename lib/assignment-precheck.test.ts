@@ -69,7 +69,7 @@ describe('assignmentPrecheck, on an Engage', () => {
 describe('assignmentPrecheck, on a Takeover', () => {
   test('fires when somebody else still holds the thread', () => {
     const held = staffRow({ status: 'engaged', assignedAgent: OTHER_AGENT })
-    expect(assignmentPrecheck('takeover', held, ME)).toEqual({ kind: 'fire' })
+    expect(assignmentPrecheck('take_over', held, ME)).toEqual({ kind: 'fire' })
   })
 
   test('fires whoever asks: who may take over is the API’s verdict, not this one', () => {
@@ -77,11 +77,11 @@ describe('assignmentPrecheck, on a Takeover', () => {
     // offers them the button, and if anything did, the refusal would still be
     // the API's — this only asks whether the thread is in a state to be taken.
     const held = staffRow({ status: 'engaged', assignedAgent: OTHER_AGENT })
-    expect(assignmentPrecheck('takeover', held, { id: 'some-agent' })).toEqual({ kind: 'fire' })
+    expect(assignmentPrecheck('take_over', held, { id: 'some-agent' })).toEqual({ kind: 'fire' })
   })
 
   test('stops when the thread was released back to the pool', () => {
-    expect(assignmentPrecheck('takeover', staffRow({ status: 'unassigned' }), ME)).toEqual({
+    expect(assignmentPrecheck('take_over', staffRow({ status: 'unassigned' }), ME)).toEqual({
       kind: 'stop',
       message: 'This conversation is no longer assigned to anybody.',
     })
@@ -89,14 +89,14 @@ describe('assignmentPrecheck, on a Takeover', () => {
 
   test('stops when it was transferred to this person', () => {
     const mine = staffRow({ status: 'engaged', assignedAgent: { id: 'me', name: 'Jonah Reed' } })
-    expect(assignmentPrecheck('takeover', mine, ME)).toEqual({
+    expect(assignmentPrecheck('take_over', mine, ME)).toEqual({
       kind: 'stop',
       message: 'You are already handling this conversation.',
     })
   })
 
   test('stops when it was closed', () => {
-    expect(assignmentPrecheck('takeover', staffRow({ status: 'closed' }), ME)).toEqual({
+    expect(assignmentPrecheck('take_over', staffRow({ status: 'closed' }), ME)).toEqual({
       kind: 'stop',
       message: 'It was closed while you were reading it.',
     })
@@ -105,8 +105,8 @@ describe('assignmentPrecheck, on a Takeover', () => {
 
 describe('assignmentPrecheck, on a row whose status and assignee disagree', () => {
   // Nothing the API does today produces one: both paths that put a thread back
-  // in the pool null its assignee. The rule is here because `composerAccess`
-  // offers the Engage on any unassigned row, and the two must agree.
+  // in the pool null its assignee. The rule is here because the API offers the
+  // Engage on any unassigned row, and the two must agree.
   test('an unassigned thread is claimable even when it still names this person', () => {
     const stale = staffRow({ status: 'unassigned', assignedAgent: { id: 'me', name: 'Jonah Reed' } })
     expect(assignmentPrecheck('engage', stale, ME)).toEqual({ kind: 'fire' })
@@ -114,7 +114,7 @@ describe('assignmentPrecheck, on a row whose status and assignee disagree', () =
 
   test('and the Takeover on one is still refused for being unassigned', () => {
     const stale = staffRow({ status: 'unassigned', assignedAgent: { id: 'me', name: 'Jonah Reed' } })
-    expect(assignmentPrecheck('takeover', stale, ME)).toEqual({
+    expect(assignmentPrecheck('take_over', stale, ME)).toEqual({
       kind: 'stop',
       message: 'This conversation is no longer assigned to anybody.',
     })

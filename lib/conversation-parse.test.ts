@@ -82,6 +82,7 @@ describe('parseConversation, on an Announcements thread', () => {
       lastMessageReceiptStatus: null,
       lastMessageRead: false,
       unreadCount: 1,
+      access: { kind: 'unknown' },
     })
   })
 
@@ -135,6 +136,8 @@ describe('parseConversation', () => {
       lastMessageReceiptStatus: null,
       lastMessageRead: false,
       unreadCount: 2,
+      // The row carries no `access`, so it reads as unknown.
+      access: { kind: 'unknown' },
     })
     expect(isStaffConversation(conversation!)).toBe(false)
   })
@@ -470,5 +473,89 @@ describe('parseStaffDirectory', () => {
 
   test('answers an empty list for a payload that is not one', () => {
     expect(parseStaffDirectory({ rows: [] })).toEqual([])
+  })
+})
+
+/*
+ * `access` arrives on every conversation shape, and `parseConversation` reads
+ * it through the Conversation access adapter. What each answer shows is the
+ * adapter's own tests; these check only that no shape drops the field.
+ */
+describe('parseConversation, reading access', () => {
+  const READ_ONLY = {
+    write: {
+      state: 'read_only',
+      reason: 'already_engaged',
+      holder: { id: 'agent-2', name: 'Priya Raman' },
+      wayOut: null,
+    },
+    actions: {},
+  }
+  const OPEN = { write: { state: 'open' }, actions: {} }
+
+  const customerGroupRow = (overrides: Record<string, unknown> = {}) => ({
+    ...customerSupportRow(),
+    type: 'group',
+    title: 'Offers',
+    description: null,
+    avatarUrl: null,
+    members: [],
+    writePolicy: 'admins',
+    canWrite: false,
+    ...overrides,
+  })
+
+  test.each([
+    ['a staff row', staffRow({ access: READ_ONLY }), READ_ONLY],
+    ["a Customer's Support DM", customerSupportRow({ access: OPEN }), OPEN],
+    [
+      "a Customer's group",
+      customerGroupRow({
+        access: { write: { state: 'read_only', reason: 'group_write_restricted' }, actions: {} },
+      }),
+      {
+        write: { state: 'read_only', reason: 'group_write_restricted', holder: null, wayOut: null },
+        actions: {},
+      },
+    ],
+    [
+      'an Announcements thread',
+      broadcastInboxRow({
+        access: { write: { state: 'read_only', reason: 'broadcast_inbox_read_only' }, actions: {} },
+      }),
+      {
+        write: { state: 'read_only', reason: 'broadcast_inbox_read_only', holder: null, wayOut: null },
+        actions: {},
+      },
+    ],
+  ])('keeps the access on %s', (_case, payload, access) => {
+    expect(parseConversation(payload)?.access).toEqual(access)
+  })
+
+  test.each([
+    ['a staff row', staffRow()],
+    ["a Customer's Support DM", customerSupportRow()],
+    ["a Customer's group", customerGroupRow()],
+    ['an Announcements thread', broadcastInboxRow()],
+  ])('reads %s with no access as unknown', (_case, payload) => {
+    expect(parseConversation(payload)?.access).toEqual({ kind: 'unknown' })
+  })
+
+  test('reads a malformed access as unknown and keeps the row', () => {
+    const conversation = parseConversation(
+      staffRow({ access: { write: { state: 'read_only', reason: 'must_wait' }, actions: {} } }),
+    )
+
+    expect(conversation).toMatchObject({ id: 'conv-1', access: { kind: 'unknown' } })
+  })
+
+  /*
+   * `canWrite` stays in the payload, deprecated, and no longer decides the
+   * composer. A Group the API opened to this viewer is open whatever it says.
+   */
+  test("does not let a Group's deprecated canWrite override its access", () => {
+    const conversation = parseConversation(customerGroupRow({ canWrite: false, access: OPEN }))
+
+    expect(conversation?.access).toEqual(OPEN)
   })
 })

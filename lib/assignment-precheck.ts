@@ -1,5 +1,5 @@
 import { isStaffConversation } from '@/lib/types'
-import type { ComposerAction } from '@/lib/composer-access'
+import type { WayOut } from '@/lib/conversation-access'
 import type { Conversation, StaffConversation } from '@/lib/types'
 
 /**
@@ -13,21 +13,18 @@ import type { Conversation, StaffConversation } from '@/lib/types'
  * `lib/use-conversation-assignment` asks it whether to carry on, and shows what
  * it says instead when the answer is no.
  *
- * It judges the thread's *state*, never the person. Who may take a thread over
- * is the API's rule — `assertCanTakeOver` begins with `assertAdmin`, and an
- * Agent is refused `403` whatever the state — and it is mirrored once, in
- * `lib/composer-access`, which is what decides whether a button is offered at
- * all. Repeating it here would mean two places to keep in step and would turn a
- * permission refusal into a sentence about somebody else holding the thread,
- * which would be a lie. What this adds is the one thing the held row cannot
- * know: what the API said a moment ago.
+ * It judges the thread's *state*, never the person. Who may engage or take a
+ * thread over is the API's rule, and the API says so in the conversation's
+ * `access` (root ADR 0015): the way out it sends is what decides whether a
+ * button is offered at all, through `lib/conversation-access`. Judging the
+ * person here as well would turn a permission refusal into a sentence about
+ * somebody else holding the thread, which would be a lie. What this adds is the
+ * one thing the held row cannot know: what the API said a moment ago.
  *
- * It reads the same statuses `composer-access` reads, and deliberately so.
- * That file answers what to *offer* somebody looking at a thread; this one
- * answers whether an offer already taken up is still good. They agree today
- * because the API's states are the same states, and the duplication is two
- * short cascades rather than one shared one because collapsing them would mean
- * a verdict on the person — see above.
+ * It reads the statuses rather than the re-read's `access`, because what it
+ * words is what changed about the thread (closed, claimed, released), and the
+ * status says that directly. The re-read is folded into the list before this
+ * runs, so the composer's own line already reflects the fresh `access`.
  *
  * A row that cannot answer — no status, or a Customer's payload, which carries
  * no assignment at all — fires. Nothing the API documents produces either on a
@@ -52,7 +49,7 @@ function stop(message: string): AssignmentPrecheck {
  * in every branch below: nothing is ever "already yours" when there is no you.
  */
 export function assignmentPrecheck(
-  kind: Exclude<ComposerAction['kind'], 'reopen'>,
+  kind: Exclude<WayOut, 'reopen'>,
   conversation: Conversation,
   viewer: { id: string | null },
 ): AssignmentPrecheck {
@@ -63,20 +60,20 @@ export function assignmentPrecheck(
 
   /*
    * Each sentence says what changed, rather than repeating the reason line it
-   * lands under. That line is `composerAccess`'s, recomputed from the row this
-   * re-read just folded in, so it already says what the thread is now — a
-   * closed one says it is closed, and one somebody holds names them. What it
-   * cannot say is that this happened between opening the thread and tapping.
+   * lands under. That line is `composerView`'s, read from the `access` on the
+   * row this re-read just folded in, so it already says what the thread is
+   * now: a closed one says it is closed, and one another agent holds names
+   * them. What it cannot say is that this happened between opening the thread
+   * and tapping.
    */
   if (status === 'closed') return stop('It was closed while you were reading it.')
 
   /*
    * The status is read before the assignee, in both branches, because an
-   * unassigned thread is claimable whoever it names. `composerAccess` offers
-   * the Engage on one of those without looking at `assignedAgent` at all, and
-   * these two must not disagree about the same row — a button that is offered
-   * and then refused by its own client is the thing this module exists to
-   * prevent.
+   * unassigned thread is claimable whoever it names. The API offers the Engage
+   * on one of those without looking at the assignee at all, and the two must
+   * not disagree about the same row. A button that is offered and then refused
+   * by its own client is the thing this module exists to prevent.
    */
   if (kind === 'engage') {
     if (status === 'unassigned') return FIRE

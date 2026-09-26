@@ -1,4 +1,5 @@
 import { asRecord } from '@/lib/api-envelope'
+import { parseAccess } from '@/lib/conversation-access'
 import type {
   Contact,
   ContactKind,
@@ -197,6 +198,9 @@ export function parseConversation(value: unknown): Conversation | null {
     id,
     communityId: nullableText(record.communityId),
     ...lastMessageFields(record),
+    // Every shape carries it. Missing or unreadable reads as unknown rather than
+    // dropping the row: the row still draws, and its composer says it is updating.
+    access: parseAccess(record.access),
   }
 
   /*
@@ -245,10 +249,8 @@ export function parseConversation(value: unknown): Conversation | null {
       members: staffPeople(record.members),
       labels: labels(record.labels),
       writePolicy: oneOf(record.writePolicy, WRITE_POLICIES),
-      // Defaults `true` on a missing or unreadable field, the same way
-      // `lastMessageRead` does below: a group this client cannot read the
-      // policy for is not grounds for locking a composer it cannot explain.
-      // Staff's own value from the API is always `true` regardless of policy.
+      // Deprecated in the API's schema and kept only while installed builds read
+      // it. The composer reads `access` instead; see `lib/conversation-access`.
       canWrite: record.canWrite !== false,
     }
   }

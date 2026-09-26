@@ -853,9 +853,9 @@ describe('the refusals the API answers an assignment with', () => {
 
   /**
    * An Agent's Takeover, which `assertCanTakeOver` refuses before it looks at
-   * the thread. Nothing offers an Agent this button — see
-   * `lib/composer-access.ts` — and a 403 is a verdict on the request rather than
-   * on the session, so it never signs anybody out.
+   * the thread. The API never offers an Agent this way out (see
+   * `lib/conversation-access.ts`), and a 403 is a verdict on the request rather
+   * than on the session, so it never signs anybody out.
    */
   test('an Agent asking to take over is forbidden, not signed out', async () => {
     enqueue(

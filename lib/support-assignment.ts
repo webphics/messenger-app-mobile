@@ -9,8 +9,8 @@ import type { SessionUser } from '@/lib/types'
  * holds it. Which one this product is running is a server-wide switch, sent on
  * every role's session, and off unless the API says otherwise.
  *
- * Read here once and handed to the pure rules as a boolean — `composer-access`,
- * `thread-actions`, `inbox-filter` and the rest — rather than read inside them,
+ * Read here once and handed to the pure rules as a boolean — `thread-actions`,
+ * `inbox-filter` and the rest — rather than read inside them,
  * so that each stays a table and each table can say what it does both ways.
  *
  * `=== true` rather than truthiness, and null for nobody signed in: a session
