@@ -33,9 +33,9 @@ function post(overrides: Partial<WallPost> = {}): WallPost {
   }
 }
 
-const author: WallPostViewer = { id: 'user-1', role: 'customer' }
-const stranger: WallPostViewer = { id: 'user-2', role: 'customer' }
-const admin: WallPostViewer = { id: 'user-3', role: 'admin' }
+const author: WallPostViewer = { id: 'user-1', role: 'customer', capabilities: [] }
+const stranger: WallPostViewer = { id: 'user-2', role: 'customer', capabilities: [] }
+const admin: WallPostViewer = { id: 'user-3', role: 'admin', capabilities: ['remove_wall_posts'] }
 
 describe('what a Post offers', () => {
   it('offers nothing at all when there is nothing to offer, so no control is drawn', () => {
@@ -71,16 +71,26 @@ describe('who may edit and delete', () => {
     expect(wallPostActions(post(), author)).toEqual(['edit', 'delete'])
   })
 
-  it('offers a stranger neither, and no takedown either — they are not an Admin', () => {
+  it('offers a stranger neither, and no takedown either — they do not hold remove_wall_posts', () => {
     expect(wallPostActions(post(), stranger)).toEqual([])
   })
 
-  it('offers an Admin takedown on somebody else’s Post, never edit or delete', () => {
+  it('offers a holder of remove_wall_posts takedown on somebody else’s Post, never edit or delete', () => {
     expect(wallPostActions(post(), admin)).toEqual(['takedown'])
   })
 
+  it('offers an Admin without remove_wall_posts no takedown', () => {
+    const restricted: WallPostViewer = { id: 'user-3', role: 'admin', capabilities: ['pin_wall_posts'] }
+    expect(wallPostActions(post(), restricted)).toEqual([])
+  })
+
+  it('offers an Agent granted remove_wall_posts takedown on somebody else’s Post', () => {
+    const agent: WallPostViewer = { id: 'user-4', role: 'agent', capabilities: ['remove_wall_posts'] }
+    expect(wallPostActions(post(), agent)).toEqual(['takedown'])
+  })
+
   it('offers an Admin their own Post as delete, not takedown — it is their own writing', () => {
-    const own: WallPostViewer = { id: 'user-1', role: 'admin' }
+    const own: WallPostViewer = { id: 'user-1', role: 'admin', capabilities: ['remove_wall_posts'] }
     expect(wallPostActions(post({ author: { id: 'user-1', name: 'Ada' } }), own)).toEqual([
       'edit',
       'delete',
@@ -202,7 +212,7 @@ describe('who may reply', () => {
 
   it('never offers it to staff — there is no such thing as their own support conversation', () => {
     expect(canReplyToWallPost(admin)).toBe(false)
-    expect(canReplyToWallPost({ id: 'user-4', role: 'agent' })).toBe(false)
+    expect(canReplyToWallPost({ id: 'user-4', role: 'agent', capabilities: [] })).toBe(false)
   })
 })
 

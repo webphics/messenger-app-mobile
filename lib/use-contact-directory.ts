@@ -69,6 +69,8 @@ export type ContactDirectoryView = {
 export function useContactDirectory(
   role: UserRole | null,
   onOpen: (conversationId: string) => void,
+  /** Whether the viewer holds `staff_dm`, which starting a staff DM needs. */
+  canStartStaffDm: boolean,
 ): ContactDirectoryView {
   const { addConversation } = useConversationInbox()
   const [directory, setDirectory] = useState<ContactDirectory>({ status: 'loading' })
@@ -127,13 +129,14 @@ export function useContactDirectory(
   const contacts = useMemo(() => filterContacts(all, query), [all, query])
 
   const intentFor = useCallback(
-    (contact: Contact) => contactIntent(contact, shared.get(contact.id) ?? null),
-    [shared],
+    (contact: Contact) =>
+      contactIntent(contact, shared.get(contact.id) ?? null, canStartStaffDm),
+    [shared, canStartStaffDm],
   )
 
   const start = useCallback(
     (contact: Contact, organizationId?: string) => {
-      const intent = contactIntent(contact, shared.get(contact.id) ?? null)
+      const intent = contactIntent(contact, shared.get(contact.id) ?? null, canStartStaffDm)
 
       if (intent.kind === 'unavailable') return
       if (intent.kind === 'open') {
@@ -167,7 +170,7 @@ export function useContactDirectory(
         onOpen(result.value.id)
       })()
     },
-    [addConversation, onOpen, shared],
+    [addConversation, onOpen, shared, canStartStaffDm],
   )
 
   return {

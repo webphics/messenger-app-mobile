@@ -66,7 +66,9 @@ import type { WallPost, WallVoteDirection } from '@/lib/types'
 export function useWallBookmarks(): WallBodyView {
   const { state } = useAuth()
   const viewer: WallPostViewer | null =
-    state.status === 'signed-in' ? { id: state.user.id, role: state.user.role } : null
+    state.status === 'signed-in'
+      ? { id: state.user.id, role: state.user.role, capabilities: state.user.capabilities }
+      : null
 
   const [read, setRead] = useState<WallPages>(emptyWall)
   const [loading, setLoading] = useState(true)

@@ -23,8 +23,9 @@ import type { OrganizationMember, OrganizationSummary } from "@/lib/types";
 /**
  * Creating a group.
  *
- * Admin only, because `POST /conversations/groups` is, and in the order the
- * API's rules force: a group belongs to exactly one organization, and its
+ * For staff holding `create_groups`, because `POST /conversations/groups` is,
+ * and in the order the API's rules force: a group belongs to exactly one
+ * organization, and its
  * members have to be in that organization — so the organization is chosen
  * first and the member list is that organization's roster rather than the
  * contact directory. Picking people before naming where they would meet is

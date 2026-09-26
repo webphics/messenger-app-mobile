@@ -10,6 +10,7 @@ import { ContactList } from "@/components/inbox/contact-list";
 import { NewGroupSheet } from "@/components/inbox/new-group-sheet";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { can } from "@/lib/capabilities";
 import { getSessionUser } from "@/lib/session";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
 import { useContactDirectory } from "@/lib/use-contact-directory";
@@ -29,8 +30,9 @@ import { useContactDirectory } from "@/lib/use-contact-directory";
  * and the thread.
  *
  * A group is the one thing here that is not a person, so it is the one control
- * above the list rather than a row in it. Admin only: `POST /conversations/groups`
- * is `@Roles(['admin'])` and answers an Agent `403` whatever they send.
+ * above the list rather than a row in it. Only for somebody holding
+ * `create_groups`: `POST /conversations/groups` refuses everyone else with
+ * `missing_capability`, Admins and Agents alike.
  */
 
 type NewChatModalProps = {
@@ -82,9 +84,10 @@ function NewChatSheet({
     [onClose, onOpenConversation],
   );
 
-  const view = useContactDirectory(user?.role ?? null, open);
+  const view = useContactDirectory(user?.role ?? null, open, can(user, "staff_dm"));
   const isCustomer = user?.role === "customer";
-  const canCreateGroup = user?.role === "admin";
+  // The API gates Group creation on `create_groups` for Admins and Agents alike.
+  const canCreateGroup = can(user, "create_groups");
 
   return (
     <View

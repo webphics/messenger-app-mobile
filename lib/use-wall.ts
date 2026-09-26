@@ -179,7 +179,7 @@ export type WallView = {
   createPost: (input: WallPostCreateInput) => Promise<ApiResult<WallPost>>
   /** The author's own edit. Patches the Post on success; the caller decides what a refusal means on screen. */
   editPost: (postId: string, input: WallPostEditInput) => Promise<ApiResult<WallPost>>
-  /** The author's delete, or an Admin's takedown — the API tells them apart by who is asking, not by a different route. */
+  /** The author's delete, or a `remove_wall_posts` holder's takedown — the API tells them apart by who is asking, not by a different route. */
   removePost: (postId: string) => Promise<ApiResult<{ id: string }>>
 }
 
@@ -227,7 +227,7 @@ function useWallPages(
 ): WallView {
   const { state } = useAuth()
   /**
-   * Memoized on the two fields it carries rather than rebuilt each render.
+   * Memoized on the three fields it carries rather than rebuilt each render.
    * It is a dependency of `react`, `recordView` and `vote`, so a fresh literal
    * made all three new every render, and `renderItem` with them — which on a
    * list whose own scrolling fires `recordView` per row is a re-render of every
@@ -235,9 +235,13 @@ function useWallPages(
    */
   const viewerId = state.status === 'signed-in' ? state.user.id : null
   const viewerRole = state.status === 'signed-in' ? state.user.role : null
+  const viewerCapabilities = state.status === 'signed-in' ? state.user.capabilities : null
   const viewer: WallPostViewer | null = useMemo(
-    () => (viewerId !== null && viewerRole !== null ? { id: viewerId, role: viewerRole } : null),
-    [viewerId, viewerRole],
+    () =>
+      viewerId !== null && viewerRole !== null && viewerCapabilities !== null
+        ? { id: viewerId, role: viewerRole, capabilities: viewerCapabilities }
+        : null,
+    [viewerId, viewerRole, viewerCapabilities],
   )
   const searching = searchTerm !== undefined
 

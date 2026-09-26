@@ -12,8 +12,8 @@ import type { Organization } from '@/lib/types'
  *
  * Mirrors `WallPolicy.assertCanPost` one role branch at a time — the same
  * shape the web client's `useComposableWallOrganizations` fetches, and for
- * the same reason: `/wall-contributors` is entirely Admin-only
- * (`WallContributorsController`), so there is no self-service "am I a
+ * the same reason: `/wall-contributors` is only for staff holding
+ * `manage_wall_contributors` (`WallContributorsController`), so there is no self-service "am I a
  * Contributor anywhere" route. An Admin posts anywhere, whatever their own
  * memberships, so the source is every organization that exists
  * (`listOrganizations`, the Admin directory) rather than `/memberships/mine`,

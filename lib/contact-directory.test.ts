@@ -74,6 +74,20 @@ describe('contactIntent', () => {
   test('a directory that never answered leaves the binding to the API', () => {
     expect(contactIntent(contact(), null)).toEqual({ kind: 'staff-dm', userId: 'user-1' })
   })
+
+  test('without staff_dm a colleague with no thread yet cannot be messaged', () => {
+    expect(contactIntent(contact(), [TALO], false)).toEqual({
+      kind: 'unavailable',
+      reason: "You can't message staff",
+    })
+  })
+
+  test('without staff_dm an existing thread still opens', () => {
+    expect(contactIntent(contact({ conversationId: 'conv-1' }), [TALO], false)).toEqual({
+      kind: 'open',
+      conversationId: 'conv-1',
+    })
+  })
 })
 
 describe('sharedOrganizationsById', () => {

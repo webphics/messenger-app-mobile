@@ -6,6 +6,7 @@ import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { can } from "@/lib/capabilities";
 import { cn } from "@/lib/cn";
 import { failureNotice } from "@/lib/conversation-failure";
 import { initials } from "@/lib/display";
@@ -34,6 +35,9 @@ import type { ManagedUser, OrganizationMember } from "@/lib/types";
  * immediate: the API revokes the membership and reassigns whatever the loss of
  * it made unreadable, which is the `membership_revoked` reason on
  * `conversation.reassigned`.
+ *
+ * Inviting and removing need `manage_memberships`. Without it the screen only
+ * lists the members, and the people who could be invited are left out.
  */
 
 type MembersState =
@@ -59,6 +63,7 @@ export function OrganizationMembersScreen({
   organizationId: string;
 }) {
   const viewer = getSessionUser();
+  const canManage = can(viewer, "manage_memberships");
   // A Shared queue holds nothing on anybody's behalf, so there is nothing of
   // theirs to reassign and the warning does not claim there is.
   const supportAssignment = useSupportAssignment();
@@ -100,13 +105,13 @@ export function OrganizationMembersScreen({
       .filter((member) => !q || member.name.toLowerCase().includes(q))
       .map((member) => ({ kind: "member", member }));
 
-    const candidateRows: Row[] = directory
+    const candidateRows: Row[] = (canManage ? directory : [])
       .filter((user) => !inside.has(user.id))
       .filter((user) => !q || userDisplayName(user).toLowerCase().includes(q))
       .map((user) => ({ kind: "candidate", user }));
 
     return [...memberRows, ...candidateRows];
-  }, [directory, query, state]);
+  }, [canManage, directory, query, state]);
 
   const memberCount = state.status === "ready" ? state.members.length : 0;
 
@@ -224,7 +229,7 @@ export function OrganizationMembersScreen({
               <Text variant="label" className="text-muted">
                 You
               </Text>
-            ) : fixed ? null : (
+            ) : fixed || !canManage ? null : (
               <TactilePressable
                 accessibilityRole="button"
                 accessibilityLabel={`Remove ${member.name}`}
@@ -284,7 +289,7 @@ export function OrganizationMembersScreen({
         </View>
       );
     },
-    [busyId, confirmRemove, invite, invited, locked, organizationId, viewer?.id],
+    [busyId, canManage, confirmRemove, invite, invited, locked, organizationId, viewer?.id],
   );
 
   return (
@@ -297,8 +302,8 @@ export function OrganizationMembersScreen({
           accessibilityLabel="Search people"
         />
         <Text variant="meta" className="text-muted">
-          {memberCount === 1 ? "1 member" : `${memberCount} members`}. Everyone
-          below the line can be invited.
+          {memberCount === 1 ? "1 member" : `${memberCount} members`}.
+          {canManage ? " Everyone below the line can be invited." : ""}
         </Text>
         {problem ? (
           <Text accessibilityLiveRegion="polite" variant="label" className="text-danger">

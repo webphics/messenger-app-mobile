@@ -1,4 +1,5 @@
 import type { ApiFailure } from '@/lib/api-result'
+import { can, type Capability } from '@/lib/capabilities'
 import type { UserRole, WallPost, WallPostReaction, WallVoteDirection } from '@/lib/types'
 
 /**
@@ -12,8 +13,15 @@ import type { UserRole, WallPost, WallPostReaction, WallVoteDirection } from '@/
  * why this stays a list rather than a set of conditions inside a sheet.
  */
 
-/** Who is looking, which is all any of this needs beyond the Post itself. */
-export type WallPostViewer = { id: string; role: UserRole }
+/**
+ * Who is looking, which is all any of this needs beyond the Post itself.
+ * `capabilities` is the session's effective set (root ADR 0017).
+ */
+export type WallPostViewer = {
+  id: string
+  role: UserRole
+  capabilities: readonly Capability[]
+}
 
 /** The API's own ceiling on a Post's body (`WALL_POST_BODY_MAX`), mirrored so an edit can say so before the API does. */
 export const WALL_POST_BODY_MAX = 500
@@ -24,22 +32,21 @@ export type WallPostAction = 'copy-body' | 'copy-link' | 'edit' | 'delete' | 'ta
  * What the overflow control offers.
  *
  * `edit` and `delete` are the author's, and only the author's — mirrors
- * `WallPolicy.assertCanEdit`, which has no Admin exception. `takedown` is the
- * one place a role exception applies to a Post's write path
- * (`assertCanRemove`): an Admin acting on somebody *else's* Post. An Admin's
- * own Post still reads as `delete` — a takedown is what happens to somebody
- * else's writing, never to your own.
+ * `WallPolicy.assertCanEdit`, which has no Admin exception. `takedown` needs
+ * `remove_wall_posts` (`assertCanRemove`), whatever the role: a holder acting
+ * on somebody *else's* Post. A holder's own Post still reads as `delete` — a
+ * takedown is what happens to somebody else's writing, never to your own.
  */
 export function wallPostActions(post: WallPost, viewer: WallPostViewer): WallPostAction[] {
   const isAuthor = post.author.id === viewer.id
-  const isAdmin = viewer.role === 'admin'
+  const mayTakeDown = can(viewer, 'remove_wall_posts')
 
   return [
     post.body?.trim() ? ('copy-body' as const) : null,
     post.link ? ('copy-link' as const) : null,
     isAuthor ? ('edit' as const) : null,
     isAuthor ? ('delete' as const) : null,
-    isAdmin && !isAuthor ? ('takedown' as const) : null,
+    mayTakeDown && !isAuthor ? ('takedown' as const) : null,
   ].filter((action): action is WallPostAction => action !== null)
 }
 

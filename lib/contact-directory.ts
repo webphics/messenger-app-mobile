@@ -50,9 +50,15 @@ export type ContactIntent =
  */
 export type SharedOrganizations = Organization[] | null
 
+/**
+ * `canStartStaffDm` is whether the viewer holds `staff_dm`, without which
+ * `POST /conversations/staff` refuses them. A thread that already exists still
+ * opens; only a new one is out of reach.
+ */
 export function contactIntent(
   contact: Contact,
   shared: SharedOrganizations = null,
+  canStartStaffDm = true,
 ): ContactIntent {
   // The API already resolved this, for every kind. A row that names a thread is
   // a row with nothing left to decide, and that includes a Customer — whose
@@ -83,6 +89,10 @@ export function contactIntent(
    */
   if (contact.role !== 'admin' && contact.role !== 'agent') {
     return { kind: 'unavailable', reason: 'Not a staff account' }
+  }
+
+  if (!canStartStaffDm) {
+    return { kind: 'unavailable', reason: "You can't message staff" }
   }
 
   // Staff, with no thread yet. The organization a DM binds to is the staff

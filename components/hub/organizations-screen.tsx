@@ -7,6 +7,7 @@ import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { can } from "@/lib/capabilities";
 import { cn } from "@/lib/cn";
 import { failureNotice } from "@/lib/conversation-failure";
 import {
@@ -15,6 +16,7 @@ import {
   listOrganizations,
   renameOrganization,
 } from "@/lib/org-api";
+import { getSessionUser } from "@/lib/session";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { OrganizationSummary } from "@/lib/types";
@@ -32,6 +34,9 @@ import type { OrganizationSummary } from "@/lib/types";
  * Deletion is the most destructive thing in the app and reads that way: it
  * names the organization, says what goes with it, and takes a deliberate
  * second tap. There is no undo, on either side.
+ *
+ * Creating, renaming and deleting need `manage_organizations`. Without it the
+ * list only reads, and each row still opens its members.
  */
 
 type State =
@@ -60,6 +65,7 @@ function memberLine(organization: OrganizationSummary): string {
 export function OrganizationsScreen() {
   const navigation = useNavigation();
   const router = useRouter();
+  const canManage = can(getSessionUser(), "manage_organizations");
   const [state, setState] = useState<State>({ status: "loading" });
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -92,6 +98,7 @@ export function OrganizationsScreen() {
   }, [load, query]);
 
   useEffect(() => {
+    if (!canManage) return;
     navigation.setOptions({
       headerRight: () => (
         <TactilePressable
@@ -105,7 +112,7 @@ export function OrganizationsScreen() {
         </TactilePressable>
       ),
     });
-  }, [navigation]);
+  }, [canManage, navigation]);
 
   const replace = useCallback((organization: OrganizationSummary) => {
     setState((held) =>
@@ -278,7 +285,7 @@ export function OrganizationsScreen() {
 
           {busy ? (
             <ActivityIndicator color={colors.primary} />
-          ) : (
+          ) : !canManage ? null : (
             <>
               <TactilePressable
                 accessibilityRole="button"
@@ -304,7 +311,7 @@ export function OrganizationsScreen() {
         </View>
       );
     },
-    [busyId, confirmDelete, renameDraft, renamingId, router, submitRename],
+    [busyId, canManage, confirmDelete, renameDraft, renamingId, router, submitRename],
   );
 
   const organizations = state.status === "ready" ? state.organizations : [];
@@ -389,7 +396,9 @@ export function OrganizationsScreen() {
               <Text variant="meta" className="mt-1 text-center text-muted">
                 {state.status === "failed"
                   ? state.hint
-                  : "Everything in this product belongs to one. Create the first with the button above."}
+                  : canManage
+                    ? "Everything in this product belongs to one. Create the first with the button above."
+                    : "Everything in this product belongs to one."}
               </Text>
               {state.status === "failed" ? (
                 <TactilePressable

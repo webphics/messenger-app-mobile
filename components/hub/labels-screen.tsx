@@ -23,8 +23,8 @@ import type { Label, LabelColor } from "@/lib/types";
 /**
  * The organization's label vocabulary.
  *
- * Admin only — both write routes are `@Roles(['admin'])` — and organization-
- * wide rather than per-thread: what a staff member does on a conversation is
+ * Offered to staff holding `manage_labels`, which both write routes check, and
+ * organization-wide rather than per-thread: what a staff member does on a conversation is
  * put one of these on it, and what happens here is deciding which of them
  * exist. Two different acts, so two different places, which is also how the
  * web client splits them.

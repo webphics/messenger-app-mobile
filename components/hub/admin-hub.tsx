@@ -19,6 +19,7 @@ import { HubScroll } from "@/components/hub/hub-scroll";
 import { Pill } from "@/components/hub/pill";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { Text } from "@/components/ui/text";
+import { can } from "@/lib/capabilities";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { useConversationInbox } from "@/lib/conversation-inbox";
@@ -172,14 +173,18 @@ export function AdminHub() {
         <Text variant="label" className="uppercase tracking-wider text-muted">
           Administration
         </Text>
-        <ActionRow
-          icon={Building2}
-          tone="neutral"
-          title="Organizations"
-          hint="The container every conversation and membership belongs to"
-          accessibilityLabel="Organizations"
-          onPress={() => router.push("/(admin)/organizations" as Href)}
-        />
+        {/* Organizations carry editing (`manage_organizations`) and their members
+            (`manage_memberships`). Holding neither leaves nothing to do there. */}
+        {can(me, "manage_organizations") || can(me, "manage_memberships") ? (
+          <ActionRow
+            icon={Building2}
+            tone="neutral"
+            title="Organizations"
+            hint="The container every conversation and membership belongs to"
+            accessibilityLabel="Organizations"
+            onPress={() => router.push("/(admin)/organizations" as Href)}
+          />
+        ) : null}
         <ActionRow
           icon={Users}
           tone="neutral"
@@ -188,14 +193,17 @@ export function AdminHub() {
           accessibilityLabel="Accounts"
           onPress={() => router.push("/(admin)/users" as Href)}
         />
-        <ActionRow
-          icon={Tags}
-          tone="neutral"
-          title="Labels"
-          hint="The vocabulary every staff member can put on a conversation"
-          accessibilityLabel="Labels"
-          onPress={() => router.push("/(admin)/labels" as Href)}
-        />
+        {/* Creating and editing labels needs `manage_labels`. */}
+        {can(me, "manage_labels") ? (
+          <ActionRow
+            icon={Tags}
+            tone="neutral"
+            title="Labels"
+            hint="The vocabulary every staff member can put on a conversation"
+            accessibilityLabel="Labels"
+            onPress={() => router.push("/(admin)/labels" as Href)}
+          />
+        ) : null}
         <ActionRow
           icon={MessageSquare}
           tone="neutral"
