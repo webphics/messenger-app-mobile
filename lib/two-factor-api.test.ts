@@ -37,6 +37,7 @@ const PROTECTED_PERSON = {
   hasPassword: true,
   twoFactorEnabled: true,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 const answered = (data: unknown, status = 200) => ({

@@ -131,6 +131,7 @@ const PARSED_USER = {
   hasPassword: true,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 function ok(data: unknown, sessionCookie: string | null = null) {

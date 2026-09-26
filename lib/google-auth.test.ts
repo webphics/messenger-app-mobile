@@ -21,6 +21,7 @@ const CUSTOMER: SessionUser = {
   hasPassword: true,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 const SUBMITTING: AuthState = { status: "submitting" };

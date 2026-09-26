@@ -77,6 +77,7 @@ describe("parseSessionUser", () => {
       hasPassword: true,
       twoFactorEnabled: false,
       supportAssignmentEnabled: false,
+      capabilities: [],
     });
   });
 
@@ -155,6 +156,53 @@ describe("parseSessionUser", () => {
     });
   });
 
+  /**
+   * The viewer's effective set, which the API computes (root ADR 0017). Like the
+   * flags above it defaults rather than drops the person, and the default is
+   * holding nothing, which hides a control rather than drawing one.
+   */
+  describe("capabilities", () => {
+    test("keeps the names this build knows", () => {
+      expect(
+        parseSessionUser(apiUser({ capabilities: ["transfer", "close", "send_broadcasts"] }))
+          ?.capabilities,
+      ).toEqual(["transfer", "close", "send_broadcasts"]);
+    });
+
+    test("drops names this build does not know and keeps the person", () => {
+      const user = parseSessionUser(
+        apiUser({ capabilities: ["close", "create_labels", "teleport", 7] }),
+      );
+
+      expect(user).not.toBeNull();
+      expect(user?.capabilities).toEqual(["close"]);
+    });
+
+    test("a session with no capabilities reads as holding nothing", () => {
+      const payload = apiUser();
+      delete (payload as Record<string, unknown>).capabilities;
+
+      const user = parseSessionUser(payload);
+      expect(user).not.toBeNull();
+      expect(user?.capabilities).toEqual([]);
+    });
+
+    test.each([
+      ["null", null],
+      ["a string", "transfer"],
+      ["an object", { transfer: true }],
+      ["a number", 26],
+    ])("%s reads as holding nothing", (_label, value) => {
+      expect(parseSessionUser(apiUser({ capabilities: value }))?.capabilities).toEqual([]);
+    });
+
+    test("a customer's empty set is carried as empty", () => {
+      expect(
+        parseSessionUser(apiUser({ role: "customer", capabilities: [] }))?.capabilities,
+      ).toEqual([]);
+    });
+  });
+
   test.each(["admin", "agent", "customer"] as const)("accepts the %s role", (role) => {
     expect(parseSessionUser(apiUser({ role }))?.role).toBe(role);
   });
@@ -197,6 +245,7 @@ describe("interpretSignIn", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        capabilities: [],
       },
     });
   });
@@ -362,6 +411,7 @@ describe("interpretSession", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        capabilities: [],
       },
     });
   });
@@ -453,6 +503,7 @@ describe("interpretMagicLinkVerify", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        capabilities: [],
       },
     });
   });
@@ -539,6 +590,7 @@ describe("interpretGoogleSignIn", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        capabilities: [],
       },
     });
   });
@@ -712,6 +764,7 @@ describe("interpretTwoFactorVerify", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        capabilities: [],
       },
     });
   });

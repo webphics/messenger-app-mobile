@@ -20,6 +20,7 @@ const AGENT: SessionUser = {
   hasPassword: true,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 const CUSTOMER: SessionUser = { ...AGENT, role: "customer" };

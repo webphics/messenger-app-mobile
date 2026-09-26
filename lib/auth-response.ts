@@ -1,4 +1,5 @@
 import { asRecord, CSRF_REFUSED_CODE } from "@/lib/api-envelope";
+import { parseCapabilities } from "@/lib/capabilities";
 import type { SessionUser, UserRole } from "@/lib/types";
 
 /**
@@ -176,7 +177,8 @@ function envelopeData(body: unknown): Record<string, unknown> | null {
  * which hides a control. The other way round would draw one that acts on an
  * assumption the payload never made. See
  * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
- * `supportAssignmentEnabled` defaults the same way.
+ * `supportAssignmentEnabled` defaults the same way, and so does `capabilities`,
+ * which reads as holding nothing when it is missing or not a list.
  */
 export function parseSessionUser(data: unknown): SessionUser | null {
   const record = asRecord(data);
@@ -202,6 +204,7 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     // The same default, for the same reason: anything but `true` is a Shared
     // queue, which offers nobody an action the API would refuse.
     supportAssignmentEnabled: record.supportAssignmentEnabled === true,
+    capabilities: parseCapabilities(record.capabilities),
   };
 }
 

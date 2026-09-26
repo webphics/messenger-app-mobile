@@ -19,6 +19,7 @@ const CUSTOMER: SessionUser = {
   hasPassword: false,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 const TOKEN = "3f9a2c";

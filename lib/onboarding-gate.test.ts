@@ -16,6 +16,7 @@ function person(overrides: Partial<SessionUser> = {}): SessionUser {
     hasPassword: true,
     twoFactorEnabled: false,
     supportAssignmentEnabled: false,
+    capabilities: [],
     ...overrides,
   };
 }

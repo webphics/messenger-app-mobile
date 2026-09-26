@@ -1,3 +1,4 @@
+import type { Capability } from '@/lib/capabilities'
 import type { ConversationAccess } from '@/lib/conversation-access'
 
 export type UserRole = 'admin' | 'agent' | 'customer'
@@ -33,6 +34,13 @@ export type SessionUser = {
    * `isSupportAssignmentEnabled` in `lib/support-assignment`.
    */
   supportAssignmentEnabled: boolean
+  /**
+   * What this viewer may do, as the API computed it: every capability for the
+   * super admin, the stored set for other staff, none for a Customer. Names
+   * this build does not know are dropped by the parse. Read it through `can`
+   * and `canAny` in `lib/capabilities`.
+   */
+  capabilities: Capability[]
 }
 
 /** A mock directory entry. Only the Agent and Admin screens still read this. */

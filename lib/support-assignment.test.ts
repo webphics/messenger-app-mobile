@@ -9,6 +9,7 @@ const AGENT: SessionUser = {
   hasPassword: true,
   twoFactorEnabled: false,
   supportAssignmentEnabled: true,
+  capabilities: [],
 }
 
 describe('isSupportAssignmentEnabled', () => {

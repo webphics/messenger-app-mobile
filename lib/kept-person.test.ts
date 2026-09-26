@@ -12,6 +12,7 @@ const AGENT: SessionUser = {
   twoFactorEnabled: false,
   // Carried, unlike the two above: it decides which screens a Stale session draws.
   supportAssignmentEnabled: true,
+  capabilities: [],
 };
 
 test("a kept person comes back exactly as they went in", () => {
@@ -58,6 +59,16 @@ test("a Stale person comes back with both account flags false", () => {
 
   expect(kept?.hasPassword).toBe(false);
   expect(kept?.twoFactorEnabled).toBe(false);
+});
+
+test("a Stale person comes back holding no capabilities", () => {
+  // Dropped like the account flags and for the same reason: a Stale session
+  // hides the controls they gate until the API confirms the set.
+  const kept = parseKeptPerson(
+    serialiseKeptPerson({ ...AGENT, capabilities: ["transfer", "close"] }),
+  );
+
+  expect(kept?.capabilities).toEqual([]);
 });
 
 describe("what is not a kept person", () => {

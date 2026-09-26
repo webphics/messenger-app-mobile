@@ -13,6 +13,7 @@ const AGENT: SessionUser = {
   hasPassword: true,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 const signedIn = (role: UserRole): AuthState => ({

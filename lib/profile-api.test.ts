@@ -35,6 +35,7 @@ const NAMED = {
   hasPassword: true,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 /** Who the device thought was signed in before the write: the nameless account. */
@@ -48,6 +49,7 @@ const BEFORE = {
   hasPassword: true,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 const answered = (data: unknown) => ({

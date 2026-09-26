@@ -31,6 +31,7 @@ const AGENT: SessionUser = {
   hasPassword: false,
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
+  capabilities: [],
 };
 
 /** What a missing native module actually throws, verbatim enough to be recognisable. */
