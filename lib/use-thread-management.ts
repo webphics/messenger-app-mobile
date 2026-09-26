@@ -7,8 +7,8 @@ import {
   transferConversation,
 } from '@/lib/conversation-api'
 import type { ApiFailure } from '@/lib/api-result'
-import { useAuth } from '@/lib/auth-context'
 import { assignmentModeChanged, assignmentRefusal } from '@/lib/conversation-failure'
+import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 import { transferCandidates } from '@/lib/thread-actions'
 import type { Conversation, StaffDirectoryUser } from '@/lib/types'
 
@@ -27,6 +27,10 @@ import type { Conversation, StaffDirectoryUser } from '@/lib/types'
  * Unassigned pool — and these are the opposite case: a thread this person is
  * already holding, which nobody else can close or transfer out from under them.
  * The API is still the authority, and a refusal is shown as its own sentence.
+ * Every refusal also goes to `useConversationWriteRefused`, which fetches the
+ * thread again when the refusal says this copy is stale (somebody closed or
+ * reopened it first, or a Capability was revoked) and re-reads the session when
+ * the Shared queue switch moved.
  *
  * The transfer directory is fetched only when somebody asks for it. It is the
  * staff directory, narrowed to the Agents a transfer may legally go to, and a
@@ -75,7 +79,7 @@ export function useThreadManagement(
   const [candidatesFailed, setCandidatesFailed] = useState(false)
   const [pending, setPending] = useState<'transfer' | 'close' | 'reopen' | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { reconfirmSession } = useAuth()
+  const writeRefused = useConversationWriteRefused()
 
   /** Which thread the answers coming back belong to. */
   const onScreen = useRef<string | null>(conversationId)
@@ -131,11 +135,12 @@ export function useThreadManagement(
 
     void transferConversation(id, agentId).then((result) => {
       // A Transfer is refused like an Engage when assignment went off under
-      // this session, and re-reading the session is what takes it away. Before
-      // the on-screen check, because the session is stale wherever they went.
+      // this session, and that refusal gets the Engage wording.
       // `true`: Transfer is only offered while assignment is on.
       const switchedOff = !result.ok && assignmentModeChanged(result.failure, true)
-      if (switchedOff) reconfirmSession()
+      // Before the on-screen check, because the list and the session are
+      // stale wherever the person went.
+      if (!result.ok) void writeRefused(id, result.failure)
 
       if (onScreen.current !== id) return
       setPending(null)
@@ -149,7 +154,7 @@ export function useThreadManagement(
           : refusal(result.failure, 'The conversation could not be transferred.'),
       )
     })
-  }, [reconfirmSession])
+  }, [writeRefused])
 
   const close = useCallback(async (summary: string): Promise<string | null> => {
     const id = onScreen.current
@@ -159,6 +164,7 @@ export function useThreadManagement(
     setError(null)
 
     const result = await closeConversation(id, summary)
+    if (!result.ok) void writeRefused(id, result.failure)
     if (onScreen.current !== id) return null
     setPending(null)
     if (result.ok) {
@@ -166,7 +172,7 @@ export function useThreadManagement(
       return null
     }
     return refusal(result.failure, 'The conversation could not be closed.')
-  }, [])
+  }, [writeRefused])
 
   const reopen = useCallback(() => {
     const id = onScreen.current
@@ -176,6 +182,7 @@ export function useThreadManagement(
     setError(null)
 
     void reopenConversation(id).then((result) => {
+      if (!result.ok) void writeRefused(id, result.failure)
       if (onScreen.current !== id) return
       setPending(null)
       if (result.ok) {
@@ -188,7 +195,7 @@ export function useThreadManagement(
           : refusal(result.failure, 'The conversation could not be reopened.'),
       )
     })
-  }, [])
+  }, [writeRefused])
 
   return { loadCandidates, candidates, candidatesFailed, transfer, close, reopen, pending, error }
 }

@@ -7,8 +7,8 @@ import {
   takeOverConversation,
 } from '@/lib/conversation-api'
 import { assignmentPrecheck } from '@/lib/assignment-precheck'
-import { useAuth } from '@/lib/auth-context'
-import { assignmentModeChanged, assignmentRefusal } from '@/lib/conversation-failure'
+import { assignmentRefusal } from '@/lib/conversation-failure'
+import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 import type { WayOut } from '@/lib/conversation-access'
 import type { Conversation } from '@/lib/types'
 
@@ -44,6 +44,12 @@ import type { Conversation } from '@/lib/types'
  * to spend it from: a GET on the connection the POST is about to use, in front
  * of a mutation nobody makes twice a minute. It is spent deliberately, and it
  * is the reason the button holds its spinner slightly longer than it used to.
+ *
+ * A refusal of any of the three goes to `useConversationWriteRefused`, the
+ * conversation write path's follow-up, like every other write: it fetches the
+ * conversation again when the refusal says the copy is stale, and re-reads the
+ * session when the Shared queue switch moved. That runs after the write; the
+ * re-read above runs before it and is not replaced by it.
  */
 
 export type ConversationAssignment = {
@@ -79,7 +85,7 @@ export function useConversationAssignment(
 ): ConversationAssignment {
   const [assigning, setAssigning] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { reconfirmSession } = useAuth()
+  const writeRefused = useConversationWriteRefused()
 
   /**
    * Which thread the answer coming back belongs to. An engage answered after the
@@ -110,31 +116,34 @@ export function useConversationAssignment(
    * Reopen skips the re-read Engage and Takeover make first. Those guard a race
    * over who holds the thread; a reopen has only one race, somebody reopening
    * it first, and the API answers that one itself with `conversation_not_closed`.
-   * On that answer the thread is re-read, because it is already in the state the
-   * person asked for and the composer should open rather than show a refusal.
+   * The write path's follow-up fetches the thread again on that answer, and
+   * nothing is shown when it arrives: the thread is already in the state the
+   * person asked for, so the composer opens rather than show a refusal.
    */
   const reopen = useCallback(async (id: string) => {
     const result = await reopenConversation(id)
-    if (onScreen.current !== id) return
 
     if (result.ok) {
+      if (onScreen.current !== id) return
       setAssigning(false)
       notify.current(result.value)
       return
     }
 
+    const refetched = writeRefused(id, result.failure)
+
     if (result.failure.kind === 'refused' && result.failure.code === 'conversation_not_closed') {
-      const fresh = await getConversation(id)
+      const fresh = await refetched
       if (onScreen.current !== id) return
       setAssigning(false)
-      if (fresh.ok) notify.current(fresh.value)
-      else setError(assignmentRefusal(fresh.failure))
+      if (fresh && !fresh.ok) setError(assignmentRefusal(fresh.failure))
       return
     }
 
+    if (onScreen.current !== id) return
     setAssigning(false)
     setError(assignmentRefusal(result.failure))
-  }, [])
+  }, [writeRefused])
 
   const assign = useCallback(
     (wayOut: WayOut) => {
@@ -179,12 +188,11 @@ export function useConversationAssignment(
             ? await engageConversation(id)
             : await takeOverConversation(id)
 
-        // The button was offered by a session that did not know the switch
-        // moved. Re-reading it is what takes the button away and opens the
-        // composer — before the on-screen check, because the session is out of
-        // date wherever the person has gone since.
-        // `true`: Engage and Takeover are only offered while assignment is on.
-        if (!result.ok && assignmentModeChanged(result.failure, true)) reconfirmSession()
+        // The button was offered by a copy, or a session, that did not know
+        // the thread or the switch moved. Fetching them again is what takes the
+        // button away. Before the on-screen check, because the list and the
+        // session are out of date wherever the person has gone since.
+        if (!result.ok) void writeRefused(id, result.failure)
 
         if (onScreen.current !== id) return
         setAssigning(false)
@@ -196,7 +204,7 @@ export function useConversationAssignment(
         setError(assignmentRefusal(result.failure))
       })()
     },
-    [conversationId, viewerId, reconfirmSession, reopen],
+    [conversationId, viewerId, writeRefused, reopen],
   )
 
   return { assign, assigning, error }

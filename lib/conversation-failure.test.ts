@@ -4,6 +4,7 @@ import {
   assignmentSwitchedOnNotice,
   failureNotice,
   readRefusal,
+  refusedWriteFollowUp,
 } from '@/lib/conversation-failure'
 
 describe('failureNotice', () => {
@@ -162,5 +163,59 @@ describe('assignmentSwitchedOnNotice', () => {
   // and an Engage's own refusals are `assignmentRefusal`'s.
   test.each(SWITCH_ROWS)('%s, with assignment believed on', (_label, failure) => {
     expect(assignmentSwitchedOnNotice(failure, true)).toBeNull()
+  })
+})
+
+describe('refusedWriteFollowUp', () => {
+  function refusedWith(code?: string) {
+    return { kind: 'refused' as const, message: 'Refused.', ...(code ? { code } : {}) }
+  }
+
+  test('a stale copy is fetched again and the session is left alone', () => {
+    expect(refusedWriteFollowUp(refusedWith('conversation_closed'), true)).toEqual({
+      refetch: true,
+      reconfirmSession: false,
+    })
+  })
+
+  test.each([true, false])(
+    'support_assignment_disabled fetches the conversation and re-reads the session (switch believed on: %s)',
+    (enabled) => {
+      expect(refusedWriteFollowUp(refusedWith('support_assignment_disabled'), enabled)).toEqual({
+        refetch: true,
+        reconfirmSession: true,
+      })
+    },
+  )
+
+  test.each(['must_engage', 'must_take_over', 'already_engaged'])(
+    '%s while the switch is believed off says it came back on: both reads',
+    (code) => {
+      expect(refusedWriteFollowUp(refusedWith(code), false)).toEqual({
+        refetch: true,
+        reconfirmSession: true,
+      })
+    },
+  )
+
+  test.each(['must_engage', 'must_take_over', 'already_engaged'])(
+    '%s while the switch is believed on is an ordinary stale copy',
+    (code) => {
+      expect(refusedWriteFollowUp(refusedWith(code), true)).toEqual({
+        refetch: true,
+        reconfirmSession: false,
+      })
+    },
+  )
+
+  test.each([
+    ['a validation error', refusedWith('validation_failed')],
+    ['a refusal with no code', refusedWith()],
+    ['a request that never arrived', { kind: 'unreachable' as const }],
+    ['an expired session', { kind: 'unauthorised' as const }],
+    ['an unreadable body', { kind: 'malformed' as const }],
+  ])('%s does neither', (_label, failure) => {
+    expect(refusedWriteFollowUp(failure, true)).toEqual({ refetch: false, reconfirmSession: false })
+    expect(refusedWriteFollowUp(failure, false)).toEqual({ refetch: false, reconfirmSession: false })
   })
 })

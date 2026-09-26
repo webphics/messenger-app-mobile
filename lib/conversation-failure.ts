@@ -1,4 +1,5 @@
 import type { ApiFailure } from '@/lib/conversation-api'
+import { refusalMeansStale } from '@/lib/conversation-access'
 
 export type FailureNotice = { title: string; hint: string }
 
@@ -32,9 +33,10 @@ const ASSIGNMENT_SWITCHED_ON: Record<string, string> = {
  * switch is believed on, is an ordinary refusal of the request.
  *
  * The switch is read off the session, and the session is otherwise read again
- * only at launch or while Stale. So a caller seeing true re-reads the session
- * (`reconfirmSession` in `lib/auth-context`), which is what moves the screens
- * between the two modes without a restart.
+ * only at launch or while Stale. So on true the write path re-reads the session
+ * (`reconfirmSession` in `lib/auth-context`, through `refusedWriteFollowUp`
+ * below), which is what moves the screens between the two modes without a
+ * restart.
  */
 export function assignmentModeChanged(
   failure: ApiFailure,
@@ -44,6 +46,39 @@ export function assignmentModeChanged(
   return supportAssignmentEnabled
     ? failure.code === SUPPORT_ASSIGNMENT_DISABLED
     : ASSIGNMENT_REQUIRED.has(failure.code)
+}
+
+/** What a conversation write path does after the API refused the write. */
+export type RefusedWriteFollowUp = {
+  /** Fetch the conversation again, because the copy on screen is stale. */
+  refetch: boolean
+  /** Read the session again, because the Shared queue switch moved. */
+  reconfirmSession: boolean
+}
+
+/**
+ * What to do after a refused conversation write: send, react, edit, upload,
+ * engage, take over, transfer, close, reopen, a label change or a note.
+ *
+ * `refetch` is the adapter's answer (`refusalMeansStale` in
+ * `lib/conversation-access`): the conversation changed under this device, and
+ * the fresh copy carries the `access` that moves the composer and the actions.
+ *
+ * `reconfirmSession` is the Shared queue switch, which lives on the session
+ * and sends no conversation event. `support_assignment_disabled` says it is
+ * off whatever this device believed, and `assignmentModeChanged` keeps the
+ * other direction: an assignment code while the switch is believed off says it
+ * came back on.
+ */
+export function refusedWriteFollowUp(
+  failure: ApiFailure,
+  supportAssignmentEnabled: boolean,
+): RefusedWriteFollowUp {
+  const switchedOff = failure.kind === 'refused' && failure.code === SUPPORT_ASSIGNMENT_DISABLED
+  return {
+    refetch: refusalMeansStale(failure),
+    reconfirmSession: switchedOff || assignmentModeChanged(failure, supportAssignmentEnabled),
+  }
 }
 
 /**
@@ -141,8 +176,8 @@ export function readRefusal(failure: ApiFailure): string | null {
  *
  * The one refusal not repeated verbatim is `support_assignment_disabled`: the
  * switch went off after this session last read it, so the button was offered
- * by a client that did not know yet. The caller re-reads the session on it
- * (`assignmentModeChanged`), and the composer opens once that lands — so the
+ * by a client that did not know yet. The write path re-reads the session on it
+ * (`refusedWriteFollowUp`), and the composer opens once that lands — so the
  * sentence says what changed and nothing about what to do.
  */
 export function assignmentRefusal(failure: ApiFailure): string | null {

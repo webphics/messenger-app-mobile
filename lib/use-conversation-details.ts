@@ -9,6 +9,7 @@ import {
   type ApiFailure,
 } from '@/lib/conversation-api'
 import type { Conversation, ConversationNote, Label } from '@/lib/types'
+import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 
 /**
  * What a thread carries besides its messages: the labels on it, and the notes
@@ -24,6 +25,11 @@ import type { Conversation, ConversationNote, Label } from '@/lib/types'
  * A label change answers with the whole conversation, which goes into the shared
  * list through `onUpdated` — so the chip appears here and the inbox row behind
  * gains it in the same update, exactly as an Engage does.
+ *
+ * A refused label change or note goes to `useConversationWriteRefused`, which
+ * fetches the conversation again when the refusal says this copy is stale (a
+ * revoked label Capability arrives as `missing_capability`), so the controls
+ * this screen drew from the old `access` go away.
  */
 
 export type NotesState =
@@ -105,6 +111,7 @@ export function useConversationDetails({
   const [notes, setNotes] = useState<NotesState>({ status: 'unavailable' })
   const [addingNote, setAddingNote] = useState(false)
   const [noteError, setNoteError] = useState<string | null>(null)
+  const writeRefused = useConversationWriteRefused()
 
   /**
    * Which thread the answers coming back belong to. A screen left before its
@@ -188,6 +195,7 @@ export function useConversationDetails({
             ? await attachLabel(id, labelId)
             : await detachLabel(id, labelId)
 
+        if (!result.ok) void writeRefused(id, result.failure)
         if (onScreen.current !== id) return
         setLabelBusy(null)
         if (result.ok) {
@@ -202,7 +210,7 @@ export function useConversationDetails({
         )
       })()
     },
-    [conversationId, labelBusy],
+    [conversationId, labelBusy, writeRefused],
   )
 
   const attach = useCallback(
@@ -232,6 +240,7 @@ export function useConversationDetails({
 
       void (async () => {
         const result = await createNote(id, trimmed)
+        if (!result.ok) void writeRefused(id, result.failure)
         if (onScreen.current !== id) return
         setAddingNote(false)
 
@@ -246,7 +255,7 @@ export function useConversationDetails({
         )
       })()
     },
-    [addingNote, conversationId],
+    [addingNote, conversationId, writeRefused],
   )
 
   return {

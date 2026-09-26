@@ -3,6 +3,7 @@ import {
   detailsView,
   messageActions,
   parseAccess,
+  refusalMeansStale,
   threadActionsView,
   UNKNOWN_ACCESS,
 } from '@/lib/conversation-access'
@@ -571,5 +572,56 @@ describe('detailsView', () => {
 
   test('a missing access field offers nothing', () => {
     expect(detailsView(undefined)).toEqual(NONE)
+  })
+})
+
+describe('refusalMeansStale', () => {
+  function refusedWith(code?: string) {
+    return { kind: 'refused' as const, message: 'Refused.', ...(code ? { code } : {}) }
+  }
+
+  test('a write refused with must_engage means the copy is stale', () => {
+    expect(refusalMeansStale(refusedWith('must_engage'))).toBe(true)
+  })
+
+  test.each([
+    'already_engaged',
+    'must_take_over',
+    'conversation_closed',
+    'conversation_not_closed',
+    'group_write_restricted',
+    'support_assignment_disabled',
+    'missing_capability',
+    'message_not_deletable',
+    'broadcast_inbox_read_only',
+  ])('a write refused with %s means the copy is stale', (code) => {
+    expect(refusalMeansStale(refusedWith(code))).toBe(true)
+  })
+
+  test.each(['validation_failed', 'conversation_not_found', 'label_not_found', 'message_edit_window_expired'])(
+    'a refusal with %s is about the request, not the conversation',
+    (code) => {
+      expect(refusalMeansStale(refusedWith(code))).toBe(false)
+    },
+  )
+
+  test('a lost thread is left to the reassignment event, since a refetch would be refused too', () => {
+    expect(refusalMeansStale(refusedWith('conversation_reassigned'))).toBe(false)
+  })
+
+  test('a refusal with no code says nothing about the conversation', () => {
+    expect(refusalMeansStale(refusedWith())).toBe(false)
+  })
+
+  test('a code named like an object property is not a stale code', () => {
+    expect(refusalMeansStale(refusedWith('constructor'))).toBe(false)
+  })
+
+  test.each([
+    ['a request that never arrived', { kind: 'unreachable' as const }],
+    ['an expired session', { kind: 'unauthorised' as const }],
+    ['an unreadable body', { kind: 'malformed' as const }],
+  ])('%s is not a stale copy', (_label, failure) => {
+    expect(refusalMeansStale(failure)).toBe(false)
   })
 })

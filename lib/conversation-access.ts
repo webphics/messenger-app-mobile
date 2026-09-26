@@ -1,4 +1,5 @@
 import { asRecord } from '@/lib/api-envelope'
+import type { ApiFailure } from '@/lib/api-result'
 import { isLocalId } from '@/lib/thread-state'
 import type { GroupWritePolicy, Message } from '@/lib/types'
 
@@ -29,7 +30,9 @@ import type { GroupWritePolicy, Message } from '@/lib/types'
  * Two entry points: `parseAccess` for the payload, and a view per surface:
  * `composerView` for the composer, `threadActionsView` for what may be done
  * to the thread, `detailsView` for labels and notes on Conversation details,
- * and `messageActions` for what one message offers.
+ * and `messageActions` for what one message offers. `refusalMeansStale` is
+ * the one rule about the other direction: whether a refused write means the
+ * copy these views were drawn from is out of date.
  */
 
 /** Why a viewer may only read, in the API's own refusal codes. */
@@ -372,4 +375,48 @@ export function messageActions(
 
   const until = Date.parse(message.editableUntil)
   return { edit: !Number.isNaN(until) && now < until }
+}
+
+/**
+ * The API's refusal codes that say the conversation changed after this device
+ * read it, so the copy on screen offered something the API no longer allows.
+ *
+ * - The six read-only reasons (`WRITE_REASONS`): somebody engaged, took over,
+ *   closed, restricted the Group, or the viewer is in an announcements thread
+ *   the copy did not show as one.
+ * - `conversation_not_closed`: a Reopen after somebody else reopened it.
+ * - `support_assignment_disabled`: the Shared queue switch went off. The
+ *   session is re-read for this too; see `refusedWriteFollowUp` in
+ *   `lib/conversation-failure`.
+ * - `missing_capability`: a Capability was revoked, which sends no
+ *   conversation event, so `actions` on the copy is out of date.
+ * - `message_not_deletable`: `deleteMessages` was offered on a copy that
+ *   should not have offered it. This client sends no delete today; the code is
+ *   listed so the rule is whole when one arrives.
+ *
+ * Not here: `conversation_reassigned`. The viewer lost the thread and can no
+ * longer read it, so a refetch answers the same refusal. The socket's
+ * `conversation.reassigned` event already moves the row (`withReassignment`
+ * in `lib/conversation-list`).
+ */
+const STALE_REFUSALS: ReadonlySet<string> = new Set([
+  ...WRITE_REASONS,
+  'conversation_not_closed',
+  'support_assignment_disabled',
+  'missing_capability',
+  'message_not_deletable',
+])
+
+/**
+ * Whether a refused conversation write means this device's copy of the
+ * conversation is stale, so the caller should fetch that one conversation
+ * again. The fresh copy carries the viewer's `access`, which is what moves the
+ * composer and the actions to the new state.
+ *
+ * False for every other failure: a validation error or any other code is about
+ * the request, not the conversation, and a request that never arrived, an
+ * expired session or an unreadable body says nothing about the conversation.
+ */
+export function refusalMeansStale(failure: ApiFailure): boolean {
+  return failure.kind === 'refused' && failure.code !== undefined && STALE_REFUSALS.has(failure.code)
 }
