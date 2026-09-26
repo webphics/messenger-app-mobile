@@ -26,9 +26,13 @@ import { chatMessageInfoHref } from '@/lib/chat-route-id'
 import { readStampLabel } from '@/lib/message-read-stamp'
 import { useMessageReceipts } from '@/lib/use-message-receipts'
 import { rejectUploadReason } from '@/lib/attachment-upload'
-import { composerView, type WayOut, type WayOutButton } from '@/lib/conversation-access'
+import {
+  composerView,
+  messageActions,
+  type WayOut,
+  type WayOutButton,
+} from '@/lib/conversation-access'
 import type { ApiFailure } from '@/lib/conversation-api'
-import { canEditMessage } from '@/lib/message-edit'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
   isLocalId,
@@ -131,8 +135,8 @@ type ThreadScreenProps = {
    *
    * Required for the same reason `onToggleReaction` is: the menu item is offered
    * from here, and one that reported nowhere would be a control that does
-   * nothing. Who may edit is still `canEditMessage`'s, judged where the menu
-   * opens — this only carries the words.
+   * nothing. Who may edit is `messageActions`'s in `lib/conversation-access`,
+   * judged where the menu opens. This only carries the words.
    */
   onEditMessage: (messageId: string, body: string) => Promise<string | null>
   /**
@@ -690,27 +694,23 @@ export function ThreadScreen({
   const [messageToEdit, setMessageToEdit] = useState<Message | null>(null)
 
   /**
-   * Whether this message can be rewritten, judged at the moment the menu opens.
+   * Whether this message can be rewritten, judged when the menu renders.
    *
-   * Read once here rather than watched: nothing in this app re-renders a
-   * virtualised list on a timer, and a window that closes while the menu is open
-   * is the API's refusal to give, shown in the sheet. `canEditMessage` holds the
-   * rule and is table-tested; this supplies the clock and the thread's kind.
+   * Edit lives only in the long-press menu, and the menu is rebuilt each time it
+   * opens, so reading the clock here is enough for Edit to be gone once the
+   * window has passed, however long the thread stays open. Nothing ticks: a
+   * window that closes while the menu is open is the API's refusal to give,
+   * shown in the sheet. The adapter holds the whole rule (the conversation's
+   * `editMessages`, the message's `editableUntil` and the unsent-message check)
+   * and is table-tested.
    */
   const canEdit = useCallback(
     (messageId: string) => {
-      if (readOnly) return false
       const message = messages.find((item) => item.id === messageId)
       if (!message) return false
-
-      return canEditMessage({
-        message,
-        outgoing: isOutgoing(message, viewer.id),
-        conversationType: conversation.type,
-        now: Date.now(),
-      })
+      return messageActions(conversation.access, message, Date.now()).edit
     },
-    [conversation.type, messages, readOnly, viewer.id],
+    [conversation.access, messages],
   )
 
   const openEditSheet = useCallback(

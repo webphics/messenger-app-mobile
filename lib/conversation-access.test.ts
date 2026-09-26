@@ -1,15 +1,16 @@
-import { composerView, parseAccess, UNKNOWN_ACCESS } from '@/lib/conversation-access'
+import { composerView, messageActions, parseAccess, UNKNOWN_ACCESS } from '@/lib/conversation-access'
+import type { Message } from '@/lib/types'
 
 /** `access` as the API sends it on a conversation this viewer may write in. */
 function openPayload() {
-  return { write: { state: 'open' }, actions: {} }
+  return { write: { state: 'open' }, actions: { editMessages: true } }
 }
 
 /** `access` as the API sends it on a conversation this viewer may only read. */
 function readOnlyPayload(write: Record<string, unknown>) {
   return {
     write: { state: 'read_only', holder: null, wayOut: null, ...write },
-    actions: {},
+    actions: { editMessages: false },
   }
 }
 
@@ -22,7 +23,10 @@ function composerFor(payload: unknown, writePolicy?: 'everyone' | 'admins' | 'na
 
 describe('parseAccess', () => {
   test('reads an open composer', () => {
-    expect(parseAccess(openPayload())).toEqual({ write: { state: 'open' }, actions: {} })
+    expect(parseAccess(openPayload())).toEqual({
+      write: { state: 'open' },
+      actions: { editMessages: true },
+    })
   })
 
   test('reads a read-only composer with its reason, holder and way out', () => {
@@ -30,15 +34,36 @@ describe('parseAccess', () => {
 
     expect(parseAccess(payload)).toEqual({
       write: { state: 'read_only', reason: 'must_take_over', holder: PRIYA, wayOut: 'take_over' },
-      actions: {},
+      actions: { editMessages: false },
     })
   })
 
   test('reads an absent holder and way out as none', () => {
-    expect(parseAccess({ write: { state: 'read_only', reason: 'conversation_closed' }, actions: {} })).toEqual({
+    expect(
+      parseAccess({
+        write: { state: 'read_only', reason: 'conversation_closed' },
+        actions: { editMessages: false },
+      }),
+    ).toEqual({
       write: { state: 'read_only', reason: 'conversation_closed', holder: null, wayOut: null },
-      actions: {},
+      actions: { editMessages: false },
     })
+  })
+
+  /*
+   * A Customer may still send in a closed Support DM, and may not edit there.
+   * The API says so with an open write and Edit off, and the two read apart.
+   */
+  test('reads an open write with editing off', () => {
+    expect(
+      parseAccess({ write: { state: 'open' }, actions: { editMessages: false } }),
+    ).toEqual({ write: { state: 'open' }, actions: { editMessages: false } })
+  })
+
+  test('keeps only the actions it knows', () => {
+    const payload = { write: { state: 'open' }, actions: { editMessages: true, pinMessages: true } }
+
+    expect(parseAccess(payload)).toEqual({ write: { state: 'open' }, actions: { editMessages: true } })
   })
 
   test('keeps only the holder fields it knows', () => {
@@ -67,10 +92,10 @@ describe('parseAccess', () => {
     ['null', null],
     ['a string', 'open'],
     ['an array', []],
-    ['no write', { actions: {} }],
-    ['a write that is not an object', { write: 'open', actions: {} }],
-    ['a write state it does not know', { write: { state: 'maybe' }, actions: {} }],
-    ['a read-only write with no reason', { write: { state: 'read_only' }, actions: {} }],
+    ['no write', { actions: { editMessages: true } }],
+    ['a write that is not an object', { write: 'open', actions: { editMessages: true } }],
+    ['a write state it does not know', { write: { state: 'maybe' }, actions: { editMessages: true } }],
+    ['a read-only write with no reason', { write: { state: 'read_only' }, actions: { editMessages: false } }],
     ['a reason it does not know', readOnlyPayload({ reason: 'must_wait' })],
     ['a way out it does not know', readOnlyPayload({ reason: 'must_engage', wayOut: 'claim' })],
     ['a way out that is not a string', readOnlyPayload({ reason: 'must_engage', wayOut: true })],
@@ -78,6 +103,10 @@ describe('parseAccess', () => {
     ['a holder that is not an object', readOnlyPayload({ reason: 'already_engaged', holder: 'Priya' })],
     ['no actions', { write: { state: 'open' } }],
     ['actions that are not an object', { write: { state: 'open' }, actions: [] }],
+    ['actions with no editMessages', { write: { state: 'open' }, actions: {} }],
+    ['an editMessages that is null', { write: { state: 'open' }, actions: { editMessages: null } }],
+    ['an editMessages that is a string', { write: { state: 'open' }, actions: { editMessages: 'true' } }],
+    ['an editMessages that is a number', { write: { state: 'open' }, actions: { editMessages: 1 } }],
     ['the unknown marker itself', UNKNOWN_ACCESS],
   ])('reads %s as unknown', (_case, payload) => {
     expect(parseAccess(payload)).toEqual({ kind: 'unknown' })
@@ -182,5 +211,77 @@ describe('composerView', () => {
 
   test('a missing access field renders the same as unknown', () => {
     expect(composerFor(undefined)).toEqual(composerView(UNKNOWN_ACCESS))
+  })
+})
+
+describe('messageActions', () => {
+  const NOW = Date.parse('2026-09-26T12:00:00.000Z')
+  /** The end of the author's window, a few minutes from now. */
+  const UNTIL = '2026-09-26T12:05:00.000Z'
+
+  /** A text message this viewer sent, as the API sends it with its edit window. */
+  function message(overrides: Partial<Message> = {}): Message {
+    return {
+      id: 'msg-1',
+      body: 'hello',
+      messageType: 'text',
+      createdAt: '2026-09-26T11:55:00.000Z',
+      editedAt: null,
+      editableUntil: UNTIL,
+      replyTo: null,
+      reactions: [],
+      attachments: [],
+      receiptStatus: 'sent',
+      fromCompany: false,
+      ...overrides,
+    } as Message
+  }
+
+  /** What the long-press menu offers on a message, read the way the thread screen reads it. */
+  function offersEdit(payload: unknown, overrides: Partial<Message> = {}, now = NOW) {
+    return messageActions(parseAccess(payload), message(overrides), now).edit
+  }
+
+  test('offers Edit inside the window when editing is on', () => {
+    expect(offersEdit(openPayload())).toBe(true)
+  })
+
+  test('offers Edit 1 ms before the window ends', () => {
+    expect(offersEdit(openPayload(), {}, Date.parse(UNTIL) - 1)).toBe(true)
+  })
+
+  test('does not offer Edit at exactly the end of the window', () => {
+    expect(offersEdit(openPayload(), {}, Date.parse(UNTIL))).toBe(false)
+  })
+
+  test('does not offer Edit after the window', () => {
+    expect(offersEdit(openPayload(), {}, Date.parse(UNTIL) + 60_000)).toBe(false)
+  })
+
+  /* Someone else's message, a voice note, a system notice, a broadcast: the API sends null. */
+  test('does not offer Edit on a message this viewer can never edit', () => {
+    expect(offersEdit(openPayload(), { editableUntil: null })).toBe(false)
+  })
+
+  test('does not offer Edit on a message this device has not sent yet', () => {
+    expect(offersEdit(openPayload(), { id: 'local-abc' })).toBe(false)
+  })
+
+  /* The Customer in a closed Support DM: still open to write, and not to edit. */
+  test('does not offer Edit when editing is off, even with an open composer', () => {
+    expect(offersEdit({ write: { state: 'open' }, actions: { editMessages: false } })).toBe(false)
+  })
+
+  test('does not offer Edit in a thread this viewer may only read', () => {
+    expect(offersEdit(readOnlyPayload({ reason: 'conversation_closed', wayOut: 'reopen' }))).toBe(false)
+  })
+
+  test('does not offer Edit while the access is unknown', () => {
+    expect(offersEdit(undefined)).toBe(false)
+    expect(messageActions(undefined, message(), NOW)).toEqual({ edit: false })
+  })
+
+  test('does not offer Edit on a window end it cannot read', () => {
+    expect(offersEdit(openPayload(), { editableUntil: 'soon' })).toBe(false)
   })
 })

@@ -30,6 +30,7 @@ function staffMessage(
     messageType: 'text',
     createdAt,
     editedAt: null,
+    editableUntil: null,
     replyTo: null,
     reactions: [],
     attachments: [],

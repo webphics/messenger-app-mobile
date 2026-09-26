@@ -1,5 +1,6 @@
 import { asRecord } from '@/lib/api-envelope'
-import type { GroupWritePolicy } from '@/lib/types'
+import { isLocalId } from '@/lib/thread-state'
+import type { GroupWritePolicy, Message } from '@/lib/types'
 
 /**
  * The Conversation access adapter: what this viewer may do in a conversation,
@@ -25,9 +26,9 @@ import type { GroupWritePolicy } from '@/lib/types'
  * out, until the launch refetch replaces the row. There is no fallback to the
  * old client-side rules.
  *
- * Two entry points: `parseAccess` for the payload, and a view per surface
- * (`composerView` today). Later tickets add the thread actions and the
- * per-message Edit and Delete answers here.
+ * Two entry points: `parseAccess` for the payload, and a view per surface:
+ * `composerView` for the composer and `messageActions` for what one message
+ * offers. Later tickets add the thread actions and Delete here.
  */
 
 /** Why a viewer may only read, in the API's own refusal codes. */
@@ -57,8 +58,12 @@ export type WriteAccess =
       wayOut: WayOut | null
     }
 
-/** The offered actions. No keys yet: later tickets add one boolean per action. */
-export type AccessActions = Record<string, never>
+/**
+ * The offered actions, one boolean each. `editMessages` is the first: on when
+ * the viewer may write here and the conversation is not a closed Support DM.
+ * Later tickets add the rest.
+ */
+export type AccessActions = { editMessages: boolean }
 
 /** `access` as the API sends it, read into this client's type. */
 export type KnownAccess = { write: WriteAccess; actions: AccessActions }
@@ -112,6 +117,17 @@ function writeAccess(value: unknown): WriteAccess | null {
 }
 
 /**
+ * The actions this build knows, each a boolean, or null. An action the API
+ * added after this build is dropped rather than failing the whole answer: not
+ * offering something this build cannot word or wire is the safe side.
+ */
+function accessActions(value: unknown): AccessActions | null {
+  const record = asRecord(value)
+  if (!record || typeof record.editMessages !== 'boolean') return null
+  return { editMessages: record.editMessages }
+}
+
+/**
  * The payload's `access`, or unknown.
  *
  * Strict on purpose. A reason or a way out this build does not know is a rule
@@ -125,9 +141,10 @@ export function parseAccess(value: unknown): ConversationAccess {
   if (!record) return UNKNOWN_ACCESS
 
   const write = writeAccess(record.write)
-  if (!write || !asRecord(record.actions)) return UNKNOWN_ACCESS
+  const actions = accessActions(record.actions)
+  if (!write || !actions) return UNKNOWN_ACCESS
 
-  return { write, actions: {} }
+  return { write, actions }
 }
 
 /** A button that gets a read-only viewer to a composer. */
@@ -208,4 +225,35 @@ export function composerView(
     reason: reasonText(write, presentation),
     wayOut: write.wayOut ? { wayOut: write.wayOut, label: WAY_OUT_LABELS[write.wayOut] } : null,
   }
+}
+
+/** What one message offers in the long-press menu. Later tickets add Delete. */
+export type MessageActionsView = { edit: boolean }
+
+/**
+ * What this message offers this viewer at `now`.
+ *
+ * Edit needs the conversation's `editMessages`, which the API turns off where
+ * the viewer may not write and in a closed Support DM, and `now` strictly
+ * before the message's `editableUntil`, which covers authorship, message type,
+ * broadcasts and the fifteen-minute window. At exactly `editableUntil` the API
+ * refuses, so the menu does too.
+ *
+ * The one fact only this client knows: a message with a local id has not
+ * reached the API yet and has nothing there to edit. Retry or delete is the
+ * remedy for one of those.
+ *
+ * `now` is a parameter so one pass judges every row against one instant, and
+ * so the boundary can be tested. Unknown access offers nothing.
+ */
+export function messageActions(
+  access: ConversationAccess | undefined,
+  message: Message,
+  now: number,
+): MessageActionsView {
+  if (!access || !isKnownAccess(access) || !access.actions.editMessages) return { edit: false }
+  if (isLocalId(message.id) || message.editableUntil === null) return { edit: false }
+
+  const until = Date.parse(message.editableUntil)
+  return { edit: !Number.isNaN(until) && now < until }
 }

@@ -563,10 +563,12 @@ export function draftMessage(draft: MessageDraft): Message {
     body: draft.body,
     messageType: attachments.length > 0 ? ('media' as const) : ('text' as const),
     createdAt: draft.sentAt ?? new Date().toISOString(),
-    // Nothing this device is still carrying has been edited: a message has to
-    // reach the API before it can be rewritten, and `canEditMessage` refuses a
-    // `local-` id for exactly that reason.
+    // Nothing this device is still carrying has been edited, and none of it can
+    // be yet: a message has to reach the API before it can be rewritten, and
+    // `messageActions` in `lib/conversation-access` refuses a `local-` id for
+    // exactly that reason. The API sends the real window with the sent copy.
     editedAt: null,
+    editableUntil: null,
     replyTo: draft.replyTo
       ? { id: draft.replyTo.id, preview: draft.replyTo.body.slice(0, REPLY_PREVIEW_LENGTH) }
       : null,

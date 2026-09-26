@@ -836,6 +836,7 @@ function message(id: string, minute: number, overrides: Partial<CustomerMessage>
     messageType: 'text',
     createdAt: at,
     editedAt: null,
+    editableUntil: null,
     replyTo: null,
     reactions: [],
     attachments: [],

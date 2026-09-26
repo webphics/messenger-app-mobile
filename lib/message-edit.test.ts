@@ -1,9 +1,4 @@
-import {
-  MESSAGE_EDIT_WINDOW_MS,
-  canEditMessage,
-  messageEditRefusal,
-  withRefreshedQuotes,
-} from '@/lib/message-edit'
+import { messageEditRefusal, withRefreshedQuotes } from '@/lib/message-edit'
 import type { Message, MessageType } from '@/lib/types'
 
 const NOW = Date.parse('2026-09-21T12:00:00.000Z')
@@ -15,6 +10,7 @@ function message(overrides: Partial<Message> = {}): Message {
     messageType: 'text' as MessageType,
     createdAt: new Date(NOW - 60_000).toISOString(),
     editedAt: null,
+    editableUntil: null,
     replyTo: null,
     reactions: [],
     attachments: [],
@@ -23,66 +19,6 @@ function message(overrides: Partial<Message> = {}): Message {
     ...overrides,
   } as Message
 }
-
-describe('canEditMessage', () => {
-  test('a text message you sent a minute ago', () => {
-    expect(canEditMessage({ message: message(), outgoing: true, now: NOW })).toBe(true)
-  })
-
-  test('somebody else wrote it', () => {
-    expect(canEditMessage({ message: message(), outgoing: false, now: NOW })).toBe(false)
-  })
-
-  test('this device is still carrying it', () => {
-    expect(
-      canEditMessage({ message: message({ id: 'local-abc' }), outgoing: true, now: NOW }),
-    ).toBe(false)
-  })
-
-  test.each<MessageType>(['media', 'voice', 'system'])('%s has no body to edit', (messageType) => {
-    expect(canEditMessage({ message: message({ messageType }), outgoing: true, now: NOW })).toBe(
-      false,
-    )
-  })
-
-  test('an announcement is read-only even for the Admin who sent it', () => {
-    expect(
-      canEditMessage({
-        message: message(),
-        outgoing: true,
-        conversationType: 'broadcast_inbox',
-        now: NOW,
-      }),
-    ).toBe(false)
-  })
-
-  test('the last instant of the window is still inside it', () => {
-    const sent = new Date(NOW - MESSAGE_EDIT_WINDOW_MS).toISOString()
-    expect(canEditMessage({ message: message({ createdAt: sent }), outgoing: true, now: NOW })).toBe(
-      true,
-    )
-  })
-
-  test('one millisecond past the window is not', () => {
-    const sent = new Date(NOW - MESSAGE_EDIT_WINDOW_MS - 1).toISOString()
-    expect(canEditMessage({ message: message({ createdAt: sent }), outgoing: true, now: NOW })).toBe(
-      false,
-    )
-  })
-
-  test('a message dated in the future is not refused for it', () => {
-    const sent = new Date(NOW + 5_000).toISOString()
-    expect(canEditMessage({ message: message({ createdAt: sent }), outgoing: true, now: NOW })).toBe(
-      true,
-    )
-  })
-
-  test('an unparseable timestamp refuses rather than throwing', () => {
-    expect(
-      canEditMessage({ message: message({ createdAt: 'not a date' }), outgoing: true, now: NOW }),
-    ).toBe(false)
-  })
-})
 
 describe('messageEditRefusal', () => {
   test("a refusal keeps the API's own sentence", () => {

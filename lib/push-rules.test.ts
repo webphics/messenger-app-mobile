@@ -93,6 +93,7 @@ describe('an arriving message', () => {
     messageType: 'text',
     createdAt: '2026-08-13T08:00:00.000Z',
     editedAt: null,
+    editableUntil: null,
     replyTo: null,
     reactions: [],
     attachments: [],

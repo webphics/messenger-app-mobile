@@ -220,6 +220,7 @@ function staffMessage(
     messageType: extra.attachments?.length ? 'media' : 'text',
     createdAt,
     editedAt: null,
+    editableUntil: null,
     replyTo: null,
     reactions: [],
     attachments: [],

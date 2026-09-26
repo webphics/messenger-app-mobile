@@ -294,6 +294,7 @@ describe('parseMessage', () => {
       messageType: 'text',
       createdAt: '2026-08-13T08:00:00.000Z',
       editedAt: null,
+      editableUntil: null,
       replyTo: null,
       reactions: [],
       attachments: [],
@@ -313,6 +314,23 @@ describe('parseMessage', () => {
   test('an unreadable edit stamp reads as never edited', () => {
     const message = parseMessage(messageRow({ fromCompany: true, editedAt: 'whenever' }))
     expect(message?.editedAt).toBeNull()
+  })
+
+  test("reads the end of this viewer's edit window", () => {
+    const message = parseMessage(
+      messageRow({ fromCompany: false, editableUntil: '2026-08-13T08:15:00.000Z' }),
+    )
+    expect(message?.editableUntil).toBe('2026-08-13T08:15:00.000Z')
+  })
+
+  test.each([
+    ['null, a message this viewer can never edit', null],
+    ['missing, an API from before the field', undefined],
+    ['not a date', 'in a while'],
+    ['not a string', 1755072900000],
+    ['empty', ''],
+  ])('reads an edit window that is %s as no Edit', (_case, editableUntil) => {
+    expect(parseMessage(messageRow({ fromCompany: false, editableUntil }))?.editableUntil).toBeNull()
   })
 
   test('reads a message with a sender as the staff shape', () => {
@@ -489,9 +507,9 @@ describe('parseConversation, reading access', () => {
       holder: { id: 'agent-2', name: 'Priya Raman' },
       wayOut: null,
     },
-    actions: {},
+    actions: { editMessages: false },
   }
-  const OPEN = { write: { state: 'open' }, actions: {} }
+  const OPEN = { write: { state: 'open' }, actions: { editMessages: true } }
 
   const customerGroupRow = (overrides: Record<string, unknown> = {}) => ({
     ...customerSupportRow(),
@@ -511,21 +529,21 @@ describe('parseConversation, reading access', () => {
     [
       "a Customer's group",
       customerGroupRow({
-        access: { write: { state: 'read_only', reason: 'group_write_restricted' }, actions: {} },
+        access: { write: { state: 'read_only', reason: 'group_write_restricted' }, actions: { editMessages: false } },
       }),
       {
         write: { state: 'read_only', reason: 'group_write_restricted', holder: null, wayOut: null },
-        actions: {},
+        actions: { editMessages: false },
       },
     ],
     [
       'an Announcements thread',
       broadcastInboxRow({
-        access: { write: { state: 'read_only', reason: 'broadcast_inbox_read_only' }, actions: {} },
+        access: { write: { state: 'read_only', reason: 'broadcast_inbox_read_only' }, actions: { editMessages: false } },
       }),
       {
         write: { state: 'read_only', reason: 'broadcast_inbox_read_only', holder: null, wayOut: null },
-        actions: {},
+        actions: { editMessages: false },
       },
     ],
   ])('keeps the access on %s', (_case, payload, access) => {
@@ -543,7 +561,7 @@ describe('parseConversation, reading access', () => {
 
   test('reads a malformed access as unknown and keeps the row', () => {
     const conversation = parseConversation(
-      staffRow({ access: { write: { state: 'read_only', reason: 'must_wait' }, actions: {} } }),
+      staffRow({ access: { write: { state: 'read_only', reason: 'must_wait' }, actions: { editMessages: false } } }),
     )
 
     expect(conversation).toMatchObject({ id: 'conv-1', access: { kind: 'unknown' } })

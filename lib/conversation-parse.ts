@@ -352,6 +352,9 @@ export function parseMessage(value: unknown): Message | null {
     // Absent on a message written before the field existed, and on every message
     // nobody has rewritten — both read as null, which is the same thing here.
     editedAt: timestamp(record.editedAt) ?? null,
+    // This viewer's edit window, or null for "never". Absent (an API from before
+    // the field) and unreadable read as null too, so the answer is no Edit.
+    editableUntil: timestamp(record.editableUntil) ?? null,
     replyTo: replyTo(record.replyTo),
     reactions: records(record.reactions).flatMap((item) => {
       const parsed = reaction(item)

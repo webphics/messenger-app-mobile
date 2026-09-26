@@ -172,6 +172,7 @@ describe('parseMessageCreated', () => {
       messageType: 'text',
       createdAt: '2026-09-03T20:22:05.789Z',
       editedAt: null,
+      editableUntil: null,
       fromCompany: true,
       replyTo: null,
       reactions: [],
@@ -505,7 +506,7 @@ describe('parseConversationUpdated, reading access', () => {
   it('keeps the access the per-viewer event carries', () => {
     const access = {
       write: { state: 'read_only', reason: 'conversation_closed', holder: null, wayOut: 'reopen' },
-      actions: {},
+      actions: { editMessages: false },
     }
     const payload = { conversation: { ...STAFF_CONVERSATION_UPDATED.conversation, access } }
 

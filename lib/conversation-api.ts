@@ -291,9 +291,10 @@ export async function addReaction(
 /**
  * Rewrites the body of a message this person sent.
  *
- * Author-only on the API, and only within its fifteen-minute window —
- * `canEditMessage` mirrors both so the menu item is absent rather than offered
- * and refused. Answers the whole updated `Message`, the same shape a reaction
+ * Author-only on the API, and only within its fifteen-minute window. The API
+ * sends both as the message's `editableUntil`, and `messageActions` in
+ * `lib/conversation-access` reads it so the menu item is absent rather than
+ * offered and refused. Answers the whole updated `Message`, the same shape a reaction
  * does, so it merges into the thread by id like any other copy of it.
  *
  * The body is sent untrimmed by no one: the caller trims, because the sheet has

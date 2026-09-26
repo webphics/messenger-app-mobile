@@ -42,8 +42,9 @@ type MessageActionsProps = {
   onInfo?: () => void;
   /**
    * Rewrite the message. Absent on anybody else's, on one still being carried,
-   * on anything that is not text, and once the API's edit window has closed —
-   * `canEditMessage` decides all four, so this is offered only where it works.
+   * on anything that is not text, where the conversation's access turns editing
+   * off, and once the API's edit window has closed. `messageActions` in
+   * `lib/conversation-access` decides, so this is offered only where it works.
    */
   onEdit?: () => void;
 };

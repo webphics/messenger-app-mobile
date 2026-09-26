@@ -336,6 +336,14 @@ type MessageBase = {
    * because somebody fixed a typo.
    */
   editedAt: string | null
+  /**
+   * When this viewer's window to rewrite this message ends, as an ISO instant,
+   * or null when this viewer can never edit it: somebody else's message, one
+   * that is not text, or a broadcast. The API computes it per viewer, so the
+   * fifteen minutes are defined there and nowhere here. Edit is offered only
+   * strictly before it; see `messageActions` in `lib/conversation-access`.
+   */
+  editableUntil: string | null
   replyTo: MessageReplyTo | null
   reactions: MessageReaction[]
   attachments: MessageAttachment[]

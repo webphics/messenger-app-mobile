@@ -280,7 +280,7 @@ describe('fromConversationRows', () => {
         holder: { id: 'agent-1', name: 'Grace Hopper' },
         wayOut: 'take_over' as const,
       },
-      actions: {},
+      actions: { editMessages: false },
     }
 
     const { conversations } = fromConversationRows(
@@ -359,6 +359,7 @@ function customerMessage(
     messageType: 'text',
     createdAt,
     editedAt: null,
+    editableUntil: null,
     replyTo: null,
     reactions: [],
     attachments: [],
@@ -379,6 +380,7 @@ function staffMessage(
     messageType: 'text',
     createdAt,
     editedAt: null,
+    editableUntil: null,
     replyTo: null,
     reactions: [],
     attachments: [],
@@ -488,6 +490,32 @@ describe('fromMessageRows', () => {
     })
 
     expect(fromMessageRows(toMessageRows('viewer-1', 'conv-1', [written]))).toEqual([written])
+  })
+
+  /*
+   * The row is the parsed Message's own JSON, so the edit window rides in it
+   * with no schema change and no version bump. A version bump deletes the
+   * database, the Outbox with it.
+   */
+  it('keeps the edit window a Message was written with', () => {
+    const written = staffMessage('msg-1', '2026-08-13T08:00:00.000Z', {
+      editableUntil: '2026-08-13T08:15:00.000Z',
+    })
+
+    const [read] = fromMessageRows(toMessageRows('viewer-1', 'conv-1', [written]))
+
+    expect(read.editableUntil).toBe('2026-08-13T08:15:00.000Z')
+    expect(read).toEqual(written)
+  })
+
+  it('reads a row written without an edit window as no Edit', () => {
+    const { editableUntil: _dropped, ...older } = customerMessage('msg-1', '2026-08-13T08:00:00.000Z', {
+      editableUntil: '2026-08-13T08:15:00.000Z',
+    })
+
+    const [read] = fromMessageRows([messageRow({ payload: JSON.stringify(older) })])
+
+    expect(read.editableUntil).toBeNull()
   })
 
   /**
