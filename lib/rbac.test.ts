@@ -1,10 +1,5 @@
 import {
   canAccessUnassignedPool,
-  canAssignConversation,
-  canBroadcast,
-  canDeleteConversation,
-  canDeleteMessage,
-  canManageUsers,
   canSeeInternalNotes,
   canViewConversation,
 } from '@/lib/rbac'
@@ -145,30 +140,9 @@ describe('role matrix', () => {
     expect(canSeeInternalNotes('admin')).toBe(true)
   })
 
-  test('delete message and conversation — admin only', () => {
-    expect(canDeleteMessage('customer')).toBe(false)
-    expect(canDeleteMessage('agent')).toBe(false)
-    expect(canDeleteMessage('admin')).toBe(true)
-    expect(canDeleteConversation('customer')).toBe(false)
-    expect(canDeleteConversation('agent')).toBe(false)
-    expect(canDeleteConversation('admin')).toBe(true)
-  })
-
-  test('assign, broadcast, manage users — admin only', () => {
-    expect(canAssignConversation('customer')).toBe(false)
-    expect(canAssignConversation('agent')).toBe(false)
-    expect(canAssignConversation('admin')).toBe(true)
-    expect(canBroadcast('customer')).toBe(false)
-    expect(canBroadcast('agent')).toBe(false)
-    expect(canBroadcast('admin')).toBe(true)
-    expect(canManageUsers('customer')).toBe(false)
-    expect(canManageUsers('agent')).toBe(false)
-    expect(canManageUsers('admin')).toBe(true)
-  })
-
   test('unknown role throws', () => {
     const bad = 'superuser' as UserRole
-    expect(() => canBroadcast(bad)).toThrow(/unknown role/i)
+    expect(() => canSeeInternalNotes(bad)).toThrow(/unknown role/i)
     expect(() => canViewConversation(bad, 'x', staffConversation() as Conversation)).toThrow(/unknown role/i)
   })
 })

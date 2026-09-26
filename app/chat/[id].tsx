@@ -308,7 +308,12 @@ function ConversationScreen({
     <ThreadScreen
       conversation={conversation}
       messages={thread.messages}
-      viewer={{ id: user.id, name: user.name, role: user.role }}
+      viewer={{
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        capabilities: user.capabilities,
+      }}
       supportAssignment={supportAssignment}
       initialDraft={initialDraft}
       organizationNames={inbox.organizationNames}

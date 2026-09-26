@@ -22,6 +22,7 @@ import { InScreenHeader } from '@/components/in-screen-header'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { attachmentViews, primaryAttachmentView } from '@/lib/attachment-view'
+import { can, type Capability } from '@/lib/capabilities'
 import { chatMessageInfoHref } from '@/lib/chat-route-id'
 import { readStampLabel } from '@/lib/message-read-stamp'
 import { useMessageReceipts } from '@/lib/use-message-receipts'
@@ -65,6 +66,8 @@ export type ThreadViewer = {
   id: string
   name: string
   role: UserRole
+  /** The session's effective set, for controls the API gates on a capability. */
+  capabilities: readonly Capability[]
 }
 
 type ThreadScreenProps = {
@@ -440,12 +443,13 @@ export function ThreadScreen({
    */
   const savedResponsesOrganizationId =
     viewer.role !== 'customer' ? conversation.organizationId : null
+  const canManageSavedResponses = can(viewer, 'manage_canned_replies')
   const savedResponses = useMemo(
     () =>
       savedResponsesOrganizationId
-        ? { organizationId: savedResponsesOrganizationId, canManage: viewer.role === 'admin' }
+        ? { organizationId: savedResponsesOrganizationId, canManage: canManageSavedResponses }
         : null,
-    [savedResponsesOrganizationId, viewer.role],
+    [savedResponsesOrganizationId, canManageSavedResponses],
   )
   const rows = useMemo(
     () => buildThreadRows(messages, { viewerId: viewer.id, namesSenders: isGroup }),

@@ -19,7 +19,7 @@ import { HubScroll } from "@/components/hub/hub-scroll";
 import { Pill } from "@/components/hub/pill";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { Text } from "@/components/ui/text";
-import { can } from "@/lib/capabilities";
+import { can, canAny } from "@/lib/capabilities";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { useConversationInbox } from "@/lib/conversation-inbox";
@@ -185,14 +185,17 @@ export function AdminHub() {
             onPress={() => router.push("/(admin)/organizations" as Href)}
           />
         ) : null}
-        <ActionRow
-          icon={Users}
-          tone="neutral"
-          title="Accounts"
-          hint="Create, invite, change roles, ban, sign out"
-          accessibilityLabel="Accounts"
-          onPress={() => router.push("/(admin)/users" as Href)}
-        />
+        {/* The Users API answers holders of any of these three, as the web Users page does. */}
+        {canAny(me, ["manage_users", "change_roles", "manage_permissions"]) ? (
+          <ActionRow
+            icon={Users}
+            tone="neutral"
+            title="Accounts"
+            hint="Create, invite, change roles, ban, sign out"
+            accessibilityLabel="Accounts"
+            onPress={() => router.push("/(admin)/users" as Href)}
+          />
+        ) : null}
         {/* Creating and editing labels needs `manage_labels`. */}
         {can(me, "manage_labels") ? (
           <ActionRow
@@ -204,14 +207,17 @@ export function AdminHub() {
             onPress={() => router.push("/(admin)/labels" as Href)}
           />
         ) : null}
-        <ActionRow
-          icon={MessageSquare}
-          tone="neutral"
-          title="Saved responses"
-          hint="Answers agents insert from the composer"
-          accessibilityLabel="Saved responses"
-          onPress={() => router.push("/(admin)/saved-responses" as Href)}
-        />
+        {/* This screen writes the library. Reading it happens in the composer, open to all staff. */}
+        {can(me, "manage_canned_replies") ? (
+          <ActionRow
+            icon={MessageSquare}
+            tone="neutral"
+            title="Saved responses"
+            hint="Answers agents insert from the composer"
+            accessibilityLabel="Saved responses"
+            onPress={() => router.push("/(admin)/saved-responses" as Href)}
+          />
+        ) : null}
       </View>
 
       {/* Admin Actions */}

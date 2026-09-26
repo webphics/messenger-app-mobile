@@ -82,28 +82,3 @@ export function canSeeInternalNotes(role: UserRole): boolean {
   assertRole(role)
   return role === 'agent' || role === 'admin'
 }
-
-export function canDeleteMessage(role: UserRole): boolean {
-  assertRole(role)
-  return role === 'admin'
-}
-
-export function canDeleteConversation(role: UserRole): boolean {
-  assertRole(role)
-  return role === 'admin'
-}
-
-export function canAssignConversation(role: UserRole): boolean {
-  assertRole(role)
-  return role === 'admin'
-}
-
-export function canBroadcast(role: UserRole): boolean {
-  assertRole(role)
-  return role === 'admin'
-}
-
-export function canManageUsers(role: UserRole): boolean {
-  assertRole(role)
-  return role === 'admin'
-}
