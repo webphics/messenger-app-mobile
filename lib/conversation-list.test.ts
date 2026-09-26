@@ -455,6 +455,20 @@ describe('withIncomingMessage', () => {
       expect(withIncomingMessage(held, 'conv-1', notice, 'agent-1')[0].unreadCount).toBeNull()
     })
 
+    test('the onboarding welcome counts, as the API counts it', () => {
+      const welcome = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
+        messageType: 'system',
+        addressedToCustomer: true,
+        body: 'Welcome to JoyChat.',
+        sender: { id: 'customer-1', name: 'Mina', role: 'customer' },
+      })
+
+      expect(withIncomingMessage(staffRows, 'conv-1', welcome, 'agent-1')[0]).toMatchObject({
+        unreadCount: 3,
+        lastMessageRead: false,
+      })
+    })
+
     test('the tab badge does not move for a notice', () => {
       const notice = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
         messageType: 'system',

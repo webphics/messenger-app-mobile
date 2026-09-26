@@ -3,6 +3,7 @@ import {
   parseConversations,
   parseMessage,
   parseMessages,
+  parseNotes,
   parseOrganizations,
   parseStaffDirectory,
 } from '@/lib/conversation-parse'
@@ -576,5 +577,43 @@ describe('parseConversation, reading access', () => {
     const conversation = parseConversation(customerGroupRow({ canWrite: false, access: OPEN }))
 
     expect(conversation?.access).toEqual(OPEN)
+  })
+})
+
+describe('parseNotes', () => {
+  const note = (overrides: Record<string, unknown> = {}) => ({
+    id: 'note-1',
+    text: 'This is a scammer',
+    author: { id: 'agent-1', name: 'Rizwan Manzoor' },
+    messageId: null,
+    editedAt: null,
+    deletedAt: null,
+    deletedBy: null,
+    access: { edit: true, delete: true },
+    createdAt: '2026-09-25T07:41:00.000Z',
+    ...overrides,
+  })
+
+  it('reads a live note, ignoring the fields this app does not use yet', () => {
+    expect(parseNotes([note({ editedAt: '2026-09-26T11:02:10.000Z' })])).toEqual([
+      {
+        id: 'note-1',
+        text: 'This is a scammer',
+        author: { id: 'agent-1', name: 'Rizwan Manzoor' },
+        messageId: null,
+        createdAt: expect.anything(),
+      },
+    ])
+  })
+
+  it('drops a deleted note rather than showing its last wording as live', () => {
+    const tombstone = note({
+      id: 'note-2',
+      deletedAt: '2026-09-26T11:05:43.000Z',
+      deletedBy: { id: 'admin-1', name: 'Tajbin Khan' },
+      access: { edit: false, delete: false },
+    })
+
+    expect(parseNotes([note(), tombstone]).map((parsed) => parsed.id)).toEqual(['note-1'])
   })
 })

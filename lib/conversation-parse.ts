@@ -476,10 +476,16 @@ export function parseLabel(value: unknown): Label | null {
  * The author is required, unlike most of what is optional here: a note with
  * nobody's name on it is not a note anyone can weigh, and dropping the row is
  * more honest than attributing it to nobody.
+ *
+ * A deleted note is dropped too. The API keeps it in the list as a tombstone
+ * with its last wording still in `text`, and this app has no tombstone row
+ * yet, so reading it as a live note would put words back on screen that a
+ * colleague deleted.
  */
 export function parseNote(value: unknown): ConversationNote | null {
   const record = asRecord(value)
   if (!record) return null
+  if (record.deletedAt != null) return null
 
   const id = text(record.id)
   const body = text(record.text)

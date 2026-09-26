@@ -216,7 +216,7 @@ export function withIncomingMessage(
  * ever exercise — the API withholds notices from a Customer's socket. An
  * Engage, a Takeover or a Transfer is the thread's record of something that
  * happened rather than something a person has to answer, and the API counts it
- * that way: `countUnreadMessagesFor` excludes `system` outright. Counting one
+ * that way: `countUnreadMessagesFor` excludes those notices. Counting one
  * here would raise a staff badge that the next list fetch takes straight back
  * down, which is the one divergence a live count can afford least.
  *
@@ -231,7 +231,10 @@ function nextUnreadCount(
   mine: boolean,
 ): number | null {
   if (held === null) return null
-  if (mine || isSystemMessage(message)) return held
+  if (mine) return held
+  // The onboarding welcome is a notice written for the Customer, and the API
+  // counts it as unread for everyone until they read it.
+  if (isSystemMessage(message) && !message.addressedToCustomer) return held
   return held + 1
 }
 
