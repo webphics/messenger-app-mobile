@@ -24,6 +24,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AttachmentSheet } from '@/components/chat/attachment-sheet'
+import { SavedResponsePicker } from '@/components/chat/saved-response-picker'
 import { VideoThumb } from '@/components/chat/video-thumb'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
 import { Waveform } from '@/components/chat/waveform'
@@ -35,6 +36,7 @@ import {
   fileNameFromUri,
   formatBytes,
 } from '@/lib/attachments'
+import { insertCannedReply } from '@/lib/canned-reply-library'
 import {
   downsamplePeaks,
   formatDurationMs,
@@ -73,6 +75,12 @@ type ComposerProps = {
   onCancelReply?: () => void
   /** Overlap the thread already lifted the composer by; see lib/keyboard-inset.ts. */
   keyboardInset?: number
+  /**
+   * Whose saved responses the + sheet offers, or null for none. Staff only — the
+   * API refuses a Customer's read — and only in a thread that belongs to an
+   * organization, since a response is always one organization's.
+   */
+  savedResponses?: { organizationId: string; canManage: boolean } | null
 }
 
 const RECORD_OPTIONS = {
@@ -169,10 +177,19 @@ export function Composer({
   replyTo,
   onCancelReply,
   keyboardInset = 0,
+  savedResponses = null,
 }: ComposerProps) {
   const insets = useSafeAreaInsets()
   const reduceMotion = useReducedMotion()
   const [attachOpen, setAttachOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  /** Set by the + sheet's Saved responses row; read once that sheet has closed. */
+  const pickerAfterSheetRef = useRef(false)
+  /**
+   * Where the caret was last, so a saved response lands where the person was
+   * typing. Kept in a ref: it changes on every keystroke and nothing draws it.
+   */
+  const selectionRef = useRef<{ start: number; end: number } | null>(null)
   const [staged, setStaged] = useState<AttachmentView | null>(null)
   const [recording, setRecording] = useState(false)
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -396,6 +413,20 @@ export function Composer({
     setStaged(attachment)
   }
 
+  function handleCloseAttach() {
+    setAttachOpen(false)
+    if (!pickerAfterSheetRef.current) return
+    pickerAfterSheetRef.current = false
+    setPickerOpen(true)
+  }
+
+  function handleInsertSavedResponse(body: string) {
+    const next = insertCannedReply(value, selectionRef.current, body)
+    onChangeText(next.text)
+    selectionRef.current = { start: next.caret, end: next.caret }
+    setPickerOpen(false)
+  }
+
   function handleSend() {
     if (recording) return
     const body = value.trim()
@@ -511,6 +542,9 @@ export function Composer({
             <Input
               value={value}
               onChangeText={onChangeText}
+              onSelectionChange={(event) => {
+                selectionRef.current = event.nativeEvent.selection
+              }}
               placeholder={replyTo ? 'Write a reply…' : 'Type a message…'}
               accessibilityLabel="Message"
               multiline
@@ -545,13 +579,30 @@ export function Composer({
 
       <AttachmentSheet
         visible={attachOpen}
-        onClose={() => setAttachOpen(false)}
+        onClose={handleCloseAttach}
         onPicked={handlePicked}
         onInsertText={(text) => {
           if (!value.trim()) onChangeText(text)
           else onChangeText(`${value} ${text}`)
         }}
+        onOpenSavedResponses={
+          savedResponses
+            ? () => {
+                pickerAfterSheetRef.current = true
+              }
+            : undefined
+        }
       />
+
+      {savedResponses ? (
+        <SavedResponsePicker
+          visible={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          organizationId={savedResponses.organizationId}
+          canManage={savedResponses.canManage}
+          onSelect={(reply) => handleInsertSavedResponse(reply.body)}
+        />
+      ) : null}
     </View>
   )
 }

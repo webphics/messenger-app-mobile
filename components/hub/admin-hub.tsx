@@ -5,6 +5,7 @@ import {
   // BookOpen, // hidden with Knowledge
   Building2,
   MessageCircle,
+  MessageSquare,
   Plus,
   ShieldCheck,
   Tags,
@@ -194,6 +195,14 @@ export function AdminHub() {
           hint="The vocabulary every staff member can put on a conversation"
           accessibilityLabel="Labels"
           onPress={() => router.push("/(admin)/labels" as Href)}
+        />
+        <ActionRow
+          icon={MessageSquare}
+          tone="neutral"
+          title="Saved responses"
+          hint="Answers agents insert from the composer"
+          accessibilityLabel="Saved responses"
+          onPress={() => router.push("/(admin)/saved-responses" as Href)}
         />
       </View>
 

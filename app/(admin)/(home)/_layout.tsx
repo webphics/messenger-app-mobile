@@ -13,6 +13,7 @@ export default function AdminHomeLayout() {
       <Stack.Screen name="organization/[id]" options={{ title: "Members" }} />
       <Stack.Screen name="users" options={{ title: "Accounts" }} />
       <Stack.Screen name="labels" options={{ title: "Labels" }} />
+      <Stack.Screen name="saved-responses" options={{ title: "Saved responses" }} />
       {/* FAQ and Knowledge are hidden for now. These lines only set a
           screen's title; the route files stay where they are, so uncommenting
           is the whole of putting them back. */}

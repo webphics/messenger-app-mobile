@@ -985,3 +985,16 @@ export type AccountSession = {
   /** Last touched, which is as close to "last used" as the API keeps. */
   updatedAt: string
 }
+
+/**
+ * A saved response, from `GET /canned-replies`: text an Agent inserts from the
+ * composer instead of retyping it. It belongs to one organization for good, so
+ * `organizationId` is read and never written back.
+ */
+export type CannedReply = {
+  id: string
+  organizationId: string
+  title: string
+  body: string
+  archived: boolean
+}

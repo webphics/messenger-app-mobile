@@ -2,6 +2,7 @@ import {
   Camera,
   FileText,
   Image as ImageIcon,
+  MessageSquare,
   // Sparkles, // hidden with Quick Response
   X,
 } from '@/components/icons'
@@ -55,11 +56,19 @@ type AttachmentSheetProps = {
   onClose: () => void
   onPicked: (attachment: AttachmentView) => void
   onInsertText: (text: string) => void
+  /**
+   * Offered only where the composer can use saved responses: staff, in a thread
+   * that belongs to an organization. Called once the sheet has finished closing,
+   * because Android and iOS will not raise the picker's own window over one that
+   * is still animating out.
+   */
+  onOpenSavedResponses?: () => void
 }
 
 /**
  * `pick` options open a native picker and resolve to a real Attachment;
- * `insert` options are pure text (quick replies).
+ * `insert` options are pure text (quick replies); `open` options hand off to a
+ * screen of their own once this sheet has gone.
  */
 type AttachmentOption =
   | {
@@ -69,6 +78,7 @@ type AttachmentOption =
       icon: typeof ImageIcon
       pick: () => Promise<AttachmentOutcome>
       insertText?: never
+      open?: never
     }
   | {
       id: string
@@ -77,6 +87,16 @@ type AttachmentOption =
       icon: typeof ImageIcon
       pick?: never
       insertText: string
+      open?: never
+    }
+  | {
+      id: string
+      title: string
+      subtitle: string
+      icon: typeof ImageIcon
+      pick?: never
+      insertText?: never
+      open: 'saved-responses'
     }
 
 const ATTACHMENT_OPTIONS: AttachmentOption[] = [
@@ -113,6 +133,18 @@ const ATTACHMENT_OPTIONS: AttachmentOption[] = [
   //   insertText: 'Hi there! Thanks for reaching out. How can I assist you today?',
   // },
 ]
+
+/**
+ * What replaced the hidden Quick Response above: the organization's real saved
+ * responses rather than one sentence written into the build.
+ */
+const SAVED_RESPONSES_OPTION: AttachmentOption = {
+  id: 'saved-responses',
+  title: 'Saved responses',
+  subtitle: 'Insert an answer your team has saved',
+  icon: MessageSquare,
+  open: 'saved-responses',
+}
 
 const DENIED_COPY = {
   camera: {
@@ -161,6 +193,7 @@ export function AttachmentSheet({
   onClose,
   onPicked,
   onInsertText,
+  onOpenSavedResponses,
 }: AttachmentSheetProps) {
   // Somewhere to start before the sheet has been laid out. Replaced by the
   // real height on the first `onLayout`, which is well before a finger can
@@ -173,6 +206,13 @@ export function AttachmentSheet({
   const start = useSharedValue(0)
   const reduceMotion = useReducedMotion()
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const options = useMemo(
+    () =>
+      onOpenSavedResponses
+        ? [...ATTACHMENT_OPTIONS, SAVED_RESPONSES_OPTION]
+        : ATTACHMENT_OPTIONS,
+    [onOpenSavedResponses],
+  )
 
   const measure = useCallback(
     (measured: number) => {
@@ -274,6 +314,13 @@ export function AttachmentSheet({
   async function handleOption(option: AttachmentOption) {
     if (pendingId) return
 
+    if (option.open !== undefined) {
+      // The composer raises the picker from `onClose`, after this sheet is gone.
+      onOpenSavedResponses?.()
+      dismiss()
+      return
+    }
+
     if (option.insertText !== undefined) {
       handleSelectText(option.insertText)
       return
@@ -346,7 +393,7 @@ export function AttachmentSheet({
               </View>
 
               <View className="gap-2 pb-1">
-                {ATTACHMENT_OPTIONS.map((item) => (
+                {options.map((item) => (
                   <TactilePressable
                     key={item.id}
                     accessibilityRole="button"

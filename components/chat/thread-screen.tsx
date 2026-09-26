@@ -432,6 +432,21 @@ export function ThreadScreen({
   // What decides whether a bubble names who sent it. An Announcements thread
   // speaks for the company rather than for a person, so it does not.
   const isGroup = conversation.type === 'group'
+
+  /**
+   * Saved responses in the composer: staff only, since the API refuses a
+   * Customer's read, and only in a thread that belongs to an organization —
+   * a staff DM has none, so it has no library to offer.
+   */
+  const savedResponsesOrganizationId =
+    viewer.role !== 'customer' ? conversation.organizationId : null
+  const savedResponses = useMemo(
+    () =>
+      savedResponsesOrganizationId
+        ? { organizationId: savedResponsesOrganizationId, canManage: viewer.role === 'admin' }
+        : null,
+    [savedResponsesOrganizationId, viewer.role],
+  )
   const rows = useMemo(
     () => buildThreadRows(messages, { viewerId: viewer.id, namesSenders: isGroup }),
     [messages, viewer.id, isGroup],
@@ -964,6 +979,7 @@ export function ThreadScreen({
           replyTo={replyQuote}
           onCancelReply={() => setReplyTo(null)}
           keyboardInset={keyboardInset}
+          savedResponses={savedResponses}
         />
       )}
       {menu ? (
