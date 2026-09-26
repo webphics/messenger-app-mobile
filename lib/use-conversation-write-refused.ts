@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
 import { getConversation } from '@/lib/conversation-api'
-import { refusedWriteFollowUp } from '@/lib/conversation-failure'
+import { followRefusedWrite } from '@/lib/conversation-failure'
 import { useConversationInbox } from '@/lib/conversation-inbox'
 import { useSupportAssignment } from '@/lib/use-support-assignment'
 import type { Conversation } from '@/lib/types'
@@ -14,7 +14,8 @@ import type { Conversation } from '@/lib/types'
  * Send, react, edit, upload, engage, take over, transfer, close, reopen, a
  * label change and a note all end here on failure. What to do is
  * `refusedWriteFollowUp` in `lib/conversation-failure`, a pure answer with
- * tests beside it; this carries it out:
+ * tests beside it, and `followRefusedWrite` there carries it out. This hook
+ * hands it the session, the switch and the shared list:
  *
  * - When the copy is stale, the conversation is fetched again and folded into
  *   the shared list through `addConversation`, the path a get-or-create
@@ -55,14 +56,13 @@ export function useConversationWriteRefused(): ConversationWriteRefused {
     held.current = { supportAssignment, reconfirmSession, addConversation }
   }, [supportAssignment, reconfirmSession, addConversation])
 
-  return useCallback(async (conversationId: string, failure: ApiFailure) => {
-    const { supportAssignment: enabled, reconfirmSession: reconfirm } = held.current
-    const followUp = refusedWriteFollowUp(failure, enabled)
-    if (followUp.reconfirmSession) reconfirm()
-    if (!followUp.refetch) return null
-
-    const fresh = await getConversation(conversationId)
-    if (fresh.ok) held.current.addConversation(fresh.value)
-    return fresh
+  return useCallback((conversationId: string, failure: ApiFailure) => {
+    const { supportAssignment, reconfirmSession: reconfirm } = held.current
+    return followRefusedWrite(conversationId, failure, {
+      supportAssignmentEnabled: supportAssignment,
+      reconfirmSession: reconfirm,
+      getConversation,
+      addConversation: (conversation) => held.current.addConversation(conversation),
+    })
   }, [])
 }

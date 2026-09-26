@@ -46,6 +46,13 @@ export const WRITE_REASONS = [
 ] as const
 export type WriteReason = (typeof WRITE_REASONS)[number]
 
+/**
+ * A read-only reason the API added after this build. The conversation is
+ * still read-only; this build only cannot say why in the API's own terms.
+ */
+export const UNRECOGNISED_REASON = 'unrecognised'
+export type ReadOnlyReason = WriteReason | typeof UNRECOGNISED_REASON
+
 /** What a read-only viewer may do to write here, when the API lets them. */
 export const WAY_OUTS = ['engage', 'take_over', 'reopen'] as const
 export type WayOut = (typeof WAY_OUTS)[number]
@@ -57,7 +64,7 @@ export type WriteAccess =
   | { state: 'open' }
   | {
       state: 'read_only'
-      reason: WriteReason
+      reason: ReadOnlyReason
       holder: AccessHolder | null
       wayOut: WayOut | null
     }
@@ -141,15 +148,31 @@ function holder(value: unknown): AccessHolder | null {
   return id && name ? { id, name } : null
 }
 
+/**
+ * A reason this build knows, or `unrecognised` for any other non-empty string.
+ * `unrecognised` reads back as itself, so the Store's round trip holds.
+ */
+function readOnlyReason(value: unknown): ReadOnlyReason | null {
+  if (!text(value)) return null
+  return oneOf(value, WRITE_REASONS) ?? UNRECOGNISED_REASON
+}
+
+/** A way out this build knows, or none for any other string. */
+function wayOutOf(value: unknown): WayOut | null | undefined {
+  if (value === undefined || value === null) return null
+  if (typeof value !== 'string') return undefined
+  return oneOf(value, WAY_OUTS)
+}
+
 function writeAccess(value: unknown): WriteAccess | null {
   const record = asRecord(value)
   if (!record) return null
   if (record.state === 'open') return { state: 'open' }
   if (record.state !== 'read_only') return null
 
-  const reason = oneOf(record.reason, WRITE_REASONS)
+  const reason = readOnlyReason(record.reason)
   const held = optional(record.holder, holder)
-  const wayOut = optional(record.wayOut, (raw) => oneOf(raw, WAY_OUTS))
+  const wayOut = wayOutOf(record.wayOut)
   if (!reason || held === undefined || wayOut === undefined) return null
 
   return { state: 'read_only', reason, holder: held, wayOut }
@@ -176,9 +199,15 @@ function accessActions(value: unknown): AccessActions | null {
 /**
  * The payload's `access`, or unknown.
  *
- * Strict on purpose. A reason or a way out this build does not know is a rule
- * it cannot word, and guessing would offer a composer or a button the API may
- * refuse, so any part that does not read makes the whole answer unknown.
+ * Strict about shape, lenient about new words. A missing or malformed part (no
+ * write, a state other than open or read-only, a reason that is not a string,
+ * a malformed holder, a known action missing or not a boolean) makes the whole
+ * answer unknown. A reason or a way out the API added after this build is not
+ * a broken shape (story 33): an unknown reason reads as read-only for a reason
+ * this build cannot name, and an unknown way out as none. Both are the safe
+ * side: no composer and no button the API may refuse, and no build stuck on
+ * "updating" until it is upgraded.
+ *
  * Reading its own output gives the same answer, which is what lets the Store
  * persist the parsed conversation and read it back through the same parser.
  */
@@ -245,6 +274,8 @@ function reasonText(
       return 'Announcements are posted by the team.'
     case 'conversation_closed':
       return 'This conversation is closed.'
+    case UNRECOGNISED_REASON:
+      return "You can't send messages here right now."
   }
 }
 
@@ -393,6 +424,12 @@ export function messageActions(
  * - `message_not_deletable`: `deleteMessages` was offered on a copy that
  *   should not have offered it. This client sends no delete today; the code is
  *   listed so the rule is whole when one arrives.
+ * - `conversation_not_found` and `forbidden`: how the API's rulings answer the
+ *   common races. A Close or Transfer after somebody else took or closed the
+ *   thread is a 404, and a Take over on a thread the viewer already holds is
+ *   `forbidden`. When the refetch answers 404 too, the thread is gone or no
+ *   longer visible: the write path hands that failure back to its caller and
+ *   never feeds it into this rule again, so it cannot loop.
  *
  * Not here: `conversation_reassigned`. The viewer lost the thread and can no
  * longer read it, so a refetch answers the same refusal. The socket's
@@ -405,6 +442,8 @@ const STALE_REFUSALS: ReadonlySet<string> = new Set([
   'support_assignment_disabled',
   'missing_capability',
   'message_not_deletable',
+  'conversation_not_found',
+  'forbidden',
 ])
 
 /**

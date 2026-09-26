@@ -1,5 +1,7 @@
+import type { ApiResult } from '@/lib/api-result'
 import type { ApiFailure } from '@/lib/conversation-api'
 import { refusalMeansStale } from '@/lib/conversation-access'
+import type { Conversation } from '@/lib/types'
 
 export type FailureNotice = { title: string; hint: string }
 
@@ -79,6 +81,39 @@ export function refusedWriteFollowUp(
     refetch: refusalMeansStale(failure),
     reconfirmSession: switchedOff || assignmentModeChanged(failure, supportAssignmentEnabled),
   }
+}
+
+/** What `followRefusedWrite` reads and calls, passed in so it stays testable. */
+export type RefusedWriteDeps = {
+  supportAssignmentEnabled: boolean
+  reconfirmSession: () => void
+  getConversation: (id: string) => Promise<ApiResult<Conversation>>
+  addConversation: (conversation: Conversation) => void
+}
+
+/**
+ * Carries out `refusedWriteFollowUp`: re-reads the session when the switch
+ * moved, and fetches the conversation again when the copy is stale, folding a
+ * fresh row into the list. Answers the refetch's result, or null when there
+ * was none.
+ *
+ * A refetch that fails, a 404 for a thread that was deleted or is no longer
+ * visible included, is handed back as it is and adds nothing. It is never run
+ * through the rule again, so a 404 answered by a 404 is one request, not a
+ * loop. The caller words it as any other refusal.
+ */
+export async function followRefusedWrite(
+  conversationId: string,
+  failure: ApiFailure,
+  deps: RefusedWriteDeps,
+): Promise<ApiResult<Conversation> | null> {
+  const followUp = refusedWriteFollowUp(failure, deps.supportAssignmentEnabled)
+  if (followUp.reconfirmSession) deps.reconfirmSession()
+  if (!followUp.refetch) return null
+
+  const fresh = await deps.getConversation(conversationId)
+  if (fresh.ok) deps.addConversation(fresh.value)
+  return fresh
 }
 
 /**
@@ -177,7 +212,7 @@ export function readRefusal(failure: ApiFailure): string | null {
  * The one refusal not repeated verbatim is `support_assignment_disabled`: the
  * switch went off after this session last read it, so the button was offered
  * by a client that did not know yet. The write path re-reads the session on it
- * (`refusedWriteFollowUp`), and the composer opens once that lands — so the
+ * (`refusedWriteFollowUp`), and the composer opens once that lands, so the
  * sentence says what changed and nothing about what to do.
  */
 export function assignmentRefusal(failure: ApiFailure): string | null {

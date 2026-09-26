@@ -153,6 +153,31 @@ describe('parseAccess', () => {
   })
 
   /*
+   * Story 33: an older build keeps working after the API adds a reason or a
+   * way out. A reason it cannot word is still read-only, in general words, and
+   * a way out it cannot wire is no way out. Only a broken shape is unknown.
+   */
+  test('reads a reason it does not know as read-only for a reason it does not name', () => {
+    expect(parseAccess(readOnlyPayload({ reason: 'must_wait', wayOut: 'engage' }))).toEqual({
+      write: { state: 'read_only', reason: 'unrecognised', holder: null, wayOut: 'engage' },
+      actions: actions(),
+    })
+  })
+
+  test('reads a way out it does not know as no way out', () => {
+    expect(parseAccess(readOnlyPayload({ reason: 'must_engage', wayOut: 'claim' }))).toEqual({
+      write: { state: 'read_only', reason: 'must_engage', holder: null, wayOut: null },
+      actions: actions(),
+    })
+  })
+
+  test('reads its own answer for an unknown reason and way out the same way twice', () => {
+    const once = parseAccess(readOnlyPayload({ reason: 'must_wait', holder: PRIYA, wayOut: 'claim' }))
+
+    expect(parseAccess(JSON.parse(JSON.stringify(once)))).toEqual(once)
+  })
+
+  /*
    * Unknown is what a row restored from a Store written before `access` existed
    * reads as, and what an API that has not deployed it yet sends. Anything this
    * build cannot read is the same answer: guessing at a reason would offer
@@ -167,8 +192,8 @@ describe('parseAccess', () => {
     ['a write that is not an object', { write: 'open', actions: actions({ editMessages: true }) }],
     ['a write state it does not know', { write: { state: 'maybe' }, actions: actions({ editMessages: true }) }],
     ['a read-only write with no reason', { write: { state: 'read_only' }, actions: actions() }],
-    ['a reason it does not know', readOnlyPayload({ reason: 'must_wait' })],
-    ['a way out it does not know', readOnlyPayload({ reason: 'must_engage', wayOut: 'claim' })],
+    ['a reason that is not a string', readOnlyPayload({ reason: 42 })],
+    ['an empty reason', readOnlyPayload({ reason: '' })],
     ['a way out that is not a string', readOnlyPayload({ reason: 'must_engage', wayOut: true })],
     ['a holder with no name', readOnlyPayload({ reason: 'already_engaged', holder: { id: 'agent-2' } })],
     ['a holder that is not an object', readOnlyPayload({ reason: 'already_engaged', holder: 'Priya' })],
@@ -276,6 +301,22 @@ describe('composerView', () => {
       })
     },
   )
+
+  test('a reason this build does not know says so in general words, and keeps the way out', () => {
+    expect(composerFor(readOnlyPayload({ reason: 'must_wait', wayOut: 'reopen' }))).toEqual({
+      kind: 'read-only',
+      reason: "You can't send messages here right now.",
+      wayOut: { wayOut: 'reopen', label: 'Reopen conversation' },
+    })
+  })
+
+  test('a way out this build does not know offers no button', () => {
+    expect(composerFor(readOnlyPayload({ reason: 'must_engage', wayOut: 'claim' }))).toEqual({
+      kind: 'read-only',
+      reason: 'Engage this conversation to reply.',
+      wayOut: null,
+    })
+  })
 
   test('the way out follows the API, whatever the reason', () => {
     expect(composerFor(readOnlyPayload({ reason: 'group_write_restricted', wayOut: 'engage' }))).toMatchObject({
@@ -598,7 +639,19 @@ describe('refusalMeansStale', () => {
     expect(refusalMeansStale(refusedWith(code))).toBe(true)
   })
 
-  test.each(['validation_failed', 'conversation_not_found', 'label_not_found', 'message_edit_window_expired'])(
+  /*
+   * The two codes the API's rulings answer the common races with: a Close or
+   * Transfer after somebody else took or closed the thread is a 404, and a
+   * Take over on a thread the viewer already holds is `forbidden`.
+   */
+  test.each(['conversation_not_found', 'forbidden'])(
+    'a write refused with %s means the copy is stale, since it is how the API answers a lost race',
+    (code) => {
+      expect(refusalMeansStale(refusedWith(code))).toBe(true)
+    },
+  )
+
+  test.each(['validation_failed', 'label_not_found', 'message_edit_window_expired'])(
     'a refusal with %s is about the request, not the conversation',
     (code) => {
       expect(refusalMeansStale(refusedWith(code))).toBe(false)

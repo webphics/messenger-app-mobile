@@ -15,8 +15,8 @@ import type { Conversation } from '@/lib/types'
 /**
  * Engaging a thread, taking one over, and reopening one.
  *
- * All three are the same shape — one POST, one conversation back, one row
- * folded into the list every screen shares — so they are one hook with the way
+ * All three are the same shape. One POST, one conversation back, one row
+ * folded into the list every screen shares, so they are one hook with the way
  * out naming which. Which way out is *offered* is not decided here: the API
  * sends it in the conversation's `access`, `lib/conversation-access` turns it
  * into a button, and this carries out whichever one was tapped.

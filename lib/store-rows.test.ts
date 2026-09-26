@@ -1,3 +1,4 @@
+import { parseAccess } from '@/lib/conversation-access'
 import {
   fromConversationRows,
   fromMessageRows,
@@ -288,6 +289,25 @@ describe('fromConversationRows', () => {
     )
 
     expect(conversations[0].access).toEqual(access)
+  })
+
+  /*
+   * Story 33: a reason or a way out the API added after this build is parsed
+   * into words this build has, and that parsed answer must read back from the
+   * Store as it was written rather than as unknown.
+   */
+  it('keeps an access whose reason and way out this build did not know', () => {
+    const access = parseAccess({
+      write: { state: 'read_only', reason: 'must_wait', holder: null, wayOut: 'claim' },
+      actions: { editMessages: false, engage: false, takeOver: false, transfer: false, close: false, reopen: false, setPriority: false, manageLabels: false, readNotes: false, writeNotes: false, setWritePolicy: false, setJoinPolicy: false, deleteMessages: false, deleteConversation: false },
+    })
+
+    const { conversations } = fromConversationRows(
+      toConversationRows('viewer-1', [staffConversation({ access })]),
+    )
+
+    expect(conversations[0].access).toEqual(access)
+    expect(conversations[0].access).toMatchObject({ write: { reason: 'unrecognised', wayOut: null } })
   })
 
   /*

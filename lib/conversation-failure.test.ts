@@ -3,9 +3,11 @@ import {
   assignmentRefusal,
   assignmentSwitchedOnNotice,
   failureNotice,
+  followRefusedWrite,
   readRefusal,
   refusedWriteFollowUp,
 } from '@/lib/conversation-failure'
+import type { Conversation } from '@/lib/types'
 
 describe('failureNotice', () => {
   test('offers a retry for a request that never arrived', () => {
@@ -217,5 +219,69 @@ describe('refusedWriteFollowUp', () => {
   ])('%s does neither', (_label, failure) => {
     expect(refusedWriteFollowUp(failure, true)).toEqual({ refetch: false, reconfirmSession: false })
     expect(refusedWriteFollowUp(failure, false)).toEqual({ refetch: false, reconfirmSession: false })
+  })
+})
+
+describe('followRefusedWrite', () => {
+  const NOT_FOUND = {
+    kind: 'refused' as const,
+    message: 'Conversation not found.',
+    code: 'conversation_not_found',
+  }
+
+  function deps(fetched: Awaited<ReturnType<typeof followRefusedWrite>>) {
+    return {
+      supportAssignmentEnabled: true,
+      reconfirmSession: jest.fn(),
+      getConversation: jest.fn(async () => fetched!),
+      addConversation: jest.fn(),
+    }
+  }
+
+  /*
+   * A Close after somebody else closed the thread answers 404, and so does the
+   * refetch when the thread is gone or no longer visible. The refetch's
+   * failure goes back to the caller, which words it as any read refusal, and
+   * is never run through the rule again.
+   */
+  test('a refetch that answers 404 is fetched once, adds nothing, and is handed back', async () => {
+    const refetch = { ok: false as const, failure: NOT_FOUND }
+    const held = deps(refetch)
+
+    const answer = await followRefusedWrite('c1', NOT_FOUND, held)
+
+    expect(held.getConversation).toHaveBeenCalledTimes(1)
+    expect(held.getConversation).toHaveBeenCalledWith('c1')
+    expect(held.addConversation).not.toHaveBeenCalled()
+    expect(answer).toEqual(refetch)
+    expect(readRefusal(refetch.failure)).toBe('Conversation not found.')
+  })
+
+  test('a refetch that answers folds the fresh row into the list', async () => {
+    const row = { id: 'c1' } as Conversation
+    const held = deps({ ok: true, value: row })
+
+    await followRefusedWrite('c1', { ...NOT_FOUND, code: 'forbidden' }, held)
+
+    expect(held.addConversation).toHaveBeenCalledWith(row)
+  })
+
+  test('a refusal about the request fetches nothing and answers null', async () => {
+    const held = deps(null)
+
+    const answer = await followRefusedWrite('c1', { ...NOT_FOUND, code: 'validation_failed' }, held)
+
+    expect(answer).toBeNull()
+    expect(held.getConversation).not.toHaveBeenCalled()
+    expect(held.reconfirmSession).not.toHaveBeenCalled()
+  })
+
+  test('support_assignment_disabled re-reads the session as well as the conversation', async () => {
+    const held = deps({ ok: false, failure: NOT_FOUND })
+
+    await followRefusedWrite('c1', { ...NOT_FOUND, code: 'support_assignment_disabled' }, held)
+
+    expect(held.reconfirmSession).toHaveBeenCalledTimes(1)
+    expect(held.getConversation).toHaveBeenCalledTimes(1)
   })
 })

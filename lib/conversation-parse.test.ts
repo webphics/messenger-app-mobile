@@ -562,7 +562,7 @@ describe('parseConversation, reading access', () => {
 
   test('reads a malformed access as unknown and keeps the row', () => {
     const conversation = parseConversation(
-      staffRow({ access: { write: { state: 'read_only', reason: 'must_wait' }, actions: NO_ACTIONS } }),
+      staffRow({ access: { write: { state: 'read_only', reason: 42 }, actions: NO_ACTIONS } }),
     )
 
     expect(conversation).toMatchObject({ id: 'conv-1', access: { kind: 'unknown' } })
