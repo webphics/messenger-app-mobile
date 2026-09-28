@@ -16,8 +16,8 @@ function viewer(...capabilities: Capability[]) {
 }
 
 describe('CAPABILITIES', () => {
-  test('all 29, grouped the way the spec lists them', () => {
-    expect(CAPABILITIES).toHaveLength(29)
+  test('all 30, grouped the way the spec lists them', () => {
+    expect(CAPABILITIES).toHaveLength(30)
     expect(Object.keys(CAPABILITY_GROUPS)).toEqual([
       'support',
       'groups',
@@ -53,7 +53,7 @@ describe('CAPABILITIES', () => {
     expect(ORGANIZATIONS_SCREEN_CAPABILITIES).toEqual(['manage_organizations', 'manage_memberships'])
   })
 
-  test('deleting your own sits after deleting any, in the Support group', () => {
+  test('deleting your own sits after deleting any, then internal notes, in the Support group', () => {
     expect(CAPABILITY_GROUPS.support).toEqual([
       'transfer',
       'close',
@@ -64,8 +64,14 @@ describe('CAPABILITIES', () => {
       'delete_conversation',
       'delete_own_messages',
       'delete_own_conversations',
+      'internal_notes',
       'delete_any_note',
     ])
+  })
+
+  test('an agent may be granted internal notes', () => {
+    expect(isCapability('internal_notes')).toBe(true)
+    expect(ADMIN_ONLY_CAPABILITIES).not.toContain('internal_notes')
   })
 
   test('messaging customers sits after managing organizations, in the Workspace group', () => {

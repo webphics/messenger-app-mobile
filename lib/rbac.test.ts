@@ -1,5 +1,5 @@
 import type { Capability } from '@/lib/capabilities'
-import { canAccessUnassignedPool, canViewConversation } from '@/lib/rbac'
+import { canAccessUnassignedPool, canHoldStaffDm, canViewConversation } from '@/lib/rbac'
 import type {
   BroadcastInboxConversation,
   Conversation,
@@ -69,6 +69,8 @@ function staffDm(overrides: Partial<StaffConversation> = {}): StaffConversation 
     ...overrides,
   })
 }
+
+const ADMIN_PEER = { id: 'admin-2', name: 'Maya Ortiz', role: 'admin' as const }
 
 function staffGroup(memberIds: string[]): StaffConversation {
   return staffConversation({
@@ -151,11 +153,14 @@ describe('canViewConversation', () => {
 describe('canViewConversation on a staff DM', () => {
   test.each<[string, UserRole, Capability[], Partial<StaffConversation>, boolean]>([
     ['an Agent with staff_dm and a resolved peer', 'agent', ['staff_dm'], {}, true],
-    ['an Agent without staff_dm', 'agent', [], {}, false],
+    ['an Agent without staff_dm, with an Agent', 'agent', [], {}, false],
     ['an Agent holding other capabilities but not staff_dm', 'agent', ['transfer', 'close'], {}, false],
+    ['an Agent without staff_dm, with an Admin', 'agent', [], { otherUser: ADMIN_PEER }, true],
     ['an Agent with staff_dm but no peer resolved', 'agent', ['staff_dm'], { otherUser: null }, false],
+    ['an Agent without staff_dm and no peer resolved', 'agent', [], { otherUser: null }, false],
     ['an Admin with staff_dm', 'admin', ['staff_dm'], {}, true],
-    ['an Admin without staff_dm: there is no admin bypass', 'admin', [], {}, false],
+    ['an Admin without staff_dm, with an Agent', 'admin', [], {}, true],
+    ['an Admin without staff_dm, with an Admin', 'admin', [], { otherUser: ADMIN_PEER }, true],
     ['an Admin with staff_dm but no peer resolved', 'admin', ['staff_dm'], { otherUser: null }, false],
   ])('%s → %s', (_label, role, held, overrides, expected) => {
     const me = viewer(role, `${role}-1`, ...held)
@@ -164,6 +169,25 @@ describe('canViewConversation on a staff DM', () => {
 
   test('a Customer never opens one, whatever it holds', () => {
     expect(canViewConversation(viewer('customer', 'customer-1', 'staff_dm'), staffDm())).toBe(false)
+  })
+})
+
+describe('canHoldStaffDm', () => {
+  test.each<[string, UserRole, Capability[], UserRole, boolean]>([
+    ['an Agent with staff_dm, with an Agent', 'agent', ['staff_dm'], 'agent', true],
+    ['an Agent without staff_dm, with an Agent', 'agent', [], 'agent', false],
+    ['an Agent without staff_dm, with an Admin', 'agent', [], 'admin', true],
+    ['an Admin without staff_dm, with an Agent', 'admin', [], 'agent', true],
+    ['an Admin without staff_dm, with an Admin', 'admin', [], 'admin', true],
+    ['an Agent with staff_dm, with a Customer', 'agent', ['staff_dm'], 'customer', false],
+    ['an Admin, with a Customer', 'admin', ['staff_dm'], 'customer', false],
+    ['a Customer holding staff_dm, with an Admin', 'customer', ['staff_dm'], 'admin', false],
+  ])('%s → %s', (_label, role, held, peerRole, expected) => {
+    expect(canHoldStaffDm({ role, capabilities: held }, peerRole)).toBe(expected)
+  })
+
+  test('nobody signed in holds none', () => {
+    expect(canHoldStaffDm(null, 'admin')).toBe(false)
   })
 })
 

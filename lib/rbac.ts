@@ -17,6 +17,20 @@ export type ConversationViewer = {
   readonly capabilities: readonly Capability[]
 }
 
+/** Who is asking about a staff DM: a role and what the API says they hold. */
+export type StaffDmViewer = Pick<ConversationViewer, 'role' | 'capabilities'>
+
+/**
+ * Whether this viewer may hold a staff DM with somebody of `peerRole`: start
+ * one, read it, send in it (#100). The API asks for `staff_dm` only when both
+ * people are agents, so an Admin on either side needs nothing. A Customer is
+ * never in one, on either side. Nobody signed in holds none.
+ */
+export function canHoldStaffDm(viewer: StaffDmViewer | null, peerRole: UserRole): boolean {
+  if (viewer === null || viewer.role === 'customer' || peerRole === 'customer') return false
+  return viewer.role === 'admin' || peerRole === 'admin' || can(viewer, 'staff_dm')
+}
+
 /**
  * Whether this viewer may open this conversation.
  *
@@ -45,11 +59,11 @@ export type ConversationViewer = {
  * - Groups carry their full membership, customers included, so an Agent is
  *   checked against it. An Admin reads every group in the product, as
  *   `canAccessGroup` lets them.
- * - A staff DM needs `staff_dm`, for an Admin as much as for an Agent: the API
- *   checks the capability before anything else (`canAccessStaffDm`) and has no
- *   bypass for it. Past that it names its peer relative to the viewer, and the
- *   API only resolves a peer for a participant. `members` is empty on that
- *   payload, so the peer is what there is to check.
+ * - A staff DM needs `staff_dm` only when both people are agents (#100): one
+ *   with an Admin in it, on either side, needs nothing (`canHoldStaffDm`). The
+ *   payload names its peer relative to the viewer, and the API only resolves a
+ *   peer for a participant. `members` is empty on that payload, so the peer,
+ *   and its role, is what there is to check.
  */
 export function canViewConversation(
   viewer: ConversationViewer,
@@ -71,7 +85,9 @@ export function canViewConversation(
     case 'support_dm':
       return true
     case 'staff_dm':
-      return can(viewer, 'staff_dm') && conversation.otherUser !== null
+      return (
+        conversation.otherUser !== null && canHoldStaffDm(viewer, conversation.otherUser.role)
+      )
     default:
       return (
         viewer.role === 'admin' ||

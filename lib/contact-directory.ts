@@ -1,3 +1,4 @@
+import { canHoldStaffDm, type StaffDmViewer } from '@/lib/rbac'
 import { staffDmIntent } from '@/lib/staff-directory'
 import type {
   Contact,
@@ -51,15 +52,17 @@ export type ContactIntent =
 export type SharedOrganizations = Organization[] | null
 
 /**
- * `canStartStaffDm` is whether the viewer holds `staff_dm`, without which
- * `POST /conversations/staff` refuses them. A thread that already exists still
- * opens; only a new one is out of reach. Required, so a caller that forgets it
- * fails to compile rather than offering a DM the API would refuse.
+ * `viewer` is who is tapping, which `canHoldStaffDm` reads: `staff_dm` is
+ * needed only for a DM between two agents, and without it
+ * `POST /conversations/staff` refuses one. An Admin is always reachable, and an
+ * Admin reaches anybody. A thread that already exists still opens; only a new
+ * one is out of reach. Required, so a caller that forgets it fails to compile
+ * rather than offering a DM the API would refuse.
  */
 export function contactIntent(
   contact: Contact,
   shared: SharedOrganizations,
-  canStartStaffDm: boolean,
+  viewer: StaffDmViewer | null,
 ): ContactIntent {
   // The API already resolved this, for every kind. A row that names a thread is
   // a row with nothing left to decide, and that includes a Customer — whose
@@ -94,8 +97,10 @@ export function contactIntent(
     return { kind: 'unavailable', reason: 'Not a staff account' }
   }
 
-  if (!canStartStaffDm) {
-    return { kind: 'unavailable', reason: "You can't message staff" }
+  if (!canHoldStaffDm(viewer, contact.role)) {
+    const reason =
+      viewer?.role === 'agent' ? "You can't message other agents" : "You can't message staff"
+    return { kind: 'unavailable', reason }
   }
 
   // Staff, with no thread yet. The organization a DM binds to is the staff
