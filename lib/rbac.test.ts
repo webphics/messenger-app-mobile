@@ -1,9 +1,7 @@
-import {
-  canAccessUnassignedPool,
-  canSeeInternalNotes,
-  canViewConversation,
-} from '@/lib/rbac'
+import type { Capability } from '@/lib/capabilities'
+import { canAccessUnassignedPool, canViewConversation } from '@/lib/rbac'
 import type {
+  BroadcastInboxConversation,
   Conversation,
   CustomerConversation,
   StaffConversation,
@@ -57,67 +55,115 @@ function customerGroup(memberIds: string[]): CustomerConversation {
   }
 }
 
+function viewer(role: UserRole, id: string, ...capabilities: Capability[]) {
+  return { role, id, capabilities }
+}
+
+function staffDm(overrides: Partial<StaffConversation> = {}): StaffConversation {
+  return staffConversation({
+    type: 'staff_dm',
+    status: null,
+    customer: null,
+    assignedAgent: null,
+    otherUser: { id: 'agent-2', name: 'Priya Shah', role: 'agent' },
+    ...overrides,
+  })
+}
+
+function staffGroup(memberIds: string[]): StaffConversation {
+  return staffConversation({
+    type: 'group',
+    status: null,
+    title: 'Warehouse onboarding',
+    customer: null,
+    assignedAgent: null,
+    members: memberIds.map((id) => ({ id, name: id, role: 'agent' as const })),
+  })
+}
+
+function announcements(): BroadcastInboxConversation {
+  return {
+    id: 'inbox-1',
+    organizationId: null,
+    type: 'broadcast_inbox',
+    title: 'Announcements',
+    ...LAST_MESSAGE,
+  }
+}
+
 describe('canViewConversation', () => {
   test('a Customer may open the support thread the API handed them', () => {
-    expect(canViewConversation('customer', 'customer-1', customerSupport())).toBe(true)
+    expect(canViewConversation(viewer('customer', 'customer-1'), customerSupport())).toBe(true)
   })
 
   test('a Customer may open a group they are a member of', () => {
-    expect(canViewConversation('customer', 'customer-1', customerGroup(['customer-1']))).toBe(true)
+    expect(
+      canViewConversation(viewer('customer', 'customer-1'), customerGroup(['customer-1'])),
+    ).toBe(true)
   })
 
   test('a Customer may not open a group they are not in', () => {
-    expect(canViewConversation('customer', 'customer-9', customerGroup(['customer-1']))).toBe(false)
+    expect(
+      canViewConversation(viewer('customer', 'customer-9'), customerGroup(['customer-1'])),
+    ).toBe(false)
   })
 
   test('a Customer holding a staff payload is holding something not meant for them', () => {
-    expect(canViewConversation('customer', 'customer-1', staffConversation())).toBe(false)
+    expect(canViewConversation(viewer('customer', 'customer-1'), staffConversation())).toBe(false)
   })
 
   test('an Agent sees a support thread assigned to another agent — Takeover depends on it', () => {
     const other = staffConversation({ assignedAgent: { id: 'agent-2', name: 'Priya Shah' } })
-    expect(canViewConversation('agent', 'agent-1', other)).toBe(true)
+    expect(canViewConversation(viewer('agent', 'agent-1'), other)).toBe(true)
   })
 
   test('an Agent sees an unassigned support thread', () => {
     const pooled = staffConversation({ status: 'unassigned', assignedAgent: null })
-    expect(canViewConversation('agent', 'agent-1', pooled)).toBe(true)
-  })
-
-  test('an Agent sees a staff DM the API resolved a peer for', () => {
-    const dm = staffConversation({
-      type: 'staff_dm',
-      status: null,
-      customer: null,
-      assignedAgent: null,
-      otherUser: { id: 'agent-2', name: 'Priya Shah', role: 'agent' },
-    })
-    expect(canViewConversation('agent', 'agent-1', dm)).toBe(true)
-  })
-
-  test('an Agent does not see a staff DM with no peer resolved for them', () => {
-    const dm = staffConversation({ type: 'staff_dm', status: null, otherUser: null })
-    expect(canViewConversation('agent', 'agent-1', dm)).toBe(false)
+    expect(canViewConversation(viewer('agent', 'agent-1'), pooled)).toBe(true)
   })
 
   test('an Agent sees a group they are a member of, and not one they are not', () => {
-    const group = staffConversation({
-      type: 'group',
-      status: null,
-      title: 'Warehouse onboarding',
-      members: [{ id: 'agent-1', name: 'Jonah Reed', role: 'agent' }],
-    })
-    expect(canViewConversation('agent', 'agent-1', group)).toBe(true)
-    expect(canViewConversation('agent', 'agent-2', group)).toBe(false)
+    expect(canViewConversation(viewer('agent', 'agent-1'), staffGroup(['agent-1']))).toBe(true)
+    expect(canViewConversation(viewer('agent', 'agent-2'), staffGroup(['agent-1']))).toBe(false)
   })
 
-  test('an Agent holding a Customer payload is holding something not meant for them', () => {
-    expect(canViewConversation('agent', 'agent-1', customerSupport())).toBe(false)
+  test('an Admin sees any group, as the API lets them', () => {
+    expect(canViewConversation(viewer('admin', 'admin-1'), staffGroup(['agent-1']))).toBe(true)
   })
 
-  test('an Admin sees everything, in either shape', () => {
-    expect(canViewConversation('admin', 'admin-1', staffConversation())).toBe(true)
-    expect(canViewConversation('admin', 'admin-1', customerGroup([]))).toBe(true)
+  test.each<[UserRole, string]>([
+    ['admin', 'admin-1'],
+    ['agent', 'agent-1'],
+  ])('a %s holding a Customer payload is holding something not meant for them', (role, id) => {
+    expect(canViewConversation(viewer(role, id), customerSupport())).toBe(false)
+    expect(canViewConversation(viewer(role, id), customerGroup([id]))).toBe(false)
+  })
+
+  test.each<[UserRole, string]>([
+    ['admin', 'admin-1'],
+    ['agent', 'agent-1'],
+    ['customer', 'customer-1'],
+  ])('a %s may open an Announcements thread the API handed them', (role, id) => {
+    expect(canViewConversation(viewer(role, id), announcements())).toBe(true)
+  })
+})
+
+describe('canViewConversation on a staff DM', () => {
+  test.each<[string, UserRole, Capability[], Partial<StaffConversation>, boolean]>([
+    ['an Agent with staff_dm and a resolved peer', 'agent', ['staff_dm'], {}, true],
+    ['an Agent without staff_dm', 'agent', [], {}, false],
+    ['an Agent holding other capabilities but not staff_dm', 'agent', ['transfer', 'close'], {}, false],
+    ['an Agent with staff_dm but no peer resolved', 'agent', ['staff_dm'], { otherUser: null }, false],
+    ['an Admin with staff_dm', 'admin', ['staff_dm'], {}, true],
+    ['an Admin without staff_dm: there is no admin bypass', 'admin', [], {}, false],
+    ['an Admin with staff_dm but no peer resolved', 'admin', ['staff_dm'], { otherUser: null }, false],
+  ])('%s → %s', (_label, role, held, overrides, expected) => {
+    const me = viewer(role, `${role}-1`, ...held)
+    expect(canViewConversation(me, staffDm(overrides))).toBe(expected)
+  })
+
+  test('a Customer never opens one, whatever it holds', () => {
+    expect(canViewConversation(viewer('customer', 'customer-1', 'staff_dm'), staffDm())).toBe(false)
   })
 })
 
@@ -134,15 +180,11 @@ describe('role matrix', () => {
     expect(canAccessUnassignedPool('admin', false)).toBe(false)
   })
 
-  test('internal notes', () => {
-    expect(canSeeInternalNotes('customer')).toBe(false)
-    expect(canSeeInternalNotes('agent')).toBe(true)
-    expect(canSeeInternalNotes('admin')).toBe(true)
-  })
-
   test('unknown role throws', () => {
     const bad = 'superuser' as UserRole
-    expect(() => canSeeInternalNotes(bad)).toThrow(/unknown role/i)
-    expect(() => canViewConversation(bad, 'x', staffConversation() as Conversation)).toThrow(/unknown role/i)
+    expect(() => canAccessUnassignedPool(bad, true)).toThrow(/unknown role/i)
+    expect(() =>
+      canViewConversation(viewer(bad, 'x'), staffConversation() as Conversation),
+    ).toThrow(/unknown role/i)
   })
 })

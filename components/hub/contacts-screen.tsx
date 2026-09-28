@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { ContactList } from "@/components/inbox/contact-list";
 import { can } from "@/lib/capabilities";
 import { chatHref } from "@/lib/chat-route-id";
-import { getSessionUser } from "@/lib/session";
+import { useViewer } from "@/lib/use-viewer";
 import { useContactDirectory } from "@/lib/use-contact-directory";
 
 /**
@@ -19,7 +19,7 @@ import { useContactDirectory } from "@/lib/use-contact-directory";
  */
 export function ContactsScreen() {
   const router = useRouter();
-  const user = getSessionUser();
+  const user = useViewer();
 
   const open = useCallback(
     (conversationId: string) => {

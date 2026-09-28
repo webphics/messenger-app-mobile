@@ -20,6 +20,7 @@ import type { ComponentType } from "react";
 export type IconProps = LucideProps;
 export type IconComponent = ComponentType<LucideProps>;
 
+export { default as Activity } from "lucide-react-native/icons/activity";
 export { default as AlertCircle } from "lucide-react-native/icons/circle-alert";
 export { default as Archive } from "lucide-react-native/icons/archive";
 export { default as ArrowBigDown } from "lucide-react-native/icons/arrow-big-down";

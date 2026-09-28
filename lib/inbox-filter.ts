@@ -1,8 +1,8 @@
 import { conversationTitle } from '@/lib/conversation-title'
 import { findOffersConversation, sortConversations } from '@/lib/conversation-list'
-import { canViewConversation } from '@/lib/rbac'
+import { canViewConversation, type ConversationViewer } from '@/lib/rbac'
 import { isStaffConversation } from '@/lib/types'
-import type { Conversation, UserRole } from '@/lib/types'
+import type { Conversation } from '@/lib/types'
 
 /**
  * The filters above a staff inbox.
@@ -50,7 +50,7 @@ export function isResolved(conversation: Conversation): boolean {
 }
 
 /**
- * The conversations a role may see, out of a list this client already holds.
+ * The conversations a viewer may see, out of a list this client already holds.
  *
  * Redundant against the API, which scopes every list it sends. It survives as
  * the guard on the things counted *from* a list rather than shown as one — a
@@ -58,11 +58,10 @@ export function isResolved(conversation: Conversation): boolean {
  * would otherwise be counted rather than merely displayed.
  */
 export function listInboxConversations(
-  role: UserRole,
-  userId: string,
+  viewer: ConversationViewer,
   conversations: Conversation[],
 ): Conversation[] {
-  return conversations.filter((conversation) => canViewConversation(role, userId, conversation))
+  return conversations.filter((conversation) => canViewConversation(viewer, conversation))
 }
 
 /**

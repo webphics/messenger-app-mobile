@@ -78,9 +78,13 @@ function sameRun(message: Message | undefined, next: Message | undefined): boole
  * A Customer's payload names nobody — it says whether the message came from the
  * company — so the two shapes cannot be compared by id. Each answers with a key
  * stable within its own shape, and a thread is never a mix of the two.
+ *
+ * Not spelled `company:` — that prefix is the company persona's id (see
+ * `isCompanyPersona`), which is a real sender in a Customer's group, and the
+ * two must never be able to compare equal.
  */
 function messageSenderKey(message: Message): string {
-  return 'sender' in message ? message.sender.id : `company:${message.fromCompany}`
+  return 'sender' in message ? message.sender.id : `from-company:${message.fromCompany}`
 }
 
 export function buildThreadRows(

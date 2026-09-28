@@ -15,8 +15,8 @@ function viewer(...capabilities: Capability[]) {
 }
 
 describe('CAPABILITIES', () => {
-  test('all 26, grouped the way the spec lists them', () => {
-    expect(CAPABILITIES).toHaveLength(26)
+  test('all 29, grouped the way the spec lists them', () => {
+    expect(CAPABILITIES).toHaveLength(29)
     expect(Object.keys(CAPABILITY_GROUPS)).toEqual([
       'support',
       'groups',
@@ -31,8 +31,10 @@ describe('CAPABILITIES', () => {
     expect(new Set(CAPABILITIES).size).toBe(CAPABILITIES.length)
   })
 
-  test('six are admin-only: the workspace four and the two reached only from the Users page', () => {
+  test('eight are admin-only: delete any, the workspace four and the two reached only from the Users page', () => {
     expect(ADMIN_ONLY_CAPABILITIES).toEqual([
+      'delete_messages',
+      'delete_conversation',
       'manage_wall_contributors',
       'manage_memberships',
       'manage_users',
@@ -44,6 +46,34 @@ describe('CAPABILITIES', () => {
 
   test('the Accounts screen opens on any of the three that act on people', () => {
     expect(USERS_SCREEN_CAPABILITIES).toEqual(['manage_users', 'change_roles', 'manage_permissions'])
+  })
+
+  test('deleting your own sits after deleting any, in the Support group', () => {
+    expect(CAPABILITY_GROUPS.support).toEqual([
+      'transfer',
+      'close',
+      'take_over',
+      'manage_labels',
+      'staff_dm',
+      'delete_messages',
+      'delete_conversation',
+      'delete_own_messages',
+      'delete_own_conversations',
+      'delete_any_note',
+    ])
+  })
+
+  test('messaging customers sits after managing organizations, in the Workspace group', () => {
+    expect(CAPABILITY_GROUPS.workspace.slice(0, 2)).toEqual([
+      'manage_organizations',
+      'message_customers',
+    ])
+  })
+
+  test('an agent may be granted deleting their own, never deleting any', () => {
+    expect(ADMIN_ONLY_CAPABILITIES).not.toContain('delete_own_messages')
+    expect(ADMIN_ONLY_CAPABILITIES).not.toContain('delete_own_conversations')
+    expect(ADMIN_ONLY_CAPABILITIES).not.toContain('message_customers')
   })
 
   test('create_labels is gone, folded into manage_labels', () => {
@@ -88,7 +118,7 @@ describe('parseCapabilities', () => {
     ['missing', undefined],
     ['null', null],
     ['a string', 'close'],
-    ['a number', 26],
+    ['a number', 29],
     ['an object', { close: true }],
   ])('%s reads as holding nothing', (_label, value) => {
     expect(parseCapabilities(value)).toEqual([])

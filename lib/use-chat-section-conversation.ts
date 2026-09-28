@@ -59,7 +59,7 @@ export function useChatSectionConversation(conversationId: string): ChatSection 
       conversation === null ||
       user === null ||
       author === null ||
-      !canViewConversation(role, user.id, conversation)
+      !canViewConversation(user, conversation)
     ) {
       return { status: 'denied' as const, home: role }
     }

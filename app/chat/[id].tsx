@@ -157,7 +157,7 @@ function ConversationScreen({
   const allowed =
     conversation !== null &&
     user !== null &&
-    canViewConversation(role, user.id, conversation);
+    canViewConversation(user, conversation);
 
   const author = useMemo(
     () => (user ? { id: user.id, name: user.name, role: user.role } : null),

@@ -11,10 +11,10 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
 import { settleEnter } from "@/lib/motion-enter";
-import { getSessionUser } from "@/lib/session";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { useUserDirectory } from "@/lib/use-user-directory";
+import { useViewer } from "@/lib/use-viewer";
 import { canCreateAccounts, userRoleLabel } from "@/lib/user-directory";
 import type { ManagedUser, UserRole } from "@/lib/types";
 
@@ -44,7 +44,7 @@ function Separator() {
 
 export function UserDirectoryScreen() {
   const navigation = useNavigation();
-  const viewer = getSessionUser();
+  const viewer = useViewer();
   const view = useUserDirectory();
   const reduceMotion = useReducedMotion();
   const [openId, setOpenId] = useState<string | null>(null);

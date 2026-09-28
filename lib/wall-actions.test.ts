@@ -42,6 +42,11 @@ describe('what a Post offers', () => {
     expect(wallPostActions(post(), stranger)).toEqual([])
   })
 
+  it('never offers a Customer Edit or Delete on a Post the company persona wrote', () => {
+    const byCompany = post({ author: { id: 'company:org-1', name: 'Acme Support' }, body: 'Hi' })
+    expect(wallPostActions(byCompany, stranger)).toEqual(['copy-body'])
+  })
+
   it('offers its text', () => {
     expect(wallPostActions(post({ body: 'The lift is fixed.' }), stranger)).toEqual(['copy-body'])
   })

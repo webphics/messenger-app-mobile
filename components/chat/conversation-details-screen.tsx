@@ -48,7 +48,7 @@ import {
   type StatusTone,
 } from '@/lib/conversation-details'
 import { conversationPeer, conversationTitle } from '@/lib/conversation-title'
-import { initials } from '@/lib/display'
+import { avatarInitials, initials, isCompanyPersona } from '@/lib/display'
 import { useKeyboardInset } from '@/lib/keyboard-inset'
 import { formatDayLabel } from '@/lib/message-day'
 import { colors, screenBottomPad } from '@/lib/tokens'
@@ -441,16 +441,21 @@ function MembersSection({ members }: { members: ConversationStaffPerson[] }) {
             <Avatar alt={member.name} className="size-9">
               <AvatarFallback className="bg-primary-soft">
                 <Text variant="label" className="font-semibold text-primary">
-                  {initials(member.name)}
+                  {avatarInitials(member)}
                 </Text>
               </AvatarFallback>
             </Avatar>
             <Text variant="body" numberOfLines={1} className="min-w-0 flex-1 text-ink">
               {member.name}
             </Text>
-            <Text variant="label" className="uppercase tracking-wide text-muted">
-              {member.role}
-            </Text>
+            {/* The company persona stands for every staff member a Customer
+                shares the group with. It is the organization, not somebody
+                holding a role, so it wears no role. */}
+            {isCompanyPersona(member.id) ? null : (
+              <Text variant="label" className="uppercase tracking-wide text-muted">
+                {member.role}
+              </Text>
+            )}
           </View>
         ))}
       </View>
