@@ -13,7 +13,7 @@ previously called the end-user role Contact; see `CONTEXT.md`.
 
 Platforms (whole product): Next.js web, Expo iOS/Android, NestJS + Postgres + Socket.IO/Redis. **This repo is Expo only.**
 
-Mobile in this app includes Customer, Agent, and a **slim** Admin surface (overview, users, conversations, settings). Full analytics, audit log UI, and SLA config stay on web.
+Mobile in this app includes Customer, Agent, and a **slim** Admin surface (overview, users, conversations, settings), plus the analytics charts for an Admin holding `view_team_analytics` and a read-only audit log for one holding `view_team_activity`. Analytics ranges, the audit log's filters and detail pane, and SLA config stay on web.
 
 ## Not this product
 

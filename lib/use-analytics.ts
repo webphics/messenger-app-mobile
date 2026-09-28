@@ -3,10 +3,10 @@ import { useFocusEffect } from 'expo-router'
 
 import { getAnalyticsOverview } from '@/lib/analytics-api'
 import { analyticsCharts } from '@/lib/analytics-charts'
-import { useAuth } from '@/lib/auth-context'
-import { can } from '@/lib/capabilities'
+import { ANALYTICS_ACCESS, mayEnter } from '@/lib/route-access'
 import type { AnalyticsOverview, ChartMetric } from '@/lib/types'
 import { useSupportAssignment } from '@/lib/use-support-assignment'
+import { useViewer } from '@/lib/use-viewer'
 
 /**
  * The Admin Hub's charts, read from `GET /analytics/overview`.
@@ -33,10 +33,10 @@ import { useSupportAssignment } from '@/lib/use-support-assignment'
  * switch — and that can move under a Hub already drawn, when a session is
  * re-read, without anything being fetched again.
  *
- * Nothing is asked for without `view_team_analytics`, which is what the API
- * checks: a read it would refuse is a request spent on a `403`, and the Hub
- * draws neither the carousel nor the tile for that viewer anyway. It stays
- * `loading` then, and nothing on screen reads it.
+ * Nothing is asked for unless the viewer passes `ANALYTICS_ACCESS` — the rule
+ * the Hub draws the carousel and the tile by, and `view_team_analytics` is
+ * what the API checks: a read it would refuse is a request spent on a `403`.
+ * It stays `loading` then, and nothing on screen reads it.
  */
 
 export type AnalyticsView = {
@@ -54,9 +54,7 @@ export type AnalyticsView = {
 }
 
 export function useAnalytics(): AnalyticsView {
-  const { state } = useAuth()
-  const allowed =
-    state.status === 'signed-in' && can(state.user, 'view_team_analytics')
+  const allowed = mayEnter(useViewer(), ANALYTICS_ACCESS)
 
   const [status, setStatus] = useState<AnalyticsView['status']>('loading')
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)

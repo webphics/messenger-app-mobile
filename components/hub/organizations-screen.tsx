@@ -16,10 +16,10 @@ import {
   listOrganizations,
   renameOrganization,
 } from "@/lib/org-api";
-import { getSessionUser } from "@/lib/session";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import type { OrganizationSummary } from "@/lib/types";
+import { useViewer } from "@/lib/use-viewer";
 
 /**
  * The organizations, for an Admin.
@@ -65,7 +65,7 @@ function memberLine(organization: OrganizationSummary): string {
 export function OrganizationsScreen() {
   const navigation = useNavigation();
   const router = useRouter();
-  const canManage = can(getSessionUser(), "manage_organizations");
+  const canManage = can(useViewer(), "manage_organizations");
   const [state, setState] = useState<State>({ status: "loading" });
   const [query, setQuery] = useState("");
   const [refreshing, setRefreshing] = useState(false);

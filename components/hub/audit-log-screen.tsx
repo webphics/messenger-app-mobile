@@ -16,13 +16,17 @@ import { useActivityList } from "@/lib/use-activity-list";
 import type { ActivityEvent } from "@/lib/types";
 
 /**
- * What the team has been doing, newest first.
+ * The Audit log: what the team has been doing, newest first.
  *
- * The web client's Activity page, read on a phone: one sentence per event and
- * when it happened, with a search that goes to the API. Offered to an Admin
- * holding `view_team_activity`, which is what the API checks; the table, its
- * filters and the detail pane stay on web, the way the rest of mobile Admin is
- * the overview and not the whole desk.
+ * The web client's Activity page, read on a phone: one sentence per entry and
+ * when it happened, with a search that goes to the API. The API, the web client
+ * and the `lib/activity-*` modules under this screen call it activity, after
+ * `GET /activity`; on screen and in the glossary it is the Audit log, because
+ * the glossary keeps "activity" off a System notice and a Notification row,
+ * and a bare "Activity" invites exactly that confusion.
+ * Offered to an Admin holding `view_team_activity`, which is what the API
+ * checks; the table, its filters and the detail pane stay on web, the way the
+ * rest of mobile Admin is the overview and not the whole desk.
  *
  * Nothing here is a control. A row says what happened; acting on it is done
  * where the thing it names lives.
@@ -36,7 +40,7 @@ function Separator() {
   return <View className="h-3" />;
 }
 
-const ActivityRow = memo(function ActivityRow({ event }: { event: ActivityEvent }) {
+const AuditLogRow = memo(function AuditLogRow({ event }: { event: ActivityEvent }) {
   const sentence = describeActivity(event);
   const actor = activityActorName(event);
   const age = formatRelativeTime(event.at);
@@ -51,7 +55,7 @@ const ActivityRow = memo(function ActivityRow({ event }: { event: ActivityEvent 
       <Avatar alt="" className="size-10">
         <AvatarFallback className={actor ? "bg-primary-soft" : "bg-line/70"}>
           {/* The system and an account that has since gone have no face, so
-              they get the feed's own mark rather than a question mark. */}
+              they get the log's own mark rather than a question mark. */}
           {actor ? (
             <Text variant="meta" className="font-bold text-primary">
               {initials(actor)}
@@ -74,10 +78,10 @@ const ActivityRow = memo(function ActivityRow({ event }: { event: ActivityEvent 
 });
 
 function renderItem({ item }: { item: ActivityEvent }) {
-  return <ActivityRow event={item} />;
+  return <AuditLogRow event={item} />;
 }
 
-export function ActivityScreen() {
+export function AuditLogScreen() {
   const view = useActivityList();
   const reduceMotion = useReducedMotion();
   const { feed } = view;
@@ -97,7 +101,7 @@ export function ActivityScreen() {
           value={view.query}
           onChangeText={view.setQuery}
           placeholder="Search by person or action…"
-          accessibilityLabel="Search activity"
+          accessibilityLabel="Search the audit log"
         />
       </View>
 
@@ -119,7 +123,7 @@ export function ActivityScreen() {
         refreshControl={makeRefreshControl(view.refreshing, view.refresh)}
         ListFooterComponent={
           view.loadingMore ? (
-            <View accessibilityLabel="Loading more activity" className="items-center py-5">
+            <View accessibilityLabel="Loading more of the audit log" className="items-center py-5">
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : view.moreFailure ? (
@@ -129,7 +133,8 @@ export function ActivityScreen() {
               </Text>
               <TactilePressable
                 accessibilityRole="button"
-                accessibilityLabel="Load more activity"
+                accessibilityLabel="Try again"
+                accessibilityHint="Loads the next page of the audit log"
                 onPress={view.loadMore}
                 className="min-h-11 justify-center rounded-full border border-line/80 bg-surface px-5"
               >
@@ -142,7 +147,7 @@ export function ActivityScreen() {
         }
         ListEmptyComponent={
           feed.status === "loading" ? (
-            <View accessibilityLabel="Loading activity" className="gap-3">
+            <View accessibilityLabel="Loading the audit log" className="gap-3">
               {[0, 1, 2, 3].map((row) => (
                 <View
                   key={row}

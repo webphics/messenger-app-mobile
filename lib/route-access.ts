@@ -1,4 +1,9 @@
-import { USERS_SCREEN_CAPABILITIES, canAny, type Capability } from '@/lib/capabilities'
+import {
+  ORGANIZATIONS_SCREEN_CAPABILITIES,
+  USERS_SCREEN_CAPABILITIES,
+  canAny,
+  type Capability,
+} from '@/lib/capabilities'
 import type { UserRole } from '@/lib/types'
 
 /**
@@ -57,13 +62,16 @@ export const ROLE_GROUP_ACCESS: Readonly<Record<UserRole, Access>> = {
 }
 
 /**
- * Organizations carry editing (`manage_organizations`) and their members
- * (`manage_memberships`). Holding neither leaves nothing to do there.
+ * Who sees the Admin's analytics: the Hub's Awaiting reply tile, its chart
+ * carousel, the chart each card opens, and `useAnalytics`, which asks the API
+ * for nothing without it. Not a screen of its own — the tile and the carousel
+ * sit on the Hub — so it is named here rather than borrowed from a screen's
+ * row, and `chart/[id]` reads it.
  */
-const ORGANIZATIONS_SCREEN_CAPABILITIES: readonly Capability[] = [
-  'manage_organizations',
-  'manage_memberships',
-]
+export const ANALYTICS_ACCESS = {
+  roles: ['admin'],
+  anyCapability: ['view_team_analytics'],
+} as const satisfies Access
 
 /**
  * The Admin Hub's screens that need more than being an Admin, keyed by their
@@ -82,9 +90,10 @@ export const SCREEN_ACCESS = {
   labels: { roles: ['admin'], anyCapability: ['manage_labels'] },
   /** Writing the library. Reading it happens in the composer, open to all staff. */
   'saved-responses': { roles: ['admin'], anyCapability: ['manage_canned_replies'] },
+  /** The Audit log. */
   activity: { roles: ['admin'], anyCapability: ['view_team_activity'] },
-  /** The Hub's chart carousel reads the same row, so a chart is drawn only where it opens. */
-  'chart/[id]': { roles: ['admin'], anyCapability: ['view_team_analytics'] },
+  /** The rule the Hub's carousel is drawn by, so a chart is drawn only where it opens. */
+  'chart/[id]': ANALYTICS_ACCESS,
   'offer-add': { roles: ['admin'] },
 } as const satisfies Record<string, Access>
 

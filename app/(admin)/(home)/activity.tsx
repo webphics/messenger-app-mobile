@@ -1,5 +1,6 @@
-import { ActivityScreen } from "@/components/hub/activity-screen";
+import { AuditLogScreen } from "@/components/hub/audit-log-screen";
 
-export default function AdminActivityScreen() {
-  return <ActivityScreen />;
+/** The Audit log. The route keeps the API's and the web client's name, `/activity`. */
+export default function AdminAuditLogScreen() {
+  return <AuditLogScreen />;
 }

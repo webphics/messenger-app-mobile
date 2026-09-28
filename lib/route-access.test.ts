@@ -1,5 +1,6 @@
 import { CAPABILITIES, type Capability } from '@/lib/capabilities'
 import {
+  ANALYTICS_ACCESS,
   ROLE_GROUP_ACCESS,
   SCREEN_ACCESS,
   mayEnter,
@@ -63,6 +64,22 @@ describe('ROLE_GROUP_ACCESS', () => {
     for (const group of ROLES) {
       expect(mayEnter(viewer(role, ...CAPABILITIES), ROLE_GROUP_ACCESS[group])).toBe(group === role)
     }
+  })
+})
+
+describe('ANALYTICS_ACCESS', () => {
+  test.each<[UserRole, Capability[], boolean]>([
+    ['admin', ['view_team_analytics'], true],
+    ['admin', ['view_team_activity'], false],
+    ['admin', [], false],
+    ['agent', ['view_team_analytics'], false],
+    ['customer', ['view_team_analytics'], false],
+  ])('a %s holding %j: %s', (role, held, expected) => {
+    expect(mayEnter(viewer(role, ...held), ANALYTICS_ACCESS)).toBe(expected)
+  })
+
+  test('a chart opens exactly where the Hub draws the carousel', () => {
+    expect(SCREEN_ACCESS['chart/[id]']).toBe(ANALYTICS_ACCESS)
   })
 })
 

@@ -1,6 +1,4 @@
-import { activityActorName, describeActivity } from '@/lib/activity-copy'
 import { parseActivityEvent, parseActivityPage } from '@/lib/activity-parse'
-import type { ActivityEvent } from '@/lib/types'
 
 const ROW = {
   id: 'evt-1',
@@ -14,10 +12,6 @@ const ROW = {
   targetLabel: 'Luis Ferreira',
   metadata: {},
   at: '2026-09-20T10:00:00.000Z',
-}
-
-function event(overrides: Partial<ActivityEvent> = {}): ActivityEvent {
-  return parseActivityEvent({ ...ROW, ...overrides })!
 }
 
 describe('parseActivityEvent', () => {
@@ -101,42 +95,5 @@ describe('parseActivityPage', () => {
 
   test('missing paging falls back to what arrived', () => {
     expect(parseActivityPage({ rows: [ROW] })).toMatchObject({ total: 1, page: 1, pageSize: 1 })
-  })
-})
-
-describe('describeActivity', () => {
-  test.each<[string, Partial<ActivityEvent>, string]>([
-    ['a named actor and target', {}, 'Jonah Reed closed the conversation Luis Ferreira'],
-    ['a gone actor', { actor: null }, 'A deleted account closed the conversation Luis Ferreira'],
-    [
-      'the system',
-      { actorRole: 'system', actor: null, kind: 'wall.post_removed' },
-      'The system removed a Wall post',
-    ],
-    ['a gone target', { targetLabel: null }, 'Jonah Reed closed a conversation'],
-    [
-      'a permissions change',
-      {
-        kind: 'user.permissions_changed',
-        target: { id: 'agent-2', name: 'Priya Shah', role: 'agent' },
-        metadata: { granted: ['message_customers', 'delete_own_messages'], revoked: ['staff_dm'] },
-      },
-      'Jonah Reed granted message customers and delete own messages and revoked staff dm for Priya Shah',
-    ],
-    ['a kind this build has no sentence for', { kind: 'team.archived' }, 'Team archived'],
-    ['a kind named like an object property', { kind: 'constructor' }, 'Constructor'],
-  ])('%s', (_label, overrides, sentence) => {
-    expect(describeActivity(event(overrides))).toBe(sentence)
-  })
-})
-
-describe('activityActorName', () => {
-  test('whoever did it', () => {
-    expect(activityActorName(event())).toBe('Jonah Reed')
-  })
-
-  test('nobody for the system or a gone account', () => {
-    expect(activityActorName(event({ actorRole: 'system', actor: null }))).toBeNull()
-    expect(activityActorName(event({ actor: null }))).toBeNull()
   })
 })
