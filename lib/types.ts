@@ -1005,16 +1005,89 @@ export type CannedReply = {
   archived: boolean
 }
 
-/** Who did something in the Activity feed, or whom it was done to. */
+/**
+ * Every kind of Audit log entry this build has a sentence for. Mirrors
+ * `activityEventKinds` in the API
+ * (`core/database/schema/mongo/activity/activity.mongo.constants.ts`), as the
+ * web client's `activityKindValues` does. `lib/activity-copy` keys its
+ * sentences on this union, so a kind added here without a sentence is a type
+ * error rather than a slug on screen.
+ */
+export const activityKinds = [
+  'conversation.engaged',
+  'conversation.taken_over',
+  'conversation.transferred',
+  'conversation.closed',
+  'conversation.reopened',
+  'conversation.deleted',
+  'conversation.unassigned',
+  'conversation.priority_changed',
+  'conversation.message_deleted',
+  'conversation.message_edited',
+  'conversation.message_attachment_deleted',
+  'group.created',
+  'group.updated',
+  'group.member_added',
+  'group.member_removed',
+  'group.member_left',
+  'group.member_joined',
+  'group.write_policy_changed',
+  'group.join_policy_changed',
+  'group.join_requested',
+  'group.join_request_approved',
+  'group.join_request_declined',
+  'group.join_request_withdrawn',
+  'group.join_request_cancelled',
+  'group.avatar_changed',
+  'community.created',
+  'community.updated',
+  'community.member_added',
+  'community.member_removed',
+  'community.member_left',
+  'community.moderator_promoted',
+  'community.moderator_demoted',
+  'community.group_linked',
+  'community.group_unlinked',
+  'user.created',
+  'user.deleted',
+  'user.role_changed',
+  'user.username_changed',
+  'user.sessions_revoked',
+  'user.two_factor_reset',
+  'user.permissions_changed',
+  'user.banned',
+  'user.unbanned',
+  'user.password_reset',
+  'team.renamed',
+  'organization.created',
+  'organization.updated',
+  'organization.deleted',
+  'invitation.sent',
+  'invitation.accepted',
+  'invitation.declined',
+  'invitation.cancelled',
+  'membership.granted',
+  'membership.removed',
+  'wall.contributor_granted',
+  'wall.contributor_revoked',
+  'wall.post_created',
+  'wall.post_edited',
+  'wall.post_removed',
+] as const
+
+export type ActivityKind = (typeof activityKinds)[number]
+
+/** Who did something in the Audit log, or whom it was done to. */
 export type ActivityPerson = { id: string; name: string; role: UserRole }
 
 /**
- * One row of the Activity feed, from `GET /activity`: a thing somebody did,
- * written by the API when they did it and never edited after.
+ * One Audit log entry, from `GET /activity`: a thing somebody did, written by
+ * the API when they did it and never edited after. The API and the web client
+ * call it an Activity Event, which is why the type keeps that name.
  *
- * `kind` stays a string rather than a union of the API's sixty-odd: a server a
- * release ahead of this client records kinds this build has no sentence for,
- * and `describeActivity` falls back to a readable slug for them rather than
+ * `kind` stays a string rather than `ActivityKind`: a server a release ahead of
+ * this client records kinds this build has no sentence for, and
+ * `describeActivity` falls back to a readable slug for them rather than
  * dropping the row.
  */
 export type ActivityEvent = {
@@ -1033,7 +1106,7 @@ export type ActivityEvent = {
   at: string
 }
 
-/** One page of the feed, newest first. */
+/** One page of the Audit log, newest first. */
 export type ActivityPage = {
   events: ActivityEvent[]
   /** How many events the query matched, which is not how many arrived in this page. */

@@ -1,7 +1,7 @@
-import type { ActivityEvent } from '@/lib/types'
+import type { ActivityEvent, ActivityKind } from '@/lib/types'
 
 /**
- * One sentence per Activity kind, the web client's copy
+ * One sentence per Audit log entry kind, the web client's copy
  * (`features/activity/utils/activity-copy.ts`) carried over so a row reads the
  * same on both.
  *
@@ -14,8 +14,10 @@ import type { ActivityEvent } from '@/lib/types'
  * and a group or community membership event stores the member's id only, so
  * the member is "a member".
  *
- * A kind this build has no sentence for falls through to a prettified slug, so
- * a newer server degrades to something readable instead of a blank row.
+ * The map is keyed on `ActivityKind`, so a kind the API records and this map
+ * forgets is a type error. A kind this build has never heard of — a server a
+ * release ahead — falls through to a prettified slug at run time, so it
+ * degrades to something readable instead of a blank row.
  */
 
 type ActivityCopyBuilder = (event: ActivityEvent) => string
@@ -114,7 +116,7 @@ export function formatCapabilityList(capabilities: string[]): string {
   return `${labels.slice(0, -1).join(', ')}, and ${labels.at(-1)}`
 }
 
-const ACTIVITY_COPY: Readonly<Record<string, ActivityCopyBuilder>> = {
+const ACTIVITY_COPY: Readonly<Record<ActivityKind, ActivityCopyBuilder>> = {
   'conversation.engaged': (event) => `${actorName(event)} engaged ${conversationLabel(event)}`,
   'conversation.taken_over': (event) =>
     `${actorName(event)} took over ${conversationLabel(event)}`,
@@ -305,9 +307,16 @@ function describeFallback(kind: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
+/**
+ * Own keys only, so a kind named like an object property (`constructor`) is
+ * not mistaken for one with a sentence.
+ */
+function isActivityKind(kind: string): kind is ActivityKind {
+  return Object.hasOwn(ACTIVITY_COPY, kind)
+}
+
 export function describeActivity(event: ActivityEvent): string {
-  const build = Object.hasOwn(ACTIVITY_COPY, event.kind) ? ACTIVITY_COPY[event.kind] : undefined
-  return build ? build(event) : describeFallback(event.kind)
+  return isActivityKind(event.kind) ? ACTIVITY_COPY[event.kind](event) : describeFallback(event.kind)
 }
 
 /**

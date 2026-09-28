@@ -38,7 +38,7 @@ export default function AdminHomeLayout() {
         <Stack.Screen name="saved-responses" options={{ title: "Saved responses" }} />
       </Stack.Protected>
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.activity)}>
-        <Stack.Screen name="activity" options={{ title: "Activity" }} />
+        <Stack.Screen name="activity" options={{ title: "Audit log" }} />
       </Stack.Protected>
       {/* FAQ and Knowledge are hidden for now. These lines only set a
           screen's title; the route files stay where they are, so uncommenting

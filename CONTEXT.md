@@ -19,9 +19,23 @@ the end-user role, which is Customer. The two must not be collapsed. The endpoin
 three roles and the row says what a tap does: a Customer's contacts are the organizations they
 belong to, an Agent's are the Customers whose Support DMs they can see plus the rest of the staff,
 and an Admin's is the whole directory. Every row already names the thread that exists between the
-two, where one does. Reached as the People tab by staff and as the New Message sheet by everyone.
+two, where one does. Staff holding `message_customers` are also sent Customers who have no support
+thread yet; starting one is web-only, so this client leaves those rows out (`reachableContacts`)
+rather than drawing a row a tap can do nothing with. Reached as the People tab by staff and as the
+New Message sheet by everyone.
 _Avoid_: Contacts (bare, when the Customer role is meant), directory, people picker, Users (that is
 the Account directory)
+
+**Company persona**:
+What a Customer sees in place of any Agent or Admin: the organization, speaking as one person. The
+API puts it wherever a staff member would otherwise appear in a Customer's payload — a group
+message's sender, a group's members, a reactor, a Post's author — so staff answer a Customer as one
+voice and no Customer can tell them apart or count them. Its id is `company:<organizationId>`, or
+`company:app` for the company as a whole where there is no organization; the prefix is how this
+client recognises one (`isCompanyPersona`), and it draws the name's first letter rather than two
+initials. Never the viewer, so its message is never outgoing. Not a *company* row in the Contact
+list, which is an organization a Customer can open a support thread with rather than a sender.
+_Avoid_: Company account, bot, staff alias, company (bare — that is the Contact row)
 
 **Account directory**:
 The Admin's list of every account, backed by `GET /users`, reached from the Admin hub. Not the
@@ -46,7 +60,7 @@ receipt like any other message, and the notice row shows neither. Never counted 
 side: the API's `countUnreadMessagesFor` excludes `system`, and so does this client's live count.
 Staff see them; a Customer never does — the API withholds them from a Customer's payload and the
 client filters again on the way in.
-_Avoid_: System message (as a bubble), event, activity log entry
+_Avoid_: System message (as a bubble), event, activity log entry (that is the Audit log's)
 
 **Agent**:
 Support staff role. Sees assigned threads plus the unassigned pool. Cannot delete.
@@ -54,8 +68,10 @@ _Avoid_: Rep, operator
 
 **Admin**:
 Oversight role with slim mobile surface: the hub, People, the Unassigned pool, conversations, and
-the org-wide settings the hub leads to — the Account directory, Organizations and Labels. Full
-analytics and the audit log stay on web.
+the org-wide settings the hub leads to — the Account directory, Organizations and Labels. The hub
+also carries Analytics & Charts for an Admin holding `view_team_analytics` and the Audit log for one
+holding `view_team_activity`; an Agent holding either gets neither on mobile. Analytics ranges and
+the Audit log's filters and detail pane stay on web.
 _Avoid_: Superuser, owner
 
 **Hub**:
@@ -286,7 +302,8 @@ The container everything in this product belongs to — every conversation, ever
 saved inbox. An Admin creates, renames and deletes them; the member and conversation counts on each
 are the API's. A Staff DM, a group, a Community and a Post each belong to exactly one.
 _Avoid_: Team (that is the API's `/team`, the single tenant name), workspace, company (a *company*
-is what a Customer's contact row for an organization is called)
+is what a Customer's contact row for an organization is called, and the Company persona is the
+organization speaking as a person)
 
 **Invitation**:
 The only way into an organization. An Admin invites and the person accepts; there is no route that
@@ -413,11 +430,23 @@ _Avoid_: Stories, ads, sponsored content (as a product feature)
 The Admin Hub's carousel of five cards read from `GET /analytics/overview` — conversations opened
 and messages sent per day over the API's default thirty UTC days, the queue's current mix, opened
 against closed for the range, and every account by role. A tap opens that one chart full-screen,
-where pull-to-refresh re-reads the overview. Staff-only server-side; absent entirely when the read
-failed with nothing already drawn. **Opened and closed are never drawn as one whole** — the API
+where pull-to-refresh re-reads the overview. The API answers only a holder of
+`view_team_analytics`, and the hub draws the carousel only for an Admin holding it
+(`ANALYTICS_ACCESS` in `lib/route-access`); absent entirely when the read failed with nothing
+already drawn. **Opened and closed are never drawn as one whole** — the API
 permits `closed` to exceed `opened` when a team works down a backlog. In a Shared queue the queue
 mix is Open against Closed, since Unassigned and Engaged are not two states of anything there.
 _Avoid_: Dashboard, metrics, reports, KPIs
+
+**Audit log**:
+The record of what staff have done — engaged, closed, banned, invited, renamed — read from
+`GET /activity`, one sentence per entry and newest first, with a search the API runs. Reached from
+the Admin hub by an Admin holding `view_team_activity`, which is what the API checks; its table,
+filters and detail pane stay on web. The API, the web client and this client's code call it
+*activity* — the route is `/activity`, an entry is an `ActivityEvent`, the modules are
+`lib/activity-*` — and the screen is `AuditLogScreen`, titled Audit log. An entry is written by the
+API and never edited, and is not a System notice, which is in the thread.
+_Avoid_: Activity, activity feed, history, Notification row
 
 **Latest on the Wall**:
 The Customer Hub's carousel of the newest Posts on the reader's own Wall — the Offers carousel's
@@ -763,7 +792,7 @@ The API's own record that something happened for a person, written by its `notif
 announced as `notification.created`. Older and broader than a Push notification, which is one
 *dispatch channel* for some of them. This client renders none of these rows and has no screen for
 them; it names them only so the two are not confused.
-_Avoid_: Notification (bare), in-app notification, activity, feed item
+_Avoid_: Notification (bare), in-app notification, activity (that is the Audit log), feed item
 
 **In-app banner**:
 What a Message gets instead of a Push notification when the app is open on some other screen: a

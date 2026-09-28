@@ -11,11 +11,11 @@ import { cn } from "@/lib/cn";
 import { failureNotice } from "@/lib/conversation-failure";
 import { initials } from "@/lib/display";
 import { inviteToOrganizations, listOrganizationMembers, removeMembership } from "@/lib/org-api";
-import { getSessionUser } from "@/lib/session";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { listUsers } from "@/lib/user-api";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
+import { useViewer } from "@/lib/use-viewer";
 import { unmanageableIds, userDisplayName } from "@/lib/user-directory";
 import type { ManagedUser, OrganizationMember } from "@/lib/types";
 
@@ -62,7 +62,7 @@ export function OrganizationMembersScreen({
 }: {
   organizationId: string;
 }) {
-  const viewer = getSessionUser();
+  const viewer = useViewer();
   const canManage = can(viewer, "manage_memberships");
   // A Shared queue holds nothing on anybody's behalf, so there is nothing of
   // theirs to reassign and the warning does not claim there is.

@@ -25,7 +25,7 @@ import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
 // import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
-import { mayEnter, SCREEN_ACCESS } from "@/lib/route-access";
+import { ANALYTICS_ACCESS, mayEnter, SCREEN_ACCESS } from "@/lib/route-access";
 import { useAnalytics } from "@/lib/use-analytics";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useViewer } from "@/lib/use-viewer";
@@ -65,10 +65,11 @@ export function AdminHub() {
    * holds can say, and the question means the same thing in both modes.
    *
    * All three — the tile, the carousel and the chart they open — are there
-   * only for a viewer holding `view_team_analytics`, which is what the API
-   * checks. Without it `useAnalytics` asks for nothing.
+   * only for a viewer passing `ANALYTICS_ACCESS`, which asks for
+   * `view_team_analytics`, what the API checks. Without it `useAnalytics`
+   * asks for nothing.
    */
-  const showsAnalytics = mayEnter(me, SCREEN_ACCESS["chart/[id]"]);
+  const showsAnalytics = mayEnter(me, ANALYTICS_ACCESS);
   const analytics = useAnalytics();
   const { awaitingReply } = analytics;
 
@@ -235,9 +236,9 @@ export function AdminHub() {
           <ActionRow
             icon={Activity}
             tone="neutral"
-            title="Activity"
+            title="Audit log"
             hint="What the team has done, newest first"
-            accessibilityLabel="Activity"
+            accessibilityLabel="Audit log"
             onPress={() => router.push("/(admin)/activity" as Href)}
           />
         ) : null}

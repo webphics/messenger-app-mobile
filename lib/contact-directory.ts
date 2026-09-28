@@ -73,6 +73,8 @@ export function contactIntent(
     return { kind: 'support', organizationId: contact.id }
   }
 
+  // `reachableContacts` keeps these off the screen; this answers for a caller
+  // that did not narrow first, rather than offering a create nothing backs.
   if (contact.kind === 'customer') {
     return { kind: 'unavailable', reason: 'No support thread yet' }
   }
@@ -129,6 +131,22 @@ export function sharedOrganizationsById(
   directory: StaffDirectoryUser[],
 ): ReadonlyMap<string, SharedOrganizations> {
   return new Map(directory.map((user) => [user.id, user.sharedOrganizations]))
+}
+
+/**
+ * The rows a tap can do something with, which is every row but a Customer with
+ * no support thread.
+ *
+ * Staff holding `message_customers` are sent those Customers too, with a null
+ * `conversationId`. Starting a conversation with a Customer is web-only — this
+ * client has no request for it — so such a row could only ever read
+ * "unavailable". It is left out instead of drawn as a dead row. A Customer
+ * viewer is never sent customer rows, so nothing of theirs is narrowed.
+ */
+export function reachableContacts(contacts: Contact[]): Contact[] {
+  return contacts.filter(
+    (contact) => contact.kind !== 'customer' || contact.conversationId !== null,
+  )
 }
 
 /** The directory as the search field leaves it. Matches a name or a role. */

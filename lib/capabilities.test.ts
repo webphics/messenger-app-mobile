@@ -2,6 +2,7 @@ import {
   ADMIN_ONLY_CAPABILITIES,
   CAPABILITIES,
   CAPABILITY_GROUPS,
+  ORGANIZATIONS_SCREEN_CAPABILITIES,
   USERS_SCREEN_CAPABILITIES,
   can,
   canAny,
@@ -46,6 +47,10 @@ describe('CAPABILITIES', () => {
 
   test('the Accounts screen opens on any of the three that act on people', () => {
     expect(USERS_SCREEN_CAPABILITIES).toEqual(['manage_users', 'change_roles', 'manage_permissions'])
+  })
+
+  test('the Organizations screen opens on editing them or on managing their members', () => {
+    expect(ORGANIZATIONS_SCREEN_CAPABILITIES).toEqual(['manage_organizations', 'manage_memberships'])
   })
 
   test('deleting your own sits after deleting any, in the Support group', () => {

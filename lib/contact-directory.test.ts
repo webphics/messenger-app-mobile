@@ -6,6 +6,7 @@ import {
   contactSubtitle,
   filterContacts,
   narrowContacts,
+  reachableContacts,
   sharedOrganizationsById,
 } from '@/lib/contact-directory'
 import type { Contact, StaffDirectoryUser } from '@/lib/types'
@@ -102,6 +103,26 @@ describe('sharedOrganizationsById', () => {
     expect(shared.get('b')).toBeNull()
     // Absent, which is a third thing again: this person was not in the directory.
     expect(shared.get('c')).toBeUndefined()
+  })
+})
+
+describe('reachableContacts', () => {
+  test.each<[string, Contact, boolean]>([
+    ['a Customer with a support thread', contact({ kind: 'customer', role: 'customer', conversationId: 'conv-1' }), true],
+    ['a Customer with no support thread', contact({ kind: 'customer', role: 'customer' }), false],
+    ['a colleague with no thread yet', contact(), true],
+    ['a colleague with a thread', contact({ conversationId: 'conv-2' }), true],
+    ['a company with no thread yet', contact({ kind: 'company', role: null, id: 'org-1' }), true],
+    ['a company with a thread', contact({ kind: 'company', role: null, id: 'org-1', conversationId: 'conv-3' }), true],
+  ])('%s: kept %s', (_label, row, kept) => {
+    expect(reachableContacts([row])).toEqual(kept ? [row] : [])
+  })
+
+  test('keeps the order of what it keeps', () => {
+    const first = contact({ id: 'a' })
+    const dead = contact({ id: 'b', kind: 'customer', role: 'customer' })
+    const last = contact({ id: 'c', kind: 'customer', role: 'customer', conversationId: 'conv-1' })
+    expect(reachableContacts([first, dead, last])).toEqual([first, last])
   })
 })
 

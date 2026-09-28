@@ -81,6 +81,16 @@ export const USERS_SCREEN_CAPABILITIES: readonly Capability[] = [
   'manage_permissions',
 ]
 
+/**
+ * Organizations carry editing (`manage_organizations`) and their members
+ * (`manage_memberships`). Holding either opens the Organizations screen and an
+ * organization's Members; holding neither leaves nothing to do there.
+ */
+export const ORGANIZATIONS_SCREEN_CAPABILITIES: readonly Capability[] = [
+  'manage_organizations',
+  'manage_memberships',
+]
+
 const KNOWN: ReadonlySet<string> = new Set(CAPABILITIES)
 
 export function isCapability(value: unknown): value is Capability {

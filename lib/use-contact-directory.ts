@@ -10,6 +10,7 @@ import { failureNotice } from '@/lib/conversation-failure'
 import {
   contactIntent,
   filterContacts,
+  reachableContacts,
   sharedOrganizationsById,
   type ContactIntent,
   type SharedOrganizations,
@@ -45,7 +46,7 @@ export type ContactDirectory =
 
 export type ContactDirectoryView = {
   directory: ContactDirectory
-  /** Everything loaded, narrowed by the search field and nothing else. */
+  /** Every row a tap can act on (`reachableContacts`), narrowed by the search field. */
   contacts: Contact[]
   /** What a tap on this row would do, with the staff directory folded in. */
   intentFor: (contact: Contact) => ContactIntent
@@ -99,7 +100,7 @@ export function useContactDirectory(
       if (staff?.ok) setShared(sharedOrganizationsById(staff.value))
 
       if (contacts.ok) {
-        setDirectory({ status: 'ready', contacts: contacts.value })
+        setDirectory({ status: 'ready', contacts: reachableContacts(contacts.value) })
         return
       }
       const notice = failureNotice(contacts.failure, 'Could not load your contacts')
