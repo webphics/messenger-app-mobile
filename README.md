@@ -147,9 +147,9 @@ selects its without-Firebase path, which writes to `Info.plist` and nothing else
 Settle two things before creating the client, because both are expensive to change afterwards. The
 bundle identifier is `com.zeestglobal.joychat`; once it exists in the Apple Developer portal and an
 OAuth client, changing it means a new OAuth client, a new Firebase Android app and a new App Store
-record. And `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` goes into `eas.json` only once there is a real value
-for it. EAS rejects an empty string in an `env` block, and an absent variable is already what the
-app reads as "no iOS client".
+record. The iOS client exists (`753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9`) and is set in every
+`env` block of `eas.json`. It is read at build time, so an installed development client built
+without it keeps the Google button disabled until it is rebuilt.
 
 ## Push notifications
 
