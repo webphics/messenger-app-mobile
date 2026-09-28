@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useCallback } from "react";
 
 import { ContactList } from "@/components/inbox/contact-list";
-import { can } from "@/lib/capabilities";
 import { chatHref } from "@/lib/chat-route-id";
 import { useViewer } from "@/lib/use-viewer";
 import { useContactDirectory } from "@/lib/use-contact-directory";
@@ -28,7 +27,7 @@ export function ContactsScreen() {
     [router],
   );
 
-  const view = useContactDirectory(user?.role ?? null, open, can(user, "staff_dm"));
+  const view = useContactDirectory(user, open);
 
   return (
     <ContactList

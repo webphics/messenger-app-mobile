@@ -84,7 +84,7 @@ function NewChatSheet({
     [onClose, onOpenConversation],
   );
 
-  const view = useContactDirectory(user?.role ?? null, open, can(user, "staff_dm"));
+  const view = useContactDirectory(user, open);
   const isCustomer = user?.role === "customer";
   // The API gates Group creation on `create_groups` for Admins and Agents alike.
   const canCreateGroup = can(user, "create_groups");

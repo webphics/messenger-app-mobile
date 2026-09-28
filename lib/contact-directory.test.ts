@@ -9,6 +9,7 @@ import {
   reachableContacts,
   sharedOrganizationsById,
 } from '@/lib/contact-directory'
+import type { StaffDmViewer } from '@/lib/rbac'
 import type { Contact, StaffDirectoryUser } from '@/lib/types'
 
 function contact(overrides: Partial<Contact> = {}): Contact {
@@ -22,13 +23,17 @@ function contact(overrides: Partial<Contact> = {}): Contact {
   }
 }
 
+const AGENT_WITH_STAFF_DM: StaffDmViewer = { role: 'agent', capabilities: ['staff_dm'] }
+const AGENT_WITHOUT_STAFF_DM: StaffDmViewer = { role: 'agent', capabilities: [] }
+const ADMIN_WITHOUT_STAFF_DM: StaffDmViewer = { role: 'admin', capabilities: [] }
+
 const TALO = { id: 'org-1', name: 'Talo' }
 const NORTHWIND = { id: 'org-2', name: 'Northwind' }
 
 describe('contactIntent', () => {
   test('a row naming a thread opens it, whatever kind the row is', () => {
     for (const kind of ['staff', 'customer', 'company'] as const) {
-      expect(contactIntent(contact({ kind, conversationId: 'conv-1' }), null, true)).toEqual({
+      expect(contactIntent(contact({ kind, conversationId: 'conv-1' }), null, AGENT_WITH_STAFF_DM)).toEqual({
         kind: 'open',
         conversationId: 'conv-1',
       })
@@ -37,21 +42,21 @@ describe('contactIntent', () => {
 
   test('a company with no thread is a support thread waiting to be created', () => {
     const company = contact({ kind: 'company', role: null, id: 'org-1' })
-    expect(contactIntent(company, null, true)).toEqual({
+    expect(contactIntent(company, null, AGENT_WITH_STAFF_DM)).toEqual({
       kind: 'support',
       organizationId: 'org-1',
     })
   })
 
   test('a customer nobody has written to is not something a tap can fix', () => {
-    expect(contactIntent(contact({ kind: 'customer', role: 'customer' }), null, true)).toEqual({
+    expect(contactIntent(contact({ kind: 'customer', role: 'customer' }), null, AGENT_WITH_STAFF_DM)).toEqual({
       kind: 'unavailable',
       reason: 'No support thread yet',
     })
   })
 
   test('one shared organization binds the staff DM to it', () => {
-    expect(contactIntent(contact(), [TALO], true)).toEqual({
+    expect(contactIntent(contact(), [TALO], AGENT_WITH_STAFF_DM)).toEqual({
       kind: 'staff-dm',
       userId: 'user-1',
       organizationId: 'org-1',
@@ -59,7 +64,7 @@ describe('contactIntent', () => {
   })
 
   test('several shared organizations are a choice, not a guess', () => {
-    expect(contactIntent(contact(), [TALO, NORTHWIND], true)).toEqual({
+    expect(contactIntent(contact(), [TALO, NORTHWIND], AGENT_WITH_STAFF_DM)).toEqual({
       kind: 'choose',
       userId: 'user-1',
       organizations: [TALO, NORTHWIND],
@@ -67,25 +72,48 @@ describe('contactIntent', () => {
   })
 
   test('no shared organization means no staff DM can exist', () => {
-    expect(contactIntent(contact(), [], true)).toEqual({
+    expect(contactIntent(contact(), [], AGENT_WITH_STAFF_DM)).toEqual({
       kind: 'unavailable',
       reason: 'You share no organization',
     })
   })
 
   test('a directory that never answered leaves the binding to the API', () => {
-    expect(contactIntent(contact(), null, true)).toEqual({ kind: 'staff-dm', userId: 'user-1' })
+    expect(contactIntent(contact(), null, AGENT_WITH_STAFF_DM)).toEqual({ kind: 'staff-dm', userId: 'user-1' })
   })
 
-  test('without staff_dm a colleague with no thread yet cannot be messaged', () => {
-    expect(contactIntent(contact(), [TALO], false)).toEqual({
+  test('an agent without staff_dm cannot start a DM with another agent', () => {
+    expect(contactIntent(contact(), [TALO], AGENT_WITHOUT_STAFF_DM)).toEqual({
+      kind: 'unavailable',
+      reason: "You can't message other agents",
+    })
+  })
+
+  test('an agent without staff_dm can still start a DM with an admin', () => {
+    expect(contactIntent(contact({ role: 'admin' }), [TALO], AGENT_WITHOUT_STAFF_DM)).toEqual({
+      kind: 'staff-dm',
+      userId: 'user-1',
+      organizationId: 'org-1',
+    })
+  })
+
+  test('an admin without staff_dm can start a DM with an agent', () => {
+    expect(contactIntent(contact(), [TALO], ADMIN_WITHOUT_STAFF_DM)).toEqual({
+      kind: 'staff-dm',
+      userId: 'user-1',
+      organizationId: 'org-1',
+    })
+  })
+
+  test('nobody signed in cannot start a staff DM', () => {
+    expect(contactIntent(contact({ role: 'admin' }), [TALO], null)).toEqual({
       kind: 'unavailable',
       reason: "You can't message staff",
     })
   })
 
   test('without staff_dm an existing thread still opens', () => {
-    expect(contactIntent(contact({ conversationId: 'conv-1' }), [TALO], false)).toEqual({
+    expect(contactIntent(contact({ conversationId: 'conv-1' }), [TALO], AGENT_WITHOUT_STAFF_DM)).toEqual({
       kind: 'open',
       conversationId: 'conv-1',
     })
@@ -186,27 +214,27 @@ describe('narrowContacts', () => {
 describe('what a row says', () => {
   test('an unavailable row says why rather than what it is', () => {
     const row = contact({ kind: 'customer', role: 'customer' })
-    const intent = contactIntent(row, null, true)
+    const intent = contactIntent(row, null, AGENT_WITH_STAFF_DM)
     expect(contactSubtitle(row, intent)).toBe('No support thread yet')
     expect(contactRowLabel(row, intent)).toBe('Jonah Reed, unavailable: no support thread yet')
   })
 
   test('a row with a thread promises to open it, not to start one', () => {
     const row = contact({ conversationId: 'conv-1' })
-    expect(contactRowLabel(row, contactIntent(row, null, true))).toBe(
+    expect(contactRowLabel(row, contactIntent(row, null, AGENT_WITH_STAFF_DM))).toBe(
       'Open conversation with Jonah Reed',
     )
   })
 
   test('a row with a choice behind it says so', () => {
     const row = contact()
-    const intent = contactIntent(row, [TALO, NORTHWIND], true)
+    const intent = contactIntent(row, [TALO, NORTHWIND], AGENT_WITH_STAFF_DM)
     expect(contactRowLabel(row, intent)).toBe('Message Jonah Reed, choose an organization')
   })
 
   test('a company reads as a company rather than as a missing role', () => {
     const row = contact({ kind: 'company', role: null })
-    expect(contactSubtitle(row, contactIntent(row, null, true))).toBe('Company')
+    expect(contactSubtitle(row, contactIntent(row, null, AGENT_WITH_STAFF_DM))).toBe('Company')
   })
 })
 
@@ -218,7 +246,7 @@ describe('what a row says', () => {
 describe('a role this app does not route on', () => {
   test('a role the client has never heard of cannot be sent a staff DM', () => {
     const row = contact({ kind: 'staff', role: null })
-    expect(contactIntent(row, [TALO], true)).toEqual({
+    expect(contactIntent(row, [TALO], AGENT_WITH_STAFF_DM)).toEqual({
       kind: 'unavailable',
       reason: 'Not a staff account',
     })
@@ -226,6 +254,6 @@ describe('a role this app does not route on', () => {
 
   test('a row whose role never arrived says nothing rather than guessing', () => {
     const row = contact({ kind: 'staff', role: null, conversationId: 'conv-1' })
-    expect(contactSubtitle(row, contactIntent(row, null, true))).toBe('')
+    expect(contactSubtitle(row, contactIntent(row, null, AGENT_WITH_STAFF_DM))).toBe('')
   })
 })

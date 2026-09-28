@@ -48,7 +48,10 @@ _Avoid_: Users tab (the tab is People, which is the Contact list), user manageme
 The list of every other Agent and Admin a staff member may write to, backed by
 `GET /conversations/staff`, and what the New Message sheet shows. Each row names the organizations
 the pair share, because a Staff DM belongs to one of them: one binds silently, several are chosen
-between, and none means the row cannot be written to at all. Distinct from the Contact list, which is
+between, and none means the row cannot be written to at all. `staff_dm` is needed only for a Staff DM
+between two Agents; one with an Admin in it needs nothing, to start, read, send or list. So an Agent
+without it is given the Admins only, here and in the staff half of the Contact list, and this client
+hides nobody on top of that (`canHoldStaffDm`). Distinct from the Contact list, which is
 the `contacts` endpoint and addresses people of any role — a Staff directory holds no Customer.
 _Avoid_: Contacts, team list, people picker, agent list (an Admin is in it too)
 
@@ -108,7 +111,9 @@ _Avoid_: Tag, category, status
 **Internal note**:
 A staff-only note about a Support DM, never shown to the Customer and never part of the thread. On
 Support DMs only — the API answers `404` for a note request on any other conversation type — and on
-staff screens only. Distinct from a System notice, which *is* in the thread and which staff read as
+staff screens only. Reading, writing, editing and deleting one all need the `internal_notes`
+Capability, which an Agent can be granted; the conversation's `access` already says whether the
+viewer holds it, so the notes section follows `access` and nothing else. Distinct from a System notice, which *is* in the thread and which staff read as
 a message.
 _Avoid_: Comment, private message, annotation
 

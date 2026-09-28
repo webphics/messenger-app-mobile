@@ -16,7 +16,8 @@ import {
   type SharedOrganizations,
 } from '@/lib/contact-directory'
 import { useConversationInbox } from '@/lib/conversation-inbox'
-import type { Contact, UserRole } from '@/lib/types'
+import type { StaffDmViewer } from '@/lib/rbac'
+import type { Contact } from '@/lib/types'
 
 /**
  * The contact directory, loaded, and what a tap on one of its rows does.
@@ -68,10 +69,9 @@ export type ContactDirectoryView = {
 }
 
 export function useContactDirectory(
-  role: UserRole | null,
+  /** Who is looking. Their role and `staff_dm` decide which staff DMs can be started. */
+  viewer: StaffDmViewer | null,
   onOpen: (conversationId: string) => void,
-  /** Whether the viewer holds `staff_dm`, which starting a staff DM needs. */
-  canStartStaffDm: boolean,
 ): ContactDirectoryView {
   const { addConversation } = useConversationInbox()
   const [directory, setDirectory] = useState<ContactDirectory>({ status: 'loading' })
@@ -83,7 +83,7 @@ export function useContactDirectory(
 
   /** Which load the answer coming back belongs to. A retry mid-flight wins. */
   const generation = useRef(0)
-  const isStaff = role !== null && role !== 'customer'
+  const isStaff = viewer !== null && viewer.role !== 'customer'
 
   const load = useCallback(() => {
     const mine = (generation.current += 1)
@@ -131,13 +131,13 @@ export function useContactDirectory(
 
   const intentFor = useCallback(
     (contact: Contact) =>
-      contactIntent(contact, shared.get(contact.id) ?? null, canStartStaffDm),
-    [shared, canStartStaffDm],
+      contactIntent(contact, shared.get(contact.id) ?? null, viewer),
+    [shared, viewer],
   )
 
   const start = useCallback(
     (contact: Contact, organizationId?: string) => {
-      const intent = contactIntent(contact, shared.get(contact.id) ?? null, canStartStaffDm)
+      const intent = contactIntent(contact, shared.get(contact.id) ?? null, viewer)
 
       if (intent.kind === 'unavailable') return
       if (intent.kind === 'open') {
@@ -171,7 +171,7 @@ export function useContactDirectory(
         onOpen(result.value.id)
       })()
     },
-    [addConversation, onOpen, shared, canStartStaffDm],
+    [addConversation, onOpen, shared, viewer],
   )
 
   return {

@@ -11,7 +11,7 @@
  * Pure and free of React, so every answer is a table row.
  */
 
-/** The 29 capabilities, grouped the way the spec and the web client list them. */
+/** The 30 capabilities, grouped the way the spec and the web client list them. */
 export const CAPABILITY_GROUPS = {
   support: [
     'transfer',
@@ -23,6 +23,7 @@ export const CAPABILITY_GROUPS = {
     'delete_conversation',
     'delete_own_messages',
     'delete_own_conversations',
+    'internal_notes',
     'delete_any_note',
   ],
   groups: ['create_groups', 'manage_group', 'set_group_policies', 'create_communities'],
