@@ -9,6 +9,31 @@ export function initials(displayName: string): string {
   return `${parts[0]?.[0] ?? ''}${parts[1]?.[0] ?? ''}`.toUpperCase()
 }
 
+/**
+ * Whether this id is the company persona: what a Customer is shown in place of
+ * any staff member (`company:<organizationId>`, or `company:app` where there is
+ * no organization). The API sends it as an ordinary person — a message's
+ * sender, a group member, a Post's author — so nothing that reads one changes
+ * shape; what changes is that it is never drawn as somebody.
+ *
+ * It can never be the viewer: the viewer's own id is a user id, so a persona's
+ * message is never outgoing and its Post never offers Edit or Delete.
+ */
+export function isCompanyPersona(id: string): boolean {
+  return id.startsWith('company:')
+}
+
+/**
+ * The letters on a person's avatar. A persona gets the first letter of the
+ * organization's name, the way a company's mark reads, rather than the two
+ * initials of somebody's name — "Acme Support" is not "AS".
+ */
+export function avatarInitials(person: { id: string; name: string }): string {
+  if (!isCompanyPersona(person.id)) return initials(person.name)
+  const first = Array.from(person.name.trim())[0]
+  return first ? first.toUpperCase() : '?'
+}
+
 export function formatRelativeTime(iso: string, nowMs = Date.now()): string {
   const then = Date.parse(iso)
   if (Number.isNaN(then)) return ''

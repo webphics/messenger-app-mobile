@@ -290,6 +290,14 @@ describe('isOutgoing', () => {
     expect(isOutgoing(message, 'agent-1')).toBe(true)
     expect(isOutgoing(message, 'agent-2')).toBe(false)
   })
+
+  test('the company persona a Customer reads in a group is never theirs', () => {
+    const message = staffMessage('a', 'x', {
+      sender: { id: 'company:org-1', name: 'Acme Support', role: 'agent' },
+    })
+    expect(isOutgoing(message, 'cust-1')).toBe(false)
+    expect(messageSenderName(message)).toBe('Acme Support')
+  })
 })
 
 describe('messageSenderName', () => {

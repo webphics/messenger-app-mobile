@@ -30,6 +30,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
 import { useRootStackAnimation } from "@/lib/use-stack-chrome";
+import { useViewer } from "@/lib/use-viewer";
 import { SessionEndRedirect } from "@/components/auth/session-end";
 import { PushRegistration } from "@/components/push/push-registration";
 import { AuthProvider } from "@/lib/auth-context";
@@ -37,6 +38,7 @@ import { ConversationInboxProvider } from "@/lib/conversation-inbox";
 import { InAppBannerProvider } from "@/lib/in-app-banner";
 import { PushIntentProvider } from "@/lib/push-intent";
 import { RealtimeProvider } from "@/lib/realtime-context";
+import { ROLE_GROUP_ACCESS, mayEnter } from "@/lib/route-access";
 import { colors } from "@/lib/tokens";
 
 Uniwind.setTheme("light");
@@ -127,138 +129,166 @@ export default function RootLayout() {
                 — which is to say to none of them. It draws over the Stack
                 rather than beside it; see `lib/in-app-banner`. */}
               <InAppBannerProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: colors.bg },
-                    animation: stackAnimation,
-                    gestureEnabled: true,
-                  }}
-                >
-                  {/* First, and named, because a route group is not part of a
-                    path: each role's `(home)/index` is `/` exactly as this one
-                    is, and every native launch starts at `/`. Left to the file
-                    system, expo-router broke that tie for the Customer Hub, so
-                    a cold start opened on the Hub with nobody signed in and the
-                    Launch gate never ran. Declared first, with the three groups
-                    named after it, the launch screen is the match. */}
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="(customer)" />
-                  <Stack.Screen name="(agent)" />
-                  <Stack.Screen name="(admin)" />
-                  <Stack.Screen
-                    name="chat/[id]"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* The two screens a thread's header opens. Beside `chat/[id]`
-                    rather than under it: the thread owns that path outright. */}
-                  <Stack.Screen
-                    name="chat/details/[id]"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  <Stack.Screen
-                    name="chat/media/[id]"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* What `View all` opens out of an expanded Community on the
-                    Conversation list. Beside the chat routes rather than under a
-                    role's tabs, because the Communities tab belongs to all three
-                    roles and a Community is a place rather than a destination. */}
-                  <Stack.Screen
-                    name="community/[id]"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* A named Wall, opened from a link somebody else shared (#79). Beside
-                    the chat and community routes for the same reason those are — it is
-                    reached from outside whatever the Tab capsule was showing. */}
-                  <Stack.Screen
-                    name="wall/[id]"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* This person's own Saved view (#84), reached from the Wall's header
-                    rather than the Tab capsule. Beside `wall/[id]` for the same reason
-                    that route sits here rather than under a role's tabs. */}
-                  <Stack.Screen
-                    name="wall/saved"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* Where this account is signed in (#05), pushed from the
-                    account card on Settings. Outside the three role groups
-                    rather than inside one, per ADR-0012: governing your own
-                    account belongs to the account and not to the role, and the
-                    Settings screen that pushes here is already the one shared
-                    component all three groups render. The password and
-                    two-factor screens below are siblings for the same reason. */}
-                  <Stack.Screen
-                    name="account/sessions"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* Setting a first password or changing one (#06). It carries
-                    no mode in its address: which of the two it is doing is read
-                    off the signed-in person, so there is no way to arrive at the
-                    wrong one. */}
-                  <Stack.Screen
-                    name="account/password"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* Two-factor, as far as ADR-0013 lets it go (#07): the state,
-                    turning it off, and fresh backup codes. Turning it on is
-                    ticket 08 and is blocked on backup-code recovery being
-                    confirmed to work. */}
-                  <Stack.Screen
-                    name="account/two-factor"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  <Stack.Screen
-                    name="(auth)"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                  {/* The magic link's landing route. Named here so a cold start opened by
-                    a link gets the same chrome as every other screen rather than the
-                    navigator's defaults. */}
-                  <Stack.Screen
-                    name="auth/magic-link"
-                    options={{
-                      headerShown: false,
-                      contentStyle: { backgroundColor: colors.bg },
-                    }}
-                  />
-                </Stack>
+                <RootStack animation={stackAnimation} />
               </InAppBannerProvider>
             </PushIntentProvider>
           </ConversationInboxProvider>
         </RealtimeProvider>
       </AuthProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/**
+ * The root navigator. Its own component, inside the providers, because the
+ * guards on the role groups read the signed-in person and `RootLayout` sits
+ * outside the `AuthProvider` that holds them.
+ */
+function RootStack({
+  animation,
+}: {
+  animation: ReturnType<typeof useRootStackAnimation>;
+}) {
+  const viewer = useViewer();
+
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.bg },
+        animation,
+        gestureEnabled: true,
+      }}
+    >
+      {/* First, and named, because a route group is not part of a
+        path: each role's `(home)/index` is `/` exactly as this one
+        is, and every native launch starts at `/`. Left to the file
+        system, expo-router broke that tie for the Customer Hub, so
+        a cold start opened on the Hub with nobody signed in and the
+        Launch gate never ran. Declared first, with the three groups
+        named after it, the launch screen is the match. */}
+      <Stack.Screen name="index" />
+      {/* Each role enters its own group and no other, and nobody enters one
+        before Hydration has said who they are. A group left out of the
+        navigator is what turns a deep link into another role's screens —
+        `/users` typed by an Agent — into this launch screen, whose gate then
+        hands over the person's own Hub. See `lib/route-access`. */}
+      <Stack.Protected guard={mayEnter(viewer, ROLE_GROUP_ACCESS.customer)}>
+        <Stack.Screen name="(customer)" />
+      </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, ROLE_GROUP_ACCESS.agent)}>
+        <Stack.Screen name="(agent)" />
+      </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, ROLE_GROUP_ACCESS.admin)}>
+        <Stack.Screen name="(admin)" />
+      </Stack.Protected>
+      <Stack.Screen
+        name="chat/[id]"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* The two screens a thread's header opens. Beside `chat/[id]`
+        rather than under it: the thread owns that path outright. */}
+      <Stack.Screen
+        name="chat/details/[id]"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      <Stack.Screen
+        name="chat/media/[id]"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* What `View all` opens out of an expanded Community on the
+        Conversation list. Beside the chat routes rather than under a
+        role's tabs, because the Communities tab belongs to all three
+        roles and a Community is a place rather than a destination. */}
+      <Stack.Screen
+        name="community/[id]"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* A named Wall, opened from a link somebody else shared (#79). Beside
+        the chat and community routes for the same reason those are — it is
+        reached from outside whatever the Tab capsule was showing. */}
+      <Stack.Screen
+        name="wall/[id]"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* This person's own Saved view (#84), reached from the Wall's header
+        rather than the Tab capsule. Beside `wall/[id]` for the same reason
+        that route sits here rather than under a role's tabs. */}
+      <Stack.Screen
+        name="wall/saved"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* Where this account is signed in (#05), pushed from the
+        account card on Settings. Outside the three role groups
+        rather than inside one, per ADR-0012: governing your own
+        account belongs to the account and not to the role, and the
+        Settings screen that pushes here is already the one shared
+        component all three groups render. The password and
+        two-factor screens below are siblings for the same reason. */}
+      <Stack.Screen
+        name="account/sessions"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* Setting a first password or changing one (#06). It carries
+        no mode in its address: which of the two it is doing is read
+        off the signed-in person, so there is no way to arrive at the
+        wrong one. */}
+      <Stack.Screen
+        name="account/password"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* Two-factor, as far as ADR-0013 lets it go (#07): the state,
+        turning it off, and fresh backup codes. Turning it on is
+        ticket 08 and is blocked on backup-code recovery being
+        confirmed to work. */}
+      <Stack.Screen
+        name="account/two-factor"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      <Stack.Screen
+        name="(auth)"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* The magic link's landing route. Named here so a cold start opened by
+        a link gets the same chrome as every other screen rather than the
+        navigator's defaults. */}
+      <Stack.Screen
+        name="auth/magic-link"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+    </Stack>
   );
 }

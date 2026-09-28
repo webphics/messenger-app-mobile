@@ -7,10 +7,10 @@ import type { AnalyticsOverview } from '@/lib/types'
 /**
  * The analytics endpoint the Admin Hub's charts are drawn from.
  *
- * Staff-only server-side (`AnalyticsController`'s `@Roles(['admin', 'agent'])`),
- * so a Customer's call comes back `refused` rather than as an empty overview —
- * which is what lets a screen tell the two apart. Nothing in this app asks for
- * it outside the Admin Hub.
+ * Needs `view_team_analytics` server-side, so a call without it comes back
+ * `refused` rather than as an empty overview — which is what lets a screen tell
+ * the two apart. Nothing in this app asks for it outside the Admin Hub, and
+ * `useAnalytics` does not ask at all for a viewer who does not hold it.
  *
  * `GET /analytics/live` is deliberately not here. It answers the queue's depth
  * right now, and the Hub already has those numbers without a request: the

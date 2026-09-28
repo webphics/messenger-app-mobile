@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router'
 import { getAnalyticsOverview } from '@/lib/analytics-api'
 import { analyticsCharts } from '@/lib/analytics-charts'
 import { useAuth } from '@/lib/auth-context'
+import { can } from '@/lib/capabilities'
 import type { AnalyticsOverview, ChartMetric } from '@/lib/types'
 import { useSupportAssignment } from '@/lib/use-support-assignment'
 
@@ -31,6 +32,11 @@ import { useSupportAssignment } from '@/lib/use-support-assignment'
  * on arrival, because which charts it becomes depends on the Shared queue
  * switch — and that can move under a Hub already drawn, when a session is
  * re-read, without anything being fetched again.
+ *
+ * Nothing is asked for without `view_team_analytics`, which is what the API
+ * checks: a read it would refuse is a request spent on a `403`, and the Hub
+ * draws neither the carousel nor the tile for that viewer anyway. It stays
+ * `loading` then, and nothing on screen reads it.
  */
 
 export type AnalyticsView = {
@@ -49,7 +55,8 @@ export type AnalyticsView = {
 
 export function useAnalytics(): AnalyticsView {
   const { state } = useAuth()
-  const signedIn = state.status === 'signed-in'
+  const allowed =
+    state.status === 'signed-in' && can(state.user, 'view_team_analytics')
 
   const [status, setStatus] = useState<AnalyticsView['status']>('loading')
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
@@ -80,7 +87,7 @@ export function useAnalytics(): AnalyticsView {
 
   useFocusEffect(
     useCallback(() => {
-      if (!signedIn) {
+      if (!allowed) {
         setStatus('loading')
         setOverview(null)
         return
@@ -90,14 +97,14 @@ export function useAnalytics(): AnalyticsView {
       return () => {
         readId.current++
       }
-    }, [signedIn, read]),
+    }, [allowed, read]),
   )
 
   const refresh = useCallback(() => {
-    if (!signedIn) return
+    if (!allowed) return
     setRefreshing(true)
     void read().finally(() => setRefreshing(false))
-  }, [signedIn, read])
+  }, [allowed, read])
 
   const charts = useMemo(
     () => (overview ? analyticsCharts(overview, supportAssignment) : []),

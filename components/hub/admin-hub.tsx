@@ -2,6 +2,7 @@ import { router, type Href } from "expo-router";
 import { View } from "react-native";
 
 import {
+  Activity,
   // BookOpen, // hidden with Knowledge
   Building2,
   MessageCircle,
@@ -19,22 +20,28 @@ import { HubScroll } from "@/components/hub/hub-scroll";
 import { Pill } from "@/components/hub/pill";
 import { RecentThreadCard } from "@/components/hub/recent-thread-card";
 import { Text } from "@/components/ui/text";
-import { USERS_SCREEN_CAPABILITIES, can, canAny } from "@/lib/capabilities";
 import { firstName } from "@/lib/display";
 import { hubEyebrow, hubGreeting } from "@/lib/hub-chrome";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
 // import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
-import { getSessionUser } from "@/lib/session";
+import { mayEnter, SCREEN_ACCESS } from "@/lib/route-access";
 import { useAnalytics } from "@/lib/use-analytics";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
+import { useViewer } from "@/lib/use-viewer";
 import { colors } from "@/lib/tokens";
 
 /** Stands in for a count the list has not answered with yet. An em dash, not a zero. */
 const PENDING_COUNT = "—";
 
 export function AdminHub() {
-  const me = getSessionUser();
+  /*
+   * Read off the auth state rather than `getSessionUser()`, because every row
+   * below is drawn from `SCREEN_ACCESS` — the table the navigator's guards read
+   * too — and a capability granted or revoked while the Hub is up has to move
+   * the rows with the screens they open.
+   */
+  const me = useViewer();
   const inbox = useConversationInbox();
   /*
    * Real, and org-wide: an Admin's `GET /conversations` is already the broad set
@@ -56,7 +63,12 @@ export function AdminHub() {
    * from the same overview. Awaiting reply is the API's count rather than the
    * list's: which message came last is not something every row this device
    * holds can say, and the question means the same thing in both modes.
+   *
+   * All three — the tile, the carousel and the chart they open — are there
+   * only for a viewer holding `view_team_analytics`, which is what the API
+   * checks. Without it `useAnalytics` asks for nothing.
    */
+  const showsAnalytics = mayEnter(me, SCREEN_ACCESS["chart/[id]"]);
   const analytics = useAnalytics();
   const { awaitingReply } = analytics;
 
@@ -101,14 +113,16 @@ export function AdminHub() {
             ) : null}
             {/* Where Unassigned sits when there is no pool: the first thing
                 worth waking up to in a Shared queue. */}
-            <StatTile
-              value={awaitingReply === null ? PENDING_COUNT : String(awaitingReply)}
-              label="Awaiting reply"
-              tone="primary"
-              alert={awaitingReply !== null && awaitingReply > 0}
-              accessibilityLabel="Conversations awaiting a reply"
-              onPress={() => router.navigate("/(admin)/conversations" as Href)}
-            />
+            {showsAnalytics ? (
+              <StatTile
+                value={awaitingReply === null ? PENDING_COUNT : String(awaitingReply)}
+                label="Awaiting reply"
+                tone="primary"
+                alert={awaitingReply !== null && awaitingReply > 0}
+                accessibilityLabel="Conversations awaiting a reply"
+                onPress={() => router.navigate("/(admin)/conversations" as Href)}
+              />
+            ) : null}
             <StatTile
               value={counted === null ? PENDING_COUNT : String(counted.length)}
               label="Conversations"
@@ -166,16 +180,18 @@ export function AdminHub() {
       </View>
 
       {/* Analytics & Charts Carousel */}
-      <ChartsSection status={analytics.status} charts={analytics.charts} />
+      {showsAnalytics ? (
+        <ChartsSection status={analytics.status} charts={analytics.charts} />
+      ) : null}
 
       {/* Administration — the org-wide settings, as opposed to any one thread */}
       <View className="mt-5 gap-3 px-4">
         <Text variant="label" className="uppercase tracking-wider text-muted">
           Administration
         </Text>
-        {/* Organizations carry editing (`manage_organizations`) and their members
-            (`manage_memberships`). Holding neither leaves nothing to do there. */}
-        {canAny(me, ["manage_organizations", "manage_memberships"]) ? (
+        {/* Each row is drawn from `SCREEN_ACCESS`, the table the screen's own
+            guard reads, so a row is here exactly when its screen opens. */}
+        {mayEnter(me, SCREEN_ACCESS.organizations) ? (
           <ActionRow
             icon={Building2}
             tone="neutral"
@@ -185,8 +201,7 @@ export function AdminHub() {
             onPress={() => router.push("/(admin)/organizations" as Href)}
           />
         ) : null}
-        {/* The Users API answers holders of any of these three, as the web Users page does. */}
-        {canAny(me, USERS_SCREEN_CAPABILITIES) ? (
+        {mayEnter(me, SCREEN_ACCESS.users) ? (
           <ActionRow
             icon={Users}
             tone="neutral"
@@ -196,8 +211,7 @@ export function AdminHub() {
             onPress={() => router.push("/(admin)/users" as Href)}
           />
         ) : null}
-        {/* Creating and editing labels needs `manage_labels`. */}
-        {can(me, "manage_labels") ? (
+        {mayEnter(me, SCREEN_ACCESS.labels) ? (
           <ActionRow
             icon={Tags}
             tone="neutral"
@@ -207,8 +221,7 @@ export function AdminHub() {
             onPress={() => router.push("/(admin)/labels" as Href)}
           />
         ) : null}
-        {/* This screen writes the library. Reading it happens in the composer, open to all staff. */}
-        {can(me, "manage_canned_replies") ? (
+        {mayEnter(me, SCREEN_ACCESS["saved-responses"]) ? (
           <ActionRow
             icon={MessageSquare}
             tone="neutral"
@@ -216,6 +229,16 @@ export function AdminHub() {
             hint="Answers agents insert from the composer"
             accessibilityLabel="Saved responses"
             onPress={() => router.push("/(admin)/saved-responses" as Href)}
+          />
+        ) : null}
+        {mayEnter(me, SCREEN_ACCESS.activity) ? (
+          <ActionRow
+            icon={Activity}
+            tone="neutral"
+            title="Activity"
+            hint="What the team has done, newest first"
+            accessibilityLabel="Activity"
+            onPress={() => router.push("/(admin)/activity" as Href)}
           />
         ) : null}
       </View>

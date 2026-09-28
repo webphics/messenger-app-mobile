@@ -34,7 +34,7 @@ describe('isResolved', () => {
 
 describe('listInboxConversations', () => {
   test('an Agent sees the whole support pool of their organizations, plus their groups', () => {
-    const list = listInboxConversations('agent', 'agent-1', CONVERSATIONS)
+    const list = listInboxConversations({ role: 'agent', id: 'agent-1', capabilities: [] }, CONVERSATIONS)
     expect(list.map((c) => c.id).sort()).toEqual([
       'conv-assigned',
       'conv-group',
@@ -44,14 +44,13 @@ describe('listInboxConversations', () => {
   })
 
   test('an Agent does not see a group they are not in', () => {
-    const list = listInboxConversations('agent', 'agent-9', CONVERSATIONS)
+    const list = listInboxConversations({ role: 'agent', id: 'agent-9', capabilities: [] }, CONVERSATIONS)
     expect(list.map((c) => c.id)).not.toContain('conv-group')
   })
 
   test('an Admin sees all', () => {
-    expect(listInboxConversations('admin', 'admin-1', CONVERSATIONS)).toHaveLength(
-      CONVERSATIONS.length,
-    )
+    const admin = { role: 'admin' as const, id: 'admin-1', capabilities: ['staff_dm' as const] }
+    expect(listInboxConversations(admin, CONVERSATIONS)).toHaveLength(CONVERSATIONS.length)
   })
 })
 

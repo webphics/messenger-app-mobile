@@ -1004,3 +1004,40 @@ export type CannedReply = {
   body: string
   archived: boolean
 }
+
+/** Who did something in the Activity feed, or whom it was done to. */
+export type ActivityPerson = { id: string; name: string; role: UserRole }
+
+/**
+ * One row of the Activity feed, from `GET /activity`: a thing somebody did,
+ * written by the API when they did it and never edited after.
+ *
+ * `kind` stays a string rather than a union of the API's sixty-odd: a server a
+ * release ahead of this client records kinds this build has no sentence for,
+ * and `describeActivity` falls back to a readable slug for them rather than
+ * dropping the row.
+ */
+export type ActivityEvent = {
+  id: string
+  kind: string
+  /** `system` for something nobody performed. */
+  actorRole: UserRole | 'system'
+  /** Null once the account behind it is gone, and for the system. */
+  actor: ActivityPerson | null
+  targetType: string
+  /** Only ever a person for a `user` target; null for every other. */
+  target: ActivityPerson | null
+  /** The target's display name for any target type, or null once it is gone. */
+  targetLabel: string | null
+  metadata: Record<string, unknown>
+  at: string
+}
+
+/** One page of the feed, newest first. */
+export type ActivityPage = {
+  events: ActivityEvent[]
+  /** How many events the query matched, which is not how many arrived in this page. */
+  total: number
+  page: number
+  pageSize: number
+}

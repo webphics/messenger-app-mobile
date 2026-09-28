@@ -5,7 +5,7 @@ import { InScreenHeader } from '@/components/in-screen-header'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
-import { initials } from '@/lib/display'
+import { avatarInitials } from '@/lib/display'
 import { formatReceiptStamp } from '@/lib/message-receipt-format'
 import { screenBottomPad } from '@/lib/tokens'
 import type { Message, MessageReceipt } from '@/lib/types'
@@ -28,7 +28,7 @@ function ReceiptRow({ receipt }: { receipt: MessageReceipt }) {
         <Avatar alt={receipt.user.name} className="size-9">
           <AvatarFallback className="bg-primary-soft">
             <Text variant="meta" className="font-bold text-primary">
-              {initials(receipt.user.name)}
+              {avatarInitials(receipt.user)}
             </Text>
           </AvatarFallback>
         </Avatar>

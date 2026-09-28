@@ -1,4 +1,10 @@
-import { firstName, formatRelativeTime, initials } from '@/lib/display'
+import {
+  avatarInitials,
+  firstName,
+  formatRelativeTime,
+  initials,
+  isCompanyPersona,
+} from '@/lib/display'
 
 describe('firstName', () => {
   test('returns the first token', () => {
@@ -13,6 +19,33 @@ describe('initials', () => {
 
   test('single token uses one letter', () => {
     expect(initials('Offers')).toBe('O')
+  })
+})
+
+describe('isCompanyPersona', () => {
+  test.each([
+    ['company:org-1', true],
+    ['company:app', true],
+    ['agent-1', false],
+    ['', false],
+    ['Company:org-1', false],
+    ['my-company:org-1', false],
+  ])('%s → %s', (id, expected) => {
+    expect(isCompanyPersona(id)).toBe(expected)
+  })
+})
+
+describe('avatarInitials', () => {
+  test('a person keeps their two initials', () => {
+    expect(avatarInitials({ id: 'agent-1', name: 'Jonah Reed' })).toBe('JR')
+  })
+
+  test('the company persona is the first letter of its name', () => {
+    expect(avatarInitials({ id: 'company:org-1', name: 'acme Support' })).toBe('A')
+  })
+
+  test('a persona with a blank name still draws something', () => {
+    expect(avatarInitials({ id: 'company:app', name: '  ' })).toBe('?')
   })
 })
 

@@ -14,7 +14,7 @@ import { WallPostReactions } from '@/components/wall/wall-post-reactions'
 import { WallPostViewCount } from '@/components/wall/wall-post-view-count'
 import { WallPostVote } from '@/components/wall/wall-post-vote'
 import type { ApiResult } from '@/lib/api-result'
-import { formatRelativeTime, initials } from '@/lib/display'
+import { avatarInitials, formatRelativeTime } from '@/lib/display'
 import {
   wallDeadline,
   wallKindColor,
@@ -222,7 +222,7 @@ export const WallPostCard = memo(function WallPostCard({
           <Avatar alt="" className="size-11">
             <AvatarFallback className="bg-primary-soft">
               <Text variant="title" className="text-primary">
-                {initials(post.author.name)}
+                {avatarInitials(post.author)}
               </Text>
             </AvatarFallback>
           </Avatar>

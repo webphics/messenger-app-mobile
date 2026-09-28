@@ -11,7 +11,7 @@
  * Pure and free of React, so every answer is a table row.
  */
 
-/** The 26 capabilities, grouped the way the spec and the web client list them. */
+/** The 29 capabilities, grouped the way the spec and the web client list them. */
 export const CAPABILITY_GROUPS = {
   support: [
     'transfer',
@@ -21,6 +21,8 @@ export const CAPABILITY_GROUPS = {
     'staff_dm',
     'delete_messages',
     'delete_conversation',
+    'delete_own_messages',
+    'delete_own_conversations',
     'delete_any_note',
   ],
   groups: ['create_groups', 'manage_group', 'set_group_policies', 'create_communities'],
@@ -35,6 +37,7 @@ export const CAPABILITY_GROUPS = {
   reporting: ['view_team_analytics', 'view_team_activity'],
   workspace: [
     'manage_organizations',
+    'message_customers',
     'manage_memberships',
     'manage_users',
     'change_roles',
@@ -53,9 +56,12 @@ export const CAPABILITIES: readonly Capability[] = Object.values(CAPABILITY_GROU
 /**
  * Never held by an agent, whatever the API stores. The workspace four, plus
  * managing memberships and Wall contributors, which are reached only from the
- * Users page. In group order, as the web client lists them.
+ * Users page, plus deleting *any* message or conversation: an agent is granted
+ * the `delete_own_*` pair instead. In group order, as the web client lists them.
  */
 export const ADMIN_ONLY_CAPABILITIES: readonly Capability[] = [
+  'delete_messages',
+  'delete_conversation',
   'manage_wall_contributors',
   'manage_memberships',
   'manage_users',
