@@ -81,6 +81,7 @@
         }
       ],
       "./plugins/with-store-excluded-from-backup",
+      "./plugins/with-scene-lifecycle",
       "expo-secure-store",
       "expo-sqlite",
       [
