@@ -52,6 +52,7 @@ export function useSimulatedRefresh(
   const [refreshing, setRefreshing] = useState(false);
   const gate = useRef({ busy: false });
   const onReloadRef = useRef(onReload);
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref, written during render on purpose so the callback reads the current onReload without being rebuilt.
   onReloadRef.current = onReload;
 
   const onRefresh = useCallback(async () => {

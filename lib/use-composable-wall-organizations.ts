@@ -36,6 +36,7 @@ export function useComposableWallOrganizations(): { organizations: Organization[
 
   useEffect(() => {
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
       setOrganizations([])
       setLoading(false)
       return

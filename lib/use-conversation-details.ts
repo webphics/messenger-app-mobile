@@ -127,6 +127,7 @@ export function useConversationDetails({
 
   useEffect(() => {
     onScreen.current = conversationId
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
     setLabelBusy(null)
     setLabelError(null)
     setNoteError(null)
@@ -147,6 +148,7 @@ export function useConversationDetails({
 
   useEffect(() => {
     if (!wantsLabels) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
       setLabels({ status: 'unavailable' })
       return
     }
@@ -171,6 +173,7 @@ export function useConversationDetails({
 
   useEffect(() => {
     if (!conversationId || !wantsNotes) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
       setNotes({ status: 'unavailable' })
       return
     }

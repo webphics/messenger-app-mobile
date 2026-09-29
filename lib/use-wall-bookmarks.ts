@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
@@ -65,10 +65,16 @@ import type { WallPost, WallVoteDirection } from '@/lib/types'
  */
 export function useWallBookmarks(): WallBodyView {
   const { state } = useAuth()
-  const viewer: WallPostViewer | null =
-    state.status === 'signed-in'
-      ? { id: state.user.id, role: state.user.role, capabilities: state.user.capabilities }
-      : null
+  const viewerId = state.status === 'signed-in' ? state.user.id : null
+  const viewerRole = state.status === 'signed-in' ? state.user.role : null
+  const viewerCapabilities = state.status === 'signed-in' ? state.user.capabilities : null
+  const viewer: WallPostViewer | null = useMemo(
+    () =>
+      viewerId !== null && viewerRole !== null && viewerCapabilities !== null
+        ? { id: viewerId, role: viewerRole, capabilities: viewerCapabilities }
+        : null,
+    [viewerId, viewerRole, viewerCapabilities],
+  )
 
   const [read, setRead] = useState<WallPages>(emptyWall)
   const [loading, setLoading] = useState(true)

@@ -325,6 +325,7 @@ function useWallPages(
     // Left alone, a `loadOlder` fired the instant the new sort's first page
     // lands would find `loadingOlder` still true from a request nobody is
     // waiting on any more, and silently do nothing.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
     setRead(emptyWall)
     setLoading(true)
     setLoadingOlder(false)

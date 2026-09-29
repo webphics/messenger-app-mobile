@@ -59,11 +59,13 @@ export function useMessageReceipts(
     // the one message that states its time flicker.
     void load()
     return () => {
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- a counter/set this effect owns, not a DOM node: the cleanup has to touch the current one.
       requestRef.current++
     }
   }, [load, status])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
     setState({ status: 'loading' })
   }, [conversationId, messageId])
 

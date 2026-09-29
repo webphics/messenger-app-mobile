@@ -106,6 +106,7 @@ export function useCommunities(): CommunityTabView {
    * on every socket event.
    */
   const conversationsRef = useRef(conversations)
+  // eslint-disable-next-line react-hooks/refs -- latest-value ref, written during render on purpose so loadCommunities is not rebuilt every time a message moves a row.
   conversationsRef.current = conversations
 
   const [communities, setCommunities] = useState<Community[]>([])
@@ -223,6 +224,7 @@ export function useCommunities(): CommunityTabView {
 
       const held = restoreCommunityFeed(viewerId, communityId)
       if (held.length > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
         setFeeds((current) => withFeed(current, communityId, { status: 'ready', rows: held }))
       }
 
@@ -383,6 +385,7 @@ export function useCommunityFeed(communityId: string | null): {
   }, [viewerId, communityId])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
     load()
     return () => {
       generation.current += 1

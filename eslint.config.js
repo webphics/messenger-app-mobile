@@ -5,7 +5,10 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    // `.claude/worktrees` holds other checkouts of this repo, `.expo` is
+    // generated: neither is this tree's code, and linting them reports every
+    // problem in each copy again.
+    ignores: ["dist/*", ".claude/**", ".expo/**"],
   },
   {
     // The CommonJS Node scripts that build the native project: the Expo CLI

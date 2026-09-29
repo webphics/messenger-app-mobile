@@ -6,7 +6,6 @@ import type {
   WallPost,
   WallPostAttachment,
   WallPostAuthor,
-  WallPostKind,
   WallPostLink,
   WallPostReaction,
 } from '@/lib/types'

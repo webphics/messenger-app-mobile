@@ -321,6 +321,7 @@ export function useThreadMessages(
     // a generation it still matched and a thread that is no longer the one it
     // asked about. Bumping it twice costs nothing — the effect takes its own
     // number afterwards, and all this does is strand answers nobody wants.
+    // eslint-disable-next-line react-hooks/refs -- generation bumped during render on purpose: answers for the thread being left must be stranded before the effect below runs (see the comment).
     generation.current += 1
     const restored = restoredThread(ownerId, conversationId, viewer)
     setState(restored)
@@ -369,6 +370,7 @@ export function useThreadMessages(
     onScreen.current = conversationId
 
     if (!conversationId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- state is reset for a new key here, ahead of the read it starts; a generation guard drops late answers. Moving it out of the effect would change when the reset renders.
       setLoading(false)
       return
     }
@@ -381,7 +383,9 @@ export function useThreadMessages(
       generation.current += 1
       inFlight.current = false
       onScreen.current = null
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- a counter/set this effect owns, not a DOM node: the cleanup has to touch the current one.
       delivering.current.clear()
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- a counter/set this effect owns, not a DOM node: the cleanup has to touch the current one.
       reacting.current.clear()
     }
   }, [conversationId, fetchPage])
