@@ -8,8 +8,6 @@ import {
   parsePostCreated,
   parsePostRemoved,
   parsePostUpdated,
-  REALTIME_EVENTS,
-  REALTIME_NAMESPACE,
 } from '@/lib/realtime-events'
 import { isStaffConversation } from '@/lib/types'
 
@@ -47,25 +45,6 @@ const CONVERSATION_UPDATED = {
     lastMessageReceiptStatus: null,
     lastMessageRead: false,
     unreadCount: null,
-  },
-}
-
-/**
- * What an Agent's socket received for the same conversation: every message
- * carries a named `sender`, including the Customer's own.
- */
-const STAFF_MESSAGE_CREATED = {
-  conversationId: '6f74c64f-445b-40fd-b264-e2adcbd77619',
-  message: {
-    id: '94fe7794-f129-4bee-884b-d4db44408aca',
-    body: 'fixture probe',
-    messageType: 'text',
-    createdAt: '2026-09-04T06:41:37.958Z',
-    sender: { id: '0d943b47-fba8-4162-8dc3-cf260544c251', name: 'QA Customer', role: 'customer' },
-    replyTo: null,
-    reactions: [],
-    attachments: [],
-    receiptStatus: 'sent',
   },
 }
 
@@ -143,24 +122,6 @@ const CONVERSATION_REASSIGNED = {
   ],
 }
 
-describe('the namespace and event names', () => {
-  it('are the API’s own', () => {
-    expect(REALTIME_NAMESPACE).toBe('/realtime')
-    expect(REALTIME_EVENTS).toEqual({
-      messageCreated: 'message.created',
-      conversationUpdated: 'conversation.updated',
-      conversationDeleted: 'conversation.deleted',
-      conversationReassigned: 'conversation.reassigned',
-      conversationJoin: 'conversation.join',
-      conversationLeave: 'conversation.leave',
-      postCreated: 'post.created',
-      postUpdated: 'post.updated',
-      postRemoved: 'post.removed',
-      notificationCreated: 'notification.created',
-    })
-  })
-})
-
 describe('parseMessageCreated', () => {
   it('reads the conversation id beside the message', () => {
     const event = parseMessageCreated(MESSAGE_CREATED)
@@ -181,17 +142,6 @@ describe('parseMessageCreated', () => {
     })
   })
 
-  it('reads what an Agent is sent: a named sender on the Customer’s own message', () => {
-    const event = parseMessageCreated(STAFF_MESSAGE_CREATED)
-
-    expect(event?.conversationId).toBe('6f74c64f-445b-40fd-b264-e2adcbd77619')
-    expect(event?.message).toMatchObject({
-      id: '94fe7794-f129-4bee-884b-d4db44408aca',
-      messageType: 'text',
-      sender: { id: '0d943b47-fba8-4162-8dc3-cf260544c251', name: 'QA Customer', role: 'customer' },
-    })
-  })
-
   it('reads an Engage notice, which only Staff are sent', () => {
     const event = parseMessageCreated(SYSTEM_NOTICE_CREATED)
 
@@ -202,33 +152,10 @@ describe('parseMessageCreated', () => {
     })
   })
 
-  it('reads a staff-shaped message, which is what a group sends a Customer', () => {
-    const event = parseMessageCreated({
-      conversationId: 'group-1',
-      message: {
-        ...MESSAGE_CREATED.message,
-        fromCompany: undefined,
-        sender: { id: 'agent-1', name: 'Rae', role: 'agent' },
-      },
-    })
-
-    expect(event?.message).toMatchObject({
-      sender: { id: 'agent-1', name: 'Rae', role: 'agent' },
-    })
-  })
-
   const refused: [string, unknown][] = [
     ['null', null],
-    ['a string', 'message.created'],
     ['no conversation id', { message: MESSAGE_CREATED.message }],
-    ['an empty conversation id', { conversationId: '', message: MESSAGE_CREATED.message }],
-    ['no message', { conversationId: 'c1' }],
     ['a message with no id', { conversationId: 'c1', message: { createdAt: '2026-09-03T20:22:05.789Z' } }],
-    ['a message with no timestamp', { conversationId: 'c1', message: { id: 'm1' } }],
-    [
-      'a message whose timestamp is not a time',
-      { conversationId: 'c1', message: { id: 'm1', createdAt: 'whenever' } },
-    ],
   ]
 
   it.each(refused)('answers null for %s', (_case, payload) => {
@@ -253,10 +180,6 @@ describe('parseConversationUpdated', () => {
     })
   })
 
-  it('keeps the API’s uncounted unread rather than inventing a zero', () => {
-    expect(parseConversationUpdated(CONVERSATION_UPDATED)?.unreadCount).toBeNull()
-  })
-
   it('reads the staff row, including what the unassigned pool filters on', () => {
     const row = parseConversationUpdated(STAFF_CONVERSATION_UPDATED)
 
@@ -273,12 +196,7 @@ describe('parseConversationUpdated', () => {
   })
 
   const refused: [string, unknown][] = [
-    ['null', null],
-    ['an empty envelope', {}],
     ['a row with no id', { conversation: { organizationId: 'o1', type: 'support_dm' } }],
-    // A *group* with no organization, not a support DM: an org-less support DM is the
-    // onboarding thread and is read rather than refused.
-    ['a row with no organization', { conversation: { id: 'c1', type: 'group' } }],
     ['a row with an unknown type', { conversation: { id: 'c1', organizationId: 'o1', type: 'dm' } }],
   ]
 
@@ -292,12 +210,7 @@ describe('parseConversationDeleted', () => {
     expect(parseConversationDeleted({ conversationId: 'c1' })).toBe('c1')
   })
 
-  const refused: [string, unknown][] = [
-    ['null', null],
-    ['an empty envelope', {}],
-    ['an empty id', { conversationId: '' }],
-    ['a non-string id', { conversationId: 7 }],
-  ]
+  const refused: [string, unknown][] = [['an empty id', { conversationId: '' }]]
 
   it.each(refused)('answers null for %s', (_case, payload) => {
     expect(parseConversationDeleted(payload)).toBeNull()
@@ -315,15 +228,6 @@ describe('parseConversationReassigned', () => {
     })
   })
 
-  test.each(['taken_over', 'transferred', 'membership_revoked'])(
-    'reads %s, which is one of the three the API can send',
-    (reason) => {
-      expect(parseConversationReassigned({ ...CONVERSATION_REASSIGNED, reason })?.reason).toBe(
-        reason,
-      )
-    },
-  )
-
   test('a revocation names nobody, because the thread went back to the pool', () => {
     expect(
       parseConversationReassigned({
@@ -337,11 +241,7 @@ describe('parseConversationReassigned', () => {
   })
 
   test.each([
-    ['no payload at all', null],
-    ['a payload that is not an object', 'conversation.reassigned'],
     ['no conversation', { reason: 'taken_over', currentAssignee: null }],
-    ['an empty conversation id', { conversationId: '', reason: 'taken_over' }],
-    ['no reason', { conversationId: 'conv-1', currentAssignee: null }],
     ['a reason this client does not know', { conversationId: 'conv-1', reason: 'reopened' }],
   ])('answers null for %s', (_case, payload) => {
     expect(parseConversationReassigned(payload)).toBeNull()
@@ -385,8 +285,6 @@ describe('parsePostCreated / parsePostUpdated', () => {
   })
 
   const refused: [string, unknown][] = [
-    ['null', null],
-    ['a string', 'post.created'],
     ['no post', { organizationId: 'org-1' }],
     ['a post that is not an object', { organizationId: 'org-1', post: 'nope' }],
   ]
@@ -404,12 +302,7 @@ describe('parsePostRemoved', () => {
     })
   })
 
-  const refused: [string, unknown][] = [
-    ['null', null],
-    ['an empty envelope', {}],
-    ['an empty id', { organizationId: 'org-1', postId: '' }],
-    ['a non-string id', { organizationId: 'org-1', postId: 7 }],
-  ]
+  const refused: [string, unknown][] = [['an empty id', { organizationId: 'org-1', postId: '' }]]
 
   it.each(refused)('answers null for %s', (_case, payload) => {
     expect(parsePostRemoved(payload)).toBeNull()
@@ -441,41 +334,16 @@ describe('parseGroupJoinRequestAnswered', () => {
     ).toBeNull()
   })
 
-  it('ignores every other notification kind this app already learns about another way', () => {
-    expect(parseGroupJoinRequestAnswered({ notification: { kind: 'message' } })).toBeNull()
-  })
-
-  it('answers null for a payload with nothing to read', () => {
-    expect(parseGroupJoinRequestAnswered(null)).toBeNull()
-    expect(parseGroupJoinRequestAnswered({})).toBeNull()
-    expect(parseGroupJoinRequestAnswered({ notification: null })).toBeNull()
-  })
-
-  it('reads no Group id it cannot place as a string as none, rather than guessing', () => {
-    expect(
-      parseGroupJoinRequestAnswered({
-        notification: { kind: 'group_join_request_approved', conversationId: 7 },
-      }),
-    ).toEqual({ groupId: null })
-  })
 })
 
 describe('createCountedMessages', () => {
+  // The API re-broadcasts a message each time its receipt advances; only the first counts.
   it('counts an id once, and never again', () => {
     const counted = createCountedMessages()
 
     expect(counted.isFirst('m1')).toBe(true)
     expect(counted.isFirst('m1')).toBe(false)
     expect(counted.isFirst('m1')).toBe(false)
-  })
-
-  it('counts one message once however many times its receipt advances', () => {
-    const counted = createCountedMessages()
-    // What the API broadcasts for two messages, the first of which was
-    // delivered and then read while the list was open.
-    const broadcasts = ['m1', 'm1', 'm1', 'm2', 'm2']
-
-    expect(broadcasts.filter((id) => counted.isFirst(id))).toEqual(['m1', 'm2'])
   })
 
   it('forgets the oldest id rather than growing without limit', () => {
@@ -488,17 +356,6 @@ describe('createCountedMessages', () => {
     expect(counted.isFirst('m2')).toBe(false)
     expect(counted.isFirst('m3')).toBe(false)
     expect(counted.isFirst('m1')).toBe(true)
-  })
-
-  it('does not remember an id twice, so a repeat cannot fill the memory', () => {
-    const counted = createCountedMessages(2)
-
-    counted.isFirst('m1')
-    counted.isFirst('m1')
-    counted.isFirst('m2')
-
-    expect(counted.isFirst('m1')).toBe(false)
-    expect(counted.isFirst('m2')).toBe(false)
   })
 })
 

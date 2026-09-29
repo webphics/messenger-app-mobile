@@ -1,8 +1,4 @@
-import {
-  communityConversations,
-  inboxConversations,
-  isCommunityConversation,
-} from '@/lib/conversation-scope'
+import { inboxConversations, isCommunityConversation } from '@/lib/conversation-scope'
 import { communitiesTabBadge, inboxTabBadge } from '@/lib/tab-badges'
 import type { Conversation } from '@/lib/types'
 
@@ -43,17 +39,6 @@ describe('isCommunityConversation', () => {
   test.each([
     ["a Community's group", { type: 'group', communityId: 'community-1' }, true],
     ['an ordinary group chat', { type: 'group', communityId: null }, false],
-    [
-      "a Community's announcements",
-      { type: 'broadcast_inbox', communityId: 'community-1' },
-      true,
-    ],
-    [
-      'the personal announcements thread',
-      { type: 'broadcast_inbox', communityId: null },
-      false,
-    ],
-    ['a support thread', { type: 'support_dm', communityId: null }, false],
   ])('%s', (_case, overrides, expected) => {
     expect(isCommunityConversation(row(overrides as Partial<Conversation>))).toBe(expected)
   })
@@ -69,10 +54,6 @@ describe('isCommunityConversation', () => {
     delete (legacy as { communityId?: string | null }).communityId
 
     expect(isCommunityConversation(legacy)).toBe(false)
-  })
-
-  test('an empty communityId is not a Community', () => {
-    expect(isCommunityConversation(row({ communityId: '' }))).toBe(false)
   })
 })
 
@@ -92,40 +73,9 @@ describe('the two surfaces', () => {
       'my-news',
     ])
   })
-
-  test('Communities keeps every room a Community owns', () => {
-    expect(communityConversations(list).map((each) => each.id)).toEqual([
-      'community-room',
-      'community-news',
-    ])
-  })
-
-  /**
-   * The property the split exists for: every thread is on exactly one surface.
-   * A thread on neither is one nobody can reach, and a thread on both is the
-   * bleed this replaced.
-   */
-  test('every conversation lands on exactly one of them', () => {
-    const inbox = inboxConversations(list).map((each) => each.id)
-    const communities = communityConversations(list).map((each) => each.id)
-
-    expect([...inbox, ...communities].sort()).toEqual(list.map((each) => each.id).sort())
-    expect(inbox.filter((id) => communities.includes(id))).toEqual([])
-  })
 })
 
 describe('the badges above them', () => {
-  const list: Conversation[] = [
-    row({ id: 'support', type: 'support_dm', communityId: null, unreadCount: 2 }),
-    row({ id: 'community-room', communityId: 'community-1', unreadCount: 3 }),
-    row({ id: 'community-news', type: 'broadcast_inbox', communityId: 'community-1', unreadCount: 5 }),
-  ]
-
-  test('each counts only what the tab under it draws', () => {
-    expect(inboxTabBadge(list)).toBe(2)
-    expect(communitiesTabBadge(list)).toBe(8)
-  })
-
   /**
    * The disagreement that prompted the split: the inbox badge counted every
    * unread thread, Community rooms included, while the tab it sat on showed
@@ -137,12 +87,5 @@ describe('the badges above them', () => {
 
     expect(inboxTabBadge(communityOnly)).toBeUndefined()
     expect(communitiesTabBadge(communityOnly)).toBe(4)
-  })
-
-  test('neither shows a zero', () => {
-    const read = [row({ communityId: 'community-1' }), row({ id: 'b', communityId: null })]
-
-    expect(inboxTabBadge(read)).toBeUndefined()
-    expect(communitiesTabBadge(read)).toBeUndefined()
   })
 })

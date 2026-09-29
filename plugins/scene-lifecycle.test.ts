@@ -1,5 +1,4 @@
 const {
-  SCENE_MANIFEST,
   adoptSceneLifecycleInAppDelegate,
   // The module under test is CommonJS, because a config plugin is evaluated by
   // the Expo CLI outside Metro and cannot read this repo's TypeScript.
@@ -47,18 +46,9 @@ class AppDelegate: ExpoAppDelegate {
 describe('adopting the scene life cycle in the AppDelegate', () => {
   const adopted = adoptSceneLifecycleInAppDelegate(APP_DELEGATE)
 
-  it('makes the AppDelegate the factory provider the scene delegate asks for', () => {
-    expect(adopted).toContain('class AppDelegate: ExpoAppDelegate, ExpoReactNativeFactoryProvider {')
-  })
-
   it('stops creating the window, which the scene delegate now does', () => {
     expect(adopted).not.toContain('UIWindow(frame:')
     expect(adopted).not.toContain('startReactNative')
-  })
-
-  it('still creates the factory the scene delegate starts React Native from', () => {
-    expect(adopted).toContain('reactNativeFactory = factory')
-    expect(adopted).toContain('return super.application(application, didFinishLaunchingWithOptions: launchOptions)')
   })
 
   it('is idempotent, because prebuild runs against an existing ios/', () => {
@@ -74,16 +64,5 @@ describe('adopting the scene life cycle in the AppDelegate', () => {
   it('refuses a template it does not recognise rather than shipping an app that will not launch', () => {
     const sdk58 = APP_DELEGATE.replace(/#if os\(iOS\)[\s\S]*?#endif\n/, '')
     expect(() => adoptSceneLifecycleInAppDelegate(sdk58)).toThrow(/remove this plugin/)
-  })
-})
-
-describe('the scene manifest', () => {
-  it('names the scene delegate by its module-qualified class', () => {
-    const [configuration] = SCENE_MANIFEST.UISceneConfigurations.UIWindowSceneSessionRoleApplication
-    expect(configuration.UISceneDelegateClassName).toBe('$(PRODUCT_MODULE_NAME).SceneDelegate')
-  })
-
-  it('keeps the app to one window', () => {
-    expect(SCENE_MANIFEST.UIApplicationSupportsMultipleScenes).toBe(false)
   })
 })

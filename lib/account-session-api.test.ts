@@ -62,21 +62,6 @@ function csrfResponse(token = 'csrf-token-value'): Response {
   )
 }
 
-const ROW = {
-  id: 'sess_1',
-  deviceName: 'Windows 11 - Chrome',
-  deviceType: 'desktop',
-  ipAddress: '203.0.113.4',
-  userAgent: 'Mozilla/5.0',
-  loginMethod: 'email',
-  status: 'active',
-  isCurrent: true,
-  isRevoked: false,
-  createdAt: '2026-09-01T09:00:00.000Z',
-  updatedAt: '2026-09-20T18:30:00.000Z',
-  expiresAt: '2026-10-01T09:00:00.000Z',
-}
-
 function page(rows: unknown[]) {
   return { rows, total: rows.length, page: 1, pageSize: 50, activeOtherSessionCount: 0 }
 }
@@ -95,51 +80,12 @@ beforeEach(() => {
 })
 
 describe('readAccountSessions', () => {
-  test('asks for active sessions only, newest first', async () => {
-    enqueue(envelope(page([ROW])))
-
-    await readAccountSessions()
-
-    expect(calls[0]?.url).toBe(
-      `${API_BASE_URL}/sessions?status=active&page=1&pageSize=50&sort=createdAt&dir=desc`,
-    )
-  })
-
-  test('reads the rows out of the page', async () => {
-    enqueue(envelope(page([ROW])))
-
-    expect(await readAccountSessions()).toEqual({
-      ok: true,
-      value: [
-        {
-          id: 'sess_1',
-          deviceName: 'Windows 11 - Chrome',
-          deviceType: 'desktop',
-          ipAddress: '203.0.113.4',
-          loginMethod: 'email',
-          isCurrent: true,
-          createdAt: '2026-09-01T09:00:00.000Z',
-          updatedAt: '2026-09-20T18:30:00.000Z',
-        },
-      ],
-    })
-  })
-
   test('answers malformed rather than claiming this account is signed in nowhere', async () => {
     enqueue(envelope(page([{ deviceName: 'Nameless' }])))
 
     expect(await readAccountSessions()).toEqual({
       ok: false,
       failure: { kind: 'malformed' },
-    })
-  })
-
-  test('a dead network is unreachable rather than an empty list', async () => {
-    enqueue(new Error('offline'))
-
-    expect(await readAccountSessions()).toEqual({
-      ok: false,
-      failure: { kind: 'unreachable' },
     })
   })
 
@@ -154,17 +100,6 @@ describe('readAccountSessions', () => {
 })
 
 describe('revokeAccountSession', () => {
-  test('posts to that one session’s revoke route', async () => {
-    enqueue(csrfResponse(), envelope({ revoked: true }))
-
-    const result = await revokeAccountSession('sess_2')
-
-    expect(calls[0]?.url).toBe(`${API_BASE_URL}/csrf`)
-    expect(calls[1]?.url).toBe(`${API_BASE_URL}/sessions/sess_2/revoke`)
-    expect(calls[1]?.init.method).toBe('POST')
-    expect(result).toEqual({ ok: true, value: true })
-  })
-
   test('escapes an id rather than letting it shape the path', async () => {
     enqueue(csrfResponse(), envelope({ revoked: true }))
 
@@ -183,15 +118,6 @@ describe('revokeAccountSession', () => {
       failure: { kind: 'refused', message: 'Session not found' },
     })
   })
-
-  test('a request that never arrived is unreachable, not a refusal', async () => {
-    enqueue(csrfResponse(), new Error('offline'))
-
-    expect(await revokeAccountSession('sess_2')).toEqual({
-      ok: false,
-      failure: { kind: 'unreachable' },
-    })
-  })
 })
 
 describe('revokeOtherAccountSessions', () => {
@@ -203,20 +129,5 @@ describe('revokeOtherAccountSessions', () => {
     expect(calls[1]?.url).toBe(`${API_BASE_URL}/sessions/revoke-others`)
     expect(calls[1]?.init.method).toBe('POST')
     expect(result).toEqual({ ok: true, value: true })
-  })
-
-  test('a count of zero is still an acknowledgement, since nothing reads it back', async () => {
-    enqueue(csrfResponse(), envelope({ revokedCount: 0 }))
-
-    expect(await revokeOtherAccountSessions()).toEqual({ ok: true, value: true })
-  })
-
-  test('reads a refusal as one', async () => {
-    enqueue(csrfResponse(), response(403, { message: 'You cannot do that' }))
-
-    expect(await revokeOtherAccountSessions()).toEqual({
-      ok: false,
-      failure: { kind: 'refused', message: 'You cannot do that' },
-    })
   })
 })

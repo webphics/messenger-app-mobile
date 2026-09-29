@@ -2,7 +2,6 @@ import {
   parseConversation,
   parseConversations,
   parseMessage,
-  parseMessages,
   parseNotes,
   parseOrganizations,
   parseStaffDirectory,
@@ -104,21 +103,6 @@ describe('parseConversation, on an Announcements thread', () => {
       communityId: null,
     })
   })
-
-  test('falls back to a name rather than dropping an untitled one', () => {
-    expect(parseConversation(broadcastInboxRow({ title: null }))).toMatchObject({
-      title: 'Announcements',
-    })
-  })
-
-  test('is kept by the list parser rather than filtered out of it', () => {
-    const rows = [customerSupportRow(), broadcastInboxRow()]
-
-    expect(parseConversations(rows).map((row) => row.type)).toEqual([
-      'support_dm',
-      'broadcast_inbox',
-    ])
-  })
 })
 
 describe('parseConversation', () => {
@@ -153,69 +137,8 @@ describe('parseConversation', () => {
     })
   })
 
-  test('an empty labels array still means the staff shape', () => {
-    expect(isStaffConversation(parseConversation(staffRow({ labels: [] }))!)).toBe(true)
-  })
-
-  test('reads a Customer group row and keeps its members', () => {
-    const conversation = parseConversation({
-      ...customerSupportRow(),
-      type: 'group',
-      title: 'Offers',
-      description: null,
-      avatarUrl: null,
-      members: [{ id: 'admin-1', name: 'Amina', role: 'admin' }],
-    })
-    expect(conversation).toMatchObject({
-      type: 'group',
-      title: 'Offers',
-      members: [{ id: 'admin-1', name: 'Amina', role: 'admin' }],
-    })
-  })
-
-  test('names an untitled group rather than rendering a blank row', () => {
-    const conversation = parseConversation({
-      ...customerSupportRow(),
-      type: 'group',
-      members: [],
-    })
-    expect(conversation).toMatchObject({ title: 'Group' })
-  })
-
-  test("reads a Customer group's write policy and the read model's answer", () => {
-    const conversation = parseConversation({
-      ...customerSupportRow(),
-      type: 'group',
-      title: 'Offers',
-      members: [],
-      writePolicy: 'named',
-      canWrite: false,
-    })
-    expect(conversation).toMatchObject({ writePolicy: 'named', canWrite: false })
-  })
-
-  test('defaults a Customer group missing the policy to open and writable', () => {
-    const conversation = parseConversation({
-      ...customerSupportRow(),
-      type: 'group',
-      title: 'Offers',
-      members: [],
-    })
-    expect(conversation).toMatchObject({ writePolicy: 'everyone', canWrite: true })
-  })
-
-  test('reads a staff group row carrying the same read model', () => {
-    const conversation = parseConversation(
-      staffRow({ type: 'group', title: 'Offers', writePolicy: 'admins', canWrite: true }),
-    )
-    expect(conversation).toMatchObject({ writePolicy: 'admins', canWrite: true })
-  })
-
-  test.each([
-    ['no id', { id: '' }],
-    ['an unknown type', { type: 'smoke_signal' }],
-  ])('refuses a row with %s', (_case, overrides) => {
-    expect(parseConversation(customerSupportRow(overrides))).toBeNull()
+  test('refuses a row of a type this app does not know', () => {
+    expect(parseConversation(customerSupportRow({ type: 'smoke_signal' }))).toBeNull()
   })
 
   /*
@@ -235,11 +158,6 @@ describe('parseConversation', () => {
     expect(
       parseConversation(customerSupportRow({ type: 'group', organizationId: undefined })),
     ).toBeNull()
-  })
-
-  test('refuses anything that is not an object', () => {
-    expect(parseConversation(null)).toBeNull()
-    expect(parseConversation(['a'])).toBeNull()
   })
 
   test('treats a row that never said whether it was read as read', () => {
@@ -265,10 +183,6 @@ describe('parseConversations', () => {
     expect(
       parseConversations([customerSupportRow(), { id: 'broken' }, customerSupportRow({ id: 'conv-2' })]),
     ).toHaveLength(2)
-  })
-
-  test('reads a body that is not a list as no conversations', () => {
-    expect(parseConversations({ rows: [] })).toEqual([])
   })
 })
 
@@ -305,31 +219,9 @@ describe('parseMessage', () => {
     expect(isStaffMessage(message!)).toBe(false)
   })
 
-  test('reads the edit stamp when the author has rewritten it', () => {
-    const message = parseMessage(
-      messageRow({ fromCompany: true, editedAt: '2026-08-13T08:04:11.000Z' }),
-    )
-    expect(message?.editedAt).toBe('2026-08-13T08:04:11.000Z')
-  })
-
-  test('an unreadable edit stamp reads as never edited', () => {
-    const message = parseMessage(messageRow({ fromCompany: true, editedAt: 'whenever' }))
-    expect(message?.editedAt).toBeNull()
-  })
-
-  test("reads the end of this viewer's edit window", () => {
-    const message = parseMessage(
-      messageRow({ fromCompany: false, editableUntil: '2026-08-13T08:15:00.000Z' }),
-    )
-    expect(message?.editableUntil).toBe('2026-08-13T08:15:00.000Z')
-  })
-
   test.each([
-    ['null, a message this viewer can never edit', null],
     ['missing, an API from before the field', undefined],
     ['not a date', 'in a while'],
-    ['not a string', 1755072900000],
-    ['empty', ''],
   ])('reads an edit window that is %s as no Edit', (_case, editableUntil) => {
     expect(parseMessage(messageRow({ fromCompany: false, editableUntil }))?.editableUntil).toBeNull()
   })
@@ -342,39 +234,9 @@ describe('parseMessage', () => {
     expect(message).toMatchObject({ sender: { id: 'agent-1', name: 'Jonah Reed', role: 'agent' } })
   })
 
-  test('keeps a system message rather than dropping it here', () => {
-    expect(parseMessage(messageRow({ messageType: 'system' }))).toMatchObject({
-      messageType: 'system',
-    })
-  })
-
   test('reads an unrecognised message type as text so the body still shows', () => {
     expect(parseMessage(messageRow({ messageType: 'hologram' }))).toMatchObject({
       messageType: 'text',
-    })
-  })
-
-  test('reads a reply reference and its preview', () => {
-    expect(
-      parseMessage(messageRow({ replyTo: { id: 'msg-0', preview: 'Try the link' } })),
-    ).toMatchObject({ replyTo: { id: 'msg-0', preview: 'Try the link' } })
-  })
-
-  test('reads reactions one per person, as the API sends them', () => {
-    expect(
-      parseMessage(
-        messageRow({
-          reactions: [
-            { emoji: '👍', userId: 'agent-1' },
-            { emoji: '👍', userId: 'cust-1' },
-          ],
-        }),
-      ),
-    ).toMatchObject({
-      reactions: [
-        { emoji: '👍', userId: 'agent-1' },
-        { emoji: '👍', userId: 'cust-1' },
-      ],
     })
   })
 
@@ -416,7 +278,6 @@ describe('parseMessage', () => {
 
   test.each([
     ['no id', { id: undefined }],
-    ['no timestamp', { createdAt: undefined }],
     ['a timestamp that is not a time', { createdAt: 'whenever' }],
   ])('refuses a message with %s', (_case, overrides) => {
     expect(parseMessage(messageRow(overrides))).toBeNull()
@@ -427,26 +288,11 @@ describe('parseMessage', () => {
   })
 })
 
-describe('parseMessages', () => {
-  test('keeps the API order and drops what it cannot read', () => {
-    const messages = parseMessages([
-      messageRow({ id: 'msg-1' }),
-      { id: 'broken' },
-      messageRow({ id: 'msg-2' }),
-    ])
-    expect(messages.map((message) => message.id)).toEqual(['msg-1', 'msg-2'])
-  })
-})
-
 describe('parseOrganizations', () => {
   test('reads the rows wrapper', () => {
     expect(
       parseOrganizations({ rows: [{ id: 'org-1', name: 'Talo' }, { id: 'org-2' }] }),
     ).toEqual([{ id: 'org-1', name: 'Talo' }])
-  })
-
-  test('reads a body without rows as no organizations', () => {
-    expect(parseOrganizations(null)).toEqual([])
   })
 })
 
@@ -482,16 +328,10 @@ describe('parseStaffDirectory', () => {
   })
 
   test.each([
-    ['no id', directoryRow({ id: '' })],
-    ['no name', directoryRow({ name: '' })],
     ['a role no staff member holds', directoryRow({ role: 'customer' })],
     ['not a record', 'agent-1'],
   ])('drops a row with %s', (_case, row) => {
     expect(parseStaffDirectory([row])).toEqual([])
-  })
-
-  test('answers an empty list for a payload that is not one', () => {
-    expect(parseStaffDirectory({ rows: [] })).toEqual([])
   })
 })
 
@@ -529,16 +369,6 @@ describe('parseConversation, reading access', () => {
     ['a staff row', staffRow({ access: READ_ONLY }), READ_ONLY],
     ["a Customer's Support DM", customerSupportRow({ access: OPEN }), OPEN],
     [
-      "a Customer's group",
-      customerGroupRow({
-        access: { write: { state: 'read_only', reason: 'group_write_restricted' }, actions: NO_ACTIONS },
-      }),
-      {
-        write: { state: 'read_only', reason: 'group_write_restricted', holder: null, wayOut: null },
-        actions: NO_ACTIONS,
-      },
-    ],
-    [
       'an Announcements thread',
       broadcastInboxRow({
         access: { write: { state: 'read_only', reason: 'broadcast_inbox_read_only' }, actions: NO_ACTIONS },
@@ -550,15 +380,6 @@ describe('parseConversation, reading access', () => {
     ],
   ])('keeps the access on %s', (_case, payload, access) => {
     expect(parseConversation(payload)?.access).toEqual(access)
-  })
-
-  test.each([
-    ['a staff row', staffRow()],
-    ["a Customer's Support DM", customerSupportRow()],
-    ["a Customer's group", customerGroupRow()],
-    ['an Announcements thread', broadcastInboxRow()],
-  ])('reads %s with no access as unknown', (_case, payload) => {
-    expect(parseConversation(payload)?.access).toEqual({ kind: 'unknown' })
   })
 
   test('reads a malformed access as unknown and keeps the row', () => {

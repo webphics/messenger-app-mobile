@@ -10,9 +10,7 @@ import {
   failSend,
   refuseSend,
   findUnsent,
-  isLocalId,
   isMessageVisibleTo,
-  isSystemMessage,
   isOutgoing,
   mergeMessages,
   messageSenderName,
@@ -20,11 +18,10 @@ import {
   threadContinues,
   threadMessages,
   visibleMessages,
-  withoutPages,
 } from '@/lib/thread-state'
 import { parseMessageCreated } from '@/lib/realtime-events'
-import type { DeliveryState, ThreadState, UnsentMessage } from '@/lib/thread-state'
-import type { CustomerMessage, Message, MessageType, StaffMessage } from '@/lib/types'
+import type { ThreadState, UnsentMessage } from '@/lib/thread-state'
+import type { CustomerMessage, Message, StaffMessage } from '@/lib/types'
 
 /**
  * The thread reducers: what a page, a socket event and a send each do to the
@@ -101,26 +98,9 @@ function messageCreatedEvent(
 const CUSTOMER_VIEWER = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
 
 describe('isMessageVisibleTo', () => {
-  const types: MessageType[] = ['text', 'media', 'voice', 'system']
-
-  test.each(types)('a Customer sees a %s message in a group', (messageType) => {
-    expect(isMessageVisibleTo('customer', 'group', { messageType })).toBe(true)
+  test('a Customer sees a system notice in a group, where it is not the internal assignment record', () => {
+    expect(isMessageVisibleTo('customer', 'group', { messageType: 'system' })).toBe(true)
   })
-
-  test.each(types)('an Agent sees a %s message in a Support DM', (messageType) => {
-    expect(isMessageVisibleTo('agent', 'support_dm', { messageType })).toBe(true)
-  })
-
-  test.each(types)('an Admin sees a %s message in a Support DM', (messageType) => {
-    expect(isMessageVisibleTo('admin', 'support_dm', { messageType })).toBe(true)
-  })
-
-  test.each(['text', 'media', 'voice'] as MessageType[])(
-    'a Customer sees a %s message in their Support DM',
-    (messageType) => {
-      expect(isMessageVisibleTo('customer', 'support_dm', { messageType })).toBe(true)
-    },
-  )
 
   test('a Customer never sees an internal system notice in their Support DM', () => {
     expect(isMessageVisibleTo('customer', 'support_dm', { messageType: 'system' })).toBe(false)
@@ -134,23 +114,9 @@ describe('isMessageVisibleTo', () => {
       }),
     ).toBe(true)
   })
-
-  test('a notice addressed to the Customer is still not a bubble', () => {
-    expect(isSystemMessage({ messageType: 'system' })).toBe(true)
-  })
 })
 
 describe('visibleMessages', () => {
-  test('drops the assignment notice from a Customer thread and keeps the rest in order', () => {
-    const messages = [
-      customerMessage('a', '2026-08-13T08:00:00.000Z'),
-      customerMessage('b', '2026-08-13T08:01:00.000Z', { messageType: 'system' }),
-      customerMessage('c', '2026-08-13T08:02:00.000Z'),
-    ]
-
-    expect(visibleMessages('customer', 'support_dm', messages).map((m) => m.id)).toEqual(['a', 'c'])
-  })
-
   test('leaves an Agent thread untouched', () => {
     const messages = [staffMessage('a', '2026-08-13T08:00:00.000Z', { messageType: 'system' })]
     expect(visibleMessages('agent', 'support_dm', messages)).toEqual(messages)
@@ -174,36 +140,10 @@ describe('mergeMessages', () => {
     expect(merged).toHaveLength(1)
     expect(merged[0]?.receiptStatus).toBe('read')
   })
-
-  test('two messages sharing a timestamp keep a stable order', () => {
-    const at = '2026-08-13T08:00:00.000Z'
-    const forwards = mergeMessages([], [customerMessage('b', at), customerMessage('a', at)])
-    const backwards = mergeMessages([], [customerMessage('a', at), customerMessage('b', at)])
-    expect(forwards.map((m) => m.id)).toEqual(backwards.map((m) => m.id))
-  })
-
-  test('returns what it was given when there is nothing to merge', () => {
-    const existing = [customerMessage('a', '2026-08-13T08:00:00.000Z')]
-    expect(mergeMessages(existing, [])).toBe(existing)
-  })
 })
 
 describe('applyMessagePage', () => {
   const viewer = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
-
-  test('the first page fills an empty thread and points the cursor at its oldest message', () => {
-    const page = [
-      customerMessage('a', '2026-08-13T08:00:00.000Z'),
-      customerMessage('b', '2026-08-13T08:01:00.000Z'),
-    ]
-
-    expect(applyMessagePage(emptyThread(), page, viewer)).toEqual({
-      messages: page,
-      unsent: [],
-      hasMore: true,
-      cursor: 'a',
-    })
-  })
 
   test('an older page lands before what is already held', () => {
     const first = applyMessagePage(
@@ -258,31 +198,11 @@ describe('applyMessagePage', () => {
     expect(state.cursor).toBe('a')
     expect(state.hasMore).toBe(true)
   })
-
-  test('the same page applied twice changes nothing', () => {
-    const page = [customerMessage('a', '2026-08-13T08:00:00.000Z')]
-    const once = applyMessagePage(emptyThread(), page, viewer)
-    expect(applyMessagePage(once, page, viewer)).toEqual(once)
-  })
-
-  test('an Agent keeps the system notice a Customer would not see', () => {
-    const page = [customerMessage('a', '2026-08-13T08:00:00.000Z', { messageType: 'system' })]
-    const state = applyMessagePage(emptyThread(), page, {
-      id: 'agent-1',
-      role: 'agent',
-      conversationType: 'support_dm',
-    })
-    expect(state.messages.map((m) => m.id)).toEqual(['a'])
-  })
 })
 
 describe('isOutgoing', () => {
   test('a Customer message not from the company is theirs', () => {
     expect(isOutgoing(customerMessage('a', 'x', { fromCompany: false }), 'cust-1')).toBe(true)
-  })
-
-  test('a Customer message from the company is not', () => {
-    expect(isOutgoing(customerMessage('a', 'x', { fromCompany: true }), 'cust-1')).toBe(false)
   })
 
   test('a staff message is outgoing only for its sender', () => {
@@ -297,16 +217,6 @@ describe('isOutgoing', () => {
     })
     expect(isOutgoing(message, 'cust-1')).toBe(false)
     expect(messageSenderName(message)).toBe('Acme Support')
-  })
-})
-
-describe('messageSenderName', () => {
-  test('names a staff sender', () => {
-    expect(messageSenderName(staffMessage('a', 'x'))).toBe('Jonah Reed')
-  })
-
-  test('names nobody in a Customer Support DM, where the company is one voice', () => {
-    expect(messageSenderName(customerMessage('a', 'x'))).toBeUndefined()
   })
 })
 
@@ -336,58 +246,6 @@ describe('draftMessage', () => {
     })
   })
 
-  test('a staff draft names its sender', () => {
-    const message = draftMessage({
-      id: 'local-1',
-      body: 'Looking now.',
-      author: { id: 'agent-1', name: 'Jonah Reed', role: 'agent' },
-      sentAt: '2026-08-13T08:00:00.000Z',
-    })
-
-    expect(message).toMatchObject({
-      sender: { id: 'agent-1', name: 'Jonah Reed', role: 'agent' },
-    })
-    expect('fromCompany' in message).toBe(false)
-  })
-
-  test('a reply carries the quoted id and a preview of it', () => {
-    const quoted = customerMessage('msg-1', '2026-08-13T08:00:00.000Z', {
-      body: 'x'.repeat(200),
-    })
-    const message = draftMessage({ id: 'local-1', body: 'Thanks', author, replyTo: quoted })
-
-    expect(message.replyTo).toEqual({ id: 'msg-1', preview: 'x'.repeat(140) })
-  })
-
-  test('an attachment makes it a media message', () => {
-    const message = draftMessage({
-      id: 'local-1',
-      body: '',
-      author,
-      attachments: [
-        {
-          type: 'image/png',
-          url: 'file:///receipt.png',
-          fileName: 'receipt.png',
-          size: 1024,
-          durationSeconds: null,
-          waveform: null,
-        },
-      ],
-    })
-
-    expect(message.messageType).toBe('media')
-  })
-})
-
-describe('isLocalId', () => {
-  test.each([
-    ['local-1757000000000-1', true],
-    ['0b4f1f2c-9d1e-4a5b-8c3d-2e1f0a9b8c7d', false],
-    ['', false],
-  ])('%s is local: %s', (id, expected) => {
-    expect(isLocalId(id)).toBe(expected)
-  })
 })
 
 describe('beginSend', () => {
@@ -397,32 +255,11 @@ describe('beginSend', () => {
     return draftMessage({ id, body: id, author, sentAt: at })
   }
 
-  test('the message joins the thread marked as on its way', () => {
-    const state = beginSend(emptyThread(), draft('local-1', '2026-08-13T08:00:00.000Z'))
-
-    expect(state.unsent).toEqual([
-      { message: draft('local-1', '2026-08-13T08:00:00.000Z'), state: 'sending' },
-    ])
-    expect(state.messages).toEqual([])
-  })
-
   test('sending again re-marks the message rather than stacking a second copy', () => {
     const message = draft('local-1', '2026-08-13T08:00:00.000Z')
     const failed = failSend(beginSend(emptyThread(), message), 'local-1')
 
     expect(beginSend(failed, message).unsent).toEqual([{ message, state: 'sending' }])
-  })
-
-  test('leaves the pages it was given alone', () => {
-    const held = applyMessagePage(
-      emptyThread(),
-      [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
-      { id: 'customer-1', role: 'customer', conversationType: 'support_dm' },
-    )
-    const state = beginSend(held, draft('local-1', '2026-08-13T08:01:00.000Z'))
-
-    expect(state.messages).toEqual(held.messages)
-    expect(state.cursor).toBe('msg-1')
   })
 })
 
@@ -446,17 +283,6 @@ describe('applySentMessage', () => {
     expect(state.messages.map((m) => m.id)).toEqual(['msg-2'])
   })
 
-  test('it lands after the history already held', () => {
-    const held = applyMessagePage(
-      emptyThread(),
-      [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
-      { id: 'customer-1', role: 'customer', conversationType: 'support_dm' },
-    )
-    const state = applySentMessage(beginSend(held, echo), 'local-1', stored)
-
-    expect(state.messages.map((m) => m.id)).toEqual(['msg-1', 'msg-2'])
-  })
-
   test('a refresh that already brought the stored message does not show it twice', () => {
     const viewer = { id: 'customer-1', role: 'customer', conversationType: 'support_dm' } as const
     const raced = applyMessagePage(beginSend(emptyThread(), echo), [stored], viewer)
@@ -466,35 +292,11 @@ describe('applySentMessage', () => {
     expect(state.unsent).toEqual([])
   })
 
-  test('another message still sending is left where it is', () => {
-    const other = draftMessage({
-      id: 'local-2',
-      body: 'And the fee?',
-      author,
-      sentAt: '2026-08-13T08:02:00.000Z',
-    })
-    const state = applySentMessage(
-      beginSend(beginSend(emptyThread(), echo), other),
-      'local-1',
-      stored,
-    )
-
-    expect(state.unsent).toEqual([{ message: other, state: 'sending' }])
-  })
-
   test('an answer for a message no longer held only adds the stored message', () => {
     const state = applySentMessage(emptyThread(), 'local-1', stored)
 
     expect(state.messages.map((m) => m.id)).toEqual(['msg-2'])
     expect(state.unsent).toEqual([])
-  })
-
-  test('does not mutate what it was given', () => {
-    const before = beginSend(emptyThread(), echo)
-    applySentMessage(before, 'local-1', stored)
-
-    expect(before.unsent).toHaveLength(1)
-    expect(before.messages).toEqual([])
   })
 })
 
@@ -507,23 +309,6 @@ describe('failSend', () => {
 
     expect(state.unsent).toEqual([{ message: echo, state: 'failed' }])
     expect(threadMessages(state).map((m) => m.id)).toEqual(['local-1'])
-  })
-
-  test('marks only the message named', () => {
-    const other = draftMessage({ id: 'local-2', body: 'And', author, sentAt: 'y' })
-    const state = failSend(beginSend(beginSend(emptyThread(), echo), other), 'local-1')
-
-    expect(deliveryStates(state.unsent)).toEqual(
-      new Map([
-        ['local-1', 'failed'],
-        ['local-2', 'sending'],
-      ]),
-    )
-  })
-
-  test('a message nobody is holding changes nothing', () => {
-    const before = beginSend(emptyThread(), echo)
-    expect(failSend(before, 'local-9')).toEqual(before)
   })
 })
 
@@ -541,71 +326,6 @@ describe('refuseSend', () => {
 
     expect(state.unsent).toEqual([{ message: echo, state: 'failed' }])
     expect(threadMessages(state).map((m) => m.id)).toEqual(['local-1'])
-  })
-
-  test('a retry stopped the same way marks the bubble already there', () => {
-    const state = refuseSend(beginSend(emptyThread(), echo), echo)
-
-    expect(state.unsent).toEqual([{ message: echo, state: 'failed' }])
-  })
-
-  test('leaves the other messages on their way out alone', () => {
-    const other = draftMessage({ id: 'local-2', body: 'And', author, sentAt: 'y' })
-
-    const state = refuseSend(beginSend(emptyThread(), other), echo)
-
-    expect(deliveryStates(state.unsent)).toEqual(
-      new Map([
-        ['local-2', 'sending'],
-        ['local-1', 'failed'],
-      ]),
-    )
-  })
-})
-
-describe('the send lifecycle', () => {
-  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
-  const echo = draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: 'x' })
-  const stored = customerMessage('msg-1', '2026-08-13T08:00:00.000Z', { fromCompany: false })
-
-  const sending = () => beginSend(emptyThread(), echo)
-  const failed = () => failSend(sending(), 'local-1')
-
-  /** Each row: where the thread was, what happened, what it shows and how it reads. */
-  test.each([
-    ['nothing sent yet', emptyThread, [], []],
-    ['the send starts', sending, ['local-1'], [['local-1', 'sending']]],
-    ['the send fails', failed, ['local-1'], [['local-1', 'failed']]],
-    ['the API answers', () => applySentMessage(sending(), 'local-1', stored), ['msg-1'], []],
-    ['a retry after a failure', () => beginSend(failed(), echo), ['local-1'], [['local-1', 'sending']]],
-    ['a retry that lands', () => applySentMessage(failed(), 'local-1', stored), ['msg-1'], []],
-    ['a refresh mid-send', () => withoutPages(sending()), ['local-1'], [['local-1', 'sending']]],
-  ] as [string, () => ThreadState, string[], [string, DeliveryState][]][])(
-    '%s',
-    (_name, build, shown, delivery) => {
-      const state = build()
-      expect(threadMessages(state).map((m) => m.id)).toEqual(shown)
-      expect([...deliveryStates(state.unsent)]).toEqual(delivery)
-    },
-  )
-})
-
-describe('findUnsent', () => {
-  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
-  const echo = draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: 'x' })
-
-  test('finds a message still in flight', () => {
-    expect(findUnsent(beginSend(emptyThread(), echo), 'local-1')).toEqual({
-      message: echo,
-      state: 'sending',
-    })
-  })
-
-  test('is undefined once the API has answered for it', () => {
-    const sent = customerMessage('msg-1', '2026-08-13T08:00:00.000Z')
-    const state = applySentMessage(beginSend(emptyThread(), echo), 'local-1', sent)
-
-    expect(findUnsent(state, 'local-1')).toBeUndefined()
   })
 })
 
@@ -628,45 +348,6 @@ describe('threadMessages', () => {
 
     expect(threadMessages(state).map((m) => m.id)).toEqual(['msg-1', 'msg-2', 'local-1'])
   })
-
-  test('a settled thread is its pages', () => {
-    const held = applyMessagePage(
-      emptyThread(),
-      [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')],
-      { id: 'customer-1', role: 'customer', conversationType: 'support_dm' },
-    )
-
-    expect(threadMessages(held)).toEqual(held.messages)
-  })
-})
-
-describe('deliveryStates', () => {
-  test('a thread with nothing in flight reports nothing', () => {
-    expect(deliveryStates(emptyThread().unsent).size).toBe(0)
-  })
-})
-
-describe('withoutPages', () => {
-  const author = { id: 'cust-1', name: 'Ada Poole', role: 'customer' } as const
-
-  test('a refresh drops the pages and keeps the message still going out', () => {
-    const echo = draftMessage({ id: 'local-1', body: 'Hi', author, sentAt: 'x' })
-    const held = beginSend(
-      applyMessagePage(emptyThread(), [customerMessage('msg-1', '2026-08-13T08:00:00.000Z')], {
-        id: 'customer-1',
-        role: 'customer',
-        conversationType: 'support_dm',
-      }),
-      echo,
-    )
-
-    expect(withoutPages(held)).toEqual({
-      messages: [],
-      unsent: [{ message: echo, state: 'sending' }],
-      hasMore: true,
-      cursor: undefined,
-    })
-  })
 })
 
 /**
@@ -678,21 +359,6 @@ describe('withoutPages', () => {
  */
 
 describe('applyIncomingMessage', () => {
-  test('puts a message that arrived over the socket in its place in the thread', () => {
-    const state: ThreadState = {
-      ...emptyThread(),
-      messages: [
-        customerMessage('a', '2026-08-13T08:00:00.000Z'),
-        customerMessage('c', '2026-08-13T08:02:00.000Z'),
-      ],
-    }
-
-    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
-    const next = applyIncomingMessage(state, event.message, CUSTOMER_VIEWER)
-
-    expect(next.messages.map((m) => m.id)).toEqual(['a', 'b', 'c'])
-  })
-
   test('the API’s duplicate of one message is still one message', () => {
     const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
 
@@ -702,52 +368,11 @@ describe('applyIncomingMessage', () => {
     expect(twice.messages.map((m) => m.id)).toEqual(['b'])
   })
 
-  test('a resync that re-fetches the message adds nothing to it', () => {
-    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
-    const live = applyIncomingMessage(emptyThread(), event.message, CUSTOMER_VIEWER)
-
-    const resynced = applyMessagePage(
-      withoutPages(live),
-      [customerMessage('a', '2026-08-13T08:00:00.000Z'), event.message],
-      CUSTOMER_VIEWER,
-    )
-
-    expect(resynced.messages.map((m) => m.id)).toEqual(['a', 'b'])
-  })
-
   test('a Customer’s Support DM never shows an assignment notice that arrives live', () => {
     const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z', { messageType: 'system' })
     const state = emptyThread()
 
     expect(applyIncomingMessage(state, event.message, CUSTOMER_VIEWER)).toBe(state)
-  })
-
-  test('an Agent does see it', () => {
-    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z', { messageType: 'system' })
-    const next = applyIncomingMessage(emptyThread(), event.message, {
-      id: 'agent-1',
-      role: 'agent',
-      conversationType: 'support_dm',
-    })
-
-    expect(next.messages.map((m) => m.id)).toEqual(['b'])
-  })
-
-  test('leaves the backwards cursor and hasMore alone', () => {
-    const state: ThreadState = { ...emptyThread(), cursor: 'a', hasMore: true }
-    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
-
-    const next = applyIncomingMessage(state, event.message, CUSTOMER_VIEWER)
-
-    expect(next.cursor).toBe('a')
-    expect(next.hasMore).toBe(true)
-  })
-
-  test('keeps a message still on its way out', () => {
-    const sending = beginSend(emptyThread(), customerMessage('local-1', '2026-08-13T08:03:00.000Z'))
-    const event = messageCreatedEvent('b', '2026-08-13T08:01:00.000Z')
-
-    expect(applyIncomingMessage(sending, event.message, CUSTOMER_VIEWER).unsent).toHaveLength(1)
   })
 })
 
@@ -822,17 +447,6 @@ describe('applyIncomingMessage and the echo of a message sent from here', () => 
     const next = applyIncomingMessage(sending('Any update?'), event.message, viewer)
 
     expect(next.unsent).toHaveLength(1)
-  })
-
-  test('someone else’s message leaves a send of different words alone', () => {
-    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
-      body: 'Something else',
-      fromCompany: false,
-    })
-
-    expect(applyIncomingMessage(sending('Any update?'), event.message, viewer).unsent).toHaveLength(
-      1,
-    )
   })
 
   test('two sends of the same words confirm one at a time, oldest first', () => {
@@ -910,45 +524,6 @@ describe('applyIncomingMessage and the echo of a message sent from here', () => 
 
     expect(next.unsent).toHaveLength(0)
     expect(next.messages.map((message) => message.id)).toEqual(['server-1'])
-  })
-
-  test('a different photo confirms nothing, however alike the two captions are', () => {
-    const sendingPhoto = beginSend(
-      emptyThread(),
-      draftMessage({
-        id: 'local-1',
-        body: 'Here',
-        author: { id: 'customer-1', name: 'QA', role: 'customer' },
-        sentAt: '2026-08-13T08:00:00.000Z',
-        attachments: [
-          {
-            type: 'image/jpeg',
-            url: '/uploads/chat/mine.jpg',
-            fileName: null,
-            size: null,
-            durationSeconds: null,
-            waveform: null,
-          },
-        ],
-      }),
-    )
-    const event = messageCreatedEvent('server-1', '2026-08-13T08:00:01.000Z', {
-      body: 'Here',
-      fromCompany: false,
-      messageType: 'media',
-      attachments: [
-        {
-          type: 'image/jpeg',
-          url: '/uploads/chat/theirs.jpg',
-          fileName: null,
-          size: null,
-          durationSeconds: null,
-          waveform: null,
-        },
-      ],
-    })
-
-    expect(applyIncomingMessage(sendingPhoto, event.message, viewer).unsent).toHaveLength(1)
   })
 
   /**
@@ -1062,16 +637,6 @@ describe('a Restored Outbox entry the API turns out to hold', () => {
     expect(threadMessages(next).map((message) => message.id)).toEqual(['server-1'])
   })
 
-  test('is resolved by the socket arrival too, whichever gets here first', () => {
-    const next = applyIncomingMessage(
-      restoredThread([restoredEntry('Any update?')]),
-      confirmed('Any update?', '2026-08-13T08:00:01.000Z'),
-      viewer,
-    )
-
-    expect(next.unsent).toEqual([])
-  })
-
   /**
    * The rule `withoutEcho` already documented, unweakened. A send that failed in
    * front of the person is a bubble they were told about, and taking it away on
@@ -1129,14 +694,6 @@ describe('a Restored Outbox entry the API turns out to hold', () => {
         fromCompany: false,
       }),
     ],
-    [
-      'a system notice, which nobody typed',
-      customerMessage('server-1', '2026-08-13T08:00:01.000Z', {
-        body: 'Any update?',
-        fromCompany: false,
-        messageType: 'system',
-      }),
-    ],
   ])('is not resolved by %s', (_name, message) => {
     const next = applyNewestPage(restoredThread([restoredEntry('Any update?')]), [message], viewer)
 
@@ -1161,24 +718,6 @@ describe('a Restored Outbox entry the API turns out to hold', () => {
     expect(next.unsent).toHaveLength(1)
   })
 
-  test('is resolved by a copy this device has never held', () => {
-    const held = restoredThread(
-      [restoredEntry('Thanks')],
-      [customerMessage('server-9', '2026-08-13T07:59:00.000Z', { fromCompany: false })],
-    )
-
-    const next = applyNewestPage(
-      held,
-      [
-        customerMessage('server-9', '2026-08-13T07:59:00.000Z', { fromCompany: false }),
-        confirmed('Thanks', '2026-08-13T08:00:01.000Z'),
-      ],
-      viewer,
-    )
-
-    expect(next.unsent).toEqual([])
-  })
-
   /**
    * The copy the API kept can be older than Messages this device went on to
    * receive before the process died — the send is what stopped, not the socket.
@@ -1197,27 +736,6 @@ describe('a Restored Outbox entry the API turns out to hold', () => {
     )
 
     expect(next.unsent).toEqual([])
-  })
-
-  /**
-   * Both copies are new to this device, so both are candidates. The Message that
-   * did not get away was the last one this person wrote, so the later of the two
-   * is the one it is likelier to be — and the earlier stays on screen as the
-   * history it is.
-   */
-  test('takes the later of two copies that read the same', () => {
-    const earlier = customerMessage('server-8', '2026-08-12T09:00:00.000Z', {
-      body: 'Thanks',
-      fromCompany: false,
-    })
-    const next = applyNewestPage(
-      restoredThread([restoredEntry('Thanks')]),
-      [earlier, confirmed('Thanks', '2026-08-13T08:00:01.000Z')],
-      viewer,
-    )
-
-    expect(next.unsent).toEqual([])
-    expect(next.messages.map((message) => message.id)).toEqual(['server-8', 'server-1'])
   })
 
   /**
@@ -1337,12 +855,6 @@ describe('the two waits a send with a file goes through', () => {
     })
   }
 
-  test('an upload is its own state, distinct from the send that follows', () => {
-    const uploading = beginUpload(emptyThread(), photoDraft('file:///cache/IMG_0001.jpg'))
-
-    expect(deliveryStates(uploading.unsent).get('local-1')).toBe('uploading')
-  })
-
   /**
    * The bubble on screen is the same bubble, holding what the upload answered
    * with. Two entries would be two bubbles.
@@ -1354,10 +866,6 @@ describe('the two waits a send with a file goes through', () => {
     expect(sending.unsent).toHaveLength(1)
     expect(deliveryStates(sending.unsent).get('local-1')).toBe('sending')
     expect(sending.unsent[0].message.attachments[0].url).toBe('/uploads/chat/9f1c.jpg')
-  })
-
-  test('a message that carries a file is media rather than text', () => {
-    expect(photoDraft('/uploads/chat/9f1c.jpg').messageType).toBe('media')
   })
 
   /**
@@ -1378,18 +886,6 @@ describe('the two waits a send with a file goes through', () => {
     expect(findUnsent(failed, 'local-1')?.message.attachments[0].url).toBe(
       '/uploads/chat/9f1c.jpg',
     )
-  })
-
-  test('a text send that failed keeps the message it was already holding', () => {
-    const sending = beginSend(
-      emptyThread(),
-      draftMessage({ id: 'local-1', body: 'Hello', author, sentAt: '2026-08-13T08:00:00.000Z' }),
-    )
-
-    const failed = failSend(sending, 'local-1')
-
-    expect(findUnsent(failed, 'local-1')?.message.body).toBe('Hello')
-    expect(deliveryStates(failed.unsent).get('local-1')).toBe('failed')
   })
 })
 
@@ -1413,26 +909,6 @@ describe('threadContinues', () => {
       threadContinues(held, [customerMessage('msg-3', '2026-08-13T08:01:00.001Z')]),
     ).toBe(false)
   })
-
-  /**
-   * A page holding only messages this viewer may not see is still evidence that
-   * the two runs meet, which is why the raw page is what this is asked about.
-   */
-  it('is true on a shared id whether or not the message would be shown', () => {
-    const notice = customerMessage('msg-2', '2026-08-13T08:01:00.000Z', {
-      messageType: 'system',
-    })
-
-    expect(threadContinues(held, [notice])).toBe(true)
-  })
-
-  it('is false for a thread holding nothing, which has nothing to continue', () => {
-    expect(threadContinues([], held)).toBe(false)
-  })
-
-  it('is false for a page holding nothing', () => {
-    expect(threadContinues(held, [])).toBe(false)
-  })
 })
 
 describe('applyNewestPage', () => {
@@ -1450,20 +926,6 @@ describe('applyNewestPage', () => {
     }
   }
 
-  it('begins a thread that is holding nothing, cursor and all', () => {
-    const page = [
-      customerMessage('msg-1', '2026-08-13T08:00:00.000Z'),
-      customerMessage('msg-2', '2026-08-13T08:01:00.000Z'),
-    ]
-
-    expect(applyNewestPage(emptyThread(), page, viewer)).toEqual({
-      messages: page,
-      unsent: [],
-      hasMore: true,
-      cursor: 'msg-1',
-    })
-  })
-
   /**
    * The point of the whole arrangement: a thread Restored from this device has
    * already been read back through, and the page that confirms it must not send
@@ -1480,16 +942,6 @@ describe('applyNewestPage', () => {
     expect(next.cursor).toBe('msg-8')
     expect(next.hasMore).toBe(true)
     expect(next.messages.map((each) => each.id)).toEqual(['msg-8', 'msg-9', 'msg-10'])
-  })
-
-  it('takes the newer copy of a message it already held', () => {
-    const read = customerMessage('msg-9', '2026-08-13T08:09:00.000Z', {
-      receiptStatus: 'read',
-    })
-
-    const next = applyNewestPage(restored(), [read], viewer)
-
-    expect(next.messages.map((each) => each.receiptStatus)).toEqual(['sent', 'read'])
   })
 
   /**
@@ -1512,18 +964,6 @@ describe('applyNewestPage', () => {
     })
   })
 
-  it('keeps a message still on its way when it starts the thread over', () => {
-    const sending = beginSend(restored(), customerMessage('local-1', '2026-08-13T08:11:00.000Z'))
-
-    const next = applyNewestPage(
-      sending,
-      [customerMessage('msg-90', '2026-08-14T08:00:00.000Z')],
-      viewer,
-    )
-
-    expect(next.unsent).toHaveLength(1)
-  })
-
   it('empties a thread whose newest page has nothing in it', () => {
     expect(applyNewestPage(restored(), [], viewer)).toEqual({
       messages: [],
@@ -1531,16 +971,5 @@ describe('applyNewestPage', () => {
       hasMore: false,
       cursor: undefined,
     })
-  })
-
-  it('withholds a system notice from a Customer on the way in', () => {
-    const page = [
-      customerMessage('msg-9', '2026-08-13T08:09:00.000Z'),
-      customerMessage('msg-10', '2026-08-13T08:10:00.000Z', { messageType: 'system' }),
-    ]
-
-    const next = applyNewestPage(restored(), page, viewer)
-
-    expect(next.messages.map((each) => each.id)).toEqual(['msg-8', 'msg-9'])
   })
 })

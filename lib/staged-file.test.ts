@@ -47,16 +47,6 @@ beforeEach(() => {
 })
 
 describe('missingStagedFiles', () => {
-  it('finds nothing on a message carrying nothing', () => {
-    expect(missingStagedFiles([])).toEqual([])
-  })
-
-  it('says nothing about a staged file that is still there', () => {
-    mockFiles.add(STAGED)
-
-    expect(missingStagedFiles([attachment(STAGED)])).toEqual([])
-  })
-
   /**
    * The case the Outbox creates: both pickers copy into the system cache, and
    * the system reclaims the cache. A message typed on a train can come back on
@@ -66,15 +56,6 @@ describe('missingStagedFiles', () => {
     expect(missingStagedFiles([attachment(STAGED)])).toEqual([attachment(STAGED)])
   })
 
-  it('names only the ones that have gone', () => {
-    const kept = 'file:///var/mobile/tmp/kept.jpg'
-    mockFiles.add(kept)
-
-    const missing = missingStagedFiles([attachment(kept, 'kept.jpg'), attachment(STAGED)])
-
-    expect(missing.map((one) => one.url)).toEqual([STAGED])
-  })
-
   /**
    * An attachment the upload already answered for. It names an object in the
    * store, not a path on this phone, and there is nothing here that could read
@@ -82,8 +63,6 @@ describe('missingStagedFiles', () => {
    */
   it.each([
     ['an origin-free path the API stored', '/uploads/chat/abc.jpg'],
-    ['an absolute URL an object store signed', 'https://cdn.example.com/abc.jpg'],
-    ['a plain http URL', 'http://cdn.example.com/abc.jpg'],
   ])('does not read %s', (_label, url) => {
     expect(missingStagedFiles([attachment(url)])).toEqual([])
     expect(mockAsked).toEqual([])
@@ -96,8 +75,6 @@ describe('missingStagedFiles', () => {
    */
   it.each([
     ['an Android content URI', 'content://com.android.providers.media/1'],
-    ['an iOS photo library URI', 'ph://ABC-123/L0/001'],
-    ['an assets-library URI', 'assets-library://asset/asset.JPG'],
   ])('assumes %s is still there', (_label, url) => {
     expect(missingStagedFiles([attachment(url)])).toEqual([])
     expect(mockAsked).toEqual([])

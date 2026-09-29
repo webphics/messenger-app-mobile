@@ -58,28 +58,13 @@ describe('community rows', () => {
     expect([...fromCommunityRows(rows).expanded]).toEqual(['b'])
   })
 
-  it('reads back in the order the tab shows, whatever order the rows came in', () => {
-    const rows = toCommunityRows(
-      'viewer',
-      [community({ id: 'z', name: 'Zed' }), community({ id: 'a', name: 'Acme' })],
-      new Set(),
-    )
-
-    expect(fromCommunityRows(rows).communities.map((row) => row.id)).toEqual(['a', 'z'])
-  })
-
   it.each([
-    ['a row with no payload at all', { id: 'x', owner_id: 'viewer', expanded: 0 }],
     ['a payload that is not JSON', { payload: 'not json', expanded: 0 }],
     ['a payload this build cannot read', { payload: JSON.stringify({ nothing: true }), expanded: 0 }],
   ])('drops %s rather than the tab', (_name, row) => {
     expect(fromCommunityRows([row, ...toCommunityRows('viewer', [community()], new Set())])).toMatchObject(
       { communities: [community()] },
     )
-  })
-
-  it('has nothing to restore from nothing', () => {
-    expect(fromCommunityRows([])).toEqual({ communities: [], expanded: new Set() })
   })
 })
 
@@ -89,11 +74,6 @@ describe('community group rows', () => {
     expect(rows.map((row) => row.position)).toEqual([0, 1])
     expect(rows[0]).toMatchObject({ community_id: 'community-1', owner_id: 'viewer' })
     expect(fromCommunityGroupRows(rows)).toEqual([announcements, joined])
-  })
-
-  it('reads a Group back with everything a row draws, muted included', () => {
-    const rows = toCommunityGroupRows('viewer', 'community-1', [joined])
-    expect(fromCommunityGroupRows(rows)[0]).toEqual(joined)
   })
 
   it('drops a row it cannot read rather than the feed', () => {

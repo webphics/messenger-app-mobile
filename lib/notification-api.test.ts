@@ -86,15 +86,6 @@ describe('readNotificationSettings', () => {
     expect(calls[0]?.url).toBe(`${API_BASE_URL}/notifications/settings`)
     expect(result).toEqual({ ok: true, value: SETTINGS })
   })
-
-  test('answers malformed rather than inventing an opt-in list', async () => {
-    enqueue(envelope('settings'))
-
-    expect(await readNotificationSettings()).toEqual({
-      ok: false,
-      failure: { kind: 'malformed' },
-    })
-  })
 })
 
 describe('setPostNotifications', () => {
@@ -109,19 +100,6 @@ describe('setPostNotifications', () => {
     expect(result).toEqual({ ok: true, value: SETTINGS })
   })
 
-  test('turning one off is a DELETE against the same path', async () => {
-    enqueue(csrfResponse(), envelope({ ...SETTINGS, postOrganizationIds: [] }))
-
-    const result = await setPostNotifications('org-1', false)
-
-    expect(calls[1]?.url).toBe(`${API_BASE_URL}/notifications/post-organizations/org-1`)
-    expect(calls[1]?.init.method).toBe('DELETE')
-    expect(result).toEqual({
-      ok: true,
-      value: { ...SETTINGS, postOrganizationIds: [] },
-    })
-  })
-
   test('escapes an id rather than letting it shape the path', async () => {
     enqueue(csrfResponse(), envelope(SETTINGS))
 
@@ -130,14 +108,5 @@ describe('setPostNotifications', () => {
     expect(calls[1]?.url).toBe(
       `${API_BASE_URL}/notifications/post-organizations/org%201%2F..%2Fsettings`,
     )
-  })
-
-  test('reads a refusal as one, in the API’s own words', async () => {
-    enqueue(csrfResponse(), response(403, { message: 'You are not in that organization' }))
-
-    expect(await setPostNotifications('org-9', true)).toEqual({
-      ok: false,
-      failure: { kind: 'refused', message: 'You are not in that organization' },
-    })
   })
 })

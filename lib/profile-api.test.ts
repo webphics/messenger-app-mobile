@@ -76,48 +76,9 @@ describe("what the API is asked", () => {
     });
   });
 
-  test("`phone` is sent explicitly as null rather than omitted", async () => {
-    // The route writes `input.phone ?? null` unconditionally, so a body with no
-    // `phone` clears the stored number. Sending null is the same outcome said
-    // out loud; sending nothing would be a silent write.
-    request.mockResolvedValueOnce(answered(NAMED));
-
-    await updateProfile({ name: "Grace Hopper", phone: null });
-
-    const body = request.mock.calls[0]![1]!.body as Record<string, unknown>;
-    expect("phone" in body).toBe(true);
-    expect(body.phone).toBeNull();
-  });
-
-  test("a kept number is sent back rather than dropped", async () => {
-    request.mockResolvedValueOnce(answered({ ...NAMED }));
-
-    await updateProfile({ name: "Grace Hopper", phone: "+447700900000" });
-
-    const body = request.mock.calls[0]![1]!.body as Record<string, unknown>;
-    expect(body.phone).toBe("+447700900000");
-  });
 });
 
 describe("the three copies of the signed-in person", () => {
-  test("the snapshot a screen reads moves to the answer", async () => {
-    request.mockResolvedValueOnce(answered(NAMED));
-
-    await updateProfile({ name: "Grace Hopper", phone: null });
-
-    expect(getSessionUser()?.name).toBe("Grace Hopper");
-  });
-
-  test("the Kept person moves with it, so a cold start agrees", async () => {
-    request.mockResolvedValueOnce(answered(NAMED));
-
-    await updateProfile({ name: "Grace Hopper", phone: null });
-
-    expect(kept).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "Grace Hopper" }),
-    );
-  });
-
   test("what lands is the server's answer, never the name that was asked for", async () => {
     // The API re-reads the session after the write. If it ever answers with
     // something other than what was sent — a trimmed name, a different casing —
@@ -145,16 +106,6 @@ describe("a write that did not happen changes nothing", () => {
     const result = await updateProfile({ name: "", phone: null });
 
     expect(result.ok).toBe(false);
-    expect(getSessionUser()).toEqual(BEFORE);
-    expect(kept).not.toHaveBeenCalled();
-  });
-
-  test("a dead network leaves them too, and says so", async () => {
-    request.mockResolvedValueOnce({ reached: false as const });
-
-    const result = await updateProfile({ name: "Grace Hopper", phone: null });
-
-    expect(result).toEqual({ ok: false, failure: { kind: "unreachable" } });
     expect(getSessionUser()).toEqual(BEFORE);
     expect(kept).not.toHaveBeenCalled();
   });

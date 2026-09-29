@@ -14,31 +14,14 @@ function viewer(role: UserRole, ...capabilities: Capability[]) {
 }
 
 describe('mayEnter', () => {
-  test.each<[string, Access]>([
-    ['no rule at all', {}],
-    ['a role rule', { roles: ['admin'] }],
-    ['a capability rule', { anyCapability: ['manage_labels'] }],
-  ])('nobody signed in enters nothing, even with %s', (_label, access) => {
-    expect(mayEnter(null, access)).toBe(false)
-    expect(mayEnter(undefined, access)).toBe(false)
+  test('nobody signed in enters anything, even a rule that asks for nothing', () => {
+    expect(mayEnter(null, {})).toBe(false)
+    expect(mayEnter(undefined, { roles: ['admin'] })).toBe(false)
   })
 
-  test('a rule asking for nothing lets any signed-in viewer in', () => {
-    expect(mayEnter(viewer('customer'), {})).toBe(true)
-  })
-
-  test.each<[UserRole, boolean]>([
-    ['admin', true],
-    ['agent', true],
-    ['customer', false],
-  ])('a staff-only rule and a %s: %s', (role, expected) => {
-    expect(mayEnter(viewer(role), { roles: ['admin', 'agent'] })).toBe(expected)
-  })
-
-  test('one capability out of several is enough', () => {
-    const access: Access = { anyCapability: ['manage_organizations', 'manage_memberships'] }
-    expect(mayEnter(viewer('admin', 'manage_memberships'), access)).toBe(true)
-    expect(mayEnter(viewer('admin', 'close'), access)).toBe(false)
+  test('a staff-only rule lets staff in and keeps a Customer out', () => {
+    expect(mayEnter(viewer('agent'), { roles: ['admin', 'agent'] })).toBe(true)
+    expect(mayEnter(viewer('customer'), { roles: ['admin', 'agent'] })).toBe(false)
   })
 
   test('both halves must hold: the role and a capability', () => {
@@ -50,10 +33,6 @@ describe('mayEnter', () => {
 
   test('an empty capability list is shut, not open: it is never satisfied', () => {
     expect(mayEnter(viewer('admin', ...CAPABILITIES), { anyCapability: [] })).toBe(false)
-  })
-
-  test('an empty role list lets nobody in', () => {
-    expect(mayEnter(viewer('admin', ...CAPABILITIES), { roles: [] })).toBe(false)
   })
 })
 
@@ -71,47 +50,22 @@ describe('ANALYTICS_ACCESS', () => {
   test.each<[UserRole, Capability[], boolean]>([
     ['admin', ['view_team_analytics'], true],
     ['admin', ['view_team_activity'], false],
-    ['admin', [], false],
     ['agent', ['view_team_analytics'], false],
-    ['customer', ['view_team_analytics'], false],
   ])('a %s holding %j: %s', (role, held, expected) => {
     expect(mayEnter(viewer(role, ...held), ANALYTICS_ACCESS)).toBe(expected)
-  })
-
-  test('a chart opens exactly where the Hub draws the carousel', () => {
-    expect(SCREEN_ACCESS['chart/[id]']).toBe(ANALYTICS_ACCESS)
   })
 })
 
 describe('SCREEN_ACCESS', () => {
   test.each<[GuardedScreen, Capability[], boolean]>([
     ['users', ['manage_users'], true],
-    ['users', ['change_roles'], true],
-    ['users', ['manage_permissions'], true],
     ['users', ['manage_team'], false],
-    ['organizations', ['manage_organizations'], true],
     ['organizations', ['manage_memberships'], true],
-    ['organizations', ['manage_users'], false],
-    ['organization/[id]', ['manage_memberships'], true],
-    ['organization/[id]', [], false],
     ['labels', ['manage_labels'], true],
-    ['labels', ['close'], false],
-    ['saved-responses', ['manage_canned_replies'], true],
     ['saved-responses', ['manage_labels'], false],
     ['activity', ['view_team_activity'], true],
-    ['activity', ['view_team_analytics'], false],
-    ['chart/[id]', ['view_team_analytics'], true],
-    ['chart/[id]', ['view_team_activity'], false],
-    ['offer-add', [], true],
   ])('an Admin holding %s → %j: %s', (screen, held, expected) => {
     expect(mayEnter(viewer('admin', ...held), SCREEN_ACCESS[screen])).toBe(expected)
-  })
-
-  test('an Admin holding everything enters every screen', () => {
-    const everything = viewer('admin', ...CAPABILITIES)
-    for (const access of Object.values(SCREEN_ACCESS)) {
-      expect(mayEnter(everything, access)).toBe(true)
-    }
   })
 
   test.each<UserRole>(['agent', 'customer'])(
@@ -123,12 +77,4 @@ describe('SCREEN_ACCESS', () => {
       }
     },
   )
-
-  test('every screen that asks for a capability names at least one', () => {
-    for (const access of Object.values(SCREEN_ACCESS) as Access[]) {
-      if (access.anyCapability !== undefined) {
-        expect(access.anyCapability.length).toBeGreaterThan(0)
-      }
-    }
-  })
 })

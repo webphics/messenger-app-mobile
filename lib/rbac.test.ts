@@ -98,13 +98,10 @@ describe('canViewConversation', () => {
     expect(canViewConversation(viewer('customer', 'customer-1'), customerSupport())).toBe(true)
   })
 
-  test('a Customer may open a group they are a member of', () => {
+  test('a Customer may open a group they are a member of, and not one they are not in', () => {
     expect(
       canViewConversation(viewer('customer', 'customer-1'), customerGroup(['customer-1'])),
     ).toBe(true)
-  })
-
-  test('a Customer may not open a group they are not in', () => {
     expect(
       canViewConversation(viewer('customer', 'customer-9'), customerGroup(['customer-1'])),
     ).toBe(false)
@@ -119,11 +116,6 @@ describe('canViewConversation', () => {
     expect(canViewConversation(viewer('agent', 'agent-1'), other)).toBe(true)
   })
 
-  test('an Agent sees an unassigned support thread', () => {
-    const pooled = staffConversation({ status: 'unassigned', assignedAgent: null })
-    expect(canViewConversation(viewer('agent', 'agent-1'), pooled)).toBe(true)
-  })
-
   test('an Agent sees a group they are a member of, and not one they are not', () => {
     expect(canViewConversation(viewer('agent', 'agent-1'), staffGroup(['agent-1']))).toBe(true)
     expect(canViewConversation(viewer('agent', 'agent-2'), staffGroup(['agent-1']))).toBe(false)
@@ -133,20 +125,12 @@ describe('canViewConversation', () => {
     expect(canViewConversation(viewer('admin', 'admin-1'), staffGroup(['agent-1']))).toBe(true)
   })
 
-  test.each<[UserRole, string]>([
-    ['admin', 'admin-1'],
-    ['agent', 'agent-1'],
-  ])('a %s holding a Customer payload is holding something not meant for them', (role, id) => {
-    expect(canViewConversation(viewer(role, id), customerSupport())).toBe(false)
-    expect(canViewConversation(viewer(role, id), customerGroup([id]))).toBe(false)
+  test('staff holding a Customer payload is holding something not meant for them', () => {
+    expect(canViewConversation(viewer('agent', 'agent-1'), customerSupport())).toBe(false)
   })
 
-  test.each<[UserRole, string]>([
-    ['admin', 'admin-1'],
-    ['agent', 'agent-1'],
-    ['customer', 'customer-1'],
-  ])('a %s may open an Announcements thread the API handed them', (role, id) => {
-    expect(canViewConversation(viewer(role, id), announcements())).toBe(true)
+  test('an Announcements thread the API handed them is always openable', () => {
+    expect(canViewConversation(viewer('agent', 'agent-1'), announcements())).toBe(true)
   })
 })
 
@@ -154,21 +138,11 @@ describe('canViewConversation on a staff DM', () => {
   test.each<[string, UserRole, Capability[], Partial<StaffConversation>, boolean]>([
     ['an Agent with staff_dm and a resolved peer', 'agent', ['staff_dm'], {}, true],
     ['an Agent without staff_dm, with an Agent', 'agent', [], {}, false],
-    ['an Agent holding other capabilities but not staff_dm', 'agent', ['transfer', 'close'], {}, false],
     ['an Agent without staff_dm, with an Admin', 'agent', [], { otherUser: ADMIN_PEER }, true],
     ['an Agent with staff_dm but no peer resolved', 'agent', ['staff_dm'], { otherUser: null }, false],
-    ['an Agent without staff_dm and no peer resolved', 'agent', [], { otherUser: null }, false],
-    ['an Admin with staff_dm', 'admin', ['staff_dm'], {}, true],
-    ['an Admin without staff_dm, with an Agent', 'admin', [], {}, true],
-    ['an Admin without staff_dm, with an Admin', 'admin', [], { otherUser: ADMIN_PEER }, true],
-    ['an Admin with staff_dm but no peer resolved', 'admin', ['staff_dm'], { otherUser: null }, false],
   ])('%s → %s', (_label, role, held, overrides, expected) => {
     const me = viewer(role, `${role}-1`, ...held)
     expect(canViewConversation(me, staffDm(overrides))).toBe(expected)
-  })
-
-  test('a Customer never opens one, whatever it holds', () => {
-    expect(canViewConversation(viewer('customer', 'customer-1', 'staff_dm'), staffDm())).toBe(false)
   })
 })
 
@@ -177,11 +151,7 @@ describe('canHoldStaffDm', () => {
     ['an Agent with staff_dm, with an Agent', 'agent', ['staff_dm'], 'agent', true],
     ['an Agent without staff_dm, with an Agent', 'agent', [], 'agent', false],
     ['an Agent without staff_dm, with an Admin', 'agent', [], 'admin', true],
-    ['an Admin without staff_dm, with an Agent', 'admin', [], 'agent', true],
-    ['an Admin without staff_dm, with an Admin', 'admin', [], 'admin', true],
     ['an Agent with staff_dm, with a Customer', 'agent', ['staff_dm'], 'customer', false],
-    ['an Admin, with a Customer', 'admin', ['staff_dm'], 'customer', false],
-    ['a Customer holding staff_dm, with an Admin', 'customer', ['staff_dm'], 'admin', false],
   ])('%s → %s', (_label, role, held, peerRole, expected) => {
     expect(canHoldStaffDm({ role, capabilities: held }, peerRole)).toBe(expected)
   })

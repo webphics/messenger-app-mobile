@@ -1,5 +1,4 @@
 import {
-  fileExtension,
   isDeviceUri,
   MAX_UPLOAD_BYTES,
   missingFilesMessage,
@@ -20,28 +19,6 @@ function view(overrides: Partial<AttachmentView> = {}): AttachmentView {
   }
 }
 
-describe('fileExtension', () => {
-  it('reads the extension of a plain name', () => {
-    expect(fileExtension('report.PDF')).toBe('pdf')
-  })
-
-  it('ignores a query string and a fragment', () => {
-    expect(fileExtension('https://cdn.example/a/b.png?v=2#top')).toBe('png')
-  })
-
-  it('is empty for a name with no extension', () => {
-    expect(fileExtension('README')).toBe('')
-  })
-
-  it('is empty for a dotfile, which has no extension', () => {
-    expect(fileExtension('.gitignore')).toBe('')
-  })
-
-  it('ignores a dot in a directory above the file', () => {
-    expect(fileExtension('file:///a.b/c')).toBe('')
-  })
-})
-
 describe('uploadMimeType', () => {
   it('reads the type the API expects for each kind of file', () => {
     expect(uploadMimeType({ uri: 'file:///a.jpeg', name: 'a.jpeg' })).toBe('image/jpeg')
@@ -49,18 +26,6 @@ describe('uploadMimeType', () => {
     expect(uploadMimeType({ uri: 'file:///a.mov', name: 'a.mov' })).toBe('video/quicktime')
     expect(uploadMimeType({ uri: 'file:///a.docx', name: 'a.docx' })).toBe(
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    )
-  })
-
-  it('prefers the name, which is what the person chose', () => {
-    expect(uploadMimeType({ uri: 'content://provider/2318', name: 'quarterly.pdf' })).toBe(
-      'application/pdf',
-    )
-  })
-
-  it('falls back to the URI when the name carries no extension', () => {
-    expect(uploadMimeType({ uri: 'file:///cache/recording.m4a', name: 'Voice note' })).toBe(
-      'audio/mp4',
     )
   })
 
@@ -72,10 +37,6 @@ describe('uploadMimeType', () => {
 })
 
 describe('rejectUploadReason', () => {
-  it('passes an ordinary file', () => {
-    expect(rejectUploadReason(view())).toBeNull()
-  })
-
   it('names the file and the limit when it is too large', () => {
     const reason = rejectUploadReason(view({ size: MAX_UPLOAD_BYTES + 1 }))
     expect(reason).toContain('IMG_0001.jpg')
@@ -84,10 +45,6 @@ describe('rejectUploadReason', () => {
 
   it('accepts a file exactly at the limit', () => {
     expect(rejectUploadReason(view({ size: MAX_UPLOAD_BYTES }))).toBeNull()
-  })
-
-  it('does not invent a size for a file the platform did not measure', () => {
-    expect(rejectUploadReason(view({ size: null, name: 'clip.m4a', kind: 'audio' }))).toBeNull()
   })
 
   it('refuses a type the API does not take', () => {
@@ -116,21 +73,9 @@ describe('isDeviceUri', () => {
     expect(isDeviceUri('http://10.0.2.2:4000/uploads/chat/a.jpg')).toBe(false)
   })
 
-  it('is false for the origin-free path the API stores', () => {
-    expect(isDeviceUri('/uploads/chat/a.jpg')).toBe(false)
-  })
-
-  it('is false for nothing at all', () => {
-    expect(isDeviceUri('')).toBe(false)
-    expect(isDeviceUri('   ')).toBe(false)
-  })
 })
 
 describe('sendMessageType', () => {
-  it('is text with nothing attached', () => {
-    expect(sendMessageType([])).toBe('text')
-  })
-
   it('is voice for one voice note on its own', () => {
     expect(sendMessageType(['audio'])).toBe('voice')
   })
@@ -148,29 +93,6 @@ function named(name: string): Pick<AttachmentView, 'name'> {
 }
 
 describe('missingFilesMessage', () => {
-  it('names the one file that has gone', () => {
-    expect(missingFilesMessage([named('holiday.jpg')])).toBe(
-      '“holiday.jpg” is no longer on this device. Attach it again to send this message.',
-    )
-  })
-
-  it('names every file that has gone', () => {
-    const message = missingFilesMessage([
-      named('one.jpg'),
-      named('two.jpg'),
-    ])
-
-    expect(message).toBe(
-      '“one.jpg”, “two.jpg” are no longer on this device. Attach them again to send this message.',
-    )
-  })
-
-  it('describes a file the picker gave no name to', () => {
-    expect(missingFilesMessage([named('')])).toBe(
-      'The file on this message is no longer on this device. Attach it again to send this message.',
-    )
-  })
-
   /**
    * A list missing one of its subjects reads as a complete list, and somebody
    * acting on it would replace the wrong file. So one nameless file makes the

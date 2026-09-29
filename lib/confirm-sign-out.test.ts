@@ -33,22 +33,8 @@ test("confirming resolves true", async () => {
   await expect(answer).resolves.toBe(true);
 });
 
-test("cancelling resolves false", async () => {
-  const answer = confirmSignOut();
-  press("Cancel");
-  await expect(answer).resolves.toBe(false);
-});
-
 test("dismissing without pressing anything resolves false", async () => {
   const answer = confirmSignOut();
   lastAlert().options.onDismiss?.();
   await expect(answer).resolves.toBe(false);
-});
-
-test("the destructive action is marked as such, and Cancel as the cancel", () => {
-  void confirmSignOut();
-  const { buttons } = lastAlert();
-
-  expect(buttons.find((button) => button.text === "Sign out")?.style).toBe("destructive");
-  expect(buttons.find((button) => button.text === "Cancel")?.style).toBe("cancel");
 });

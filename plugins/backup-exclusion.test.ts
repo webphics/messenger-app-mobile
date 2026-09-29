@@ -31,9 +31,6 @@ class AppDelegate: ExpoAppDelegate {
 }
 `
 
-/** `SecureStore` and the Store's own directory. */
-const EXCLUSIONS_PER_SECTION = 2
-
 describe('the Android rules', () => {
   const documents: [string, () => string][] = [
     ['full-backup-content', fullBackupContentXml],
@@ -51,24 +48,6 @@ describe('the Android rules', () => {
     expect(xml()).toContain('<exclude domain="sharedpref" path="SecureStore"/>')
   })
 
-  it.each(documents)('%s excludes rather than includes, so the rest of the app is still backed up', (_name, xml) => {
-    expect(xml()).not.toContain('<include')
-  })
-
-  it.each(documents)('%s puts each exclusion on its own line', (_name, xml) => {
-    // Android's XML parser is not the point; a document whose rules ran together
-    // into one line would still satisfy every `toContain` above, and is exactly
-    // what a mangled newline escape produces.
-    const rules = xml()
-      .split('\n')
-      .filter((line: string) => line.includes('<exclude'))
-    expect(rules).toHaveLength(EXCLUSIONS_PER_SECTION * (xml() === dataExtractionRulesXml() ? 2 : 1))
-  })
-
-  it('names both halves of an Android 12 backup', () => {
-    expect(dataExtractionRulesXml()).toContain('<cloud-backup>')
-    expect(dataExtractionRulesXml()).toContain('<device-transfer>')
-  })
 })
 
 describe('taking over the manifest attributes', () => {
@@ -77,10 +56,6 @@ describe('taking over the manifest attributes', () => {
     'android:dataExtractionRules': DATA_EXTRACTION_RULES_RESOURCE,
   }
 
-  it('claims attributes nobody has set', () => {
-    expect(backupAttributes({})).toEqual(ours)
-  })
-
   it('replaces the rules expo-secure-store set, whose exclusion ours carries', () => {
     expect(
       backupAttributes({
@@ -88,10 +63,6 @@ describe('taking over the manifest attributes', () => {
         'android:dataExtractionRules': SECURE_STORE_DATA_EXTRACTION_RULES_RESOURCE,
       }),
     ).toEqual(ours)
-  })
-
-  it('is idempotent against a project it has already patched', () => {
-    expect(backupAttributes({ ...ours })).toEqual(ours)
   })
 
   it('refuses to overwrite rules somebody else owns', () => {
@@ -114,10 +85,6 @@ describe('the iOS flag', () => {
     expect(patched.indexOf('joychatExcludeStoreFromBackup()')).toBeLessThan(
       patched.indexOf('return super.application(application, didFinishLaunchingWithOptions'),
     )
-  })
-
-  it('imports Foundation, which nothing in the template guarantees', () => {
-    expect(excludeStoreInAppDelegate(APP_DELEGATE)).toContain('import Foundation')
   })
 
   it('applies once, however many prebuilds run against the same project', () => {

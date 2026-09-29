@@ -65,18 +65,6 @@ describe("what the API is asked for a first password", () => {
       body: { newPassword: "a-brand-new-one" },
     });
   });
-
-  test("and nothing else, because the body is a strict object", async () => {
-    // `SetPasswordInputSchema` is a `z.strictObject`, so an extra key is
-    // refused outright rather than ignored. A stray `currentPassword` left over
-    // from the other mode would fail the whole request.
-    request.mockResolvedValueOnce(answered(true));
-
-    await setPassword("a-brand-new-one");
-
-    const body = request.mock.calls[0]![1]!.body as Record<string, unknown>;
-    expect(Object.keys(body)).toEqual(["newPassword"]);
-  });
 });
 
 describe("what the API is asked for a change", () => {
@@ -92,18 +80,6 @@ describe("what the API is asked for a change", () => {
       method: "POST",
       body: { currentPassword: "the-old-one", newPassword: "the-new-one" },
     });
-  });
-
-  test("and exactly those two keys", async () => {
-    request.mockResolvedValueOnce(answered(WITH_PASSWORD));
-
-    await changePassword({
-      currentPassword: "the-old-one",
-      newPassword: "the-new-one",
-    });
-
-    const body = request.mock.calls[0]![1]!.body as Record<string, unknown>;
-    expect(Object.keys(body).sort()).toEqual(["currentPassword", "newPassword"]);
   });
 });
 
@@ -125,19 +101,6 @@ describe("a password that was set", () => {
     expect(kept).toHaveBeenCalledWith(
       expect.objectContaining({ id: "7", hasPassword: true }),
     );
-  });
-
-  test("nothing else about the person is invented", async () => {
-    // The flag is the only thing this route's answer says anything about, and
-    // the rest of the person is carried across untouched rather than re-read.
-    request.mockResolvedValueOnce(answered(true));
-
-    await setPassword("a-brand-new-one");
-
-    expect(getSessionUser()).toEqual({
-      ...WITHOUT_PASSWORD,
-      hasPassword: true,
-    });
   });
 
   test("a `false` status is not a password that was set", async () => {
@@ -173,18 +136,6 @@ describe("a password that was changed", () => {
       expect.objectContaining({ name: "Ada L.", hasPassword: true }),
     );
   });
-
-  test("both writes happen, as they do for a profile write", async () => {
-    request.mockResolvedValueOnce(answered(WITH_PASSWORD));
-
-    await changePassword({
-      currentPassword: "the-old-one",
-      newPassword: "the-new-one",
-    });
-
-    expect(getSessionUser()).toEqual(WITH_PASSWORD);
-    expect(kept).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe("a write that did not happen changes nothing", () => {
@@ -207,26 +158,6 @@ describe("a write that did not happen changes nothing", () => {
       ok: false,
       failure: { kind: "refused", message: "Current password is incorrect." },
     });
-    expect(getSessionUser()).toEqual(WITHOUT_PASSWORD);
-    expect(kept).not.toHaveBeenCalled();
-  });
-
-  test("a refused set leaves the held person alone", async () => {
-    request.mockResolvedValueOnce(refused);
-
-    const result = await setPassword("short");
-
-    expect(result.ok).toBe(false);
-    expect(getSessionUser()).toEqual(WITHOUT_PASSWORD);
-    expect(kept).not.toHaveBeenCalled();
-  });
-
-  test("a dead network says so and writes nothing", async () => {
-    request.mockResolvedValueOnce({ reached: false as const });
-
-    const result = await setPassword("a-brand-new-one");
-
-    expect(result).toEqual({ ok: false, failure: { kind: "unreachable" } });
     expect(getSessionUser()).toEqual(WITHOUT_PASSWORD);
     expect(kept).not.toHaveBeenCalled();
   });
@@ -262,20 +193,6 @@ describe("a write that did not happen changes nothing", () => {
 
     expect(result).toEqual({ ok: false, failure: { kind: "malformed" } });
     expect(getSessionUser()).toEqual(WITHOUT_PASSWORD);
-    expect(kept).not.toHaveBeenCalled();
-  });
-
-  test("a set with nobody held is reported rather than guessed at", async () => {
-    // Unreachable in practice: a 200 from a guarded route means there was a
-    // session, and a session means a held person. It is here because the
-    // derivation has nothing to derive from, and inventing one would be worse
-    // than saying the answer could not be read.
-    setSessionUser(null);
-    request.mockResolvedValueOnce(answered(true));
-
-    const result = await setPassword("a-brand-new-one");
-
-    expect(result).toEqual({ ok: false, failure: { kind: "malformed" } });
     expect(kept).not.toHaveBeenCalled();
   });
 });

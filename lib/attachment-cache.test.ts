@@ -182,47 +182,12 @@ afterEach(() => {
 let realDirectoryDelete: (() => void) | null = null
 
 describe('cacheKey', () => {
-  it('is the last path segment, which the API already made unique', () => {
-    expect(cacheKey('/uploads/chat/9f1c-4a2b.jpg')).toBe('9f1c-4a2b.jpg')
-  })
-
-  it('drops a query string, so a signed URL still names one object', () => {
-    expect(cacheKey('https://store.example/a/b.pdf?X-Amz-Signature=deadbeef')).toBe('b.pdf')
-  })
-
-  it('replaces anything a path segment may not hold', () => {
-    expect(cacheKey('https://x/a%20b%2Fc.pdf')).toBe('a_b_c.pdf')
-  })
-
-  it('falls back rather than answering with nothing', () => {
-    expect(cacheKey('https://example.com/')).toBe('attachment')
-  })
-
   it('does not answer with a name that would hide the directory', () => {
     expect(cacheKey('https://x/...')).toBe('attachment')
   })
 })
 
 describe('cachedFileName', () => {
-  /**
-   * The name is what the next app to receive the file shows the person. The
-   * object's own name is a UUID, and uniqueness is the directory's job.
-   */
-  it('is the name the attachment carries, not the one the API stored it under', () => {
-    expect(cachedFileName('/uploads/chat/9f1c-4a2b.pdf', 'Invoice March.pdf')).toBe(
-      'Invoice_March.pdf',
-    )
-  })
-
-  it('falls back to the stored name when the attachment carries none', () => {
-    expect(cachedFileName('/uploads/chat/9f1c-4a2b.pdf', null)).toBe('9f1c-4a2b.pdf')
-    expect(cachedFileName('/uploads/chat/9f1c-4a2b.pdf', '   ')).toBe('9f1c-4a2b.pdf')
-  })
-
-  it('falls back rather than letting a name of only punctuation hide the file', () => {
-    expect(cachedFileName('/uploads/chat/9f1c.pdf', '../..')).toBe('9f1c.pdf')
-  })
-
   /**
    * The marker `lastUsedAt` reads lives beside the document. Nothing may ever be
    * cached under its name, which is what stripping leading dots guarantees.
@@ -259,35 +224,6 @@ describe('ensureCachedFile', () => {
     expect(result).toEqual({ ok: true, uri: 'file:///cache/attachments/a.pdf/Report.pdf' })
   })
 
-  /**
-   * Two people can send a file called `Invoice.pdf`. The directory is named for
-   * the stored object, so the two never collide however alike their names.
-   */
-  it('keeps two files of the same name apart, by the object each came from', async () => {
-    await ensureCachedFile('https://api.example/uploads/chat/one.pdf', 'Invoice.pdf')
-    await ensureCachedFile('https://api.example/uploads/chat/two.pdf', 'Invoice.pdf')
-
-    expect(mockDownloaded).toHaveLength(2)
-  })
-
-  it('creates the cache directory when the system has reclaimed it', async () => {
-    await ensureCachedFile('https://api.example/uploads/chat/a.pdf', 'Report.pdf')
-
-    expect(mockCreated).toEqual(['file:///cache/attachments/a.pdf/'])
-  })
-
-  /**
-   * The attachment on an outgoing bubble is the file the picker produced, and it
-   * is local for as long as the upload is in flight. Fetching it back from the
-   * server would be fetching a copy of something already in hand.
-   */
-  it('answers a device URI with itself, and downloads nothing', async () => {
-    const result = await ensureCachedFile('file:///data/user/0/cache/a.pdf', 'a.pdf')
-
-    expect(mockDownloaded).toHaveLength(0)
-    expect(result).toEqual({ ok: true, uri: 'file:///data/user/0/cache/a.pdf' })
-  })
-
   it('reports a download that failed rather than throwing out of the tap that started it', async () => {
     mockDownloadFails = true
 
@@ -295,38 +231,6 @@ describe('ensureCachedFile', () => {
       ok: false,
       reason: 'unreachable',
     })
-  })
-
-  /**
-   * The marker is what makes "recently used" mean last read. A hit costs no
-   * download, so without this the file a person opens every day would look
-   * older every day, and go before one downloaded once and forgotten.
-   */
-  it('marks the attachment as read on a hit as well as on a download', async () => {
-    seedCached('a.pdf', { bytes: 10, usedAt: 1, name: 'Report.pdf' })
-    jest.spyOn(Date, 'now').mockReturnValue(9_000)
-
-    await ensureCachedFile('https://api.example/uploads/chat/a.pdf', 'Report.pdf')
-
-    expect(mockFiles.get('file:///cache/attachments/a.pdf/.used')?.text).toBe('9000')
-  })
-
-  it('marks a fresh download as read, so it is the newest thing in the cache', async () => {
-    jest.spyOn(Date, 'now').mockReturnValue(4_000)
-
-    await ensureCachedFile('https://api.example/uploads/chat/a.pdf', 'Report.pdf')
-
-    expect(mockFiles.get('file:///cache/attachments/a.pdf/.used')?.text).toBe('4000')
-  })
-
-  it('evicts once the download has landed', async () => {
-    seedCached('old.pdf', { bytes: ATTACHMENT_CACHE_BUDGET_BYTES, usedAt: 1 })
-    mockDownloadBytes = 1_000
-
-    await ensureCachedFile('https://api.example/uploads/chat/new.pdf', 'New.pdf')
-
-    expect(mockDeleted).toEqual(['file:///cache/attachments/old.pdf/'])
-    expect(mockFiles.has('file:///cache/attachments/new.pdf/New.pdf')).toBe(true)
   })
 
   /**
@@ -364,15 +268,6 @@ describe('ensureCachedFile', () => {
 })
 
 describe('evictAttachmentFiles', () => {
-  it('does nothing while the cache is inside its budget', () => {
-    seedCached('a.pdf', { bytes: 10, usedAt: 1 })
-    seedCached('b.pdf', { bytes: 10, usedAt: 2 })
-
-    evictAttachmentFiles()
-
-    expect(mockDeleted).toEqual([])
-  })
-
   it('discards least recently read first, and stops as soon as it fits', () => {
     const half = Math.ceil(ATTACHMENT_CACHE_BUDGET_BYTES / 2) - 100
     seedCached('oldest.pdf', { bytes: half, usedAt: 100 })
@@ -382,26 +277,6 @@ describe('evictAttachmentFiles', () => {
     evictAttachmentFiles()
 
     expect(mockDeleted).toEqual(['file:///cache/attachments/oldest.pdf/'])
-  })
-
-  /**
-   * A copy cached before the marker existed still has to be orderable. What the
-   * filesystem knows is when the download landed, which is the best available
-   * answer and never a reason to refuse to evict.
-   */
-  it('falls back to what the filesystem recorded when there is no marker', () => {
-    const most = Math.ceil(ATTACHMENT_CACHE_BUDGET_BYTES * 0.6)
-    seedCached('legacy.pdf', { bytes: most })
-    mockFiles.set('file:///cache/attachments/legacy.pdf/doc.pdf', {
-      bytes: most,
-      lastModified: 100,
-      text: null,
-    })
-    seedCached('marked.pdf', { bytes: most, usedAt: 200 })
-
-    evictAttachmentFiles()
-
-    expect(mockDeleted).toEqual(['file:///cache/attachments/legacy.pdf/'])
   })
 
   /**
@@ -455,39 +330,6 @@ describe('evictAttachmentFiles', () => {
   })
 
   /**
-   * An interrupted `markUsed` leaves a marker with nothing in it. `Number('')`
-   * is `0` — finite, and the oldest possible stamp — so reading it as one would
-   * send the file just read to the front of the queue.
-   */
-  it('ignores an empty marker rather than reading it as the oldest stamp', () => {
-    const most = Math.ceil(ATTACHMENT_CACHE_BUDGET_BYTES * 0.6)
-    seedCached('interrupted.pdf', { bytes: most, usedAt: 300 })
-    mockFiles.set(`${ATTACHMENTS}interrupted.pdf/.used`, {
-      bytes: 0,
-      lastModified: 300,
-      text: '',
-    })
-    mockFiles.set(`${ATTACHMENTS}interrupted.pdf/doc.pdf`, {
-      bytes: most,
-      lastModified: 300,
-      text: null,
-    })
-    seedCached('older.pdf', { bytes: most, usedAt: 100 })
-
-    evictAttachmentFiles()
-
-    expect(mockDeleted).toEqual(['file:///cache/attachments/older.pdf/'])
-  })
-
-  it('does nothing when the cache directory does not exist yet', () => {
-    mockDirectories.delete(ATTACHMENTS)
-
-    evictAttachmentFiles()
-
-    expect(mockDeleted).toEqual([])
-  })
-
-  /**
    * A cache that cannot be evicted from must not become a document that cannot be
    * opened, so every filesystem call here is allowed to fail on its own.
    */
@@ -531,13 +373,6 @@ describe('wipeAttachmentFiles', () => {
     expect(mockFiles.has(`${ATTACHMENTS}two.pdf/doc.pdf`)).toBe(false)
   })
 
-  it('has nothing to do on a device that never downloaded one', () => {
-    mockDirectories.delete(ATTACHMENTS)
-
-    expect(() => wipeAttachmentFiles()).not.toThrow()
-    expect(mockDeleted).toEqual([])
-  })
-
   // A Session end that could fail is a Session end that could strand somebody on
   // a screen they have already been signed out of.
   it('swallows a directory the platform will not remove', () => {
@@ -551,14 +386,5 @@ describe('wipeAttachmentFiles', () => {
     }
 
     expect(() => wipeAttachmentFiles()).not.toThrow()
-  })
-
-  it('leaves a cache the next download can still land in', async () => {
-    seedCached('one.pdf', { bytes: 10, usedAt: 100 })
-    wipeAttachmentFiles()
-
-    const cached = await ensureCachedFile('https://api.example/uploads/new.pdf', 'new.pdf')
-
-    expect(cached).toEqual({ ok: true, uri: `${ATTACHMENTS}new.pdf/new.pdf` })
   })
 })

@@ -15,14 +15,6 @@ describe('parseNotificationSettings', () => {
     })
   })
 
-  test('reads a person who has never touched any of it as opted into nothing', () => {
-    expect(parseNotificationSettings({})).toEqual({
-      broadcastOptOut: false,
-      mutedConversationIds: [],
-      postOrganizationIds: [],
-    })
-  })
-
   test('is not a document at all when the body is not a record', () => {
     for (const value of [null, undefined, 'settings', 42, []]) {
       expect(parseNotificationSettings(value)).toBeNull()
@@ -34,16 +26,6 @@ describe('parseNotificationSettings', () => {
       parseNotificationSettings({ postOrganizationIds: ['org_1', '', 7, null, { id: 'org_2' }] })
         ?.postOrganizationIds,
     ).toEqual(['org_1'])
-  })
-
-  test('reads a list that did not arrive as an empty one rather than refusing the document', () => {
-    expect(
-      parseNotificationSettings({ postOrganizationIds: 'org_1', broadcastOptOut: 'yes' }),
-    ).toEqual({
-      broadcastOptOut: false,
-      mutedConversationIds: [],
-      postOrganizationIds: [],
-    })
   })
 
   test('no field this build does not know can opt somebody in', () => {

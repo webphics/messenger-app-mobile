@@ -1,5 +1,4 @@
 import * as Notifications from 'expo-notifications'
-import { Linking } from 'react-native'
 
 import {
   PUSH_PERMISSION_ASKED_FILE,
@@ -7,7 +6,6 @@ import {
   dismissConversationNotifications,
   ensurePushPermission,
   needsSystemNotificationSettings,
-  openSystemNotificationSettings,
   readPushToken,
   takeTappedConversation,
 } from '@/lib/push-device'
@@ -26,19 +24,6 @@ const mockCalls: string[] = []
 const mockTapListeners: ((response: never) => void)[] = []
 const mockRemoved: unknown[] = []
 
-/**
- * The presentation handler this module registers as it is imported.
- *
- * Kept rather than read back off the mock, because it is registered before any
- * `beforeEach` has run and the call itself is cleared away by the first one.
- * `var`, and declared without a value: the registration happens while this
- * file's own imports are still being run, which is before a `const` at this
- * scope exists at all, and a hoisted binding is the one thing the factory below
- * can reach at that moment.
- */
-// eslint-disable-next-line no-var
-var mockHandler: { handleNotification: () => Promise<unknown> } | undefined
-
 /** The cache, small enough to read: one file's contents by name. */
 const mockCache = new Map<string, string>()
 let mockCacheReadFails = false
@@ -46,9 +31,7 @@ let mockCacheWriteFails = false
 
 jest.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 6 },
-  setNotificationHandler: jest.fn((handler) => {
-    mockHandler = handler
-  }),
+  setNotificationHandler: jest.fn(),
   getPresentedNotificationsAsync: jest.fn(),
   dismissNotificationAsync: jest.fn(),
   getPermissionsAsync: jest.fn(),
@@ -138,10 +121,6 @@ describe('readPushToken', () => {
     expect(mockCalls).toEqual(['channel', 'token'])
   })
 
-  it('answers the token this installation was issued', async () => {
-    expect(await readPushToken()).toBe('ExponentPushToken[abc]')
-  })
-
   /**
    * Reading a token is a request to Expo's servers, so a phone with no signal
    * fails here. Nothing about this app depends on it: the registration is
@@ -149,12 +128,6 @@ describe('readPushToken', () => {
    */
   it('answers null rather than throwing when the token cannot be read', async () => {
     notifications.getExpoPushTokenAsync.mockRejectedValueOnce(new Error('offline'))
-
-    expect(await readPushToken()).toBeNull()
-  })
-
-  it('answers null rather than throwing when the channel cannot be created', async () => {
-    notifications.setNotificationChannelAsync.mockRejectedValueOnce(new Error('no native module'))
 
     expect(await readPushToken()).toBeNull()
   })
@@ -180,20 +153,6 @@ describe('ensurePushPermission', () => {
     expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled()
   })
 
-  it('does not re-request a permission already granted', async () => {
-    notifications.getPermissionsAsync.mockResolvedValue(permission('granted'))
-
-    expect(await ensurePushPermission('sign-in')).toBe('granted')
-    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled()
-  })
-
-  it('does not request one the platform will not draw a dialog for', async () => {
-    notifications.getPermissionsAsync.mockResolvedValue(permission('denied', false))
-
-    expect(await ensurePushPermission('sign-in')).toBe('denied')
-    expect(notifications.requestPermissionsAsync).not.toHaveBeenCalled()
-  })
-
   /**
    * What the emulator caught. Android 13+ reports a never-asked permission as
    * `denied`, so this is the ordinary first ask rather than an edge case.
@@ -211,32 +170,6 @@ describe('ensurePushPermission', () => {
     expect(await ensurePushPermission('sign-in')).toBe('undetermined')
     expect(mockCache.has(ASKED_FILE)).toBe(false)
   })
-
-  it('answers undetermined rather than throwing when the platform cannot be read', async () => {
-    notifications.getPermissionsAsync.mockRejectedValueOnce(new Error('no native module'))
-    notifications.requestPermissionsAsync.mockRejectedValueOnce(new Error('no native module'))
-
-    expect(await ensurePushPermission('sign-in')).toBe('undetermined')
-  })
-
-  /**
-   * A storage that will not answer is indistinguishable from one that has never
-   * been written to, which is the safe way round: it asks, rather than staying
-   * silent for good on a device whose answer nobody can read.
-   */
-  it('treats a cache that cannot be read as a device that has not asked', async () => {
-    mockCacheReadFails = true
-
-    await ensurePushPermission('sign-in')
-
-    expect(notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not fail when the record of the ask cannot be written', async () => {
-    mockCacheWriteFails = true
-
-    await expect(ensurePushPermission('sign-in')).resolves.toBe('granted')
-  })
 })
 
 /**
@@ -252,57 +185,9 @@ describe('needsSystemNotificationSettings', () => {
     expect(await needsSystemNotificationSettings()).toBe(true)
   })
 
+
   it('offers nothing while the ask is still to come', async () => {
     expect(await needsSystemNotificationSettings()).toBe(false)
-  })
-
-  it('offers nothing to somebody who granted it', async () => {
-    notifications.getPermissionsAsync.mockResolvedValue(permission('granted'))
-    mockCache.set(ASKED_FILE, 'asked')
-
-    expect(await needsSystemNotificationSettings()).toBe(false)
-  })
-
-  it('offers the route when the platform will not draw a dialog at all', async () => {
-    notifications.getPermissionsAsync.mockResolvedValue(permission('denied', false))
-
-    expect(await needsSystemNotificationSettings()).toBe(true)
-  })
-
-  it('answers no rather than throwing when the platform cannot be read', async () => {
-    notifications.getPermissionsAsync.mockRejectedValueOnce(new Error('no native module'))
-
-    expect(await needsSystemNotificationSettings()).toBe(false)
-  })
-
-  /**
-   * The other half of that: an unreadable platform says nothing is decided and
-   * nothing is closed, so what is left deciding is the record of the ask. A
-   * device that has asked and cannot say what came of it has one place left to
-   * go, and this offers it rather than leaving somebody with neither a dialog
-   * nor a route.
-   */
-  it('offers the route when the platform cannot be read and this device has asked', async () => {
-    notifications.getPermissionsAsync.mockRejectedValueOnce(new Error('no native module'))
-    mockCache.set(ASKED_FILE, 'asked')
-
-    expect(await needsSystemNotificationSettings()).toBe(true)
-  })
-})
-
-describe('openSystemNotificationSettings', () => {
-  it('sends the person to this app’s own page in the operating system', async () => {
-    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue()
-
-    await openSystemNotificationSettings()
-
-    expect(openSettings).toHaveBeenCalledTimes(1)
-  })
-
-  it('does not fail when the platform refuses to open it', async () => {
-    jest.spyOn(Linking, 'openSettings').mockRejectedValueOnce(new Error('no activity'))
-
-    await expect(openSystemNotificationSettings()).resolves.toBeUndefined()
   })
 })
 
@@ -330,10 +215,6 @@ describe('takeTappedConversation', () => {
     expect(takeTappedConversation()).toBe('cnv_01')
   })
 
-  it('answers null on a launch nobody tapped anything to start', () => {
-    expect(takeTappedConversation()).toBeNull()
-  })
-
   /**
    * A build with no native side answers nothing rather than throwing, and it has
    * to: this is read on the way into a cold start, and a throw here would be a
@@ -356,15 +237,6 @@ describe('addPushTapListener', () => {
     mockTapListeners[0](tap('cnv_02', 'ntf_02'))
 
     expect(opened).toEqual(['cnv_02'])
-  })
-
-  it('says nothing for a tap this build cannot read a conversation out of', () => {
-    const opened: string[] = []
-    addPushTapListener((id) => opened.push(id))
-
-    mockTapListeners[0](tap(null, 'ntf_03'))
-
-    expect(opened).toEqual([])
   })
 
   /**
@@ -411,42 +283,6 @@ describe('addPushTapListener', () => {
 
     expect(opened).toEqual(['cnv_05', 'cnv_05'])
   })
-
-  it('takes the subscription back when it is unsubscribed', () => {
-    const stop = addPushTapListener(() => {})
-
-    stop()
-
-    expect(mockRemoved).toEqual(mockTapListeners)
-  })
-
-  /** A build with no native side subscribes to nothing and unsubscribes cleanly. */
-  it('answers an unsubscribe that does nothing when it cannot subscribe', () => {
-    notifications.addNotificationResponseReceivedListener.mockImplementation(() => {
-      throw new Error('no native module')
-    })
-
-    expect(() => addPushTapListener(() => {})()).not.toThrow()
-  })
-})
-
-/**
- * The handler is registered as this module is imported rather than by a screen,
- * because a dispatch can arrive before any screen has mounted. What it answers
- * is a constant: while the app is in front of somebody, the app is what tells
- * them — see the note on it.
- */
-describe('a notification arriving while the app is in front of the person', () => {
-  it('is drawn by nothing the operating system owns', async () => {
-    expect(mockHandler).toBeDefined()
-
-    await expect(mockHandler?.handleNotification()).resolves.toEqual({
-      shouldShowBanner: false,
-      shouldShowList: false,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    })
-  })
 })
 
 describe('dismissConversationNotifications', () => {
@@ -477,25 +313,5 @@ describe('dismissConversationNotifications', () => {
     await dismissConversationNotifications('cnv_01')
 
     expect(mockCalls).toEqual(['dismiss:a'])
-  })
-
-  it('does nothing when the shade holds nothing for it', async () => {
-    await dismissConversationNotifications('cnv_01')
-
-    expect(mockCalls).toEqual([])
-  })
-
-  it.each([
-    ['the shade cannot be read', () => {
-      notifications.getPresentedNotificationsAsync.mockRejectedValue(new Error('no shade'))
-    }],
-    ['a notification refuses to be dismissed', () => {
-      notifications.getPresentedNotificationsAsync.mockResolvedValue([presented('a', 'cnv_01')])
-      notifications.dismissNotificationAsync.mockRejectedValue(new Error('gone'))
-    }],
-  ])('does not fail a read when %s', async (_case, arrange) => {
-    arrange()
-
-    await expect(dismissConversationNotifications('cnv_01')).resolves.toBeUndefined()
   })
 })

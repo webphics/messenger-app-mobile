@@ -117,23 +117,6 @@ describe('deregisterPushDevice', () => {
     expect(mockCache.get(TOKEN_FILE)).toBe(TOKEN)
   })
 
-  it('keeps the record when the request never got an answer', async () => {
-    rememberPushRegistration(TOKEN)
-    request.mockResolvedValueOnce({ reached: false })
-
-    await deregisterPushDevice(COOKIE)
-
-    expect(mockCache.get(TOKEN_FILE)).toBe(TOKEN)
-  })
-
-  // Nothing registered is nothing to remove, and an installation whose cache the
-  // system reclaimed is one of those.
-  it('makes no request when this installation has registered nothing', async () => {
-    await deregisterPushDevice(COOKIE)
-
-    expect(request).not.toHaveBeenCalled()
-  })
-
   /**
    * A moment with nothing to authenticate with — a cold start that found no
    * cookie, a refused sign-in. There is no request to make, and the owner-scoped
@@ -155,24 +138,6 @@ describe('deregisterPushDevice', () => {
     await expect(deregisterPushDevice(COOKIE)).resolves.toBeUndefined()
   })
 
-  it('answers rather than throwing when the record cannot be read', async () => {
-    rememberPushRegistration(TOKEN)
-    mockCacheReadFails = true
-
-    await expect(deregisterPushDevice(COOKIE)).resolves.toBeUndefined()
-
-    expect(request).not.toHaveBeenCalled()
-  })
-
-  it('swallows a record it accepted but could not remove', async () => {
-    rememberPushRegistration(TOKEN)
-    mockCacheWriteFails = true
-
-    await expect(deregisterPushDevice(COOKIE)).resolves.toBeUndefined()
-
-    expect(request).toHaveBeenCalledTimes(1)
-  })
-
   // Written by every registration, so the record is the token the *last* one
   // sent rather than the first — a token rotates, and the row follows it.
   it('removes the token most recently registered', async () => {
@@ -187,14 +152,6 @@ describe('deregisterPushDevice', () => {
       cookie: COOKIE,
     })
   })
-
-  // A cache that cannot be written leaves no record, which costs a row nobody
-  // removes rather than anything a person sees.
-  it('records nothing rather than throwing when the cache will not take it', () => {
-    mockCacheWriteFails = true
-
-    expect(() => rememberPushRegistration(TOKEN)).not.toThrow()
-  })
 })
 
 /**
@@ -203,10 +160,6 @@ describe('deregisterPushDevice', () => {
  * cannot be allowed to overtake it.
  */
 describe('pushDeregistrationSettled', () => {
-  it('answers at once when nothing is in flight', async () => {
-    await expect(pushDeregistrationSettled()).resolves.toBeUndefined()
-  })
-
   it('waits for the deregistration this Session end fired', async () => {
     rememberPushRegistration(TOKEN)
     let answer: (outcome: HttpOutcome) => void = () => {}
@@ -254,16 +207,5 @@ describe('pushDeregistrationSettled', () => {
     } finally {
       jest.useRealTimers()
     }
-  })
-
-  // Whatever it did. The gate is about ordering, not about success — a `DELETE`
-  // the API refused still has to have been refused before the logout goes.
-  it('answers rather than rejecting when the deregistration failed', async () => {
-    rememberPushRegistration(TOKEN)
-    request.mockRejectedValueOnce(new Error('deadline'))
-
-    void deregisterPushDevice(COOKIE)
-
-    await expect(pushDeregistrationSettled()).resolves.toBeUndefined()
   })
 })

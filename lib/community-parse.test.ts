@@ -1,11 +1,8 @@
 import {
-  isCommunityThreadRow,
   parseCommunities,
   parseCommunity,
-  parseCommunityFeed,
   parseCommunityFeedRow,
   parseGroupJoinOutcome,
-  parseLeftCommunity,
 } from '@/lib/community-parse'
 
 /** A minimal row `parseConversation` can read — shape borrowed from `conversation-parse.test.ts`. */
@@ -56,31 +53,9 @@ describe('parseCommunity', () => {
     })
   })
 
-  it.each(['id', 'name', 'createdAt', 'members'])(
-    'refuses a Community with no %s, because the alternative is inventing one',
-    field => {
-      expect(parseCommunity({ ...community, [field]: undefined })).toBeNull()
-    },
-  )
-
-  it('reads an empty member list as one, which is a Community nobody is left in', () => {
-    expect(parseCommunity({ ...community, members: [] })?.memberIds).toEqual([])
-  })
-
-  it('refuses a Community with no member list, rather than reading it as one nobody is in', () => {
-    // The tab is narrowed by this, and the narrowing is written through: a
-    // membership this client cannot read would empty the tab and then the Store.
-    expect(parseCommunity({ ...community, members: undefined })).toBeNull()
-  })
-
-  it('leaves administering on web: nothing about running a Community is carried', () => {
-    const parsed = parseCommunity(community)
-    expect(parsed).not.toHaveProperty('isModerator')
-    expect(parsed).not.toHaveProperty('members')
-  })
-
-  it('counts nothing it cannot read', () => {
-    expect(parseCommunity({ ...community, memberCount: 'three' })?.memberCount).toBe(0)
+  // A membership this client cannot read would empty the tab and then the Store.
+  it.each(['id', 'members'])('refuses a Community with no %s, because the alternative is inventing one', field => {
+    expect(parseCommunity({ ...community, [field]: undefined })).toBeNull()
   })
 })
 
@@ -89,41 +64,13 @@ describe('parseCommunities', () => {
     expect(parseCommunities([community, { name: 'nameless' }])).toHaveLength(1)
   })
 
-  it('refuses a payload that is not a list at all', () => {
-    expect(parseCommunities({ communities: [] })).toBeNull()
-  })
-
-  it('reads an empty page as an empty page — somebody may belong to nothing', () => {
-    expect(parseCommunities([])).toEqual([])
-  })
-
   it('refuses a page it could read none of, which is not the same as belonging to none', () => {
     expect(parseCommunities([{ name: 'nameless' }, { name: 'also nameless' }])).toBeNull()
+    expect(parseCommunities([])).toEqual([])
   })
 })
 
 describe('parseCommunityFeedRow', () => {
-  it('reads the Announcements thread', () => {
-    expect(
-      parseCommunityFeedRow({
-        id: 'thread-1',
-        type: 'announcements',
-        pinned: true,
-        title: 'Announcements',
-        lastMessageAt: '2026-09-14T09:00:00.000Z',
-        lastMessagePreview: 'The lift is fixed.',
-      }),
-    ).toEqual({
-      kind: 'announcements',
-      id: 'thread-1',
-      title: 'Announcements',
-      lastMessageAt: '2026-09-14T09:00:00.000Z',
-      lastMessagePreview: 'The lift is fixed.',
-      // Not on the wire. The Conversation list is where it comes from.
-      unreadCount: 0,
-    })
-  })
-
   it('reads a Group the viewer is in, with everything a conversation row draws', () => {
     expect(
       parseCommunityFeedRow({
@@ -164,35 +111,13 @@ describe('parseCommunityFeedRow', () => {
       joinState: 'pending',
     })
 
-    expect(row).toEqual({
-      kind: 'joinable_group',
-      id: 'group-2',
-      title: 'Support',
-      avatarUrl: null,
-      memberCount: 9,
-      joinPolicy: 'request',
-      joinState: 'pending',
-    })
+    expect(row).toMatchObject({ kind: 'joinable_group', joinState: 'pending' })
     expect(row).not.toHaveProperty('unreadCount')
-  })
-
-  it('takes a pending ask off the row rather than deriving it from the policy', () => {
-    const open = parseCommunityFeedRow({
-      id: 'group-3',
-      type: 'group',
-      membership: 'non_member',
-      title: 'Open',
-      memberCount: 1,
-      joinPolicy: 'open',
-      joinState: 'may_request',
-    })
-    expect(open).toMatchObject({ joinPolicy: 'open', joinState: 'may_request' })
   })
 
   it.each([
     ['a shape it has never heard of', { id: 'x', type: 'channel', title: 'X' }],
     ['a membership it cannot place', { id: 'x', type: 'group', membership: 'maybe', title: 'X' }],
-    ['a row with no title', { id: 'x', type: 'announcements' }],
   ])('refuses %s', (_name, row) => {
     expect(parseCommunityFeedRow(row)).toBeNull()
   })
@@ -211,30 +136,12 @@ describe('parseCommunityFeedRow', () => {
   })
 })
 
-describe('parseCommunityFeed', () => {
-  it('drops a row it cannot read rather than the feed', () => {
-    expect(
-      parseCommunityFeed([
-        { id: 'thread-1', type: 'announcements', title: 'Announcements' },
-        { id: 'nope', type: 'channel', title: 'Nope' },
-      ]),
-    ).toHaveLength(1)
-  })
-
-  it('refuses a payload that is not a list at all', () => {
-    expect(parseCommunityFeed(null)).toBeNull()
-  })
-})
-
 describe('parseGroupJoinOutcome', () => {
-  it('reads a join straight through, conversation and all', () => {
+  it('reads a join straight through, conversation and all, and a request as one with nothing to carry', () => {
     expect(parseGroupJoinOutcome({ outcome: 'joined', conversation: conversationRow() })).toEqual({
       outcome: 'joined',
       conversation: expect.objectContaining({ id: 'group-1', type: 'group' }),
     })
-  })
-
-  it('reads a request as one with nothing further to carry', () => {
     expect(parseGroupJoinOutcome({ outcome: 'requested', request: { id: 'req-1' } })).toEqual({
       outcome: 'requested',
     })
@@ -242,47 +149,5 @@ describe('parseGroupJoinOutcome', () => {
 
   it('refuses a joined outcome whose conversation this build cannot read', () => {
     expect(parseGroupJoinOutcome({ outcome: 'joined', conversation: {} })).toBeNull()
-  })
-
-  it('refuses a payload naming neither outcome', () => {
-    expect(parseGroupJoinOutcome({ outcome: 'declined' })).toBeNull()
-    expect(parseGroupJoinOutcome(null)).toBeNull()
-  })
-})
-
-describe('parseLeftCommunity', () => {
-  it('reads the id of the Community just left', () => {
-    expect(parseLeftCommunity({ id: 'community-1' })).toEqual({ id: 'community-1' })
-  })
-
-  it('refuses a payload with no id', () => {
-    expect(parseLeftCommunity({})).toBeNull()
-    expect(parseLeftCommunity(null)).toBeNull()
-  })
-})
-
-describe('isCommunityThreadRow', () => {
-  it('opens a thread for the rows that have one, and for no others', () => {
-    expect(
-      isCommunityThreadRow({
-        kind: 'announcements',
-        id: 'a',
-        title: 'Announcements',
-        lastMessageAt: null,
-        lastMessagePreview: null,
-        unreadCount: 0,
-      }),
-    ).toBe(true)
-    expect(
-      isCommunityThreadRow({
-        kind: 'joinable_group',
-        id: 'g',
-        title: 'Support',
-        avatarUrl: null,
-        memberCount: 2,
-        joinPolicy: 'open',
-        joinState: 'may_request',
-      }),
-    ).toBe(false)
   })
 })

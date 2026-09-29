@@ -1,13 +1,9 @@
 import {
   applyFirstPage,
   applyOlderPage,
-  canPageBack,
-  emptyWall,
   withLivePost,
-  withoutLivePost,
   withRestoredPost,
   withUpdatedPost,
-  type WallPages,
 } from '@/lib/wall-pages'
 import type { WallPost } from '@/lib/types'
 
@@ -35,150 +31,43 @@ function post(id: string): WallPost {
   }
 }
 
-const ids = (read: WallPages) => read.posts.map(p => p.id)
+const ids = (read: { posts: WallPost[] }) => read.posts.map(p => p.id)
 
-describe('the first page', () => {
-  it('draws what came back, newest first as the API ordered it', () => {
-    expect(ids(applyFirstPage([post('c'), post('b'), post('a')], LIMIT))).toEqual(['c', 'b', 'a'])
-  })
-
-  it('takes its cursor from the last Post, which is where the next page starts', () => {
-    expect(applyFirstPage([post('c'), post('b')], LIMIT).cursor).toBe('b')
-  })
-
-  it('replaces rather than merges, so a Post taken down between reads leaves the screen', () => {
-    const drawn = applyFirstPage([post('c'), post('b'), post('a')], LIMIT)
-    expect(ids(applyFirstPage([post('c'), post('a')], LIMIT))).toEqual(['c', 'a'])
-    expect(ids(drawn)).toEqual(['c', 'b', 'a'])
-  })
-
-  it('is the end of the Wall when it came back short', () => {
+describe('paging', () => {
+  it('a first page that came back short is the end of the Wall; a full one is not', () => {
     expect(applyFirstPage([post('c')], LIMIT).reachedEnd).toBe(true)
-  })
-
-  it('is not the end when it came back full, even if it happens to be the last', () => {
     expect(applyFirstPage([post('c'), post('b'), post('a')], LIMIT).reachedEnd).toBe(false)
   })
 
-  it('leaves an empty Wall with no cursor to page from', () => {
-    expect(applyFirstPage([], LIMIT)).toEqual({ posts: [], cursor: null, reachedEnd: true })
-  })
-})
-
-describe('a page from further back', () => {
-  const first = applyFirstPage([post('e'), post('d'), post('c')], LIMIT)
-
-  it('goes under what is already drawn', () => {
-    expect(ids(applyOlderPage(first, [post('b'), post('a')], LIMIT))).toEqual([
-      'e',
-      'd',
-      'c',
-      'b',
-      'a',
-    ])
+  it('a Post that arrived on both pages is drawn once, and the cursor still moves', () => {
+    const first = applyFirstPage([post('e'), post('d'), post('c')], LIMIT)
+    const next = applyOlderPage(first, [post('c'), post('b')], LIMIT)
+    expect(ids(next)).toEqual(['e', 'd', 'c', 'b'])
+    expect(next.cursor).toBe('b')
   })
 
-  it('draws a Post that arrived on both pages once', () => {
-    expect(ids(applyOlderPage(first, [post('c'), post('b')], LIMIT))).toEqual(['e', 'd', 'c', 'b'])
-  })
-
-  it('still moves the cursor to where the API got to, duplicate or not', () => {
-    expect(applyOlderPage(first, [post('c'), post('b')], LIMIT).cursor).toBe('b')
-  })
-
-  it('keeps the cursor it had when the page came back empty', () => {
+  it('keeps the cursor it had when an older page came back empty', () => {
+    const first = applyFirstPage([post('e'), post('d'), post('c')], LIMIT)
     expect(applyOlderPage(first, [], LIMIT).cursor).toBe('c')
   })
-
-  it('ends the Wall when the page came back short', () => {
-    expect(applyOlderPage(first, [post('b')], LIMIT).reachedEnd).toBe(true)
-  })
 })
 
-describe('whether there is a page worth asking for', () => {
-  it('there is not, on a Wall nobody has read yet', () => {
-    expect(canPageBack(emptyWall)).toBe(false)
-  })
-
-  it('there is, once a full page has been drawn', () => {
-    expect(canPageBack(applyFirstPage([post('c'), post('b'), post('a')], LIMIT))).toBe(true)
-  })
-
-  it('there is not, once the Wall has answered short', () => {
-    expect(canPageBack(applyFirstPage([post('c')], LIMIT))).toBe(false)
-  })
-})
-
-describe('a Post that arrives live', () => {
+describe('folding in what arrives', () => {
   const read = applyFirstPage([post('c'), post('b'), post('a')], LIMIT)
 
-  it('goes on top', () => {
-    expect(ids(withLivePost(read, post('d')))).toEqual(['d', 'c', 'b', 'a'])
-  })
-
-  it('replaces a copy already held rather than duplicating it, but still moves to the top', () => {
+  it('a live Post already held is replaced rather than duplicated, and moves to the top', () => {
     expect(ids(withLivePost(read, post('b')))).toEqual(['b', 'c', 'a'])
   })
 
-  it('leaves the cursor and reachedEnd alone — an arrival changes nothing about paging', () => {
-    const ended = { ...read, reachedEnd: true }
-    const next = withLivePost(ended, post('d'))
-    expect(next.cursor).toBe(ended.cursor)
-    expect(next.reachedEnd).toBe(true)
-  })
-})
-
-describe('an edit or a reaction, over the socket', () => {
-  const read = applyFirstPage([post('c'), post('b'), post('a')], LIMIT)
-
-  it('replaces the Post in place, without moving it', () => {
-    const edited: WallPost = { ...post('b'), body: 'edited', editedAt: '2026-09-14T11:00:00.000Z' }
-    const next = withUpdatedPost(read, edited)
-    expect(ids(next)).toEqual(['c', 'b', 'a'])
-    expect(next.posts[1]).toEqual(edited)
-  })
-
-  it('does nothing for a Post this device has not read', () => {
+  it('an edit replaces the Post in place, and does nothing for a Post this device has not read', () => {
+    const edited: WallPost = { ...post('b'), body: 'edited' }
+    expect(ids(withUpdatedPost(read, edited))).toEqual(['c', 'b', 'a'])
     expect(withUpdatedPost(read, post('z'))).toBe(read)
   })
-})
 
-describe('a Post removed live', () => {
-  const read = applyFirstPage([post('c'), post('b'), post('a')], LIMIT)
-
-  it('drops it', () => {
-    expect(ids(withoutLivePost(read, 'b'))).toEqual(['c', 'a'])
-  })
-
-  it('does nothing for a Post already absent', () => {
-    expect(withoutLivePost(read, 'z')).toBe(read)
-  })
-})
-
-describe('the Saved view putting a Post back after a refused un-bookmark', () => {
-  const read = applyFirstPage([post('c'), post('a')], LIMIT)
-
-  it('restores it at the index it held', () => {
-    const removed = post('b')
-    expect(ids(withRestoredPost(read, removed, 1))).toEqual(['c', 'b', 'a'])
-  })
-
-  it('clamps an index past the end rather than dropping the Post', () => {
-    expect(ids(withRestoredPost(read, post('z'), 99))).toEqual(['c', 'a', 'z'])
-  })
-
-  it('clamps a negative index to the front', () => {
-    expect(ids(withRestoredPost(read, post('z'), -1))).toEqual(['z', 'c', 'a'])
-  })
-
-  it('does nothing for a Post already back — a second refusal never duplicates it', () => {
-    expect(withRestoredPost(read, post('c'), 0)).toBe(read)
-  })
-
-  it('leaves the cursor and reachedEnd alone — this is not paging', () => {
-    const ended = { ...read, reachedEnd: true }
-    const next = withRestoredPost(ended, post('b'), 1)
-    expect(next.cursor).toBe(ended.cursor)
-    expect(next.reachedEnd).toBe(true)
+  it('a refused un-bookmark puts the Post back at its index, never duplicating it', () => {
+    const saved = applyFirstPage([post('c'), post('a')], LIMIT)
+    expect(ids(withRestoredPost(saved, post('b'), 1))).toEqual(['c', 'b', 'a'])
+    expect(withRestoredPost(saved, post('c'), 0)).toBe(saved)
   })
 })

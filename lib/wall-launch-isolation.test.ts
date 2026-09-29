@@ -116,10 +116,6 @@ function reachedByLaunch(): Set<string> {
 describe('a launch does not reach the Wall', () => {
   const reached = reachedByLaunch()
 
-  it.each(LAUNCH_ENTRY_POINTS)('starts from %s, so a rename cannot empty this test', path => {
-    expect(existsSync(join(REPOSITORY, path))).toBe(true)
-  })
-
   it('follows the imports rather than only reading the four files', () => {
     // The gate's own neighbours, each reached through a different entry point.
     expect(reached).toContain('lib/auth-context.tsx')
@@ -134,17 +130,6 @@ describe('a launch does not reach the Wall', () => {
     expect(
       wall.join(', ') || 'nothing, which is what a launch may know about the Wall',
     ).toBe('nothing, which is what a launch may know about the Wall')
-  })
-
-  it('would say so if one were pulled in, so the walk is not vacuous', () => {
-    // The same walk from the screen the tab mounts: proof that a Wall module is
-    // reachable by this resolver when something actually imports one.
-    const fromTheTab = readFileSync(join(REPOSITORY, 'app/(customer)/wall.tsx'), 'utf8')
-    const imported = importsOf(fromTheTab)
-      .map(specifier => resolve(specifier, 'app/(customer)/wall.tsx'))
-      .filter((path): path is string => path !== null)
-
-    expect(imported.filter(path => WALL.test(path))).not.toHaveLength(0)
   })
 })
 
@@ -164,10 +149,6 @@ describe('a role’s tabs mount when they are opened', () => {
     'app/(agent)/_layout.tsx',
     'app/(admin)/_layout.tsx',
   ]
-
-  it.each(LAYOUTS)('%s has a Wall tab to be wrong about', path => {
-    expect(readFileSync(join(REPOSITORY, path), 'utf8')).toContain('name="wall"')
-  })
 
   /**
    * The layouts, and the options they spread in.

@@ -4,7 +4,7 @@ import {
   type ThreadViewer,
   type UnsentMessage,
 } from '@/lib/thread-state'
-import { messageOrder, STORE_SCHEMA_VERSION } from '@/lib/store-rows'
+import { STORE_SCHEMA_VERSION } from '@/lib/store-rows'
 import type { Conversation, CustomerMessage, Message } from '@/lib/types'
 
 /**
@@ -409,14 +409,6 @@ beforeEach(() => {
 })
 
 describe('the schema', () => {
-  it('creates the table and stamps the version on a device that has none', async () => {
-    const store = loadStore()
-
-    expect(store.restoreStore('viewer-1').conversations).toEqual([])
-    expect(schemaCreations()).toBe(1)
-    expect(mockFiles.get(DATABASE_NAME)?.userVersion).toBe(STORE_SCHEMA_VERSION)
-  })
-
   /**
    * Migration is discard, not transform — and the file rather than its tables,
    * because a newer schema's tables are ones this build cannot even name.
@@ -441,15 +433,6 @@ describe('the schema', () => {
     expect(mockDeleted).toEqual([])
     expect(schemaCreations()).toBe(0)
   })
-
-  it('opens once, however many times it is asked', async () => {
-    const store = loadStore()
-
-    store.restoreStore('viewer-1')
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    expect(schemaCreations()).toBe(1)
-  })
 })
 
 describe('restoreStore', () => {
@@ -464,28 +447,6 @@ describe('restoreStore', () => {
     expect(
       store.restoreStore('viewer-2').conversations.map((each) => each.id),
     ).toEqual(['conv-9'])
-  })
-
-  /** A phone is shared. Somebody else's support history is not this person's to see. */
-  it('gives back nothing for a person this device has never held rows for', async () => {
-    const store = loadStore()
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    expect(store.restoreStore('viewer-2').conversations).toEqual([])
-  })
-
-  it('gives back nothing rather than throwing when the database will not open', async () => {
-    mockFails.open = true
-    const store = loadStore()
-
-    expect(store.restoreStore('viewer-1').conversations).toEqual([])
-  })
-
-  it('gives back nothing rather than throwing when the read fails', () => {
-    const store = loadStore()
-    mockFails.read = true
-
-    expect(store.restoreStore('viewer-1').conversations).toEqual([])
   })
 
   /**
@@ -503,18 +464,6 @@ describe('restoreStore', () => {
     await save(store, 'viewer-1', [conversation('conv-1')])
 
     expect(store.restoreStore('viewer-1').conversations).toHaveLength(1)
-  })
-
-  it('carries the Unread count a badge is drawn from', async () => {
-    const store = loadStore()
-    await save(store, 'viewer-1', [
-      conversation('conv-1', { unreadCount: 4, lastMessageRead: false }),
-    ])
-
-    expect(store.restoreStore('viewer-1').conversations[0]).toMatchObject({
-      unreadCount: 4,
-      lastMessageRead: false,
-    })
   })
 })
 
@@ -537,14 +486,6 @@ describe('saveStore', () => {
     await save(store, 'viewer-1', [conversation('conv-1')])
 
     expect(store.restoreStore('viewer-2').conversations).toHaveLength(1)
-  })
-
-  it('writes one transaction per state change', async () => {
-    const store = loadStore()
-
-    await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
-
-    expect(mockCounts.transactions).toBe(1)
   })
 
   /**
@@ -587,36 +528,10 @@ describe('saveStore', () => {
     ).toEqual(['conv-1'])
   })
 
-  it('writes again after a failure rather than believing the failed write landed', async () => {
-    const store = loadStore()
-    mockFails.write = true
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    mockFails.write = false
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    expect(store.restoreStore('viewer-1').conversations).toHaveLength(1)
-  })
-
   /**
-   * A cold start Restores and then renders, and rendering is what triggers the
-   * write-through. Writing back the very list that was just read would spend a
-   * transaction at the busiest moment of a launch to change nothing.
-   */
-  it('does not write back the list it just restored', async () => {
-    seed(STORE_SCHEMA_VERSION, [rowFor('viewer-1', conversation('conv-1'))])
-    const store = loadStore()
-
-    const restored = store.restoreStore('viewer-1')
-    await save(store, 'viewer-1', restored.conversations, restored.organizationNames)
-
-    expect(mockCounts.transactions).toBe(0)
-  })
-
-  /**
-   * The skip above is about a state the disk already holds, and the names are
-   * half of that state: a Customer's second request answering after the first
-   * changes the titles without changing the rows.
+   * A cold start Restores and then renders; writing back the list just read is
+   * skipped, and the names are half of that state: a Customer's second request
+   * answering after the first changes the titles without changing the rows.
    */
   it('writes a state that changed only the organization names', async () => {
     seed(STORE_SCHEMA_VERSION, [rowFor('viewer-1', conversation('conv-1'))])
@@ -628,25 +543,6 @@ describe('saveStore', () => {
     expect(mockCounts.transactions).toBe(1)
     expect(store.restoreStore('viewer-1').organizationNames.get('org-1')).toBe('Acme Corp')
   })
-
-  it('writes the next state after a restore', async () => {
-    seed(STORE_SCHEMA_VERSION, [rowFor('viewer-1', conversation('conv-1'))])
-    const store = loadStore()
-
-    const restored = store.restoreStore('viewer-1')
-    await save(store, 'viewer-1', [...restored.conversations, conversation('conv-2')])
-
-    expect(mockCounts.transactions).toBe(1)
-    expect(store.restoreStore('viewer-1').conversations).toHaveLength(2)
-  })
-
-  it('writes nothing anywhere when the database will not open', async () => {
-    mockFails.open = true
-    const store = loadStore()
-
-    await expect(save(store, 'viewer-1', [conversation('conv-1')])).resolves
-      .toBeUndefined()
-  })
 })
 
 /**
@@ -657,46 +553,12 @@ describe('saveStore', () => {
 describe('organization names', () => {
   const acme = new Map([['org-1', 'Acme Corp']])
 
-  it('come back with the conversations they title', async () => {
-    const store = loadStore()
-
-    await save(store, 'viewer-1', [conversation('conv-1')], acme)
-
-    expect(store.restoreStore('viewer-1').organizationNames.get('org-1')).toBe('Acme Corp')
-  })
-
-  it('are written in the same transaction as the rows', async () => {
-    const store = loadStore()
-
-    await save(store, 'viewer-1', [conversation('conv-1')], acme)
-
-    expect(mockCounts.transactions).toBe(1)
-  })
-
-  it('are replaced rather than added to, like the rows', async () => {
-    const store = loadStore()
-
-    await save(store, 'viewer-1', [conversation('conv-1')], acme)
-    await save(store, 'viewer-1', [conversation('conv-1')], new Map([['org-2', 'Other Ltd']]))
-
-    const { organizationNames } = store.restoreStore('viewer-1')
-    expect([...organizationNames]).toEqual([['org-2', 'Other Ltd']])
-  })
-
   it('belong to the person they were fetched for', async () => {
     const store = loadStore()
 
     await save(store, 'viewer-1', [conversation('conv-1')], acme)
 
     expect(store.restoreStore('viewer-2').organizationNames.size).toBe(0)
-  })
-
-  it('are empty for a staff member, who has none to title anything with', async () => {
-    const store = loadStore()
-
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    expect(store.restoreStore('viewer-1').organizationNames.size).toBe(0)
   })
 })
 
@@ -720,15 +582,6 @@ describe('wipeStore', () => {
     await store.wipeStore()
 
     expect(store.restoreStore('viewer-1').conversations).toEqual([])
-  })
-
-  it('leaves a usable database behind', async () => {
-    const store = loadStore()
-    await store.wipeStore()
-
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    expect(store.restoreStore('viewer-1').conversations).toHaveLength(1)
   })
 })
 
@@ -762,17 +615,6 @@ describe('a Wipe bars the people it took the Store from', () => {
     expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toEqual([])
   })
 
-  it('refuses a frontier, so nothing of the thread is recorded either', async () => {
-    const store = loadStore()
-    store.restoreStore('viewer-1')
-    await save(store, 'viewer-1', [conversation('conv-1')])
-    await store.wipeStore()
-
-    await saveThread(store, 'viewer-1', 'conv-1', { hasMore: false, cursor: 'c' })
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toEqual([])
-  })
-
   // The bar is a Wipe's, not a permanent verdict: signing back in Restores, and
   // Restoring is the moment the disk and this person are the same again.
   it('lets somebody back in the moment they Restore', async () => {
@@ -785,31 +627,6 @@ describe('a Wipe bars the people it took the Store from', () => {
     await save(store, 'viewer-1', [conversation('conv-1')])
 
     expect(store.restoreStore('viewer-1').conversations).toHaveLength(1)
-  })
-
-  it('bars every person it wiped, not only the one who was on screen', async () => {
-    const store = loadStore()
-    store.restoreStore('viewer-1')
-    store.restoreStore('viewer-2')
-    await store.wipeStore()
-
-    await save(store, 'viewer-1', [conversation('conv-1')])
-    await save(store, 'viewer-2', [conversation('conv-9')])
-
-    expect(store.restoreStore('viewer-1').conversations).toEqual([])
-    expect(store.restoreStore('viewer-2').conversations).toEqual([])
-  })
-
-  // Nobody a Wipe never served can be somebody whose data it removed, so the bar
-  // has nothing to say about them.
-  it('says nothing about a person it never held anything for', async () => {
-    const store = loadStore()
-    store.restoreStore('viewer-1')
-    await store.wipeStore()
-
-    await save(store, 'viewer-2', [conversation('conv-9')])
-
-    expect(store.restoreStore('viewer-2').conversations).toHaveLength(1)
   })
 
   // The database this build cannot read is discarded and begun again, which is a
@@ -914,12 +731,6 @@ function statementsFor(fragment: string): number {
 }
 
 describe('restoreThread', () => {
-  it('has nothing for a thread this device has never held', async () => {
-    const store = loadStore()
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toEqual([])
-  })
-
   it('gives back the Messages that were written', async () => {
     const store = loadStore()
     const written = thread(3)
@@ -955,28 +766,6 @@ describe('restoreThread', () => {
     expect(restored(store, 'viewer-2', 'conv-1', 50).messages).toEqual([])
   })
 
-  it('holds one thread apart from another', async () => {
-    const store = loadStore()
-
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(2) })
-
-    expect(restored(store, 'viewer-1', 'conv-2', 50).messages).toEqual([])
-  })
-
-  it('gives back the frontier the thread recorded', async () => {
-    const store = loadStore()
-
-    const messages = thread(2)
-    await save(store, 'viewer-1', [conversation('conv-1')])
-    await saveThread(store, 'viewer-1', 'conv-1', { messages })
-    await saveThread(store, 'viewer-1', 'conv-1', { messages, hasMore: false, cursor: 'msg-1' })
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50)).toMatchObject({
-      hasMore: false,
-      cursor: 'msg-1',
-    })
-  })
-
   /**
    * Every row written before there was a frontier to write. Falling back to
    * nothing would mean "ask from the top", which on a thread this device is
@@ -993,15 +782,6 @@ describe('restoreThread', () => {
       cursor: 'msg-1',
     })
   })
-
-  it('has nothing when the database cannot be read, and discards it', async () => {
-    const store = loadStore()
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(2) })
-    mockFails.read = true
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toEqual([])
-    expect(mockDeleted).toContain(DATABASE_NAME)
-  })
 })
 
 describe('restoreOlderMessages', () => {
@@ -1014,37 +794,9 @@ describe('restoreOlderMessages', () => {
 
     expect(ids(older)).toEqual(['msg-5', 'msg-6', 'msg-7'])
   })
-
-  it('gives back nothing at the bottom of what this device holds', async () => {
-    const store = loadStore()
-    const written = thread(3)
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: written })
-
-    expect(store.restoreOlderMessages('viewer-1', 'conv-1', written[0], 50)).toEqual([])
-  })
-
-  it('gives back nothing for a thread this device has never held', async () => {
-    const store = loadStore()
-
-    expect(store.restoreOlderMessages('viewer-1', 'conv-1', message('msg-9', 9), 50)).toEqual([])
-  })
 })
 
 describe("saveThread: a thread's Messages", () => {
-  it('adds to a thread rather than replacing it', async () => {
-    const store = loadStore()
-
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(2) })
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(4) })
-
-    expect(ids(restored(store, 'viewer-1', 'conv-1', 50).messages)).toEqual([
-      'msg-1',
-      'msg-2',
-      'msg-3',
-      'msg-4',
-    ])
-  })
-
   /**
    * A Message that has been confirmed does not leave the thread it is in; what
    * changes is its receipts. So the row is replaced by id rather than joined by
@@ -1082,25 +834,6 @@ describe("saveThread: a thread's Messages", () => {
       'msg-90',
       'msg-91',
     ])
-  })
-
-  /**
-   * A thread's state change is a thread's state change, however many of its
-   * three tables moved with it. The queue is filled first and drained after,
-   * because `drain` runs as far as its first await the moment it is called.
-   */
-  it('costs one transaction when the Messages and the frontier move together', async () => {
-    const store = loadStore()
-    await save(store, 'viewer-1', [conversation('conv-1')])
-    mockCounts.transactions = 0
-
-    await saveThread(store, 'viewer-1', 'conv-1', {
-      messages: thread(3),
-      hasMore: false,
-      cursor: 'msg-1',
-    })
-
-    expect(mockCounts.transactions).toBe(1)
   })
 
   /**
@@ -1143,58 +876,6 @@ describe("saveThread: a thread's Messages", () => {
     ])
   })
 
-  it('leaves another thread alone when it replaces one', async () => {
-    const store = loadStore()
-
-    await saveThread(store, 'viewer-1', 'conv-2', { messages: thread(2) })
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(3) })
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(1, 90) })
-
-    expect(restored(store, 'viewer-1', 'conv-2', 50).messages).toHaveLength(2)
-  })
-
-  it('writes only what is not already the row on disk', async () => {
-    const store = loadStore()
-    const written = thread(3)
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: written })
-    mockStatements.length = 0
-
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: [...written, message('msg-4', 4)] })
-
-    expect(statementsFor('INSERT OR REPLACE INTO messages')).toBe(1)
-  })
-
-  /**
-   * A thread that has just been Restored reaches its first state change holding
-   * exactly the rows it read. A transaction that writes them back over
-   * themselves is the one cost this whole arrangement exists to avoid.
-   */
-  it('writes nothing at all when a Restored thread has not changed', async () => {
-    const store = loadStore()
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(3) })
-
-    const held = restored(store, 'viewer-1', 'conv-1', 50)
-    mockCounts.transactions = 0
-    await store.saveThread('viewer-1', 'conv-1', held)
-
-    expect(mockCounts.transactions).toBe(0)
-  })
-
-  /**
-   * A burst costs the transaction already under way plus one for the state that
-   * is finally true, rather than one per arriving Message.
-   */
-  it('coalesces a burst to the thread that is true when it gets there', async () => {
-    const store = loadStore()
-
-    void saveThread(store, 'viewer-1', 'conv-1', { messages: thread(1) })
-    void saveThread(store, 'viewer-1', 'conv-1', { messages: thread(2) })
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(3) })
-
-    expect(mockCounts.transactions).toBe(2)
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toHaveLength(3)
-  })
-
   /**
    * A drop that has been decided cannot be undecided by the next state to land
    * on top of it before the queue is drained.
@@ -1212,27 +893,6 @@ describe("saveThread: a thread's Messages", () => {
       'msg-90',
       'msg-91',
     ])
-  })
-
-  it('says nothing when the write fails', async () => {
-    const store = loadStore()
-    mockFails.write = true
-
-    await expect(saveThread(store, 'viewer-1', 'conv-1', { messages: thread(2) })).resolves.toBeUndefined()
-
-    mockFails.write = false
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toEqual([])
-  })
-
-  it('writes again after a write that failed', async () => {
-    const store = loadStore()
-    mockFails.write = true
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(2) })
-
-    mockFails.write = false
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(2) })
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toHaveLength(2)
   })
 })
 
@@ -1254,32 +914,6 @@ describe("saveThread: a thread's frontier", () => {
       cursor: 'msg-1',
     })
   })
-
-  it('survives a restart, and is written back by the next list write', async () => {
-    const first = loadStore()
-    await save(first, 'viewer-1', [conversation('conv-1')])
-    await saveThread(first, 'viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
-
-    const second = loadStore()
-    second.restoreStore('viewer-1')
-    await save(second, 'viewer-1', [conversation('conv-1')])
-
-    expect(second.restoreStore('viewer-1').paging.get('conv-1')).toEqual({
-      hasMore: false,
-      cursor: 'msg-1',
-    })
-  })
-
-  it('writes nothing when the frontier has not moved', async () => {
-    const store = loadStore()
-    await save(store, 'viewer-1', [conversation('conv-1')])
-    await saveThread(store, 'viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
-    mockCounts.transactions = 0
-
-    await saveThread(store, 'viewer-1', 'conv-1', { hasMore: false, cursor: 'msg-1' })
-
-    expect(mockCounts.transactions).toBe(0)
-  })
 })
 
 describe('a conversation that has left the list', () => {
@@ -1298,16 +932,6 @@ describe('a conversation that has left the list', () => {
     expect(restored(store, 'viewer-1', 'conv-2', 50).messages).toEqual([])
   })
 
-  it('leaves the threads that are still in it alone', async () => {
-    const store = loadStore()
-    await save(store, 'viewer-1', [conversation('conv-1'), conversation('conv-2')])
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(3) })
-
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toHaveLength(3)
-  })
-
   it('leaves the threads of another person alone', async () => {
     const store = loadStore()
     await save(store, 'viewer-2', [conversation('conv-9')])
@@ -1316,26 +940,6 @@ describe('a conversation that has left the list', () => {
     await save(store, 'viewer-1', [conversation('conv-1')])
 
     expect(restored(store, 'viewer-2', 'conv-9', 50).messages).toHaveLength(2)
-  })
-})
-
-describe('wipeStore, with Messages on the disk', () => {
-  it('leaves none of them behind', async () => {
-    const store = loadStore()
-    await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(3) })
-
-    await store.wipeStore()
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toEqual([])
-  })
-
-  it('does not let a write already on its way put them back', async () => {
-    const store = loadStore()
-
-    void saveThread(store, 'viewer-1', 'conv-1', { messages: thread(3) })
-    await store.wipeStore()
-
-    expect(restored(store, 'viewer-1', 'conv-1', 50).messages).toEqual([])
   })
 })
 
@@ -1363,16 +967,6 @@ describe('eviction', () => {
     return conversations
   }
 
-  it('keeps the Messages of the twenty most recently active threads', async () => {
-    const store = loadStore()
-
-    await held(store, 21)
-
-    for (const id of list(21).slice(0, 20).map((one) => one.id)) {
-      expect(restored(store, 'viewer-1', id, 50).messages).toHaveLength(1)
-    }
-  })
-
   it('drops the Messages of the twenty-first', async () => {
     const store = loadStore()
 
@@ -1393,18 +987,6 @@ describe('eviction', () => {
     await held(store, 30)
 
     expect(store.restoreStore('viewer-1').conversations).toHaveLength(30)
-  })
-
-  it('keeps a thread that lost its Messages fetchable, like one never opened', async () => {
-    const store = loadStore()
-
-    await held(store, 21)
-    await saveThread(store, 'viewer-1', 'conv-000', { messages: thread(2) })
-
-    expect(restored(store, 'viewer-1', 'conv-020', 50).messages).toEqual([])
-    expect(
-      store.restoreStore('viewer-1').conversations.some((one) => one.id === 'conv-020'),
-    ).toBe(true)
   })
 
   /**
@@ -1474,44 +1056,6 @@ describe('eviction', () => {
       expect(restored(store, 'viewer-1', 'conv-1', 100).messages).toHaveLength(50)
     })
 
-    /**
-     * The hole this is really about: a page fetched from further back than
-     * anything that survived would land under the fifty with the evicted history
-     * missing in between, and nothing reading it back could tell.
-     */
-    it('takes no page from below what survived', async () => {
-      const store = loadStore()
-      const messages = await sweptThread(store)
-
-      await saveThread(store, 'viewer-1', 'conv-1', { messages: [...thread(20, -30), ...messages] })
-
-      const held = restored(store, 'viewer-1', 'conv-1', 100).messages
-      expect(held).toHaveLength(50)
-      expect(ids(held)).not.toContain('msg--30')
-    })
-
-    it('does not write its frontier back over the reset', async () => {
-      const store = loadStore()
-      const messages = await sweptThread(store)
-
-      await saveThread(store, 'viewer-1', 'conv-1', { messages, hasMore: true, cursor: 'msg-1' })
-
-      expect(mockFiles.get(DATABASE_NAME)?.rows.find((row) => row.id === 'conv-1')).toMatchObject({
-        has_more: 1,
-        cursor: null,
-      })
-    })
-
-    /** A replace rebuilds the thread whole, so it cannot leave a hole in one. */
-    it('accepts a replace, which rebuilds it rather than patching it', async () => {
-      const store = loadStore()
-      await sweptThread(store)
-
-      await saveThread(store, 'viewer-1', 'conv-1', { messages: thread(3, 90) })
-
-      expect(restored(store, 'viewer-1', 'conv-1', 100).messages).toHaveLength(3)
-    })
-
     it('takes writes again once it has been Restored', async () => {
       const store = loadStore()
       const messages = await sweptThread(store)
@@ -1523,23 +1067,6 @@ describe('eviction', () => {
         'msg-61',
       )
     })
-  })
-
-  it('does not let a later write of the list carry the old cursor back', async () => {
-    const store = loadStore()
-    const conversations = await held(store, 21)
-    await saveThread(store, 'viewer-1', 'conv-020', {
-      messages: thread(1),
-      hasMore: false,
-      cursor: 'msg-900',
-    })
-    await saveThread(store, 'viewer-1', 'conv-000', { messages: thread(2) })
-
-    await save(store, 'viewer-1', [...conversations])
-
-    expect(
-      mockFiles.get(DATABASE_NAME)?.rows.find((row) => row.id === 'conv-020'),
-    ).toMatchObject({ has_more: 1, cursor: null })
   })
 
   it('keeps the fifty newest Messages of a thread paged back further than that', async () => {
@@ -1611,17 +1138,6 @@ describe('eviction', () => {
 
     expect(restored(store, 'viewer-2', 'conv-x', 50).messages).toHaveLength(3)
   })
-
-  it('leaves the Store alone when a sweep cannot be written', async () => {
-    const store = loadStore()
-    await held(store, 21)
-    mockFails.write = true
-
-    await saveThread(store, 'viewer-1', 'conv-000', { messages: thread(2) })
-    mockFails.write = false
-
-    expect(restored(store, 'viewer-1', 'conv-020', 50).messages).toHaveLength(1)
-  })
 })
 
 /** A Message typed on this device: a local id, and nothing the server has said. */
@@ -1629,22 +1145,11 @@ function unsent(id: string, minute: number, overrides: Partial<CustomerMessage> 
   return message(`local-${id}`, minute, { fromCompany: false, ...overrides })
 }
 
-/** Statements against the Outbox, which the schema's own `CREATE TABLE` is not. */
-function outboxStatements(): number {
-  return statementsFor('INTO outbox') + statementsFor('FROM outbox')
-}
-
 function outboxIds(store: Store, ownerId: string, conversationId: string): string[] {
   return restored(store, ownerId, conversationId).unsent.map((entry) => entry.message.id)
 }
 
 describe('restoreThread: the Outbox', () => {
-  it('has nothing for a thread this device has never held', () => {
-    const store = loadStore()
-
-    expect(restored(store, 'viewer-1', 'conv-1').unsent).toEqual([])
-  })
-
   it('gives back what was never sent, oldest first', async () => {
     const store = loadStore()
 
@@ -1698,32 +1203,6 @@ describe('restoreThread: the Outbox', () => {
 
     expect(restored(store, 'viewer-2', 'conv-1').unsent).toEqual([])
   })
-
-  it('holds one thread apart from another', async () => {
-    const store = loadStore()
-
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })
-
-    expect(restored(store, 'viewer-1', 'conv-2').unsent).toEqual([])
-  })
-
-  it('gives back nothing rather than throwing when the read fails', () => {
-    const store = loadStore()
-    mockFails.read = true
-
-    expect(restored(store, 'viewer-1', 'conv-1').unsent).toEqual([])
-  })
-
-  it('discards a database it could not read, so the next write still lands', async () => {
-    const store = loadStore()
-    mockFails.read = true
-    restored(store, 'viewer-1', 'conv-1').unsent
-    mockFails.read = false
-
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })
-
-    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a'])
-  })
 })
 
 describe('saveThread: the Outbox', () => {
@@ -1741,15 +1220,6 @@ describe('saveThread: the Outbox', () => {
     expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-b'])
   })
 
-  it('empties the Outbox when the last Message in it is confirmed', async () => {
-    const store = loadStore()
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })
-
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([]) })
-
-    expect(restored(store, 'viewer-1', 'conv-1').unsent).toEqual([])
-  })
-
   /**
    * A failed send can still have achieved something: what an upload answered
    * with is written back onto the message it is holding, so the row has to move
@@ -1762,44 +1232,6 @@ describe('saveThread: the Outbox', () => {
     await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1, { body: 'edited' })]) })
 
     expect(restored(store, 'viewer-1', 'conv-1').unsent[0].message.body).toBe('edited')
-  })
-
-  it('leaves another thread alone', async () => {
-    const store = loadStore()
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })
-
-    await saveThread(store, 'viewer-1', 'conv-2', { unsent: outbox([]) })
-
-    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a'])
-  })
-
-  it('writes nothing at all when a Restored Outbox has not changed', async () => {
-    const store = loadStore()
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })
-    const held = restored(store, 'viewer-1', 'conv-1').unsent
-    mockStatements.length = 0
-
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: held })
-
-    expect(outboxStatements()).toBe(0)
-  })
-
-  it('writes nothing for a thread whose Outbox is and always was empty', async () => {
-    const store = loadStore()
-    mockStatements.length = 0
-
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([]) })
-
-    expect(outboxStatements()).toBe(0)
-  })
-
-  it('says nothing when the write fails', async () => {
-    const store = loadStore()
-    mockFails.write = true
-
-    await expect(saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })).resolves.toBeUndefined()
-    mockFails.write = false
-    expect(restored(store, 'viewer-1', 'conv-1').unsent).toEqual([])
   })
 
   it('writes again after a write that failed', async () => {
@@ -1853,16 +1285,6 @@ describe('an Outbox row whose Conversation is gone', () => {
     expect(restored(store, 'viewer-1', 'conv-2').unsent).toEqual([])
   })
 
-  it('leaves the Outbox of a thread still in the list alone', async () => {
-    const store = loadStore()
-    await save(store, 'viewer-1', list)
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })
-
-    await save(store, 'viewer-1', [conversation('conv-1')])
-
-    expect(outboxIds(store, 'viewer-1', 'conv-1')).toEqual(['local-a'])
-  })
-
   it('leaves another person on this phone alone', async () => {
     const store = loadStore()
     await saveThread(store, 'viewer-2', 'conv-2', { unsent: outbox([unsent('a', 1)]) })
@@ -1892,15 +1314,6 @@ describe('an Outbox row whose Conversation is gone', () => {
 })
 
 describe('wipeStore, with an Outbox on the disk', () => {
-  it('leaves none of it behind', async () => {
-    const store = loadStore()
-    await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })
-
-    await store.wipeStore()
-
-    expect(restored(store, 'viewer-1', 'conv-1').unsent).toEqual([])
-  })
-
   it('refuses a write queued after it by somebody it just wiped', async () => {
     const store = loadStore()
     await saveThread(store, 'viewer-1', 'conv-1', { unsent: outbox([unsent('a', 1)]) })

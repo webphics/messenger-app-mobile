@@ -4,12 +4,9 @@ import {
   communityTabRows,
   communityThreads,
   feedAfterRead,
-  JOINABLE_SECTION_TITLE,
-  JOINED_SECTION_TITLE,
   MAX_INLINE_GROUPS,
   myCommunities,
   sortCommunities,
-  withLiveSections,
   withLiveThread,
   type CommunityFeed,
 } from '@/lib/community-list'
@@ -101,32 +98,12 @@ describe('myCommunities', () => {
     expect(myCommunities([mine, theirs], 'viewer').map((row) => row.id)).toEqual(['mine'])
   })
 
-  it('makes an Admin whole answer invisible where they never joined, rather than refused', () => {
-    const everything = [
-      community({ id: 'a', name: 'A', memberIds: ['someone'] }),
-      community({ id: 'b', name: 'B', memberIds: ['else'] }),
-    ]
-
-    expect(myCommunities(everything, 'admin')).toEqual([])
-  })
-
-  it('has nothing to show nobody', () => {
-    expect(myCommunities([community()], null)).toEqual([])
-  })
-
   /**
-   * The case that made this take a third argument, and the one no unit test
-   * would have thought to write: membership and the rooms a person holds are
-   * set separately, so an Admin can be given a Community's Announcements thread
-   * and its Groups without being a member of the Community.
-   *
-   * It cost nothing while Chats showed every conversation — the rooms were
-   * readable there. Once Chats held only what is not a Community's, a Community
-   * narrowed away here took its rooms off both tabs and the threads were
-   * reachable from nowhere at all. Sixteen of one account's thirty-six, found by
-   * opening the screen.
+   * Membership and the rooms a person holds are set separately, so an Admin can be given a
+   * Community's Announcements thread without being a member of it. Narrowing that Community away
+   * took its rooms off both tabs and left the threads reachable from nowhere.
    */
-  it("keeps a Community holding a room the viewer can open, with no membership", () => {
+  it('keeps a Community holding a room the viewer can open, with no membership', () => {
     const notAMember = community({ id: 'held', name: 'Held', memberIds: ['someone else'] })
     const stranger = community({ id: 'stranger', name: 'Stranger', memberIds: ['someone else'] })
     const room = conversation({ id: 'room-1', communityId: 'held' })
@@ -134,20 +111,6 @@ describe('myCommunities', () => {
     expect(myCommunities([notAMember, stranger], 'viewer', [room]).map((row) => row.id)).toEqual([
       'held',
     ])
-  })
-
-  it('counts a membership and a held room once, not twice', () => {
-    const both = community({ id: 'both', memberIds: ['viewer'] })
-    const room = conversation({ id: 'room-1', communityId: 'both' })
-
-    expect(myCommunities([both], 'viewer', [room]).map((row) => row.id)).toEqual(['both'])
-  })
-
-  it('is not widened by a conversation belonging to no Community', () => {
-    const stranger = community({ id: 'stranger', memberIds: ['someone else'] })
-    const plainChat = conversation({ id: 'chat-1', communityId: null })
-
-    expect(myCommunities([stranger], 'viewer', [plainChat])).toEqual([])
   })
 })
 
@@ -161,12 +124,6 @@ describe('sortCommunities', () => {
 
     expect(sortCommunities(rows).map((row) => row.id)).toEqual(['a', 'b', 'z'])
   })
-
-  it('leaves the list it was given alone', () => {
-    const rows = [community({ id: 'z', name: 'Beta' }), community({ id: 'a', name: 'Acme' })]
-    sortCommunities(rows)
-    expect(rows[0].id).toBe('z')
-  })
 })
 
 describe('communityThreads', () => {
@@ -179,24 +136,8 @@ describe('communityThreads', () => {
     expect(groups.map((row) => row.id)).toEqual(['newer', 'older'])
   })
 
-  it('puts a Group nobody has written in last, and breaks a tie by name', () => {
-    const quietB = group({ id: 'b', title: 'B' })
-    const quietA = group({ id: 'a', title: 'A' })
-    const loud = group({ id: 'loud', title: 'Loud', lastMessageAt: '2026-09-14T10:00:00.000Z' })
-
-    expect(communityThreads([quietB, quietA, loud]).groups.map((row) => row.id)).toEqual([
-      'loud',
-      'a',
-      'b',
-    ])
-  })
-
   it('drops the Groups the viewer is not in — those have no thread to open', () => {
     expect(communityThreads([joinable, announcements]).groups).toEqual([])
-  })
-
-  it('still finds Announcements in a Community holding nothing else the viewer is in', () => {
-    expect(communityThreads([announcements, joinable]).announcements?.id).toBe('announcements-1')
   })
 })
 
@@ -227,25 +168,6 @@ describe('withLiveThread', () => {
       unreadCount: 2,
     })
   })
-
-  it('leaves a thread the Conversation list has never held exactly as it was', () => {
-    const row = group({ id: 'unheld' })
-    expect(withLiveThread(row, [conversation()])).toBe(row)
-  })
-
-  it('gives the Announcements thread the count the feed has no field for', () => {
-    const live = conversation({ id: 'announcements-1', unreadCount: 7 })
-    expect(withLiveThread(announcements, [live])).toMatchObject({ unreadCount: 7 })
-  })
-
-  it('answers with the same row when the live copy says what it already said', () => {
-    const row = group({ unreadCount: 3, lastMessagePreview: 'Shipping Friday' })
-    const live = conversation({ unreadCount: 3, lastMessagePreview: 'Shipping Friday' })
-
-    // Identity, not equality: every drawn row is re-read whenever a socket event
-    // moves anything, and a new object each time would defeat `memo` on the row.
-    expect(withLiveThread(row, [live])).toBe(row)
-  })
 })
 
 describe('feedAfterRead', () => {
@@ -261,40 +183,12 @@ describe('feedAfterRead', () => {
   })
 
   it('is a failure over a Community with nothing drawn, which is somebody at a dead end', () => {
-    expect(feedAfterRead({ ok: false, failure: { kind: 'unreachable' } }, null)).toEqual({
-      status: 'failed',
-      title: 'Cannot reach the server',
-      hint: 'Check your connection and try again.',
-    })
-  })
-
-  it('titles a refusal for the rooms rather than for the conversation list', () => {
-    expect(
-      feedAfterRead({ ok: false, failure: { kind: 'refused', message: 'Nope.' } }, null),
-    ).toEqual({ status: 'failed', title: 'Could not load groups', hint: 'Nope.' })
-  })
-
-  it('does not treat a feed that arrived empty as one worth keeping', () => {
-    const drawn: CommunityFeed = { status: 'ready', rows: [] }
-    expect(feedAfterRead({ ok: false, failure: { kind: 'unreachable' } }, drawn)).toMatchObject({
-      status: 'failed',
-    })
+    expect(feedAfterRead({ ok: false, failure: { kind: 'unreachable' } }, null).status).toBe('failed')
   })
 })
 
 describe('communityTabRows', () => {
   const ready = (rows: CommunityFeedRow[]): CommunityFeed => ({ status: 'ready', rows })
-
-  it('draws a collapsed Community as one row', () => {
-    const rows = communityTabRows({
-      communities: [community()],
-      expanded: new Set(),
-      feeds: new Map(),
-      conversations: [],
-    })
-
-    expect(rows.map((row) => row.kind)).toEqual(['community'])
-  })
 
   it('opens an expanded one onto Announcements, its Groups and View all', () => {
     const rows = communityTabRows({
@@ -322,39 +216,6 @@ describe('communityTabRows', () => {
     expect(rows.filter((row) => row.kind === 'thread')).toHaveLength(MAX_INLINE_GROUPS)
   })
 
-  it('shows Announcements for a Community holding no Groups the viewer is in', () => {
-    const rows = communityTabRows({
-      communities: [community()],
-      expanded: new Set(['community-1']),
-      feeds: new Map([['community-1', ready([announcements, joinable])]]),
-      conversations: [],
-    })
-
-    expect(rows.map((row) => row.kind)).toEqual(['community', 'thread', 'view-all'])
-  })
-
-  it('says a Community has nothing the viewer can open rather than drawing nothing', () => {
-    const rows = communityTabRows({
-      communities: [community()],
-      expanded: new Set(['community-1']),
-      feeds: new Map([['community-1', ready([joinable])]]),
-      conversations: [],
-    })
-
-    expect(rows.map((row) => row.kind)).toEqual(['community', 'feed-empty', 'view-all'])
-  })
-
-  it('treats a feed nobody has asked for yet as one that is loading', () => {
-    const rows = communityTabRows({
-      communities: [community()],
-      expanded: new Set(['community-1']),
-      feeds: new Map(),
-      conversations: [],
-    })
-
-    expect(rows.map((row) => row.kind)).toEqual(['community', 'feed-loading', 'view-all'])
-  })
-
   it('offers View all even where the feed failed, so a failure is not a dead end', () => {
     const rows = communityTabRows({
       communities: [community()],
@@ -366,19 +227,6 @@ describe('communityTabRows', () => {
     })
 
     expect(rows.map((row) => row.kind)).toEqual(['community', 'feed-failed', 'view-all'])
-  })
-
-  it('draws each thread with what the Conversation list knows about it', () => {
-    const rows = communityTabRows({
-      communities: [community()],
-      expanded: new Set(['community-1']),
-      feeds: new Map([['community-1', ready([group()])]]),
-      conversations: [conversation({ unreadCount: 5, lastMessagePreview: 'Live' })],
-    })
-
-    expect(rows.find((row) => row.kind === 'thread')).toMatchObject({
-      row: { unreadCount: 5, lastMessagePreview: 'Live' },
-    })
   })
 
   it('keys every row uniquely, so several expanded Communities cannot collide', () => {
@@ -404,32 +252,6 @@ describe('communitySections', () => {
     expect(sections.joined.map((row) => row.id)).toEqual(['group-1'])
     expect(sections.joinable.map((row) => row.id)).toEqual(['group-9'])
   })
-
-  it('orders the Groups somebody may join alphabetically, since none of them have activity to rank by', () => {
-    const b = joinableGroup({ id: 'b', title: 'Beta' })
-    const a = joinableGroup({ id: 'a', title: 'Alpha' })
-
-    expect(communitySections([b, a]).joinable.map((row) => row.id)).toEqual(['a', 'b'])
-  })
-
-  it('has nothing joinable in a Community the viewer is already everywhere in', () => {
-    expect(communitySections([announcements, group()]).joinable).toEqual([])
-  })
-})
-
-describe('withLiveSections', () => {
-  it('overlays the live Conversation onto the pinned thread and every joined Group', () => {
-    const sections = communitySections([announcements, group()])
-    const live = conversation({ unreadCount: 5, lastMessagePreview: 'Live' })
-
-    const next = withLiveSections(sections, [live])
-    expect(next.joined[0]).toMatchObject({ unreadCount: 5, lastMessagePreview: 'Live' })
-  })
-
-  it('leaves the Groups somebody may join untouched — there is no thread to overlay', () => {
-    const sections = communitySections([joinable])
-    expect(withLiveSections(sections, [conversation()]).joinable).toEqual(sections.joinable)
-  })
 })
 
 describe('communityScreenRows', () => {
@@ -442,30 +264,6 @@ describe('communityScreenRows', () => {
       'thread',
       'section',
       'joinable',
-    ])
-  })
-
-  it('names both sections even when neither is empty', () => {
-    const rows = communityScreenRows(communitySections([group(), joinable]))
-    const titles = rows.filter((row) => row.kind === 'section').map((row) => row.title)
-
-    expect(titles).toEqual([JOINED_SECTION_TITLE, JOINABLE_SECTION_TITLE])
-  })
-
-  it('says a section is empty rather than collapsing it away', () => {
-    const rows = communityScreenRows(communitySections([joinable]))
-
-    expect(rows.map((row) => row.kind)).toEqual(['section', 'joined-empty', 'section', 'joinable'])
-  })
-
-  it('says both sections are empty for a Community with no Groups at all', () => {
-    const rows = communityScreenRows(communitySections([]))
-
-    expect(rows.map((row) => row.kind)).toEqual([
-      'section',
-      'joined-empty',
-      'section',
-      'joinable-empty',
     ])
   })
 

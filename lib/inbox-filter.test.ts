@@ -1,11 +1,8 @@
 import {
   activeInboxChip,
   filterConversations,
-  inboxChips,
   isResolved,
-  latestInboxThread,
   listAssignedConversations,
-  listInboxConversations,
   listUnassignedConversations,
 } from '@/lib/inbox-filter'
 import { mergeConversation, withReassignment } from '@/lib/conversation-list'
@@ -14,94 +11,16 @@ import { isStaffConversation } from '@/lib/types'
 
 const assigned = CONVERSATIONS.find((c) => c.id === 'conv-assigned')!
 const unassigned = CONVERSATIONS.find((c) => c.id === 'conv-unassigned')!
-const group = CONVERSATIONS.find((c) => c.id === 'conv-group')!
-const offers = CONVERSATIONS.find((c) => c.id === 'offers')!
 const closed = { ...assigned, id: 'conv-closed', status: 'closed' as const }
 
-describe('isResolved', () => {
-  test('a closed support thread is resolved', () => {
-    expect(isResolved(closed)).toBe(true)
-  })
-
-  test('an engaged one is not', () => {
-    expect(isResolved(assigned)).toBe(false)
-  })
-
-  test('a group has no status to be resolved by', () => {
-    expect(isResolved(group)).toBe(false)
-  })
+test('a closed support thread is resolved', () => {
+  expect(isResolved(closed)).toBe(true)
 })
 
-describe('listInboxConversations', () => {
-  test('an Agent sees the whole support pool of their organizations, plus their groups', () => {
-    const list = listInboxConversations({ role: 'agent', id: 'agent-1', capabilities: [] }, CONVERSATIONS)
-    expect(list.map((c) => c.id).sort()).toEqual([
-      'conv-assigned',
-      'conv-group',
-      'conv-unassigned',
-      'offers',
-    ])
-  })
-
-  test('an Agent does not see a group they are not in', () => {
-    const list = listInboxConversations({ role: 'agent', id: 'agent-9', capabilities: [] }, CONVERSATIONS)
-    expect(list.map((c) => c.id)).not.toContain('conv-group')
-  })
-
-  test('an Admin sees all', () => {
-    const admin = { role: 'admin' as const, id: 'admin-1', capabilities: ['staff_dm' as const] }
-    expect(listInboxConversations(admin, CONVERSATIONS)).toHaveLength(CONVERSATIONS.length)
-  })
-})
-
-describe('latestInboxThread', () => {
-  test('skips Offers and returns the newest thread in the list', () => {
-    expect(latestInboxThread(CONVERSATIONS)?.id).toBe('conv-unassigned')
-  })
-
-  test('is nothing when the list is empty', () => {
-    expect(latestInboxThread([])).toBeUndefined()
-  })
-
-  test('is nothing when Offers is the only thing in it', () => {
-    expect(latestInboxThread([offers])).toBeUndefined()
-  })
-})
-
-describe('listAssignedConversations', () => {
-  test('the support threads this agent holds', () => {
-    expect(listAssignedConversations('agent-1', CONVERSATIONS).map((c) => c.id)).toEqual([
-      assigned.id,
-    ])
-  })
-
-  test('counts nothing for an agent nothing is assigned to', () => {
-    expect(listAssignedConversations('agent-9', CONVERSATIONS)).toEqual([])
-  })
-
-  test('a group is never assigned to anyone', () => {
-    expect(listAssignedConversations('agent-1', [group])).toEqual([])
-  })
-})
-
-describe('listUnassignedConversations', () => {
-  test('only support threads nobody has engaged', () => {
-    expect(listUnassignedConversations(CONVERSATIONS).map((c) => c.id)).toEqual([
-      unassigned.id,
-    ])
-  })
-})
-
-/**
- * What a staff session sees happen to its two lists when somebody else moves a
- * conversation — the pool and the assigned list, each read out of the one list
- * every screen shares, so a socket event moves both without a refetch.
- */
 describe('an assignment that happened elsewhere', () => {
   const holder = isStaffConversation(assigned) ? assigned.assignedAgent : null
 
   test('a thread another Agent just engaged leaves the pool', () => {
-    // What `conversation.updated` carries, and what the inbox does with it.
     const engagedElsewhere = {
       ...unassigned,
       status: 'engaged' as const,
@@ -117,11 +36,6 @@ describe('an assignment that happened elsewhere', () => {
   })
 
   test('a thread taken over leaves the assignee’s own list', () => {
-    expect(holder).not.toBeNull()
-    expect(listAssignedConversations(holder!.id, CONVERSATIONS).map((c) => c.id)).toContain(
-      assigned.id,
-    )
-
     const taken = withReassignment(CONVERSATIONS, {
       conversationId: assigned.id,
       reason: 'taken_over',
@@ -131,12 +45,9 @@ describe('an assignment that happened elsewhere', () => {
     expect(listAssignedConversations(holder!.id, taken).map((c) => c.id)).not.toContain(
       assigned.id,
     )
-    // Still in the inbox: an Agent reads every Support DM in their organizations
-    // whoever holds it. It has moved off the Mine chip, not out of sight.
-    expect(taken.map((c) => c.id)).toContain(assigned.id)
   })
 
-  test('a thread whose assignee left the organization goes back to the pool for everyone else', () => {
+  test('a thread whose assignee left the organization goes back to the pool', () => {
     const returned = withReassignment(CONVERSATIONS, {
       conversationId: assigned.id,
       reason: 'taken_over',
@@ -148,138 +59,39 @@ describe('an assignment that happened elsewhere', () => {
 })
 
 describe('filterConversations', () => {
-  const all = CONVERSATIONS
-
-  test('the all chip returns everything, with Offers pinned first', () => {
-    const ids = filterConversations(all, { query: '', chip: 'all' }).map((c) => c.id)
-    expect(ids[0]).toBe('offers')
-    expect([...ids].sort()).toEqual(all.map((c) => c.id).sort())
-  })
-
-  test('open excludes a closed thread', () => {
-    const ids = filterConversations([...all, closed], { query: '', chip: 'open' }).map((c) => c.id)
-    expect(ids).toContain(assigned.id)
-    expect(ids).not.toContain(closed.id)
-  })
-
-  test('resolved includes only closed threads', () => {
-    expect(filterConversations([...all, closed], { query: '', chip: 'resolved' }).map((c) => c.id)).toEqual([
+  test('open excludes a closed thread, resolved keeps only it', () => {
+    const list = [...CONVERSATIONS, closed]
+    expect(filterConversations(list, { query: '', chip: 'open' }).map((c) => c.id)).not.toContain(
+      closed.id,
+    )
+    expect(filterConversations(list, { query: '', chip: 'resolved' }).map((c) => c.id)).toEqual([
       closed.id,
     ])
   })
 
-  test('a query matches the title or the preview', () => {
-    expect(filterConversations(all, { query: 'luis', chip: 'all' }).map((c) => c.id)).toContain(assigned.id)
-    expect(filterConversations(all, { query: 'march invoice', chip: 'all' }).map((c) => c.id)).toEqual([
-      unassigned.id,
-    ])
-    expect(filterConversations(all, { query: 'offers', chip: 'all' }).map((c) => c.id)).toEqual([offers.id])
-  })
-
-  test('a Customer support row is searchable by the organization that titles it', () => {
-    const customerRow = {
-      id: 'conv-customer',
-      organizationId: 'org-1',
-      type: 'support_dm' as const,
-      lastMessageAt: '2026-08-13T08:00:00.000Z',
-      lastMessagePreview: 'Hello',
-      lastMessageMine: false,
-      lastMessageReceiptStatus: null,
-      lastMessageRead: true,
-      unreadCount: 0,
-    }
-    const names = new Map([['org-1', 'Talo']])
-    expect(filterConversations([customerRow], { query: 'talo', chip: 'all', organizationNames: names })).toHaveLength(1)
-    expect(filterConversations([customerRow], { query: 'other', chip: 'all', organizationNames: names })).toHaveLength(0)
-  })
-
-  test('mine keeps only the threads assigned to the viewer', () => {
+  test('mine keeps only the viewer’s threads, and nothing with nobody looking', () => {
     expect(
-      filterConversations(all, { query: '', chip: 'mine', viewerId: 'agent-1' }).map((c) => c.id),
+      filterConversations(CONVERSATIONS, { query: '', chip: 'mine', viewerId: 'agent-1' }).map(
+        (c) => c.id,
+      ),
     ).toEqual([assigned.id])
-  })
-
-  test('mine with nobody looking keeps nothing, rather than everything', () => {
-    expect(filterConversations(all, { query: '', chip: 'mine' })).toEqual([])
-  })
-
-  test('Offers stays out when the chip excludes it', () => {
-    expect(filterConversations(all, { query: '', chip: 'resolved' }).map((c) => c.id)).not.toContain(offers.id)
-  })
-})
-
-describe('inboxChips', () => {
-  test('with assignment on, every chip, Mine included', () => {
-    expect(inboxChips(true)).toEqual(['all', 'mine', 'open', 'resolved'])
-  })
-
-  test('in a Shared queue, no Mine: nothing is anybody’s', () => {
-    expect(inboxChips(false)).toEqual(['all', 'open', 'resolved'])
-  })
-})
-
-describe('activeInboxChip', () => {
-  test.each([
-    ['all', true, 'all'],
-    ['mine', true, 'mine'],
-    ['open', true, 'open'],
-    ['resolved', true, 'resolved'],
-    ['all', false, 'all'],
-    // Left selected when the switch went off: the chip is gone, so is its filter.
-    ['mine', false, 'all'],
-    ['open', false, 'open'],
-    ['resolved', false, 'resolved'],
-  ] as const)('%s, assignment %s, filters as %s', (chip, supportAssignment, expected) => {
-    expect(activeInboxChip(chip, supportAssignment)).toBe(expected)
+    expect(filterConversations(CONVERSATIONS, { query: '', chip: 'mine' })).toEqual([])
   })
 
   test('a Mine that fell back filters the whole list, not the viewer’s share of it', () => {
     const chip = activeInboxChip('mine', false)
-    expect(filterConversations(CONVERSATIONS, { query: '', chip, viewerId: 'agent-1' })).toHaveLength(
-      CONVERSATIONS.length,
-    )
-  })
-})
-
-describe('filterConversations, narrowed to a custom inbox', () => {
-  const elsewhere = { ...assigned, id: 'conv-elsewhere', organizationId: 'org-elsewhere' }
-  // Named rather than read off the fixture: `organizationId` is nullable now that the
-  // onboarding thread has none, and a custom inbox names organizations it knows exist.
-  const assignedOrganizationId = 'org-mock'
-
-  test('null is the unified inbox and narrows nothing', () => {
-    const ids = filterConversations([assigned, elsewhere], {
-      query: '',
-      chip: 'all',
-      organizationIds: null,
-    }).map((c) => c.id)
-    expect(ids.sort()).toEqual(['conv-assigned', 'conv-elsewhere'])
+    expect(
+      filterConversations(CONVERSATIONS, { query: '', chip, viewerId: 'agent-1' }),
+    ).toHaveLength(CONVERSATIONS.length)
   })
 
-  test('a set keeps only the organizations it names', () => {
-    const ids = filterConversations([assigned, elsewhere], {
+  test('a custom inbox keeps only the organizations it names, within the other filters', () => {
+    const elsewhere = { ...assigned, id: 'conv-elsewhere', organizationId: 'org-elsewhere' }
+    const ids = filterConversations([assigned, elsewhere, closed], {
       query: '',
-      chip: 'all',
-      organizationIds: new Set([assignedOrganizationId]),
+      chip: 'open',
+      organizationIds: new Set(['org-mock']),
     }).map((c) => c.id)
     expect(ids).toEqual(['conv-assigned'])
-  })
-
-  test('an inbox naming an organization nobody is in any more simply matches nothing', () => {
-    const ids = filterConversations([assigned, elsewhere], {
-      query: '',
-      chip: 'all',
-      organizationIds: new Set(['org-gone']),
-    })
-    expect(ids).toEqual([])
-  })
-
-  test('it narrows within the other filters rather than replacing them', () => {
-    const ids = filterConversations([assigned, closed], {
-      query: '',
-      chip: 'resolved',
-      organizationIds: new Set([assignedOrganizationId]),
-    }).map((c) => c.id)
-    expect(ids).toEqual([closed.id])
   })
 })

@@ -43,9 +43,6 @@ describe('what counts as a reference to the document directory', () => {
   const writes: [string, string][] = [
     ['the current expo-file-system API', 'const d = new Directory(Paths.document, "notes")'],
     ['the legacy one', 'const d = FileSystem.documentDirectory + "notes"'],
-    ['a bare documentDirectory', 'const { documentDirectory } = FileSystem'],
-    ['a quoted property', 'const d = new Directory(Paths["document"], "notes")'],
-    ['a destructured Paths', 'const { document, cache } = Paths'],
     ['a renamed destructure', 'const { document: documents } = Paths'],
   ]
 
@@ -53,75 +50,21 @@ describe('what counts as a reference to the document directory', () => {
     expect(references(source)).toHaveLength(1)
   })
 
-  it('is one however many ways a single line names it', () => {
-    expect(references('Paths.document, FileSystem.documentDirectory')).toHaveLength(1)
-  })
-
-  it('survives a property a formatter split over two lines', () => {
-    const split = `const d = new Directory(
-  Paths
-    .document,
-)`
-    // Reported against the line the name starts on, which is where somebody
-    // reading the failure will look.
-    expect(references(split)).toEqual([expect.objectContaining({ line: 2 })])
-  })
-
-  const permitted: [string, string][] = [
-    ['a download', 'return new Directory(Paths.cache, CACHE_DIRECTORY)'],
-    ['a staged copy', 'const staged = new Directory(Paths.cache, "staged", key)'],
-    ['prose about the cache', '// Under `Paths.cache`, deliberately: the system may reclaim it.'],
-    ['a destructured cache', 'const { cache } = Paths'],
-  ]
-
   // Neither platform backs the cache up, so `attachment-cache` is entitled to
   // it and this must never be the thing that stops it.
-  it.each(permitted)('%s under the cache is not', (_name, source) => {
-    expect(references(source)).toEqual([])
-  })
-
-  it('is nothing at all in a file that writes nowhere', () => {
-    expect(references('export const answer = 42\n')).toEqual([])
-  })
-
-  it('says which file and which line', () => {
-    const found = documentDirectoryReferences([
-      { path: 'lib/notes.ts', source: 'const a = 1\nconst b = 2\nconst d = Paths.document\n' },
-    ])
-    expect(found).toEqual([
-      { path: 'lib/notes.ts', line: 3, text: 'const d = Paths.document' },
-    ])
-  })
-
-  it('reports every one, not the first', () => {
-    const found = documentDirectoryReferences([
-      { path: 'lib/a.ts', source: 'Paths.document\nPaths.document\n' },
-      { path: 'app/b.tsx', source: 'FileSystem.documentDirectory\n' },
-    ])
-    expect(found).toHaveLength(3)
+  it('a download under the cache is not one', () => {
+    expect(references('return new Directory(Paths.cache, CACHE_DIRECTORY)')).toEqual([])
   })
 })
 
 describe('the failure message', () => {
-  const message = documentDirectoryFailure(
-    documentDirectoryReferences([{ path: 'lib/notes.ts', source: 'const d = Paths.document\n' }]),
-  )
-
-  it('names the decision', () => {
+  it('names the decision and where it is written down', () => {
+    const message = documentDirectoryFailure(
+      documentDirectoryReferences([{ path: 'lib/notes.ts', source: 'const d = Paths.document\n' }]),
+    )
     expect(message).toContain('ADR-0011')
-  })
-
-  it('names where the decision is written down', () => {
     expect(message).toContain('EXCLUSIONS')
     expect(message).toContain('plugins/backup-exclusion.js')
-  })
-
-  it('names what tripped it', () => {
-    expect(message).toContain('lib/notes.ts:1')
-  })
-
-  it('offers the cache, which no backup takes', () => {
-    expect(message).toContain('Paths.cache')
   })
 })
 

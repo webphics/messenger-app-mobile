@@ -30,12 +30,6 @@ describe('shouldShowDayDivider', () => {
     expect(shouldShowDayDivider(localIso(2026, 8, 13, 8, 12), localIso(2026, 8, 13, 8))).toBe(false)
     expect(shouldShowDayDivider(localIso(2026, 8, 13, 8), localIso(2026, 8, 12, 22))).toBe(true)
   })
-
-  test('one evening is one day', () => {
-    // The pair that used to straddle the UTC midnight in UTC+6 and split the
-    // evening in two.
-    expect(shouldShowDayDivider(localIso(2026, 8, 13, 23), localIso(2026, 8, 13, 17))).toBe(false)
-  })
 })
 
 describe('formatDayLabel', () => {

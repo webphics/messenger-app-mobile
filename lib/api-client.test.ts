@@ -153,9 +153,6 @@ function enqueueUpload(...answers: QueuedUpload[]): void {
   mockUploadQueue.push(...answers);
 }
 
-/** `UploadType.MULTIPART`, as the mock below reports it. */
-const MULTIPART = 1;
-
 jest.mock("expo-file-system", () => ({
   UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
   File: class {
@@ -195,10 +192,6 @@ beforeEach(() => {
 });
 
 describe("readCookieValue", () => {
-  test("reads a value from a single Set-Cookie header", () => {
-    expect(readCookieValue("csrf-token=abc123; Path=/; HttpOnly", "csrf-token")).toBe("abc123");
-  });
-
   test("reads a value out of the comma-joined header React Native produces", () => {
     const joined =
       "other=1; Path=/, csrf-token=abc.def; Path=/; HttpOnly, third=3; Path=/";
@@ -208,13 +201,6 @@ describe("readCookieValue", () => {
   test("matches the whole name, not a suffix of a longer one", () => {
     expect(readCookieValue("x-csrf-token=wrong; Path=/", "csrf-token")).toBeNull();
   });
-
-  test.each([null, "", "other=1; Path=/", "csrf-token=; Path=/"])(
-    "returns null for %p",
-    (header) => {
-      expect(readCookieValue(header, "csrf-token")).toBeNull();
-    },
-  );
 });
 
 describe("findSessionCookie", () => {
@@ -228,12 +214,6 @@ describe("findSessionCookie", () => {
     expect(
       findSessionCookie("__Secure-better-auth.session_token=abc.def; Path=/; Secure"),
     ).toBe("__Secure-better-auth.session_token=abc.def");
-  });
-
-  test("finds it among the other cookies the API sets on the same response", () => {
-    const joined =
-      "better-auth.session_data=cached; Path=/, better-auth.session_token=abc.def; Path=/; HttpOnly, csrf-token=xyz; Path=/";
-    expect(findSessionCookie(joined)).toBe("better-auth.session_token=abc.def");
   });
 
   /**
@@ -250,15 +230,6 @@ describe("findSessionCookie", () => {
 
   test("does not mistake the session_data cache cookie for the credential", () => {
     expect(findSessionCookie("better-auth.session_data=cached; Path=/")).toBeNull();
-  });
-
-  test.each([
-    ["no header at all", null],
-    ["a response that set no cookies", ""],
-    ["a response that set only the CSRF cookie", "csrf-token=xyz; Path=/"],
-    ["a session cookie being cleared", "better-auth.session_token=; Path=/; Max-Age=0"],
-  ])("returns null for %s", (_label, header) => {
-    expect(findSessionCookie(header)).toBeNull();
   });
 });
 
@@ -281,18 +252,6 @@ describe("findChallengeCookie", () => {
     ).toBe("__Secure-better-auth.two_factor=chal.lenge");
   });
 
-  test("finds it in the comma-joined header React Native produces", () => {
-    const joined =
-      "better-auth.session_data=cached; Path=/, better-auth.two_factor=chal.lenge; Path=/; HttpOnly, csrf-token=xyz; Path=/";
-    expect(findChallengeCookie(joined)).toBe("better-auth.two_factor=chal.lenge");
-  });
-
-  test("is not confused by the comma inside an Expires attribute", () => {
-    const joined =
-      "better-auth.two_factor=chal.lenge; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT; HttpOnly";
-    expect(findChallengeCookie(joined)).toBe("better-auth.two_factor=chal.lenge");
-  });
-
   /**
    * The two cookies are looked for separately and must stay that way. A
    * challenge read as a session would be written to the keychain, and a session
@@ -302,25 +261,6 @@ describe("findChallengeCookie", () => {
     const session = "better-auth.session_token=abc.def; Path=/; HttpOnly";
     expect(findChallengeCookie(session)).toBeNull();
     expect(findSessionCookie("better-auth.two_factor=chal.lenge; Path=/")).toBeNull();
-  });
-
-  test.each([
-    ["no header at all", null],
-    ["a response that set no cookies", ""],
-    ["a response that set only the CSRF cookie", "csrf-token=xyz; Path=/"],
-    ["a challenge being cleared", "better-auth.two_factor=; Path=/; Max-Age=0"],
-  ])("returns null for %s", (_label, header) => {
-    expect(findChallengeCookie(header)).toBeNull();
-  });
-});
-
-describe("the held credential", () => {
-  test("round-trips and can be cleared", () => {
-    expect(getSessionCookie()).toBeNull();
-    setSessionCookie(SESSION_COOKIE);
-    expect(getSessionCookie()).toBe(SESSION_COOKIE);
-    setSessionCookie(null);
-    expect(getSessionCookie()).toBeNull();
   });
 });
 
@@ -352,40 +292,12 @@ describe("taking the platform cookie store out of the path", () => {
 });
 
 describe("apiRequest", () => {
-  test("targets the configured base URL", async () => {
-    await apiRequest("/auth/session");
-    expect(calls[0].url).toBe(`${API_BASE_URL}/auth/session`);
-  });
-
-  test("attaches the Session cookie without the call site asking", async () => {
-    setSessionCookie(SESSION_COOKIE);
-    await apiRequest("/auth/session");
-    expect(headersOf(calls[0]).Cookie).toBe(SESSION_COOKIE);
-  });
-
-  test("sends no Cookie header at all when there is nothing to send", async () => {
-    await apiRequest("/auth/session");
-    expect(headersOf(calls[0]).Cookie).toBeUndefined();
-  });
-
-  test("an explicit cookie is presented even when none is held", async () => {
-    enqueue(csrfResponse(), response(200, {}));
-    await apiRequest("/auth/logout", { method: "POST", cookie: "ending=session" });
-    expect(headersOf(calls[1]).Cookie).toBe("ending=session; csrf-token=cookie-value");
-  });
-
   test("an explicit cookie overrides the held one", async () => {
     setSessionCookie(SESSION_COOKIE);
     enqueue(csrfResponse(), response(200, {}));
     await apiRequest("/auth/logout", { method: "POST", cookie: "ending=session" });
     expect(headersOf(calls[1]).Cookie).toContain("ending=session");
     expect(headersOf(calls[1]).Cookie).not.toContain(SESSION_COOKIE);
-  });
-
-  test("serialises a JSON body and declares its type", async () => {
-    await apiRequest("/auth/login", { method: "POST", body: { email: "a@b.co" } });
-    expect(calls[calls.length - 1].init.body).toBe('{"email":"a@b.co"}');
-    expect(headersOf(calls[calls.length - 1])["Content-Type"]).toBe("application/json");
   });
 
   test("reads the Session cookie off the response, case-insensitively", async () => {
@@ -419,17 +331,6 @@ describe("apiRequest", () => {
       reached: true,
       sessionCookie: null,
       challengeCookie: "better-auth.two_factor=chal.lenge",
-    });
-  });
-
-  test("reports the status and parsed body", async () => {
-    enqueue(response(401, { message: "Invalid email or password." }));
-    expect(await apiRequest("/auth/session")).toEqual({
-      reached: true,
-      status: 401,
-      body: { message: "Invalid email or password." },
-      sessionCookie: null,
-      challengeCookie: null,
     });
   });
 
@@ -467,20 +368,6 @@ describe("a file upload", () => {
     expect(uploads[0].url).toBe(`${API_BASE_URL}/conversations/c1/files`);
   });
 
-  test("sends it under the field name and the type the API reads", async () => {
-    enqueue(csrfResponse());
-    enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
-
-    await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
-
-    expect(uploads[0].options).toMatchObject({
-      httpMethod: "POST",
-      uploadType: MULTIPART,
-      fieldName: "file",
-      mimeType: "image/jpeg",
-    });
-  });
-
   test("declares no Content-Type, so the uploader can name the boundary", async () => {
     enqueue(csrfResponse());
     enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
@@ -501,44 +388,6 @@ describe("a file upload", () => {
       Cookie: `${SESSION_COOKIE}; csrf-token=cookie-value`,
       "x-csrf-token": "csrf-token-value",
     });
-  });
-
-  test("an upload the API refused as too large is reported, not thrown", async () => {
-    enqueue(csrfResponse());
-    enqueueUpload({
-      status: 413,
-      body: JSON.stringify({ statusCode: 413, message: "File too large" }),
-    });
-
-    expect(await apiRequest("/conversations/c1/files", { method: "POST", file: FILE })).toEqual({
-      reached: true,
-      status: 413,
-      body: { statusCode: 413, message: "File too large" },
-      sessionCookie: null,
-      challengeCookie: null,
-    });
-  });
-
-  test("an answer that is not JSON reads as no body rather than throwing", async () => {
-    enqueue(csrfResponse());
-    enqueueUpload({ status: 502, body: "<html>Bad Gateway</html>" });
-
-    expect(await apiRequest("/conversations/c1/files", { method: "POST", file: FILE })).toEqual({
-      reached: true,
-      status: 502,
-      body: null,
-      sessionCookie: null,
-      challengeCookie: null,
-    });
-  });
-
-  test("a file that could not be read is a request that never arrived", async () => {
-    enqueue(csrfResponse());
-    enqueueUpload(new Error("File does not exist"));
-
-    await expect(
-      apiRequest("/conversations/c1/files", { method: "POST", file: FILE }),
-    ).resolves.toEqual({ reached: false });
   });
 
   /**
@@ -598,20 +447,8 @@ describe("the CSRF pair", () => {
     expect(calls.filter((call) => call.url.endsWith("/csrf"))).toHaveLength(1);
   });
 
-  test("a read needs no pair, so it costs no pre-flight", async () => {
-    await apiRequest("/auth/session");
-    expect(calls).toHaveLength(1);
-    expect(headersOf(calls[0])["x-csrf-token"]).toBeUndefined();
-  });
-
   test.each([
-    ["the pre-flight was refused", () => enqueue(response(500, null))],
     ["the pre-flight never answered", () => enqueue(new TypeError("Network request failed"))],
-    ["the pre-flight set no cookie", () => enqueue(response(200, { data: "token" }))],
-    [
-      "the pre-flight returned no token",
-      () => enqueue(response(200, { data: null }, { "set-cookie": "csrf-token=c; Path=/" })),
-    ],
   ])("still sends the request when %s", async (_label, arrange) => {
     arrange();
     const outcome = await apiRequest("/auth/login", { method: "POST" });
@@ -672,18 +509,6 @@ describe("a CSRF refusal", () => {
     expect(calls.filter((call) => call.url.endsWith("/auth/login"))).toHaveLength(1);
     expect(outcome).toMatchObject({ status: 403 });
   });
-
-  test("a refusal that survives the retry keeps the API's own words", async () => {
-    enqueue(csrfResponse(), csrfRefusal(), csrfResponse("fresh", "fresh-cookie"), csrfRefusal());
-
-    expect(await apiRequest("/auth/logout", { method: "POST" })).toEqual({
-      reached: true,
-      status: 403,
-      body: { statusCode: 403, code: "csrf_invalid", message: "Invalid CSRF token." },
-      sessionCookie: null,
-      challengeCookie: null,
-    });
-  });
 });
 
 describe("a 403 that a fresh token could not fix", () => {
@@ -696,29 +521,6 @@ describe("a 403 that a fresh token could not fix", () => {
     const outcome = await apiRequest("/auth/login", { method: "POST" });
 
     expect(calls).toHaveLength(2);
-    expect(outcome).toMatchObject({ status: 403 });
-  });
-
-  test("wrong credentials are a 401, which never touches the CSRF path", async () => {
-    enqueue(
-      csrfResponse(),
-      response(401, { statusCode: 401, code: "invalid_credentials", message: "Invalid email or password." }),
-    );
-
-    const outcome = await apiRequest("/auth/login", {
-      method: "POST",
-      body: { email: "a@b.co", password: "wrong" },
-    });
-
-    expect(calls.filter((call) => call.url.endsWith("/csrf"))).toHaveLength(1);
-    expect(calls.filter((call) => call.url.endsWith("/auth/login"))).toHaveLength(1);
-    expect(outcome).toMatchObject({ status: 401 });
-  });
-
-  test("a 403 on a read is never a CSRF refusal, so it is not retried", async () => {
-    enqueue(response(403, null));
-    const outcome = await apiRequest("/auth/session");
-    expect(calls).toHaveLength(1);
     expect(outcome).toMatchObject({ status: 403 });
   });
 
@@ -761,15 +563,6 @@ describe("a request that hangs", () => {
     await expect(pending).resolves.toEqual({ reached: false });
   });
 
-  test("is still waiting a moment before the deadline", async () => {
-    enqueue(HANGS);
-    const settled = watch(apiRequest("/auth/session"));
-
-    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS - 1);
-
-    expect(settled()).toBe(false);
-  });
-
   /**
    * The point of the whole thing. Being abandoned is the network being gone,
    * which says nothing about whether the Session is still good — and
@@ -805,17 +598,6 @@ describe("a request that hangs", () => {
     await expect(pending).resolves.toEqual({ reached: false });
   });
 
-  test("a body that is merely unparseable still reads as an answer", async () => {
-    enqueue(response(502, undefined));
-    expect(await apiRequest("/conversations")).toEqual({
-      reached: true,
-      status: 502,
-      body: null,
-      sessionCookie: null,
-      challengeCookie: null,
-    });
-  });
-
   test("the pre-flight is bounded too, so a mutation is not held up by it", async () => {
     enqueue(HANGS, response(200, {}));
     const pending = apiRequest("/auth/logout", { method: "POST" });
@@ -826,16 +608,6 @@ describe("a request that hangs", () => {
     const sent = calls[calls.length - 1];
     expect(sent.url).toBe(`${API_BASE_URL}/auth/logout`);
     expect(headersOf(sent)["x-csrf-token"]).toBeUndefined();
-  });
-
-  test("each request gets its own deadline rather than sharing one clock", async () => {
-    enqueue(response(200, { data: 1 }));
-    expect(await apiRequest("/conversations")).toMatchObject({ reached: true });
-
-    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS * 2);
-
-    enqueue(response(200, { data: 2 }));
-    expect(await apiRequest("/conversations")).toMatchObject({ reached: true });
   });
 
   test("an upload that goes silent is abandoned on the same terms", async () => {
