@@ -174,22 +174,42 @@ mobile has a transport of its own rather than the browser subscription route, se
 
 ### CI: the Android Release workflow
 
-`.github/workflows/android-release.yml` builds a release APK on every push to `main`, `dev` and
-`release`, and can be run by hand from *Actions → Android Release → Run workflow*. The manual run
-takes an optional version override and a *dry run* switch that builds without publishing.
+`.github/workflows/android-release.yml` builds a release APK when a **version tag** is pushed.
+Pushing to `main` (or any branch) builds nothing. It can also be run by hand from *Actions →
+Android Release → Run workflow*, which takes a *dry run* switch that builds without publishing.
 
-The branch picks the GitHub environment the build reads its values from, and where the APK goes:
+The tag prefix picks the GitHub environment the build reads its values from, and where the APK goes:
 
-| Branch | Environment | Release tag | Pre-release |
-| --- | --- | --- | --- |
-| `main` | Production | `joychat-v<version>` | no |
-| `dev` | Development | `joychat-development-v<version>` | yes |
-| `release` | Release | `joychat-release-v<version>` | yes |
-| any other (manual run) | Development | none, nothing is published | |
+| Tag | Environment | Pre-release |
+| --- | --- | --- |
+| `joychat-v<version>` | Production | no |
+| `joychat-development-v<version>` | Development | yes |
+| `joychat-release-v<version>` | Release | yes |
+| none (manual run from a branch) | Development | nothing is published |
 
-Each published run attaches `joychat-release.apk` to a GitHub Release and uploads the same file to
-the project's builds page on expo.dev. The version comes from `expo.version` in `app.json`. A push
-that does not bump it replaces the APK on the existing tag.
+Each tag run attaches `joychat-release.apk` to the GitHub Release for that tag (with generated
+notes) and uploads the same file to the project's builds page on expo.dev. The tag is the version,
+and `expo.version` in `app.json` must equal it, or the run fails in its first minute. A Production
+tag must also point at a commit that is on `main`.
+
+#### Cutting a release
+
+From a clean, up-to-date `main`:
+
+```bash
+pnpm release patch   # or minor / major / an explicit 1.4.0
+```
+
+```bash
+git push --follow-tags
+```
+
+`pnpm release` bumps `package.json`, syncs `app.json`, commits `chore(release): X.Y.Z` and creates
+the `joychat-vX.Y.Z` tag. Pushing the tag starts the build. For a Development or Release build, run
+`npm version <bump> --tag-version-prefix=joychat-development-v` (or `joychat-release-v`) instead.
+
+To retry a failed run, use *Re-run failed jobs* on it, or run the workflow from the tag in the
+Actions tab. Re-pushing the same tag replaces the APK on its Release.
 
 The build runs `eas build --platform android --profile production --local` on an `ubuntu-latest`
 runner, which is the same command as `pnpm build:apk:eas`. It uses no EAS build credits, but the NDK

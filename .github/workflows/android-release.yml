@@ -1,5 +1,6 @@
-# Builds the Android APK on the runner with Gradle, publishes it as a GitHub
-# Release asset (tag `joychat-v<X.Y.Z>`, asset `joychat-release.apk`), and
+# Builds the Android APK on the runner with Gradle when a version tag is pushed,
+# publishes it as a GitHub Release asset on that tag (`joychat-v<X.Y.Z>`, asset
+# `joychat-release.apk`), and
 # uploads the same file to the project's builds page at expo.dev.
 #
 # The build runs through `eas build --platform android --profile production
@@ -70,23 +71,26 @@
 # and `credentials.json` names a committed copy of that same template keystore.
 # It is committed because it is not a secret; a real one would not be.
 #
-# Triggers on every push to main, dev and release, and the branch picks the
-# environment the build reads its values from (see `target`). Within a branch,
-# the version in app.json is what decides whether a run publishes something
-# new. A push that does not bump `expo.version` replaces the APK on the tag that
-# is already there.
+# Triggers on a pushed version tag, not on a branch push, so merging to main
+# builds nothing. The tag is the release: its prefix picks the environment the
+# build reads its values from (see `target`) and the rest of it is the version.
+# `expo.version` in app.json has to agree with the tag, and `meta` fails the run
+# in seconds when it does not. `pnpm release` bumps it, commits and tags in one
+# step, so the two cannot drift.
+#
+# Pushing the same tag again (deleting and re-creating it on a new commit)
+# replaces the APK on the existing GitHub Release.
 
 name: Android Release
 
 on:
   push:
-    branches: [main, dev, release]
+    tags:
+      - 'joychat-v[0-9]+.[0-9]+.[0-9]+'
+      - 'joychat-development-v[0-9]+.[0-9]+.[0-9]+'
+      - 'joychat-release-v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
-      version:
-        description: Override the version (default = expo.version in app.json)
-        required: false
-        type: string
       dry_run:
         description: Build only — upload the APK as a run artifact and publish no Release
         required: false
@@ -103,10 +107,9 @@ permissions:
   contents: read
 
 env:
-  # Only a convention today. If an update check is ever added, this is the
-  # prefix it has to look for. Production's tags use it as it is; `target`
-  # puts the environment in front of the `v` for the others, so no Development
-  # or Release tag starts with it.
+  # Production's tags start with this as it is; `target` puts the environment in
+  # front of the `v` for the others, so no Development or Release tag starts
+  # with it. The `on.push.tags` patterns above have to agree with this.
   RELEASE_TAG_PREFIX: joychat-v
 
   # One ABI. See ANDROID_ABIS in scripts/build-apk.mjs.
@@ -121,7 +124,7 @@ env:
 # throws at import, giving an APK that installs and dies on launch rather than
 # a build that fails here.
 #
-# They are *variables* on the branch's environment, not secrets: an
+# They are *variables* on the tag's environment, not secrets: an
 # `EXPO_PUBLIC_*` value is inlined into the shipped bundle by definition, so
 # anyone holding the APK can read it, and hiding it in the log would only make
 # it harder to check. A job sees an environment's values only when it names
@@ -131,19 +134,23 @@ env:
 # deployment record; `release` is the one that counts as the deployment.
 
 jobs:
-  # The branch decides the environment:
+  # The tag decides the environment:
   #
-  #   main    -> Production   tag joychat-v<X.Y.Z>
-  #   dev     -> Development  tag joychat-development-v<X.Y.Z>, a pre-release
-  #   release -> Release      tag joychat-release-v<X.Y.Z>, a pre-release
+  #   joychat-v<X.Y.Z>              -> Production   the repository's "latest" Release
+  #   joychat-development-v<X.Y.Z>  -> Development  a pre-release
+  #   joychat-release-v<X.Y.Z>      -> Release      a pre-release
   #
   # Separate tags, because `release` replaces the asset on a tag that already
-  # exists, so a shared tag would let a dev push overwrite the Production APK.
+  # exists, so a shared tag would let a dev build overwrite the Production APK.
   # Pre-releases, so the repository's "latest" Release stays Production's.
   #
-  # A dispatch from any other branch builds with Development's values and
-  # publishes nothing, so a change to this file can still be tried on a branch
-  # without reaching any environment's Release or Expo.
+  # A dispatch from a branch, or from a tag that matches none of the above,
+  # builds with Development's values and publishes nothing, so a change to this
+  # file can still be tried on a branch without reaching any environment's
+  # Release or Expo.
+  #
+  # A dispatch from a version tag behaves like the tag push, so a failed run
+  # can be retried from Actions without deleting and re-pushing the tag.
   target:
     name: Resolve environment
     runs-on: ubuntu-latest
@@ -159,14 +166,14 @@ jobs:
         run: |
           set -euo pipefail
           PUBLISH=true
-          case "$GITHUB_REF_NAME" in
-            main)    ENVIRONMENT=Production ;;
-            dev)     ENVIRONMENT=Development ;;
-            release) ENVIRONMENT=Release ;;
+          case "${GITHUB_REF_TYPE}:${GITHUB_REF_NAME}" in
+            tag:joychat-development-v*) ENVIRONMENT=Development ;;
+            tag:joychat-release-v*)     ENVIRONMENT=Release ;;
+            tag:joychat-v*)             ENVIRONMENT=Production ;;
             *)
               ENVIRONMENT=Development
               PUBLISH=false
-              echo "::notice::Branch ${GITHUB_REF_NAME} has no environment. Building with Development's values and publishing nothing."
+              echo "::notice::${GITHUB_REF_NAME} is not a version tag. Building with Development's values and publishing nothing."
               ;;
           esac
 
@@ -191,8 +198,9 @@ jobs:
           echo "${GITHUB_REF_NAME} builds for ${ENVIRONMENT}, tag prefix ${TAG_PREFIX}, publish ${PUBLISH}"
 
   # Everything that can be decided before anything slow starts. Ten seconds, and
-  # both failures it catches — a missing environment variable, a version that
-  # is not X.Y.Z — would otherwise surface at the end of a 40-minute build.
+  # the failures it catches — a missing environment variable, a tag that does
+  # not agree with app.json, a Production tag cut off main — would otherwise
+  # surface at the end of a 40-minute build, or worse, not at all.
   meta:
     name: Check config, resolve version
     needs: [target]
@@ -213,7 +221,21 @@ jobs:
       title: ${{ steps.meta.outputs.title }}
 
     steps:
+      # Full history, for the ancestry check below.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A tag can be pushed from any commit, and the branch used to be what kept
+      # Production builds on main. This puts that back: a joychat-v tag has to
+      # point at a commit main already contains.
+      - name: Require a Production tag to be on main
+        if: ${{ needs.target.outputs.environment == 'Production' && needs.target.outputs.publish == 'true' }}
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::${GITHUB_REF_NAME} points at ${GITHUB_SHA}, which is not on main. Merge it to main and tag from there."
+            exit 1
+          fi
 
       # The failure this prevents is an APK that looks fine and crashes on the
       # first screen.
@@ -229,26 +251,37 @@ jobs:
             echo "::warning::EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID is not set on the ${ENVIRONMENT} environment. The build succeeds and Google sign-in is disabled in it."
           fi
 
-      # app.json is the one place a version is written, so the tag, the title
-      # and the asset name are all derived from it rather than repeated here.
+      # The tag is the release and names its own version. app.json has to say
+      # the same, because that is the versionName the APK is built with; a
+      # disagreement means the tag was cut before the bump was committed, and
+      # the APK would report a version other than the one it is published as.
+      # The title and the asset name are derived from here rather than repeated.
+      #
+      # A run that is not on a version tag (a manual run from a branch) has no
+      # tag to name it, so it takes app.json's version and publishes nothing.
       - name: Resolve version and names
         id: meta
-        # Through the environment rather than interpolated into the script, so a
-        # dispatch input arrives at `sh` as a string and not as more script.
         env:
-          INPUT_VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ needs.target.outputs.publish }}
           TAG_PREFIX: ${{ needs.target.outputs.tag_prefix }}
           LABEL: ${{ needs.target.outputs.label }}
         run: |
           set -euo pipefail
 
-          if [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
+          APP_VERSION="$(node -p "require('./app.json').expo.version")"
+          if [ "$PUBLISH" = true ]; then
+            TAG="$GITHUB_REF_NAME"
+            VERSION="${TAG#"$TAG_PREFIX"}"
           else
-            VERSION="$(node -p "require('./app.json').expo.version")"
+            TAG=""
+            VERSION="$APP_VERSION"
           fi
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Version must be X.Y.Z, got \"$VERSION\". Set expo.version in app.json."
+            echo "::error::Version must be X.Y.Z, got \"$VERSION\". Tags look like ${TAG_PREFIX}1.2.3."
+            exit 1
+          fi
+          if [ "$VERSION" != "$APP_VERSION" ]; then
+            echo "::error::${TAG} says ${VERSION} but expo.version in app.json is ${APP_VERSION}. Delete the tag, commit the bump, and tag again (pnpm release does all three in the right order)."
             exit 1
           fi
 
@@ -269,12 +302,12 @@ jobs:
 
           {
             echo "version=$VERSION"
-            echo "tag=${TAG_PREFIX}${VERSION}"
+            echo "tag=${TAG}"
             echo "apk=${APK_BASE}-release.apk"
             echo "title=${APP_NAME} Android ${VERSION}${LABEL}"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Version $VERSION → tag ${TAG_PREFIX}${VERSION}, asset ${APK_BASE}-release.apk"
+          echo "Version $VERSION → tag ${TAG:-none}, asset ${APK_BASE}-release.apk"
 
   # The long one. Nothing here publishes anything, so it can be re-run as often
   # as a flaky NDK compile needs without touching a Release or a tag.
@@ -343,7 +376,7 @@ jobs:
 
       # The `production` profile in eas.json carries its own EXPO_PUBLIC_*
       # values, and EAS spreads a profile's `env` over the runner's
-      # (`@expo/build-tools`, dist/context.js), so without this every branch
+      # (`@expo/build-tools`, dist/context.js), so without this every environment
       # would bundle what eas.json says. This rewrites the profile in the
       # runner's checkout only. Nothing is committed, and a local
       # `pnpm build:apk:eas` still reads eas.json as it is.
@@ -440,18 +473,17 @@ jobs:
   # Seconds, and the only job that writes anything to GitHub. Re-run this one
   # alone when a release fails; the APK it needs is still attached to the run.
   #
-  # Two guards, and the branch one is the load-bearing half: a dispatch can name
-  # any branch, so a build tried on one that `target` does not map publishes
-  # nothing and cannot touch a tag. That also means testing a change to this
-  # file needs no new dispatch input — which matters, because GitHub validates
-  # dispatch inputs against the workflow on the DEFAULT branch, so `dry_run` is
-  # not accepted until this file is on main. `build` still runs in full either
-  # way and still uploads the APK, so a branch run leaves something to install
-  # and test.
+  # Two guards, and the `publish` one is the load-bearing half: a dispatch can
+  # name any branch, so a build tried on one that `target` does not map
+  # publishes nothing and cannot touch a tag. That also means testing a change
+  # to this file needs no new dispatch input — which matters, because GitHub
+  # validates dispatch inputs against the workflow on the DEFAULT branch, so
+  # `dry_run` is not accepted until this file is on main. `build` still runs in
+  # full either way and still uploads the APK, so a branch run leaves something
+  # to install and test.
   #
-  # dry_run is then the way to suppress a release from main, dev or release
-  # itself. `inputs` is empty on a push, so the negation leaves an ordinary
-  # release alone.
+  # dry_run is then the way to suppress a release from a version tag. `inputs`
+  # is empty on a tag push, so the negation leaves an ordinary release alone.
   release:
     name: Publish the Release
     needs: [target, meta, build]
@@ -459,7 +491,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Reads nothing from the environment. Naming it is what records a published
-    # Release as a deployment to the branch's environment, the way `deploy`
+    # Release as a deployment to the tag's environment, the way `deploy`
     # does in the web repos.
     environment: ${{ needs.target.outputs.environment }}
 
@@ -486,28 +518,33 @@ jobs:
           PRERELEASE: ${{ needs.target.outputs.prerelease }}
         run: |
           set -euo pipefail
-          NOTES="JoyChat Android ${VERSION} (${ANDROID_ABIS}, debug-signed). Built from ${GITHUB_SHA} on ${GITHUB_REF_NAME}."
+          NOTES="JoyChat Android ${VERSION} (${ANDROID_ABIS}, debug-signed). Built from ${GITHUB_SHA}."
 
           FLAGS=()
           if [ "$PRERELEASE" = true ]; then
             FLAGS+=(--prerelease)
           fi
 
-          # --clobber, so a second push on an unchanged version replaces the
-          # asset rather than failing on a name that is already taken.
+          # The tag is already there — it is what started this run — so nothing
+          # here creates one. `--verify-tag` makes that a failure rather than a
+          # silent tag off the default branch, should it ever not be.
           #
-          # --target, because a tag that does not exist yet is otherwise cut
-          # from the default branch, which for a dev or release push is not the
-          # commit that was built.
+          # --clobber, so a re-run of the same tag replaces the asset rather
+          # than failing on a name that is already taken. The edit leaves the
+          # notes alone, so a re-run does not overwrite the generated changelog.
+          #
+          # --generate-notes puts the commits and PRs since the previous release
+          # under NOTES, which is what a versioned release is for.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "dist/${APK}" --repo "$GITHUB_REPOSITORY" --clobber
-            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES" "${FLAGS[@]}"
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" "${FLAGS[@]}"
           else
             gh release create "$TAG" "dist/${APK}" \
               --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" \
+              --verify-tag \
               --title "$TITLE" \
               --notes "$NOTES" \
+              --generate-notes \
               "${FLAGS[@]}"
           fi
 

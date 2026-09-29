@@ -75,6 +75,8 @@
     "start:tunnel": "pnpm exec expo start -c --tunnel",
     "lint": "expo lint",
     "test": "jest --watchAll=false",
+    "release": "npm version --tag-version-prefix=joychat-v --message=\"chore(release): %s\"",
+    "version": "node scripts/sync-app-version.mjs && git add app.json",
     "build:android": "eas build --platform android --profile preview",
     "build:apk": "node scripts/build-apk.mjs",
     "eas-build-post-install": "node scripts/eas-local-properties.mjs",
