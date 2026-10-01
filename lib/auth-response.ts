@@ -141,6 +141,9 @@ const DEFAULT_LINK_REQUEST_REFUSAL =
  */
 const CREDENTIAL_REFUSED = new Set([401, 403]);
 
+/** The API's code for a session refused because its account is banned (`BannedUserInterceptor`). */
+const BANNED_CODE = "user_banned";
+
 /**
  * A CSRF refusal arrives as a 403, which would otherwise read as "your credential
  * is no good". `lib/api-client` already refreshes the pair and retries once, so a
@@ -393,6 +396,15 @@ export function interpretMagicLinkRequest(
  */
 export function interpretSession(outcome: HttpOutcome, cookie: string): AuthOutcome {
   if (!outcome.reached) return { kind: "transport-failure" };
+
+  // A 403 on this route is a verdict on the credential only when the API says
+  // so. The one 403 it raises for a session is a banned account; any other — a
+  // proxy, a firewall, a gateway answering for a server it could not reach —
+  // says nothing about the cookie, and erasing it signed people out at launch.
+  if (outcome.status === 403 && asRecord(outcome.body)?.code !== BANNED_CODE) {
+    const message = nonEmptyString(asRecord(outcome.body)?.message);
+    return { kind: "server-error", message: message ?? DEFAULT_SERVER_ERROR };
+  }
 
   if (outcome.status < 200 || outcome.status >= 300) {
     return refusal(outcome.status, outcome.body);

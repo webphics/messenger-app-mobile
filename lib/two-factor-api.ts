@@ -1,6 +1,10 @@
 import { asRecord } from "@/lib/api-envelope";
 import { readOutcome, type ApiResult } from "@/lib/api-result";
-import { authenticatedRequest } from "@/lib/auth-service";
+import {
+  adoptReplacedSessionCookie,
+  authenticatedRequest,
+  currentCredentialEpoch,
+} from "@/lib/auth-service";
 import { writeKeptPerson } from "@/lib/keychain";
 import { getSessionUser, setSessionUser } from "@/lib/session";
 import type { SessionUser } from "@/lib/types";
@@ -121,6 +125,7 @@ function parseBackupCodes(data: unknown): string[] | null {
 export async function disableTwoFactor(
   password: string | null,
 ): Promise<ApiResult<SessionUser>> {
+  const startedAt = currentCredentialEpoch();
   const outcome = await authenticatedRequest(DISABLE_PATH, {
     method: "POST",
     body: twoFactorBody(password),
@@ -132,6 +137,10 @@ export async function disableTwoFactor(
   );
 
   if (result.ok) {
+    // The API ended the session this request carried and answered with its
+    // successor. Held before anything else is written, so the next request
+    // already carries the cookie that still works.
+    await adoptReplacedSessionCookie(outcome, startedAt);
     setSessionUser(result.value);
     await writeKeptPerson(result.value);
   }

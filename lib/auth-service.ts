@@ -514,6 +514,32 @@ export function onSessionExpired(listener: () => void): () => void {
  * password or a cold start that found a stale cookie rather than a session ending
  * under someone.
  */
+/**
+ * Take on the Session cookie a request answered with, in place of the one it was sent with.
+ *
+ * For the one authenticated route that replaces the session under a person who stays signed in:
+ * turning two-factor off ends the session the request carried and starts its successor. Keeping
+ * the old cookie meant the next request came back 401 and signed the person out.
+ *
+ * Bound to the epoch the request started in, like every other credential write: a sign-out that
+ * landed while the request was in flight wins, and nothing is written behind it.
+ */
+export async function adoptReplacedSessionCookie(
+  outcome: HttpOutcome,
+  startedAt: number,
+): Promise<void> {
+  if (!outcome.reached || !outcome.sessionCookie) return;
+  if (startedAt !== credentialEpoch) return;
+
+  setSessionCookie(outcome.sessionCookie);
+  await writeSessionCookie(outcome.sessionCookie);
+}
+
+/** The current credential epoch, for a caller that will hand it back to `adoptReplacedSessionCookie`. */
+export function currentCredentialEpoch(): number {
+  return credentialEpoch;
+}
+
 export async function authenticatedRequest(
   path: string,
   options: ApiRequestOptions = {},

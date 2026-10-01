@@ -1,4 +1,7 @@
-import { authenticatedRequest } from "@/lib/auth-service";
+import {
+  adoptReplacedSessionCookie,
+  authenticatedRequest,
+} from "@/lib/auth-service";
 import { writeKeptPerson } from "@/lib/keychain";
 import { getSessionUser, setSessionUser } from "@/lib/session";
 import { disableTwoFactor, generateBackupCodes } from "@/lib/two-factor-api";
@@ -9,13 +12,20 @@ import { disableTwoFactor, generateBackupCodes } from "@/lib/two-factor-api";
  * function was called. `lib/session` is deliberately real rather than mocked.
  */
 
-jest.mock("@/lib/auth-service", () => ({ authenticatedRequest: jest.fn() }));
+jest.mock("@/lib/auth-service", () => ({
+  authenticatedRequest: jest.fn(),
+  adoptReplacedSessionCookie: jest.fn(),
+  currentCredentialEpoch: jest.fn(() => 0),
+}));
 jest.mock("@/lib/keychain", () => ({ writeKeptPerson: jest.fn() }));
 
 const request = authenticatedRequest as jest.MockedFunction<
   typeof authenticatedRequest
 >;
 const kept = writeKeptPerson as jest.MockedFunction<typeof writeKeptPerson>;
+const adopt = adoptReplacedSessionCookie as jest.MockedFunction<
+  typeof adoptReplacedSessionCookie
+>;
 
 /** Who the device thought was signed in: two-factor on, and a password. */
 const PROTECTED_PERSON = {
@@ -89,6 +99,20 @@ describe("two-factor that was turned off", () => {
     );
   });
 
+  test("the session the API replaced it with is the one held from now on", async () => {
+    // Turning the factor off ends the session the request carried; keeping its
+    // cookie signed the person out on their next request.
+    const outcome = {
+      ...answered({ status: true }),
+      sessionCookie: "better-auth.session_token=successor",
+    };
+    request.mockResolvedValueOnce(outcome);
+
+    await disableTwoFactor("hunter2");
+
+    expect(adopt).toHaveBeenCalledWith(outcome, 0);
+  });
+
   test("a `false` status is not a factor that was turned off", async () => {
     // Somebody must not be told their factor is off while it is on.
     request.mockResolvedValueOnce(answered({ status: false }));
@@ -98,6 +122,7 @@ describe("two-factor that was turned off", () => {
     expect(result).toEqual({ ok: false, failure: { kind: "malformed" } });
     expect(getSessionUser()).toEqual(PROTECTED_PERSON);
     expect(kept).not.toHaveBeenCalled();
+    expect(adopt).not.toHaveBeenCalled();
   });
 
   test("a refused disable changes nothing", async () => {

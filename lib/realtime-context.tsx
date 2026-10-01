@@ -248,6 +248,13 @@ function useRealtimeConnection(): RealtimeValue {
       if (answered) emit({ kind: 'group-join-answered', groupId: answered.groupId })
     })
 
+    // A membership changed on somebody else's device (an admin placing this
+    // Customer), so the organizations every list was built from are stale. The
+    // same full re-read a reconnect asks for, rather than a second path to it.
+    socket.on(REALTIME_EVENTS.membershipChanged, () => {
+      emit({ kind: 'resync' })
+    })
+
     return () => {
       socket.removeAllListeners()
       socket.disconnect()

@@ -313,6 +313,29 @@ describe("interpretSession", () => {
     });
   });
 
+  test("a banned account's 403 is unauthorised", () => {
+    const outcome: HttpOutcome = {
+      reached: true,
+      status: 403,
+      body: { statusCode: 403, code: "user_banned", message: "Your account has been banned" },
+      sessionCookie: null,
+    };
+    expect(interpretSession(outcome, HELD)).toEqual({
+      kind: "unauthorised",
+      message: "Your account has been banned",
+    });
+  });
+
+  test("a 403 the API did not code is a server error, so the cookie survives a proxy's refusal", () => {
+    const outcome: HttpOutcome = {
+      reached: true,
+      status: 403,
+      body: null,
+      sessionCookie: null,
+    };
+    expect(interpretSession(outcome, HELD).kind).toBe("server-error");
+  });
+
   test("an unanswered request is a transport failure, which is not the same as a dead cookie", () => {
     expect(interpretSession({ reached: false }, HELD)).toEqual({
       kind: "transport-failure",

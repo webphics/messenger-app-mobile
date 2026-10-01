@@ -50,6 +50,12 @@ export const REALTIME_EVENTS = {
    * see `parseGroupJoinRequestAnswered`.
    */
   notificationCreated: 'notification.created',
+  /**
+   * Somebody else added this person to an organization or removed them from
+   * one. Carries only the organization id: what this app shows for it (the
+   * Support DM rows, the Onboarding thread, the Wall) is re-read from REST.
+   */
+  membershipChanged: 'membership.changed',
 } as const
 
 export type MessageCreated = {
