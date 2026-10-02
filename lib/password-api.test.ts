@@ -32,7 +32,7 @@ const kept = writeKeptPerson as jest.MockedFunction<typeof writeKeptPerson>;
 const WITHOUT_PASSWORD = {
   id: "7",
   name: "Ada Lovelace",
-  email: "ada@joychat.test",
+  email: "ada@chatroute.test",
   role: "customer" as const,
   hasPassword: false,
   twoFactorEnabled: false,

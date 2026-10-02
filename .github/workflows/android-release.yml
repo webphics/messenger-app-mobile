@@ -1,6 +1,6 @@
 # Builds the Android APK on the runner with Gradle when a version tag is pushed,
-# publishes it as a GitHub Release asset on that tag (`joychat-v<X.Y.Z>`, asset
-# `joychat-release.apk`), and
+# publishes it as a GitHub Release asset on that tag (`chatroute-v<X.Y.Z>`, asset
+# `chatroute-release.apk`), and
 # uploads the same file to the project's builds page at expo.dev.
 #
 # The build runs through `eas build --platform android --profile production
@@ -86,9 +86,9 @@ name: Android Release
 on:
   push:
     tags:
-      - 'joychat-v[0-9]+.[0-9]+.[0-9]+'
-      - 'joychat-development-v[0-9]+.[0-9]+.[0-9]+'
-      - 'joychat-release-v[0-9]+.[0-9]+.[0-9]+'
+      - 'chatroute-v[0-9]+.[0-9]+.[0-9]+'
+      - 'chatroute-development-v[0-9]+.[0-9]+.[0-9]+'
+      - 'chatroute-release-v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -110,7 +110,7 @@ env:
   # Production's tags start with this as it is; `target` puts the environment in
   # front of the `v` for the others, so no Development or Release tag starts
   # with it. The `on.push.tags` patterns above have to agree with this.
-  RELEASE_TAG_PREFIX: joychat-v
+  RELEASE_TAG_PREFIX: chatroute-v
 
   # One ABI. See ANDROID_ABIS in scripts/build-apk.mjs.
   ANDROID_ABIS: arm64-v8a
@@ -136,9 +136,9 @@ env:
 jobs:
   # The tag decides the environment:
   #
-  #   joychat-v<X.Y.Z>              -> Production   the repository's "latest" Release
-  #   joychat-development-v<X.Y.Z>  -> Development  a pre-release
-  #   joychat-release-v<X.Y.Z>      -> Release      a pre-release
+  #   chatroute-v<X.Y.Z>              -> Production   the repository's "latest" Release
+  #   chatroute-development-v<X.Y.Z>  -> Development  a pre-release
+  #   chatroute-release-v<X.Y.Z>      -> Release      a pre-release
   #
   # Separate tags, because `release` replaces the asset on a tag that already
   # exists, so a shared tag would let a dev build overwrite the Production APK.
@@ -167,9 +167,9 @@ jobs:
           set -euo pipefail
           PUBLISH=true
           case "${GITHUB_REF_TYPE}:${GITHUB_REF_NAME}" in
-            tag:joychat-development-v*) ENVIRONMENT=Development ;;
-            tag:joychat-release-v*)     ENVIRONMENT=Release ;;
-            tag:joychat-v*)             ENVIRONMENT=Production ;;
+            tag:chatroute-development-v*) ENVIRONMENT=Development ;;
+            tag:chatroute-release-v*)     ENVIRONMENT=Release ;;
+            tag:chatroute-v*)             ENVIRONMENT=Production ;;
             *)
               ENVIRONMENT=Development
               PUBLISH=false
@@ -227,7 +227,7 @@ jobs:
           fetch-depth: 0
 
       # A tag can be pushed from any commit, and the branch used to be what kept
-      # Production builds on main. This puts that back: a joychat-v tag has to
+      # Production builds on main. This puts that back: a chatroute-v tag has to
       # point at a commit main already contains.
       - name: Require a Production tag to be on main
         if: ${{ needs.target.outputs.environment == 'Production' && needs.target.outputs.publish == 'true' }}
@@ -518,7 +518,7 @@ jobs:
           PRERELEASE: ${{ needs.target.outputs.prerelease }}
         run: |
           set -euo pipefail
-          NOTES="JoyChat Android ${VERSION} (${ANDROID_ABIS}, debug-signed). Built from ${GITHUB_SHA}."
+          NOTES="ChatRoute Android ${VERSION} (${ANDROID_ABIS}, debug-signed). Built from ${GITHUB_SHA}."
 
           FLAGS=()
           if [ "$PRERELEASE" = true ]; then

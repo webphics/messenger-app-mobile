@@ -4,7 +4,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { Platform, Text as RNText, type Role } from 'react-native';
 
-/** JoyChat type roles — size/weight/leading only; color stays on the caller. */
+/** ChatRoute type roles — size/weight/leading only; color stays on the caller. */
 const textVariants = cva(
   cn(
     'font-sans text-foreground',

@@ -1,5 +1,5 @@
 {
-  "name": "joychat",
+  "name": "chatroute",
   "main": "expo-router/entry",
   "version": "1.0.3",
   "packageManager": "pnpm@11.3.0",
@@ -75,13 +75,13 @@
     "start:tunnel": "pnpm exec expo start -c --tunnel",
     "lint": "expo lint",
     "test": "jest --watchAll=false",
-    "release": "npm version --tag-version-prefix=joychat-v --message=\"chore(release): %s\"",
+    "release": "npm version --tag-version-prefix=chatroute-v --message=\"chore(release): %s\"",
     "version": "node scripts/sync-app-version.mjs && git add app.json",
     "build:android": "eas build --platform android --profile preview",
     "build:apk": "node scripts/build-apk.mjs",
     "eas-build-post-install": "node scripts/eas-local-properties.mjs",
-    "build:apk:eas": "eas build --platform android --profile production --local --non-interactive --output dist/joychat-release.apk",
-    "build:apk:emulator": "eas build --platform android --profile emulator --local --non-interactive --output dist/joychat-emulator.apk"
+    "build:apk:eas": "eas build --platform android --profile production --local --non-interactive --output dist/chatroute-release.apk",
+    "build:apk:emulator": "eas build --platform android --profile emulator --local --non-interactive --output dist/chatroute-emulator.apk"
   },
   "jest": {
     "preset": "jest-expo",

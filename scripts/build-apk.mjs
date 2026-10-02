@@ -186,6 +186,6 @@ if (!existsSync(apk)) {
 }
 const dist = join(root, "dist");
 mkdirSync(dist, { recursive: true });
-const out = join(dist, "joychat-release.apk");
+const out = join(dist, "chatroute-release.apk");
 copyFileSync(apk, out);
 console.log(`APK: ${out}`);

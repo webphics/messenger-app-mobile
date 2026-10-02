@@ -57,6 +57,9 @@ import type { SeedAccount } from "@/lib/seed-accounts";
 import { CHALLENGE_COPY, codeError } from "@/lib/two-factor-challenge";
 import { colors, screenTopPad } from "@/lib/tokens";
 
+/** `brand-lockup.png` is 900x587; the mark sits above the wordmark. */
+const BRAND_LOCKUP_ASPECT = 900 / 587;
+
 /**
  * The only way into the app, in the three steps the web client asks in
  * (`login-form.tsx`, `type LoginStep`).
@@ -598,16 +601,17 @@ export function SignInForm() {
           entering={settleDownEnter(!!reduceMotion)}
           className="items-center"
         >
+          {/* The delivered stacked lockup, as one image: the wordmark's R is a
+              drawn glyph rather than a letter in any font, so the name is never
+              typeset beside the mark. */}
           <Image
-            source={require("../../assets/images/logo.png")}
-            accessibilityLabel="JoyChat"
-            className="mb-3 h-20 w-28"
+            source={require("../../assets/images/brand-lockup.png")}
+            accessibilityRole="image"
+            accessibilityLabel="ChatRoute"
+            style={{ width: 176, height: 176 / BRAND_LOCKUP_ASPECT }}
             resizeMode="contain"
           />
-          <Text variant="display" className="text-center text-ink">
-            JoyChat
-          </Text>
-          <Text variant="meta" className="mt-1 text-center text-muted">
+          <Text variant="meta" className="mt-3 text-center text-muted">
             Internal Support & Team Collaboration
           </Text>
         </Animated.View>

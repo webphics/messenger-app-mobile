@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "JoyChat",
+    "name": "ChatRoute",
     "slug": "joychat",
     "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "joychat",
+    "scheme": ["chatroute", "joychat"],
     "userInterfaceStyle": "light",
     "updates": {
       "enabled": false
@@ -18,7 +18,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/android-icon-foreground.png"
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": ["android.permission.READ_MEDIA_AUDIO"],

@@ -96,7 +96,7 @@ export function SettingsScreen() {
             Application
           </Text>
           <Text variant="label" className="font-medium text-ink-soft">
-            JoyChat v1.0.0
+            ChatRoute v1.0.0
           </Text>
         </View>
 

@@ -47,11 +47,11 @@ const EXCLUSIONS = [
   { domain: "file", path: STORE_DIRECTORY },
 ]
 
-const BACKUP_RULES_FILE = "joychat_backup_rules.xml"
-const DATA_EXTRACTION_RULES_FILE = "joychat_data_extraction_rules.xml"
+const BACKUP_RULES_FILE = "chatroute_backup_rules.xml"
+const DATA_EXTRACTION_RULES_FILE = "chatroute_data_extraction_rules.xml"
 
-const BACKUP_RULES_RESOURCE = "@xml/joychat_backup_rules"
-const DATA_EXTRACTION_RULES_RESOURCE = "@xml/joychat_data_extraction_rules"
+const BACKUP_RULES_RESOURCE = "@xml/chatroute_backup_rules"
+const DATA_EXTRACTION_RULES_RESOURCE = "@xml/chatroute_data_extraction_rules"
 
 const SECURE_STORE_BACKUP_RULES_RESOURCE = "@xml/secure_store_backup_rules"
 const SECURE_STORE_DATA_EXTRACTION_RULES_RESOURCE = "@xml/secure_store_data_extraction_rules"
@@ -135,7 +135,7 @@ function backupAttributes(current) {
  * `expo-sqlite` will open the database in is created here, before anything has
  * opened one, and marked.
  */
-const EXCLUSION_FUNCTION = "joychatExcludeStoreFromBackup"
+const EXCLUSION_FUNCTION = "chatrouteExcludeStoreFromBackup"
 
 const LAUNCH_ANCHOR =
   "return super.application(application, didFinishLaunchingWithOptions: launchOptions)"

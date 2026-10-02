@@ -1,4 +1,4 @@
-# JoyChat (internal support messenger) — scope
+# ChatRoute (internal support messenger) — scope
 
 Self-contained internal chat for support. Users log in. Three roles:
 

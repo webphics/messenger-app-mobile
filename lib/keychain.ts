@@ -14,7 +14,14 @@ import type { SessionUser } from "@/lib/types";
  * time. Callers get a boolean when it matters and never a rejection.
  */
 
-/** Namespaced so it cannot collide with anything a later feature stores. */
+/**
+ * Namespaced so it cannot collide with anything a later feature stores.
+ *
+ * The namespace is the product's former name, JoyChat, and stays that way: a key
+ * is how an installed phone finds its cookie, so renaming it to ChatRoute would
+ * sign every existing install out on its next launch. The same goes for the
+ * Kept person below.
+ */
 export const SESSION_COOKIE_KEY = "joychat.session_cookie";
 
 /**

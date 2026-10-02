@@ -1,10 +1,10 @@
-# JoyChat (Expo mobile)
+# ChatRoute (Expo mobile)
 
 Internal support messenger mobile client. This repo is Expo-only; web and API live elsewhere.
 
 ## Language
 
-**JoyChat**:
+**ChatRoute**:
 The product brand shown on launcher, auth, and hub wordmarks.
 _Avoid_: Messenger (as product name), Casewire, ISM
 
@@ -461,7 +461,7 @@ single Post. Absent entirely when the Wall is empty or could not be read.
 _Avoid_: Feed, highlights (as a product surface), Wall preview
 
 **Launch screen**:
-The still JoyChat mark on the cold-start screen, shown while the session hydrates and the first Conversation fetch runs. It is `components/ui/app-loading-screen`, and it hides the native splash once the mark has decoded.
+The still ChatRoute mark on the cold-start screen, shown while the session hydrates and the first Conversation fetch runs. It is `components/ui/app-loading-screen`, and it hides the native splash once the mark has decoded.
 _Avoid_: Splash screen (that is the separate native `expo-splash-screen` surface this screen dismisses), launch animation (there is no animation any more)
 
 **Launch gate**:

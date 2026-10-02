@@ -4,11 +4,15 @@ import { Image, View } from "react-native";
 
 // import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // hidden with the agent stack
 import { TactilePressable } from "@/components/ui/tactile-pressable";
-import { Text } from "@/components/ui/text";
+// import { Text } from "@/components/ui/text"; // hidden with the agent stack
 // import { initials } from "@/lib/display"; // hidden with the agent stack
 // import { getSession } from "@/lib/session"; // hidden with the agent stack
 // import { PEOPLE } from "@/lib/mock-data"; // hidden with the agent stack
 import { colors } from "@/lib/tokens";
+
+/** Intrinsic ratios of `brand-mark.png` (600x447) and `brand-wordmark.png` (1200x196). */
+const BRAND_MARK_ASPECT = 600 / 447;
+const BRAND_WORDMARK_ASPECT = 1200 / 196;
 
 type HubHeaderProps = {
   settingsHref: Href;
@@ -23,17 +27,25 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
 
   return (
     <View className="flex-row items-center justify-between">
-      {/* Brand Logo & Name */}
-      <View className="flex-row items-center gap-2">
+      {/* The mark and the wordmark, side by side. Both are images: the
+          wordmark's R is drawn, so typing the name would lose it. One label for
+          the pair, since they say one thing. */}
+      <View
+        className="flex-row items-center gap-2"
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel="ChatRoute"
+      >
         <Image
-          source={require("../../assets/images/logo.png")}
-          accessibilityLabel="JoyChat Logo"
-          className="h-8 w-12"
+          source={require("../../assets/images/brand-mark.png")}
+          style={{ height: 28, width: 28 * BRAND_MARK_ASPECT }}
           resizeMode="contain"
         />
-        <Text variant="headline" className="text-ink">
-          JoyChat
-        </Text>
+        <Image
+          source={require("../../assets/images/brand-wordmark.png")}
+          style={{ height: 18, width: 18 * BRAND_WORDMARK_ASPECT }}
+          resizeMode="contain"
+        />
       </View>
 
       {/* Right Actions: Settings */}

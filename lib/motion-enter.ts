@@ -9,7 +9,7 @@ import { motion } from "@/lib/motion";
 import { layoutAnimation } from "@/lib/reduced-motion";
 
 /**
- * Focal: JoyChat Blue bubble settles onto the Clear Desk in its list slot.
+ * Focal: ChatRoute Blue bubble settles onto the Clear Desk in its list slot.
  * Thread FlatList is inverted — never use positive translateY (that drives
  * the bubble into the composer). Scale + opacity only (ZoomIn, not FadeInDown).
  *

@@ -52,13 +52,13 @@ export function UnreachableScreen({
         </View>
 
         <Text variant="headline" className="mt-5 text-center text-ink">
-          Can&rsquo;t reach JoyChat
+          Can&rsquo;t reach ChatRoute
         </Text>
         {/* Deliberately covers both ways Hydration can end here: no answer at all,
             and an answer this app could not read. Naming only the first would be
             wrong half the time, and the person cannot act differently either way. */}
         <Text variant="meta" className="mt-2 text-center text-muted">
-          You&rsquo;re still signed in — JoyChat just couldn&rsquo;t get a usable answer from
+          You&rsquo;re still signed in — ChatRoute just couldn&rsquo;t get a usable answer from
           the server. Check your connection and try again.
         </Text>
 

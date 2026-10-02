@@ -19,6 +19,11 @@
  * place. Editing this field later is that decision, whether or not it looks
  * like one.
  *
+ * Which is why the rename to ChatRoute left it as `joychat`, along with the
+ * package name and bundle identifier that Firebase and the OAuth clients are
+ * registered against. The name a person sees is `name` in `app.json`; the slug
+ * only ever shows on expo.dev.
+ *
  * ## Why this exists
  *
  * Google's iOS SDK completes the sign-in by reopening the app on a URL scheme

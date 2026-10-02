@@ -268,7 +268,7 @@ describe('withIncomingMessage', () => {
       const welcome = staffMessage('m1', '2026-08-13T10:00:00.000Z', {
         messageType: 'system',
         addressedToCustomer: true,
-        body: 'Welcome to JoyChat.',
+        body: 'Welcome to ChatRoute.',
         sender: { id: 'customer-1', name: 'Mina', role: 'customer' },
       })
 

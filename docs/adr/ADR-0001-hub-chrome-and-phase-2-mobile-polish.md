@@ -15,7 +15,7 @@ The app now ships role-based hubs for Contact, Agent, and Admin. Hub chrome and 
 
 ## Decision
 
-1. Brand all hubs with JoyChat logo + JoyChat wordmark in the header.
+1. Brand all hubs with ChatRoute logo + ChatRoute wordmark in the header.
 2. Keep role labels in the greeting block (not the header) as:
    - SUPPORT for Contact
    - AGENT for Agent
@@ -30,5 +30,5 @@ The app now ships role-based hubs for Contact, Agent, and Admin. Hub chrome and 
 ## Consequences
 
 - Hub chrome and copy are centralized in pure helpers, reducing role-copy drift.
-- Product surfaces consistently reflect JoyChat branding in header and settings chrome.
+- Product surfaces consistently reflect ChatRoute branding in header and settings chrome.
 - Motion and list guidance are documented for future Phase 2 work while staying inside current dependency constraints.

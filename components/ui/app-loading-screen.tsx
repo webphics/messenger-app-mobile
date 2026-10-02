@@ -13,7 +13,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { easing } from "@/lib/motion-easing";
 import { colors } from "@/lib/tokens";
 
-/** The JoyChat mark, still. Its intrinsic size is 720x406. */
+/** The ChatRoute mark, still. Its intrinsic size is 720x406. */
 const LAUNCH_MARK = require("@/assets/images/launch-mark.png");
 const LAUNCH_MARK_ASPECT = 720 / 406;
 
@@ -102,7 +102,7 @@ export function AppLoadingScreen({
   return (
     <Animated.View
       accessibilityRole="progressbar"
-      aria-label="Loading JoyChat…"
+      aria-label="Loading ChatRoute…"
       style={[styles.container, { backgroundColor }, animatedStyle]}
     >
       <Image

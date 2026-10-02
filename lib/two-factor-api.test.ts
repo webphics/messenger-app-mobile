@@ -31,7 +31,7 @@ const adopt = adoptReplacedSessionCookie as jest.MockedFunction<
 const PROTECTED_PERSON = {
   id: "7",
   name: "Ada Lovelace",
-  email: "ada@joychat.test",
+  email: "ada@chatroute.test",
   role: "customer" as const,
   hasPassword: true,
   twoFactorEnabled: true,

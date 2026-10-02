@@ -295,7 +295,7 @@ sit in front of. There is no onboarding in this app today.
   mobile should gate the Hub the same way is a product question nobody has answered.
 - **`34d10ff`, `b8ef6e6`, `422d1eb`, `2aec0e6` — email providers and templates.** Server-side
   delivery: detailed provider test errors, template bodies backfilled, the `Talo` preheader
-  corrected to `JoyChat`. Matters to this app only in that a misconfigured provider now makes
+  corrected to `ChatRoute`. Matters to this app only in that a misconfigured provider now makes
   `POST /auth/magic-link` answer `500` rather than a false `200` — a real failure the sign-in screen
   should not report as a sent link.
 - **`c0b3667` — `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in deploy.** Web plumbing. This app's Google audience
@@ -339,7 +339,7 @@ opens the website, every time**, and there is no server setting that changes thi
 ### Why not just add a native origin to invitations
 
 Because an invitation is mailed to somebody who by definition does not have an account yet, and very
-likely does not have the app. A `joychat://` link is a dead end for them: it opens nothing, and
+likely does not have the app. A `chatroute://` link is a dead end for them: it opens nothing, and
 several mail clients decline to linkify a non-HTTPS scheme at all — `lib/magic-link-config.ts`
 already records this for magic links.
 
@@ -399,10 +399,10 @@ so doing it once serves all three link shapes.
 
 - [ ] **`MAGIC_LINK_APP_ORIGINS` still names the old scheme.** Every deployed environment this app
       points at has it set to `enki:` or to nothing. Commit `5be1879` changed this app's scheme to
-      `joychat://`, so every magic link request from a current build now falls back to
+      `chatroute://`, so every magic link request from a current build now falls back to
       `BETTER_AUTH_URL` and **the emailed link stops opening the app**. It fails quietly: the API
-      answers `200`, the mail arrives, the link opens a website. Set it to `joychat:` wherever
-      `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` is `joychat://`. The API's own `.env.example` still shows
+      answers `200`, the mail arrives, the link opens a website. Set it to `chatroute:` wherever
+      `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` is `chatroute://`. The API's own `.env.example` still shows
       `enki:` in its example line and should be corrected too.
 
 **Then, in order of how much they unblock:**

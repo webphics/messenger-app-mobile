@@ -291,7 +291,7 @@ export function AccountSessionsScreen() {
       >
         <Text variant="label" className="mb-4 font-normal leading-5 text-muted">
           Every device your account is signed in on. Ending a session signs that
-          device out the next time it reaches JoyChat.
+          device out the next time it reaches ChatRoute.
         </Text>
 
         {notice.kind === "loading" ? (

@@ -1,6 +1,6 @@
-# JoyChat mobile
+# ChatRoute mobile
 
-The iOS and Android client for JoyChat, built with Expo. Three roles use it: Admin, Agent and
+The iOS and Android client for ChatRoute, built with Expo. Three roles use it: Admin, Agent and
 Customer. The developer console stays on web (`docs/adr/ADR-0014-the-developer-console-is-not-a-mobile-surface.md`).
 
 ```bash
@@ -50,7 +50,7 @@ comes into existence on mobile.** The API has no registration endpoint, and veri
 creates the account. Staff accounts are made by an Admin on web.
 
 `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` says where the link in the email points. Leave it unset and the app
-uses its own scheme from `app.json` (`joychat://`). Production wants an HTTPS origin with app-link
+uses its own scheme from `app.json` (`chatroute://`). Production wants an HTTPS origin with app-link
 association files served from it, which cannot be arranged against localhost. The in-app route that
 reads the token is the same either way, so that switch is configuration and manifest work.
 
@@ -68,7 +68,7 @@ Everything else runs in Expo Go.
 | --- | --- | --- |
 | Password sign-in | yes | yes |
 | Requesting a magic link | yes | yes |
-| Opening a magic link (`joychat://`) | no | yes |
+| Opening a magic link (`chatroute://`) | no | yes |
 | Google sign-in | **no** | yes |
 | Push notifications | **no** | yes |
 | Everything after sign-in | yes | yes |
@@ -182,12 +182,12 @@ The tag prefix picks the GitHub environment the build reads its values from, and
 
 | Tag | Environment | Pre-release |
 | --- | --- | --- |
-| `joychat-v<version>` | Production | no |
-| `joychat-development-v<version>` | Development | yes |
-| `joychat-release-v<version>` | Release | yes |
+| `chatroute-v<version>` | Production | no |
+| `chatroute-development-v<version>` | Development | yes |
+| `chatroute-release-v<version>` | Release | yes |
 | none (manual run from a branch) | Development | nothing is published |
 
-Each tag run attaches `joychat-release.apk` to the GitHub Release for that tag (with generated
+Each tag run attaches `chatroute-release.apk` to the GitHub Release for that tag (with generated
 notes) and uploads the same file to the project's builds page on expo.dev. The tag is the version,
 and `expo.version` in `app.json` must equal it, or the run fails in its first minute. A Production
 tag must also point at a commit that is on `main`.
@@ -205,8 +205,8 @@ git push --follow-tags
 ```
 
 `pnpm release` bumps `package.json`, syncs `app.json`, commits `chore(release): X.Y.Z` and creates
-the `joychat-vX.Y.Z` tag. Pushing the tag starts the build. For a Development or Release build, run
-`npm version <bump> --tag-version-prefix=joychat-development-v` (or `joychat-release-v`) instead.
+the `chatroute-vX.Y.Z` tag. Pushing the tag starts the build. For a Development or Release build, run
+`npm version <bump> --tag-version-prefix=chatroute-development-v` (or `chatroute-release-v`) instead.
 
 To retry a failed run, use *Re-run failed jobs* on it, or run the workflow from the tag in the
 Actions tab. Re-pushing the same tag replaces the APK on its Release.
@@ -248,9 +248,9 @@ the shipped bundle, so anyone holding the APK can read them anyway.
 
 | Command | Where it builds | Output |
 | --- | --- | --- |
-| `pnpm build:apk` | Gradle on this machine. Windows, needs JDK 17 and the Android SDK. | `dist/joychat-release.apk`, `arm64-v8a` + `x86_64` |
-| `pnpm build:apk:eas` | EAS local build, same as CI. Builds `HEAD`, not the working tree. | `dist/joychat-release.apk`, `arm64-v8a` |
-| `pnpm build:apk:emulator` | EAS local build, `emulator` profile | `dist/joychat-emulator.apk`, `arm64-v8a` + `x86_64` |
+| `pnpm build:apk` | Gradle on this machine. Windows, needs JDK 17 and the Android SDK. | `dist/chatroute-release.apk`, `arm64-v8a` + `x86_64` |
+| `pnpm build:apk:eas` | EAS local build, same as CI. Builds `HEAD`, not the working tree. | `dist/chatroute-release.apk`, `arm64-v8a` |
+| `pnpm build:apk:emulator` | EAS local build, `emulator` profile | `dist/chatroute-emulator.apk`, `arm64-v8a` + `x86_64` |
 | `pnpm build:android` | EAS cloud, `preview` profile. Uses a build credit. | APK on the EAS install page |
 
 An `arm64-v8a`-only APK crashes on launch on an x86_64 emulator. Use `pnpm build:apk` or

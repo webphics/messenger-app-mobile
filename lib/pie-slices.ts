@@ -12,7 +12,7 @@ import type { ChartSlice } from '@/lib/types'
  * lib/tokens.ts, and do not re-point this ramp at colors.amber/colors.danger.
  */
 export const SLICE_COLORS = [
-  colors.primary, // JoyChat lavender
+  colors.primary, // ChatRoute lavender
   colors.success, // sage
   '#F2A93B', // gold
   '#3D3129', // graphite

@@ -76,7 +76,7 @@ export function NotificationPermissionRow() {
       </View>
 
       <Text variant="label" className="mb-3 font-normal leading-5 text-muted">
-        Notifications are turned off for JoyChat. Your phone’s settings are the only
+        Notifications are turned off for ChatRoute. Your phone’s settings are the only
         place to turn them back on.
       </Text>
 
