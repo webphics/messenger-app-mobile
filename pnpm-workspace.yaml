@@ -27,4 +27,8 @@ minimumReleaseAgeExclude:
   - expo-router@57.0.23
   - expo-sharing@57.0.22
   - expo-video@57.0.5
+  - '@expo/eas-build-job@24.9.0'
+  - '@expo/eas-json@24.9.0'
+  - '@expo/steps@24.9.0'
+  - eas-cli@24.10.0
 nodeLinker: hoisted

@@ -9,19 +9,23 @@
  * It is bound to the EAS project in `extra.eas.projectId` for that project's
  * whole life — https://expo.fyi/eas-project-id — so the two move together or
  * not at all. `eas build` refuses outright when they disagree, and so does
- * `eas project:info`, which is how the rename to JoyChat was caught: the slug
- * changed here and the project on expo.dev was still `enki`.
+ * `eas project:info`, which is how an earlier half-done rename was caught: the
+ * slug changed here and the project on expo.dev still had the old one.
  *
- * It was settled by creating a new project, `@webphics/joychat`, which is only
- * cheap while nothing is shipped: a new project issues a new Android keystore,
- * so the signing SHA-1 changes, anything registered against the old one has to
- * be re-registered, and an APK signed by the old key cannot be upgraded in
- * place. Editing this field later is that decision, whether or not it looks
- * like one.
+ * Each rename has been settled by creating a new project. The current one is
+ * `@webphics/chatroute`, created on 2026-10-03. A new project starts with none of the old one's credentials: no
+ * remote Android keystore, so a build signed on EAS gets a new SHA-1 that the
+ * Android OAuth client and Firebase have to be told about, and no FCM V1 key,
+ * so Expo cannot deliver push until one is uploaded with `eas credentials`.
+ * Push tokens are scoped to the project too, so an install built against the
+ * old one stops receiving push until it is replaced by a new build. Editing
+ * this field later is that decision, whether or not it looks like one.
  *
- * Which is why the rename to ChatRoute left it as `joychat`, along with the
- * package name and bundle identifier that Firebase and the OAuth clients are
- * registered against. The name a person sees is `name` in `app.json`; the slug
+ * The package name and bundle identifier, `com.zeestglobal.chatroute`, are a
+ * separate decision with a bigger bill. Firebase and the OAuth clients are
+ * registered against them, and a phone treats a new one as a different app: it
+ * installs beside the old one rather than upgrading it, with an empty keystore
+ * and an empty Store. The name a person sees is `name` in `app.json`; the slug
  * only ever shows on expo.dev.
  *
  * ## Why this exists

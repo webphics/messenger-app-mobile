@@ -20,7 +20,7 @@
 /**
  * `expo-sqlite` opens every database under a `SQLite` directory — inside
  * `filesDir` on Android, inside `Documents` on iOS. Excluding the directory
- * rather than `joychat-store.db` is deliberate: SQLite writes `-wal` and `-shm`
+ * rather than `chatroute-store.db` is deliberate: SQLite writes `-wal` and `-shm`
  * beside the database, and a rule naming only the database would back up the
  * write-ahead log holding the newest Messages.
  */

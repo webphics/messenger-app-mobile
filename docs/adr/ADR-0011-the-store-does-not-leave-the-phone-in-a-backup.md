@@ -26,7 +26,7 @@ rules of its own that keep the Session cookie out. So ours replace its files and
 exclusion, and the plugin throws rather than replacing rules it does not recognise — the failure mode
 worth designing against is not a wrong rule, it is a third plugin's rule silently disappearing.
 
-The exclusion names the `SQLite` directory rather than `joychat-store.db`, because SQLite writes `-wal`
+The exclusion names the `SQLite` directory rather than `chatroute-store.db`, because SQLite writes `-wal`
 and `-shm` beside the database and the write-ahead log holds the newest Messages. It covers the
 phone-to-phone transfer as well as the cloud: the keychain cannot travel either, and a Store arriving
 without the credential it belongs to is a support history on a device nobody has signed into.

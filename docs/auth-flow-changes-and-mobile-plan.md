@@ -362,8 +362,8 @@ so doing it once serves all three link shapes.
 2. **Association files on the web origin**, served from `/.well-known/` as `application/json`, with
    no redirect. Android's needs the package name and the **release signing certificate SHA-256**;
    iOS's needs the team id and bundle id.
-   **Both carry the new identity from `5be1879`: `com.zeestglobal.joychat`.** The old
-   `com.anonymous.enki` will verify nothing.
+   **Both carry the current identity: `com.zeestglobal.chatroute`.** Earlier package names,
+   such as `com.anonymous.enki`, will verify nothing.
 3. **Two routes**, mirroring `app/auth/magic-link.tsx`:
    - `app/invitations/redeem.tsx` — `GET` the preview, then branch on `outcome`: `signup` collects
      name and password and `POST`s, `signin` sends them to sign-in with the address filled,
@@ -409,7 +409,7 @@ so doing it once serves all three link shapes.
 
 - [ ] Decide the web host that will carry the association files, and whether one host serves all
       environments or each gets its own.
-- [ ] Publish `assetlinks.json` and `apple-app-site-association` with `com.zeestglobal.joychat` and
+- [ ] Publish `assetlinks.json` and `apple-app-site-association` with `com.zeestglobal.chatroute` and
       both signing fingerprints.
 - [ ] `app.json`: `intentFilters` + `associatedDomains`.
 - [ ] `app/invitations/redeem.tsx` and `lib/invite-link-config.ts` with its contract test.

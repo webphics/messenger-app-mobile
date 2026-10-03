@@ -17,12 +17,12 @@ import type { SessionUser } from "@/lib/types";
 /**
  * Namespaced so it cannot collide with anything a later feature stores.
  *
- * The namespace is the product's former name, JoyChat, and stays that way: a key
- * is how an installed phone finds its cookie, so renaming it to ChatRoute would
- * sign every existing install out on its next launch. The same goes for the
- * Kept person below.
+ * A key is how an installed phone finds its cookie, so renaming the namespace
+ * signs every existing install out on its next launch. It changes only together
+ * with the application id, as it did for ChatRoute, when there is no installed
+ * keystore to keep. The same goes for the Kept person below.
  */
-export const SESSION_COOKIE_KEY = "joychat.session_cookie";
+export const SESSION_COOKIE_KEY = "chatroute.session_cookie";
 
 /**
  * The Kept person: who the cookie above belongs to, as this device last heard it.
@@ -32,18 +32,18 @@ export const SESSION_COOKIE_KEY = "joychat.session_cookie";
  * with the cookie, in the same keystore, and `forgetCredential` takes both. See
  * `docs/adr/ADR-0010-a-kept-person-answers-an-unreachable-hydration.md`.
  */
-export const KEPT_PERSON_KEY = "joychat.session_user";
+export const KEPT_PERSON_KEY = "chatroute.session_user";
 
 /**
  * Keys nothing reads any more, cleared off any install that still holds one.
  *
- * Empty, and that is the end state rather than a gap. This list held the
- * previous brand's three keys so that an install upgrading across the rename
+ * Empty, and that is the end state rather than a gap. This list once held a
+ * former brand's three keys so that an install upgrading across the rename
  * would not keep a signed-in person's cookie in the keystore forever with
  * nothing left in the app that would ever read it.
  *
- * The application id moved with the rename — a different Android package and a
- * different iOS bundle identifier — and a keystore belongs to an application
+ * The application id moved with each rename (a different Android package and
+ * a different iOS bundle identifier), and a keystore belongs to an application
  * id. So there is no install that holds both the old keys and this code: the
  * old app's keystore is another app's keystore, unreachable from here, and it
  * goes when that app is uninstalled. Naming those keys here cleared nothing and

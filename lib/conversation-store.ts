@@ -104,12 +104,12 @@ import type { Community, CommunityFeedRow, Conversation, Message } from '@/lib/t
  */
 
 /**
- * Named for the product's former name, JoyChat, and deliberately not renamed to
- * ChatRoute: a new file name is an empty Store on every installed phone, and the
- * backup exclusion in `plugins/backup-exclusion.js` covers the directory rather
- * than this name, so nothing else depends on it.
+ * Renaming this file is an empty Store on every installed phone, so it changes
+ * only together with the application id, when there is no installed Store to
+ * keep. The backup exclusion in `plugins/backup-exclusion.js` covers the
+ * directory rather than this name, so nothing else depends on it.
  */
-const DATABASE_NAME = 'joychat-store.db'
+const DATABASE_NAME = 'chatroute-store.db'
 
 /**
  * Created only on a database this build has just made. A database whose version

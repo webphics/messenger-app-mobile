@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:753090717715:android:e6e166cba81e8642e2b7e6",
+        "mobilesdk_app_id": "1:753090717715:android:6c7f25b56e15be44e2b7e6",
         "android_client_info": {
-          "package_name": "com.zeestglobal.joychat"
+          "package_name": "com.zeestglobal.chatroute"
         }
       },
       "oauth_client": [
@@ -29,6 +29,13 @@
             {
               "client_id": "753090717715-vtk6in9mcbhfjsls3v60qlk6f5h5bc83.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.zeestglobal.chatroute"
+              }
             }
           ]
         }

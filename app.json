@@ -1,18 +1,18 @@
 {
   "expo": {
     "name": "ChatRoute",
-    "slug": "joychat",
+    "slug": "chatroute",
     "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": ["chatroute", "joychat"],
+    "scheme": "chatroute",
     "userInterfaceStyle": "light",
     "updates": {
       "enabled": false
     },
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.zeestglobal.joychat",
+      "bundleIdentifier": "com.zeestglobal.chatroute",
       "supportsTablet": true
     },
     "android": {
@@ -22,9 +22,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "blockedPermissions": ["android.permission.READ_MEDIA_AUDIO"],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
       "softwareKeyboardLayoutMode": "resize",
-      "package": "com.zeestglobal.joychat"
+      "package": "com.zeestglobal.chatroute"
     },
     "web": {
       "output": "static",
@@ -96,12 +98,18 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "7511881b-e2ec-43e1-870c-517e7d338809"
+        "projectId": "faad9a83-d245-4c2f-bac3-bca8d61cf1ca"
+      },
+      "router": {},
+      "expo-navigation-bar": {
+        "enforceContrast": false,
+        "style": "dark"
       }
     },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "owner": "webphics"
   }
 }

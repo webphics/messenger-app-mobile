@@ -111,7 +111,7 @@ iOS needs both, and until an iOS client exists the button is disabled there and 
 
 ### Android: the signing certificate fingerprint
 
-Android's OAuth client is identified by the package name (`com.zeestglobal.joychat`) **plus the
+Android's OAuth client is identified by the package name (`com.zeestglobal.chatroute`) **plus the
 SHA-1 of the certificate the build was signed with**. Every fingerprint that signs a build people
 sign in from has to be registered against the Android OAuth client in the Google console. A build
 signed with an unregistered certificate fails Google sign-in with nothing on screen to explain it.
@@ -145,7 +145,7 @@ selects its without-Firebase path, which writes to `Info.plist` and nothing else
 - **No API change.** The token's audience is still the web client (ADR-0005).
 
 Settle two things before creating the client, because both are expensive to change afterwards. The
-bundle identifier is `com.zeestglobal.joychat`; once it exists in the Apple Developer portal and an
+bundle identifier is `com.zeestglobal.chatroute`; once it exists in the Apple Developer portal and an
 OAuth client, changing it means a new OAuth client, a new Firebase Android app and a new App Store
 record. The iOS client exists (`753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9`) and is set in every
 `env` block of `eas.json`. It is read at build time, so an installed development client built

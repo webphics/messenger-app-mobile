@@ -339,7 +339,7 @@ function loadStore(): Store {
   return require('@/lib/conversation-store') as Store
 }
 
-const DATABASE_NAME = 'joychat-store.db'
+const DATABASE_NAME = 'chatroute-store.db'
 
 function conversation(id: string, overrides: Partial<Conversation> = {}): Conversation {
   return {
