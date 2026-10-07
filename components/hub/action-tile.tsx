@@ -88,7 +88,18 @@ export function StatTile({
         </Text>
         {alert ? <View className="size-2 rounded-full bg-amber" /> : null}
       </View>
-      <Text variant="label" className="mt-0.5 text-muted">{label}</Text>
+      {/* Three tiles share one row on a 360dp phone, where "Conversations"
+          is one letter too wide for the 12px label and broke as "Conversation / s".
+          Shrinking the label a step beats a second line that misaligns the row. */}
+      <Text
+        variant="label"
+        className="mt-0.5 text-muted"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+      >
+        {label}
+      </Text>
     </TactilePressable>
   );
 }
