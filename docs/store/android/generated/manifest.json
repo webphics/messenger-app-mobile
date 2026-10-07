@@ -1,0 +1,266 @@
+[
+  {
+    "file": "feature-graphic.png",
+    "width": 1024,
+    "height": 500,
+    "transparent": false
+  },
+  {
+    "file": "phone-01.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 225,
+      "y": 545,
+      "width": 631,
+      "visibleHeight": 1375,
+      "cornerRadius": 57,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "phone-02.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 225,
+      "y": 535,
+      "width": 631,
+      "visibleHeight": 1385,
+      "cornerRadius": 57,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "phone-03.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 213,
+      "y": 539,
+      "width": 654,
+      "visibleHeight": 1381,
+      "cornerRadius": 59,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "phone-04.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 228,
+      "y": 589,
+      "width": 624,
+      "visibleHeight": 1331,
+      "cornerRadius": 56,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "phone-05.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 199,
+      "y": 533,
+      "width": 681,
+      "visibleHeight": 1387,
+      "cornerRadius": 61,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "phone-06.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 210,
+      "y": 622,
+      "width": 660,
+      "visibleHeight": 1298,
+      "cornerRadius": 59,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "phone-07.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 211,
+      "y": 544,
+      "width": 659,
+      "visibleHeight": 1376,
+      "cornerRadius": 59,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "phone-08.png",
+    "width": 1080,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 210,
+      "y": 555,
+      "width": 660,
+      "visibleHeight": 1365,
+      "cornerRadius": 59,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "tablet-7-1.png",
+    "width": 1200,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 185,
+      "y": 730,
+      "width": 831,
+      "visibleHeight": 1190,
+      "cornerRadius": 75,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "tablet-7-3.png",
+    "width": 1200,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 180,
+      "y": 640,
+      "width": 842,
+      "visibleHeight": 1280,
+      "cornerRadius": 76,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "tablet-7-4.png",
+    "width": 1200,
+    "height": 1920,
+    "transparent": false,
+    "screen": {
+      "x": 206,
+      "y": 623,
+      "width": 788,
+      "visibleHeight": 1297,
+      "cornerRadius": 71,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "tablet-10-1.png",
+    "width": 1600,
+    "height": 2560,
+    "transparent": false,
+    "screen": {
+      "x": 233,
+      "y": 865,
+      "width": 1134,
+      "visibleHeight": 1695,
+      "cornerRadius": 102,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "tablet-10-3.png",
+    "width": 1600,
+    "height": 2560,
+    "transparent": false,
+    "screen": {
+      "x": 235,
+      "y": 830,
+      "width": 1131,
+      "visibleHeight": 1730,
+      "cornerRadius": 102,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "tablet-10-4.png",
+    "width": 1600,
+    "height": 2560,
+    "transparent": false,
+    "screen": {
+      "x": 245,
+      "y": 945,
+      "width": 1109,
+      "visibleHeight": 1615,
+      "cornerRadius": 100,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "empty-inbox.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "empty-unassigned.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "no-signal.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "empty-wall.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "empty-search.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "notifications-off.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "zero-fee.png",
+    "width": 1536,
+    "height": 1024,
+    "transparent": false
+  },
+  {
+    "file": "payouts.png",
+    "width": 1536,
+    "height": 1024,
+    "transparent": false
+  }
+]

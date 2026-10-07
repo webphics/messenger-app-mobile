@@ -1,0 +1,169 @@
+[
+  {
+    "name": "feature-graphic",
+    "w": 1024,
+    "h": 500,
+    "prompt": "Use case: ads-marketing. Generate ChatRoute Google Play feature graphic, exact 1024 x 500 PNG opaque sRGB. Background #FAF9F7 with extremely faint #EEEAF8 radial wash slightly left. Left 55%: use supplied brand lockup image unchanged, mark above wordmark, wordmark 420px wide, vertically centered. Under it exact text \"Support messenger for teams\" in Manrope Regular 30px #858187. Right 45%: two overlapping abstract chat bubbles, outgoing #6253A3 with 22px rounded corners and tighter bottom-right; incoming white hairline #E7E4E2 with tighter bottom-left. Each contains 2 or 3 placeholder bars, no words. One #7FA68A dot 14px at incoming top-left. 48px safe margins. Calm sparse flat design, lavender less than 15% area. No extra decoration, no watermark. Preserve supplied logo exactly.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-bc33b874-040b-452e-b94f-57bb5a2bba81.png"
+  },
+  {
+    "name": "phone-01",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Help, in one thread\". Subline verbatim \"Ask your organisation and get the reply where you asked\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. ",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-7a9e97d6-1172-4c91-af17-b3c48e294f4c.png"
+  },
+  {
+    "name": "phone-02",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Photos, documents, voice notes\". Subline verbatim \"Attach what explains it faster than typing\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. ",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-741a0a73-a7fd-40f9-bc96-f92312fe2f13.png"
+  },
+  {
+    "name": "phone-03",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Claim it. Reply. Done.\". Subline verbatim \"Agents work the Unassigned pool with one tap\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. ",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-8a533d54-fbb9-423e-9fb7-857183ec5057.png"
+  },
+  {
+    "name": "phone-04",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Oversight that fits in a pocket\". Subline verbatim \"Directory, organisations, audit log and charts for Admins\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. ",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-e763ed30-b04f-4665-9da9-a3d6e6285e18.png"
+  },
+  {
+    "name": "phone-05",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Reaches you when the app is closed\". Subline verbatim \"A reply lands on the lock screen and opens the thread\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. ",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-c6eddded-3758-4818-ab5a-89f62b8e6abb.png"
+  },
+  {
+    "name": "phone-06",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Opens on what your phone last knew\". Subline verbatim \"Conversations stay on the device, with or without a signal\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. Add small white round pill just above phone with hairline #E7E4E2, tiny graphite aeroplane glyph and exact text \"No signal\" in muted Manrope Regular.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-52b2565e-71a7-491e-9138-da52818daf29.png"
+  },
+  {
+    "name": "phone-07",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Announcements and groups\". Subline verbatim \"The Wall and Communities, for every role\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. ",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-f133de7f-b7b2-4fc0-873f-bae81d9a8f44.png"
+  },
+  {
+    "name": "phone-08",
+    "w": 1080,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact canvas 1080 x 1920. Top caption area 22%, left aligned 80px margins, headline about 72px over at most two lines, subline 36px. Headline verbatim \"Sign in your way\". Subline verbatim \"Password, magic link, Google, two-factor\". Phone centered below caption. Screen rectangle requested x=170 y=560 width=740 height=1480 (bottom cropped), rounded corners 56px. ",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-2b8847a8-8334-4649-ac87-9bb4c3e7189c.png"
+  },
+  {
+    "name": "tablet-7-1",
+    "w": 1200,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact portrait canvas 1200 x 1920. Generic Android TABLET, wider portrait tablet proportions. Same caption composition: top 22%, side margins 89px, headline 72px, subline 40px. Headline verbatim \"Help, in one thread\". Subline verbatim \"Ask your organisation and get the reply where you asked\". Tablet centered below text. Flat blank screen. No other decoration.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-9091a9d0-c4e4-4c29-af81-6fa694b3b0a9.png"
+  },
+  {
+    "name": "tablet-7-3",
+    "w": 1200,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact portrait canvas 1200 x 1920. Generic Android TABLET, wider portrait tablet proportions. Same caption composition: top 22%, side margins 89px, headline 72px, subline 40px. Headline verbatim \"Claim it. Reply. Done.\". Subline verbatim \"Agents work the Unassigned pool with one tap\". Tablet centered below text. Flat blank screen. No other decoration.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-4e897a57-d479-426c-bcf7-07f2cf8ba3a4.png"
+  },
+  {
+    "name": "tablet-7-4",
+    "w": 1200,
+    "h": 1920,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact portrait canvas 1200 x 1920. Generic Android TABLET, wider portrait tablet proportions. Same caption composition: top 22%, side margins 89px, headline 72px, subline 40px. Headline verbatim \"Oversight that fits in a pocket\". Subline verbatim \"Directory, organisations, audit log and charts for Admins\". Tablet centered below text. Flat blank screen. No other decoration.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-0ee48c7d-bbd0-4fed-b48b-1310e4bd9066.png"
+  },
+  {
+    "name": "tablet-10-1",
+    "w": 1600,
+    "h": 2560,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact portrait canvas 1600 x 2560. Generic Android TABLET, wider portrait tablet proportions. Same caption composition: top 22%, side margins 118px, headline 96px, subline 53px. Headline verbatim \"Help, in one thread\". Subline verbatim \"Ask your organisation and get the reply where you asked\". Tablet centered below text. Flat blank screen. No other decoration.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-49851742-1759-4a61-b24c-4174cd21ab62.png"
+  },
+  {
+    "name": "tablet-10-3",
+    "w": 1600,
+    "h": 2560,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact portrait canvas 1600 x 2560. Generic Android TABLET, wider portrait tablet proportions. Same caption composition: top 22%, side margins 118px, headline 96px, subline 53px. Headline verbatim \"Claim it. Reply. Done.\". Subline verbatim \"Agents work the Unassigned pool with one tap\". Tablet centered below text. Flat blank screen. No other decoration.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-0ef2fbb2-2075-486a-be66-a54ceab05ad2.png"
+  },
+  {
+    "name": "tablet-10-4",
+    "w": 1600,
+    "h": 2560,
+    "prompt": "Use case: ads-marketing. ChatRoute 'The Clear Desk' store artwork. PNG sRGB. Calm light sparse design, #FAF9F7 background, extremely faint #EEEAF8 radial wash behind device fading to off-white edges. Graphite #29272D text, muted #858187. Manrope ExtraBold headlines tight tracking -0.02em, Manrope Regular sublines. No logos, no decoration, no invented app UI, no watermark. Device straight front view, generic modern Android, slim uniform graphite bezels, rounded corners, centered punch-hole camera, no buttons. Screen MUST be completely flat solid #EEEAF8 placeholder, no status bar, no UI. One low opacity ambient soft shadow. Device bottom cropped off canvas by 8%. Exact portrait canvas 1600 x 2560. Generic Android TABLET, wider portrait tablet proportions. Same caption composition: top 22%, side margins 118px, headline 96px, subline 53px. Headline verbatim \"Oversight that fits in a pocket\". Subline verbatim \"Directory, organisations, audit log and charts for Admins\". Tablet centered below text. Flat blank screen. No other decoration.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-0b332ab5-d31e-409f-88f3-ef095fb9eb6c.png"
+  },
+  {
+    "name": "empty-inbox",
+    "w": 1200,
+    "h": 1200,
+    "alpha": true,
+    "prompt": "Use case: illustration-story. ChatRoute empty state illustration. Exact 1200 x 1200 PNG, truly transparent background. Flat simple geometric two-tone illustration: a single open speech bubble outline in Lavender with three sage dots inside, on a faint sage ground line. Lavender #6253A3, sage #7FA68A, mist #EEEAF8, soft grey #E7E4E2 only except specified tiny amber. Same 24px rounded stroke throughout, rounded corners. Centered with 10% padding, clean readable when reduced to 160px. No text, no faces, no people, no realism, no 3D, no gradients, no watermark.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-6ab57aa9-85f1-46a6-b34c-6c5b0d0bab7f.png"
+  },
+  {
+    "name": "empty-unassigned",
+    "w": 1200,
+    "h": 1200,
+    "alpha": true,
+    "prompt": "Use case: illustration-story. ChatRoute empty state illustration. Exact 1200 x 1200 PNG, truly transparent background. Flat simple geometric two-tone illustration: three small bubble outlines in a row, middle filled Lavender Mist, a small amber #D09033 dot above first. Lavender #6253A3, sage #7FA68A, mist #EEEAF8, soft grey #E7E4E2 only except specified tiny amber. Same 24px rounded stroke throughout, rounded corners. Centered with 10% padding, clean readable when reduced to 160px. No text, no faces, no people, no realism, no 3D, no gradients, no watermark.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-9c9f4b2e-ad8f-4a02-93d3-f1021bc377cc.png"
+  },
+  {
+    "name": "no-signal",
+    "w": 1200,
+    "h": 1200,
+    "alpha": true,
+    "prompt": "Use case: illustration-story. ChatRoute empty state illustration. Exact 1200 x 1200 PNG, truly transparent background. Flat simple geometric two-tone illustration: a bubble outline with a short dashed line trailing off it, one dash sage. Lavender #6253A3, sage #7FA68A, mist #EEEAF8, soft grey #E7E4E2 only except specified tiny amber. Same 24px rounded stroke throughout, rounded corners. Centered with 10% padding, clean readable when reduced to 160px. No text, no faces, no people, no realism, no 3D, no gradients, no watermark.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-2a66961b-b9d4-4092-8b56-b6b54efef4b8.png"
+  },
+  {
+    "name": "empty-wall",
+    "w": 1200,
+    "h": 1200,
+    "alpha": true,
+    "prompt": "Use case: illustration-story. ChatRoute empty state illustration. Exact 1200 x 1200 PNG, truly transparent background. Flat simple geometric two-tone illustration: rounded post card outline with Lavender header bar and two Soft Grey text bars. Lavender #6253A3, sage #7FA68A, mist #EEEAF8, soft grey #E7E4E2 only except specified tiny amber. Same 24px rounded stroke throughout, rounded corners. Centered with 10% padding, clean readable when reduced to 160px. No text, no faces, no people, no realism, no 3D, no gradients, no watermark. STRICT correction: only a single rounded rectangular post card outline, one lavender header bar and exactly two grey text bars. Remove all leaves, plants, rays, amber marks, sparks and all other objects. Pure flat solid colors, no shading.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-d1e21c91-f34e-409b-9805-4bf81606d733.png"
+  },
+  {
+    "name": "empty-search",
+    "w": 1200,
+    "h": 1200,
+    "alpha": true,
+    "prompt": "Use case: illustration-story. ChatRoute empty state illustration. Exact 1200 x 1200 PNG, truly transparent background. Flat simple geometric two-tone illustration: a magnifier circle in Lavender, sage handle, tiny bubble inside lens. Lavender #6253A3, sage #7FA68A, mist #EEEAF8, soft grey #E7E4E2 only except specified tiny amber. Same 24px rounded stroke throughout, rounded corners. Centered with 10% padding, clean readable when reduced to 160px. No text, no faces, no people, no realism, no 3D, no gradients, no watermark. Required central detail: inside magnifying glass lens put a small lavender outlined speech bubble with a tail and three tiny sage dots. It must be clearly visible. Only magnifier and this bubble. No reflection arc, no shading, no gradient.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-9efad9f0-f1f8-4f52-8fd4-6818836d3e29.png"
+  },
+  {
+    "name": "notifications-off",
+    "w": 1200,
+    "h": 1200,
+    "alpha": true,
+    "prompt": "Use case: illustration-story. ChatRoute empty state illustration. Exact 1200 x 1200 PNG, truly transparent background. Flat simple geometric two-tone illustration: bell outline in Lavender with one sage slash, no red. Lavender #6253A3, sage #7FA68A, mist #EEEAF8, soft grey #E7E4E2 only except specified tiny amber. Same 24px rounded stroke throughout, rounded corners. Centered with 10% padding, clean readable when reduced to 160px. No text, no faces, no people, no realism, no 3D, no gradients, no watermark.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-95ab79ca-c21d-49a5-bcf8-3e2f46611b00.png"
+  },
+  {
+    "name": "zero-fee",
+    "w": 1536,
+    "h": 1024,
+    "prompt": "Use case: ads-marketing. ChatRoute carousel artwork. Exact 1536 x 1024 PNG opaque. Calm sparse flat geometric illustration: a large off-white circle with a lavender \"0\" cut-out and two sage speech-bubble shapes behind it. Off-white #FAF9F7 background. Lavender #6253A3 covers under 15% of image. Simple generous negative space. No words, no coins, no lightning bolts, no photographs, no faces, no 3D, no watermark.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-8c2660da-f3dd-4439-bb6c-a7bdc23af983.png"
+  },
+  {
+    "name": "payouts",
+    "w": 1536,
+    "h": 1024,
+    "prompt": "Use case: ads-marketing. ChatRoute carousel artwork. Exact 1536 x 1024 PNG opaque. Calm sparse flat geometric illustration: three ascending rounded bars in Lavender Mist #EEEAF8, Lavender #6253A3, Sage #7FA68A, on off-white. Off-white #FAF9F7 background. Lavender #6253A3 covers under 15% of image. Simple generous negative space. No words, no coins, no lightning bolts, no photographs, no faces, no 3D, no watermark.",
+    "source": "C:\\Users\\Evan\\.codex\\generated_images\\01a114a5-57f5-7da2-b1ce-1b31543655b8\\exec-92d8fc65-fe72-454d-a71d-3aa606705232.png"
+  }
+]

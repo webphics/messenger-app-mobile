@@ -1,0 +1,206 @@
+[
+  {
+    "file": "iphone-01.png",
+    "width": 1320,
+    "height": 2868,
+    "transparent": false,
+    "screen": {
+      "x": 222,
+      "y": 957,
+      "width": 876,
+      "visibleHeight": 1911,
+      "cornerRadius": 79,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "iphone-02.png",
+    "width": 1320,
+    "height": 2868,
+    "transparent": false,
+    "screen": {
+      "x": 176,
+      "y": 807,
+      "width": 968,
+      "visibleHeight": 2061,
+      "cornerRadius": 87,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "iphone-03.png",
+    "width": 1320,
+    "height": 2868,
+    "transparent": false,
+    "screen": {
+      "x": 191,
+      "y": 829,
+      "width": 933,
+      "visibleHeight": 2039,
+      "cornerRadius": 84,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "iphone-04.png",
+    "width": 1320,
+    "height": 2868,
+    "transparent": false,
+    "screen": {
+      "x": 221,
+      "y": 885,
+      "width": 877,
+      "visibleHeight": 1983,
+      "cornerRadius": 79,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "iphone-05.png",
+    "width": 1320,
+    "height": 2868,
+    "transparent": false,
+    "screen": {
+      "x": 219,
+      "y": 886,
+      "width": 882,
+      "visibleHeight": 1982,
+      "cornerRadius": 79,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "iphone-06.png",
+    "width": 1320,
+    "height": 2868,
+    "transparent": false,
+    "screen": {
+      "x": 225,
+      "y": 829,
+      "width": 870,
+      "visibleHeight": 2039,
+      "cornerRadius": 78,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "iphone-07.png",
+    "width": 1320,
+    "height": 2868,
+    "transparent": false,
+    "screen": {
+      "x": 225,
+      "y": 897,
+      "width": 869,
+      "visibleHeight": 1971,
+      "cornerRadius": 78,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "ipad-1.png",
+    "width": 2064,
+    "height": 2752,
+    "transparent": false,
+    "screen": {
+      "x": 369,
+      "y": 1093,
+      "width": 1324,
+      "visibleHeight": 1659,
+      "cornerRadius": 119,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "ipad-3.png",
+    "width": 2064,
+    "height": 2752,
+    "transparent": false,
+    "screen": {
+      "x": 354,
+      "y": 916,
+      "width": 1355,
+      "visibleHeight": 1836,
+      "cornerRadius": 122,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "ipad-4.png",
+    "width": 2064,
+    "height": 2752,
+    "transparent": false,
+    "screen": {
+      "x": 395,
+      "y": 957,
+      "width": 1273,
+      "visibleHeight": 1795,
+      "cornerRadius": 115,
+      "bottomCropped": true,
+      "coordinates": "Measured approximate inner screen bounds; check mask against bezel before compositing."
+    }
+  },
+  {
+    "file": "empty-inbox.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "empty-unassigned.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "no-signal.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "empty-wall.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "empty-search.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "notifications-off.png",
+    "width": 1200,
+    "height": 1200,
+    "transparent": true
+  },
+  {
+    "file": "zero-fee.png",
+    "width": 1536,
+    "height": 1024,
+    "transparent": false
+  },
+  {
+    "file": "payouts.png",
+    "width": 1536,
+    "height": 1024,
+    "transparent": false
+  },
+  {
+    "file": "app-icon.png",
+    "width": 1024,
+    "height": 1024,
+    "transparent": false
+  }
+]
