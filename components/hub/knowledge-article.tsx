@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ScrollView, View } from "react-native";
 
 import { Button } from "@/components/ui/button";
+import { LinkedText, linkTint } from "@/components/ui/linked-text";
 import { Text } from "@/components/ui/text";
 import { hapticSuccess } from "@/lib/haptics";
 import {
@@ -61,7 +62,7 @@ export function KnowledgeArticleView({ article }: KnowledgeArticleViewProps) {
           variant="body"
           className="text-ink-soft"
         >
-          {article.body}
+          <LinkedText text={article.body} linkClassName={linkTint(false)} />
         </Text>
       </View>
 

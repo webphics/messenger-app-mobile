@@ -323,6 +323,7 @@ function ConversationScreen({
       onDismissFailure={thread.dismissFailure}
       onLoadOlder={thread.loadOlder}
       loadingOlder={thread.loadingOlder}
+      hasOlder={thread.hasOlder}
       refreshing={thread.refreshing}
       onRefresh={thread.refresh}
       onSendMessage={thread.send}

@@ -27,6 +27,7 @@ import { DetailsCard } from '@/components/chat/details-card'
 import { ThreadManagementSection } from '@/components/chat/thread-management-section'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { LinkedText, linkTint } from '@/components/ui/linked-text'
 import { Text } from '@/components/ui/text'
 import { chatMediaHref } from '@/lib/chat-route-id'
 import {
@@ -845,7 +846,7 @@ function NoteCard({ note }: { note: ConversationNote }) {
           </Text>
         </View>
         <Text variant="meta" className="text-ink">
-          {note.text}
+          <LinkedText text={note.text} linkClassName={linkTint(false)} />
         </Text>
       </View>
     </View>

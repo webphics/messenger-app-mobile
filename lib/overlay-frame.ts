@@ -7,7 +7,13 @@ export type Rect = {
 
 export type OpenMenuPayload = {
   messageId: string
+  /** The bubble sits on the end side. Decides which edge the tray hugs. */
   outgoing: boolean
+  /**
+   * The viewer wrote it. Not the same as `outgoing`: a colleague's message in a
+   * Support DM sits on the end side but is not the viewer's to inspect.
+   */
+  mine: boolean
   pageX: number
   pageY: number
   width: number
@@ -17,6 +23,7 @@ export type OpenMenuPayload = {
 export type ReactionAnchor = Rect & {
   messageId: string
   outgoing: boolean
+  mine: boolean
   hostWidth: number
 }
 
@@ -113,6 +120,7 @@ export function anchorFromPayload(
   return {
     messageId: payload.messageId,
     outgoing: payload.outgoing,
+    mine: payload.mine,
     ...local,
     hostWidth: host.width,
   }

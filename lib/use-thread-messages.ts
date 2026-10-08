@@ -89,6 +89,8 @@ export type ThreadMessages = {
   /** True only for the first page: paging older has its own flag. */
   loading: boolean
   loadingOlder: boolean
+  /** Whether the API has history before the oldest page held — what a jump to a quote walks. */
+  hasOlder: boolean
   refreshing: boolean
   failure: ApiFailure | null
   /**
@@ -809,6 +811,9 @@ export function useThreadMessages(
     delivery,
     loading,
     loadingOlder,
+    // Not gated on `cursor`: a Restored thread pages back off the disk first,
+    // before it has a cursor to ask the API with.
+    hasOlder: state.hasMore,
     refreshing,
     failure,
     dismissFailure,

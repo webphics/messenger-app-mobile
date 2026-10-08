@@ -26,6 +26,10 @@
   --color-primary: #6253a3;
   --color-primary-soft: #eeeaf8;
   --color-bubble-in: #ffffff;
+  --color-role-admin: #cceae1;
+  --color-role-agent: #dae1fd;
+  --color-role-customer: #f1d9ee;
+  --color-role-ink: #6253a3;
   --color-success: #3f724f;
   --color-danger: #b12c30;
   --color-amber: #d09033;
@@ -57,6 +61,10 @@
       --color-primary: #6253a3;
       --color-primary-soft: #eeeaf8;
       --color-bubble-in: #ffffff;
+      --color-role-admin: #cceae1;
+      --color-role-agent: #dae1fd;
+      --color-role-customer: #f1d9ee;
+      --color-role-ink: #6253a3;
       --color-success: #3f724f;
       --color-danger: #b12c30;
       --color-amber: #d09033;
@@ -85,6 +93,10 @@
       --color-primary: #a396dd;
       --color-primary-soft: #2e2745;
       --color-bubble-in: #332f3a;
+      --color-role-admin: #203f37;
+      --color-role-agent: #2f3557;
+      --color-role-customer: #492c47;
+      --color-role-ink: #ccc7f9;
       --color-success: #8fb89a;
       --color-danger: #e4737a;
       --color-amber: #e0a53c;

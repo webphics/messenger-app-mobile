@@ -11,6 +11,8 @@ import { Dimensions, Image, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
+  withDelay,
+  withSequence,
   Extrapolation,
   interpolate,
   useAnimatedStyle,
@@ -22,11 +24,14 @@ import { scheduleOnRN } from 'react-native-worklets'
 
 import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { MessageMedia } from '@/components/chat/message-media'
+import { RoleBadge } from '@/components/chat/role-badge'
 import { VideoThumb } from '@/components/chat/video-thumb'
+import { LinkedText, linkTint } from '@/components/ui/linked-text'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
 import { hapticLight, hapticMedium } from '@/lib/haptics'
 import { fitImageSize } from '@/lib/image-layout'
+import { hasLink } from '@/lib/linkify'
 import {
   isImageOrVideo,
   type QuoteLayoutMode,
@@ -47,6 +52,7 @@ import type {
   AttachmentKind,
   AttachmentView,
   ReceiptStatus,
+  UserRole,
 } from '@/lib/types'
 
 export type { OpenMenuPayload }
@@ -60,10 +66,45 @@ export type QuotedMessage = {
   layoutMode: QuoteLayoutMode
 }
 
+type TapGesture = ReturnType<typeof Gesture.Tap>
+
+/**
+ * Wraps a quote in the gesture that jumps to the original, where there is one.
+ * A plain `Pressable` would race the bubble's own tap for the same touch.
+ */
+function QuoteTapTarget({
+  gesture,
+  children,
+}: {
+  gesture?: TapGesture
+  children: React.ReactElement
+}) {
+  if (!gesture) return children
+  return (
+    <GestureDetector gesture={gesture}>
+      <View
+        collapsable={false}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="Go to the original message"
+      >
+        {children}
+      </View>
+    </GestureDetector>
+  )
+}
+
 type MessageBubbleProps = {
   messageId: string
   body: string
+  /** The viewer wrote it: primary fill, receipts, and the end side. */
   outgoing: boolean
+  /**
+   * A colleague speaking for the company in a Support DM. Sits on the end side
+   * beside the viewer's own messages, in the soft tint rather than the primary
+   * fill, with no receipts — see `messageStance`.
+   */
+  colleague?: boolean
   status: ReceiptStatus
   createdAt: string
   /**
@@ -107,6 +148,8 @@ type MessageBubbleProps = {
   delivery?: DeliveryState
   onRetrySend?: (messageId: string) => void
   senderName?: string
+  /** Worn beside `senderName`. */
+  senderRole?: UserRole
   quoted?: QuotedMessage
   reactions?: ReactionGroup[]
   currentUserId: string
@@ -145,6 +188,13 @@ type MessageBubbleProps = {
    * buttons.
    */
   onToggleReaction?: (messageId: string, emoji: string) => void
+  /**
+   * A tap on the quote above a reply, with the reply's own id: the thread
+   * scrolls to the original. Absent on a message that quotes nothing.
+   */
+  onPressQuote?: (messageId: string) => void
+  /** Set briefly on the original a quote tap landed on, so the eye finds it. */
+  highlighted?: boolean
 }
 
 const SWIPE_REPLY = 56
@@ -222,12 +272,14 @@ function Delivery({
 function Receipt({
   status,
   outgoing,
+  end,
   createdAt,
   showTime,
   timeLabel,
 }: {
   status: ReceiptStatus
   outgoing: boolean
+  end: boolean
   createdAt: string
   showTime: boolean
   timeLabel?: string
@@ -253,7 +305,7 @@ function Receipt({
       accessibilityLabel={outgoing ? messageStatusLabel(status) : undefined}
       className={cn(
         'mt-1 flex-row items-center gap-1',
-        outgoing ? 'justify-end pr-1' : 'justify-start pl-1',
+        end ? 'justify-end pr-1' : 'justify-start pl-1',
       )}
     >
       {time ? (
@@ -271,10 +323,12 @@ function Receipt({
 const QuoteCaption = memo(function QuoteCaption({
   quoted,
   outgoing,
+  end,
   senderName,
 }: {
   quoted: QuotedMessage
   outgoing: boolean
+  end: boolean
   senderName?: string
 }) {
   return (
@@ -282,7 +336,7 @@ const QuoteCaption = memo(function QuoteCaption({
       className={cn(
         'mb-1 flex-row items-center gap-1',
         // Messenger: label sits on the same edge as the cluster, not centered in the column.
-        outgoing ? 'justify-end self-end' : 'justify-start self-start',
+        end ? 'justify-end self-end' : 'justify-start self-start',
       )}
     >
       <CornerUpLeft color={colors.muted} size={11} />
@@ -305,10 +359,32 @@ const QuoteCaption = memo(function QuoteCaption({
 const QuoteChrome = memo(function QuoteChrome({
   quoted,
   outgoing,
+  end,
+  senderName,
+  quoteGesture,
+}: {
+  quoted: QuotedMessage
+  outgoing: boolean
+  end: boolean
+  senderName?: string
+  quoteGesture?: TapGesture
+}) {
+  return (
+    <QuoteTapTarget gesture={quoteGesture}>
+      <QuoteChromeBody quoted={quoted} outgoing={outgoing} end={end} senderName={senderName} />
+    </QuoteTapTarget>
+  )
+})
+
+const QuoteChromeBody = memo(function QuoteChromeBody({
+  quoted,
+  outgoing,
+  end,
   senderName,
 }: {
   quoted: QuotedMessage
   outgoing: boolean
+  end: boolean
   senderName?: string
 }) {
   if (
@@ -316,15 +392,15 @@ const QuoteChrome = memo(function QuoteChrome({
     quoted.layoutMode === 'fused-on-image'
   ) {
     return (
-      <View className={cn('mb-0.5', outgoing ? 'items-end' : 'items-start')}>
-        <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
+      <View className={cn('mb-0.5', end ? 'items-end' : 'items-start')}>
+        <QuoteCaption quoted={quoted} outgoing={outgoing} end={end} senderName={senderName} />
       </View>
     )
   }
 
   return (
-    <View className={cn('mb-0.5', outgoing ? 'items-end' : 'items-start')}>
-      <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
+    <View className={cn('mb-0.5', end ? 'items-end' : 'items-start')}>
+      <QuoteCaption quoted={quoted} outgoing={outgoing} end={end} senderName={senderName} />
       <View className="max-w-[92%] flex-row items-center gap-2 overflow-hidden rounded-[18px] border border-line/80 bg-line/35 opacity-90">
         {quoted.thumbUri ? (
           // `<Image>` cannot decode mp4/mov, so a video quote needs a player
@@ -371,12 +447,16 @@ const FusedImageReply = memo(function FusedImageReply({
   quoted,
   body,
   outgoing,
+  end,
   senderName,
+  quoteGesture,
 }: {
   quoted: QuotedMessage
   body: string
   outgoing: boolean
+  end: boolean
   senderName?: string
+  quoteGesture?: TapGesture
 }) {
   const { width: screenW, height: screenH } = Dimensions.get('window')
   // Full bubble column — reply text can overhang the photo (Messenger).
@@ -413,9 +493,11 @@ const FusedImageReply = memo(function FusedImageReply({
   return (
     <View
       style={{ width: columnW, minWidth: columnW }}
-      className={cn(outgoing ? 'items-end' : 'items-start')}
+      className={cn(end ? 'items-end' : 'items-start')}
     >
-      <QuoteCaption quoted={quoted} outgoing={outgoing} senderName={senderName} />
+      <QuoteTapTarget gesture={quoteGesture}>
+        <QuoteCaption quoted={quoted} outgoing={outgoing} end={end} senderName={senderName} />
+      </QuoteTapTarget>
       <View
         style={{
           width: columnW,
@@ -425,7 +507,7 @@ const FusedImageReply = memo(function FusedImageReply({
         }}
         className={cn(
           'relative overflow-visible',
-          outgoing ? 'items-end' : 'items-start',
+          end ? 'items-end' : 'items-start',
         )}
       >
         {/* Recessed quoted photo — behind the reply bubble */}
@@ -462,14 +544,16 @@ const FusedImageReply = memo(function FusedImageReply({
             'px-3.5 py-2 shadow-md shadow-black/20',
             outgoing
               ? 'self-end rounded-[20px] rounded-br-md bg-primary'
-              : 'self-start rounded-[20px] rounded-bl-md border border-line/70 bg-bubble-in',
+              : end
+                ? 'self-end rounded-[20px] rounded-br-md border border-primary/15 bg-primary-soft'
+                : 'self-start rounded-[20px] rounded-bl-md border border-line/70 bg-bubble-in',
           )}
         >
           <Text
             variant="body"
             className={outgoing ? 'text-primary-foreground' : 'text-ink'}
           >
-            {body}
+            <LinkedText text={body} linkClassName={linkTint(outgoing)} />
           </Text>
         </View>
       </View>
@@ -484,12 +568,12 @@ const FusedImageReply = memo(function FusedImageReply({
 
 const ReactionBadge = memo(function ReactionBadge({
   reactions,
-  outgoing,
+  end,
   currentUserId,
   onToggleReaction,
 }: {
   reactions: ReactionGroup[]
-  outgoing: boolean
+  end: boolean
   currentUserId: string
   onToggleReaction?: (emoji: string) => void
 }) {
@@ -499,7 +583,7 @@ const ReactionBadge = memo(function ReactionBadge({
     <View
       className={cn(
         'absolute -bottom-3.5 z-10 flex-row items-center rounded-full border border-line/80 bg-surface px-2 py-0.5 shadow-md shadow-black/15',
-        outgoing ? 'right-2' : 'left-2',
+        end ? 'right-2' : 'left-2',
       )}
     >
       {reactions.map((reaction) =>
@@ -559,6 +643,7 @@ export const MessageBubble = memo(function MessageBubble({
   messageId,
   body,
   outgoing,
+  colleague = false,
   status,
   createdAt,
   edited,
@@ -570,6 +655,7 @@ export const MessageBubble = memo(function MessageBubble({
   delivery,
   onRetrySend,
   senderName,
+  senderRole,
   quoted,
   reactions = [],
   currentUserId,
@@ -579,6 +665,8 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenMenu,
   onReply,
   onToggleReaction,
+  onPressQuote,
+  highlighted,
 }: MessageBubbleProps) {
   const bubbleRef = useRef<View>(null)
   const sizeRef = useRef({ width: 0, height: 0 })
@@ -587,6 +675,8 @@ export const MessageBubble = memo(function MessageBubble({
   const x = useSharedValue(0)
   const tint = useSharedValue(0)
   const swipedHaptic = useSharedValue(false)
+  // Which side the bubble sits on. `outgoing` alone says whose it is.
+  const end = outgoing || colleague
   // The first attachment shapes the bubble; the rest are stacked inside it.
   const attachment = attachments[0]
   const trailing = attachments.slice(1)
@@ -594,6 +684,7 @@ export const MessageBubble = memo(function MessageBubble({
   // somewhere to sit, so a message carrying more than one keeps its chrome.
   const borderless = isImageOrVideo(attachment) && trailing.length === 0
   const hasText = body.trim().length > 0
+  const bodyHasLink = useMemo(() => hasLink(body), [body])
   const showChromeBubble = !borderless && (hasText || !!attachment)
   const fused =
     quoted?.layoutMode === 'fused-on-image' &&
@@ -633,7 +724,8 @@ export const MessageBubble = memo(function MessageBubble({
       const fallback = () => {
         onOpenMenu({
           messageId,
-          outgoing,
+          outgoing: end,
+          mine: outgoing,
           pageX: absX - size.width / 2,
           pageY: absY - size.height / 2,
           width: size.width,
@@ -648,7 +740,8 @@ export const MessageBubble = memo(function MessageBubble({
       void measureWindowOrPage(node, Dimensions.get('window')).then((rect) => {
         onOpenMenu({
           messageId,
-          outgoing,
+          outgoing: end,
+          mine: outgoing,
           pageX: rect.x,
           pageY: rect.y,
           width: rect.width,
@@ -656,7 +749,7 @@ export const MessageBubble = memo(function MessageBubble({
         })
       })
     },
-    [messageId, onOpenMenu, outgoing],
+    [end, messageId, onOpenMenu, outgoing],
   )
 
   const handleReply = useCallback(() => {
@@ -672,6 +765,35 @@ export const MessageBubble = memo(function MessageBubble({
         : undefined,
     [messageId, onToggleReaction],
   )
+
+  const handlePressQuote = useCallback(() => {
+    onPressQuote?.(messageId)
+  }, [messageId, onPressQuote])
+
+  const quoteGesture = useMemo(
+    () =>
+      onPressQuote && quoted
+        ? Gesture.Tap()
+            .maxDuration(LONG_PRESS_MS)
+            .maxDistance(12)
+            .onEnd((_, ok) => {
+              if (ok) scheduleOnRN(handlePressQuote)
+            })
+        : undefined,
+    [handlePressQuote, onPressQuote, quoted],
+  )
+
+  // The original a quote tap landed on flashes once — the long-press dimming,
+  // borrowed, so it reads as this bubble being pointed at rather than selected.
+  useEffect(() => {
+    if (!highlighted) return
+    tint.set(
+      withSequence(
+        withTiming(0.6, { duration: 140, easing: easing.out }),
+        withDelay(650, withTiming(0, { duration: 450, easing: easing.out })),
+      ),
+    )
+  }, [highlighted, tint])
 
   const handleRevealTime = useCallback(() => {
     onRevealTime?.(messageId)
@@ -709,9 +831,14 @@ export const MessageBubble = memo(function MessageBubble({
           would race that control for the same touch. Those bubbles still state
           their time when they end a run, and Message info reaches the rest.
         */
-        ...(onRevealTime && !attachment
+        // Nor where the text carries a link: the link's own press and this tap
+        // would race for the same touch, and the link is what was meant.
+        ...(onRevealTime && !attachment && !bodyHasLink
           ? [
-              Gesture.Tap()
+              (quoteGesture
+                ? Gesture.Tap().requireExternalGestureToFail(quoteGesture)
+                : Gesture.Tap()
+              )
                 .maxDuration(LONG_PRESS_MS)
                 .maxDistance(12)
                 .onEnd((_, ok) => {
@@ -754,8 +881,10 @@ export const MessageBubble = memo(function MessageBubble({
       ),
     [
       attachment,
+      bodyHasLink,
       handleRevealTime,
       handleReply,
+      quoteGesture,
       onOpenMenu,
       onRevealTime,
       reportOpen,
@@ -821,26 +950,40 @@ export const MessageBubble = memo(function MessageBubble({
             style={swipeStyle}
             className={cn(
               'max-w-[78%]',
-              outgoing ? 'self-end items-end' : 'self-start items-start',
+              end ? 'self-end items-end' : 'self-start items-start',
             )}
           >
             {senderName ? (
-              <Text variant="label" className="mb-1 px-1 font-normal text-muted">
-                {senderName}
-              </Text>
+              <View
+                className={cn(
+                  'mb-1 max-w-full flex-row items-center gap-1.5 px-1',
+                  end ? 'self-end' : 'self-start',
+                )}
+              >
+                <Text
+                  variant="label"
+                  numberOfLines={1}
+                  className="min-w-0 shrink font-normal text-muted"
+                >
+                  {senderName}
+                </Text>
+                {senderRole ? <RoleBadge role={senderRole} /> : null}
+              </View>
             ) : null}
             {showQuoteChrome && quoted ? (
               <QuoteChrome
                 quoted={quoted}
                 outgoing={outgoing}
+                end={end}
                 senderName={senderName}
+                quoteGesture={quoteGesture}
               />
             ) : null}
             {fused && quoted ? (
               <View
                 className={cn(
                   'relative overflow-visible',
-                  outgoing ? 'self-end' : 'self-start',
+                  end ? 'self-end' : 'self-start',
                   reactions.length > 0 && 'mb-2',
                 )}
               >
@@ -860,7 +1003,9 @@ export const MessageBubble = memo(function MessageBubble({
                     quoted={quoted}
                     body={body}
                     outgoing={outgoing}
+                    end={end}
                     senderName={senderName}
+                    quoteGesture={quoteGesture}
                   />
                   <Animated.View
                     pointerEvents="none"
@@ -873,7 +1018,7 @@ export const MessageBubble = memo(function MessageBubble({
                 </View>
                 <ReactionBadge
                   reactions={reactions}
-                  outgoing={outgoing}
+                  end={end}
                   currentUserId={currentUserId}
                   onToggleReaction={handleToggleReaction}
                 />
@@ -883,7 +1028,7 @@ export const MessageBubble = memo(function MessageBubble({
             <View
               className={cn(
                 'relative overflow-visible',
-                outgoing ? 'self-end' : 'self-start',
+                end ? 'self-end' : 'self-start',
                 reactions.length > 0 && 'mb-2',
               )}
               style={
@@ -909,7 +1054,9 @@ export const MessageBubble = memo(function MessageBubble({
                   showChromeBubble &&
                     (outgoing
                       ? 'rounded-[22px] rounded-br-md bg-primary shadow-primary/25'
-                      : 'rounded-[22px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8'),
+                      : colleague
+                        ? 'rounded-[22px] rounded-br-md border border-primary/15 bg-primary-soft shadow-black/8'
+                        : 'rounded-[22px] rounded-bl-md border border-line/70 bg-bubble-in shadow-black/8'),
                   borderless && 'bg-transparent shadow-none',
                 )}
                 style={
@@ -945,7 +1092,7 @@ export const MessageBubble = memo(function MessageBubble({
                       outgoing ? 'text-primary-foreground' : 'text-ink',
                     )}
                   >
-                    {body}
+                    <LinkedText text={body} linkClassName={linkTint(outgoing)} />
                     {/*
                       Trailing the text, inside the bubble, rather than beside the
                       time. The time cluster is drawn only on the newest bubble and
@@ -993,7 +1140,7 @@ export const MessageBubble = memo(function MessageBubble({
               </View>
               <ReactionBadge
                 reactions={reactions}
-                outgoing={outgoing}
+                end={end}
                 currentUserId={currentUserId}
                 onToggleReaction={handleToggleReaction}
               />
@@ -1005,6 +1152,7 @@ export const MessageBubble = memo(function MessageBubble({
               <Receipt
                 status={status}
                 outgoing={outgoing}
+                end={end}
                 createdAt={createdAt}
                 showTime={showTime || Boolean(timeRevealed)}
                 // A revealed bubble is being asked when it was sent, which is

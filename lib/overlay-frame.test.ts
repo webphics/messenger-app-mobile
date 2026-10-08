@@ -14,6 +14,7 @@ test('anchorFromPayload falls back to finger + size when the window rect is impl
       {
         messageId: 'm2',
         outgoing: true,
+        mine: true,
         pageX: 200,
         pageY: 400 * 33,
         width: 80,
@@ -25,6 +26,7 @@ test('anchorFromPayload falls back to finger + size when the window rect is impl
   ).toEqual({
     messageId: 'm2',
     outgoing: true,
+    mine: true,
     x: 160,
     y: 400 * 33 - 80 - 20,
     width: 80,

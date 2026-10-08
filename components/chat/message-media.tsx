@@ -5,6 +5,7 @@ import { useVideoPlayer, VideoView } from 'expo-video'
 
 import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
+import { LinkedText, linkTint } from '@/components/ui/linked-text'
 import { Text } from '@/components/ui/text'
 import { formatBytes } from '@/lib/attachments'
 import { fitImageSize, mediaCaptionColumnWidth } from '@/lib/image-layout'
@@ -82,7 +83,7 @@ function MediaShell({
             outgoing ? 'text-primary-foreground' : 'text-ink',
           )}
         >
-          {trimmed}
+          <LinkedText text={trimmed} linkClassName={linkTint(outgoing)} />
         </Text>
       ) : null}
     </View>
@@ -158,7 +159,7 @@ function CaptionBubble({
         variant="body"
         className={outgoing ? 'text-primary-foreground' : 'text-ink'}
       >
-        {text}
+        <LinkedText text={text} linkClassName={linkTint(outgoing)} />
       </Text>
     </View>
   )

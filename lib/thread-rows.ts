@@ -1,6 +1,13 @@
-import { isOutgoing, isSystemMessage, messageSenderName } from '@/lib/thread-state'
+import { messageStance, namesItsSender, type BubbleStance } from '@/lib/bubble-stance'
+import { isCompanyPersona } from '@/lib/display'
+import { isSystemMessage } from '@/lib/thread-state'
 import { formatDayLabel, shouldShowDayDivider } from '@/lib/message-day'
-import type { Message } from '@/lib/types'
+import {
+  isStaffMessage,
+  type ConversationType,
+  type Message,
+  type UserRole,
+} from '@/lib/types'
 
 /**
  * What a thread draws, in the order an inverted list wants it.
@@ -23,7 +30,14 @@ export type ThreadRow =
       type: 'message'
       id: string
       message: Message
+      /** Which side the bubble sits on and how it is painted — see `messageStance`. */
+      stance: BubbleStance
       senderName?: string
+      /**
+       * The role worn beside `senderName`. Absent for the company persona, which
+       * is an organization rather than somebody holding a role.
+       */
+      senderRole?: UserRole
       /**
        * Whether the next message down starts a new run.
        *
@@ -36,9 +50,12 @@ export type ThreadRow =
     }
 
 export type ThreadRowOptions = {
-  viewerId: string
-  /** Whether an incoming bubble is captioned with who sent it. Groups do; two-sided threads do not. */
-  namesSenders: boolean
+  viewer: { id: string; role: UserRole }
+  /**
+   * Decides sides and captions: a Group names everyone but the viewer, and a
+   * Support DM puts a colleague on the company's side and names them.
+   */
+  conversationType: ConversationType | undefined
 }
 
 /**
@@ -89,7 +106,7 @@ function messageSenderKey(message: Message): string {
 
 export function buildThreadRows(
   messages: Message[],
-  { viewerId, namesSenders }: ThreadRowOptions,
+  { viewer, conversationType }: ThreadRowOptions,
 ): ThreadRow[] {
   const rows: ThreadRow[] = []
 
@@ -106,15 +123,22 @@ export function buildThreadRows(
       continue
     }
 
+    const stance = messageStance(message, viewer, conversationType)
+    // Captioned only where this message begins a run — see `sameRun`.
+    const sender =
+      isStaffMessage(message) &&
+      namesItsSender(stance, conversationType) &&
+      !sameRun(previous, message)
+        ? message.sender
+        : undefined
+
     rows.push({
       type: 'message',
       id: message.id,
       message,
-      // Captioned only where this message begins a run — see `sameRun`.
-      senderName:
-        namesSenders && !isOutgoing(message, viewerId) && !sameRun(previous, message)
-          ? messageSenderName(message)
-          : undefined,
+      stance,
+      senderName: sender?.name,
+      senderRole: sender && !isCompanyPersona(sender.id) ? sender.role : undefined,
       endsRun: !sameRun(message, messages[i + 1]),
     })
   }

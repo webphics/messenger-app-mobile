@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { View, type NativeSyntheticEvent, type TextLayoutEventData } from 'react-native'
 
 import { TactilePressable } from '@/components/ui/tactile-pressable'
+import { LinkedText, linkTint } from '@/components/ui/linked-text'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
 import { wallBodyEmphasis, WALL_BODY_CLAMP_LINES } from '@/lib/wall-card'
@@ -74,7 +75,7 @@ export function WallPostBody({ body, hasImages }: { body: string; hasImages: boo
         numberOfLines={expanded ? undefined : WALL_BODY_CLAMP_LINES}
         className={emphasis}
       >
-        {body}
+        <LinkedText text={body} linkClassName={linkTint(false)} />
       </Text>
 
       {overflows ? (

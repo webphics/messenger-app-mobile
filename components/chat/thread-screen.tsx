@@ -54,6 +54,7 @@ import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
 import { threadNotice, type ThreadNotice } from '@/lib/thread-notice'
+import { jumpStep } from '@/lib/thread-jump'
 import { buildThreadRows, threadDayMarks, type ThreadRow } from '@/lib/thread-rows'
 import {
   anchorFromPayload,
@@ -107,6 +108,8 @@ type ThreadScreenProps = {
   /** Scrolling to the top of the thread asks for the page before it. */
   onLoadOlder?: () => void
   loadingOlder?: boolean
+  /** Whether `onLoadOlder` has anything left to fetch. Bounds a jump to a quoted message. */
+  hasOlder?: boolean
   refreshing?: boolean
   onRefresh?: () => void
   /**
@@ -374,6 +377,7 @@ export function ThreadScreen({
   onDismissFailure,
   onLoadOlder,
   loadingOlder = false,
+  hasOlder = false,
   refreshing = false,
   onRefresh,
   onSendMessage,
@@ -432,9 +436,6 @@ export function ThreadScreen({
     onDismissSendError?.()
   }, [onDismissSendError])
 
-  // What decides whether a bubble names who sent it. An Announcements thread
-  // speaks for the company rather than for a person, so it does not.
-  const isGroup = conversation.type === 'group'
 
   /**
    * Saved responses in the composer: staff only, since the API refuses a
@@ -452,8 +453,12 @@ export function ThreadScreen({
     [savedResponsesOrganizationId, canManageSavedResponses],
   )
   const rows = useMemo(
-    () => buildThreadRows(messages, { viewerId: viewer.id, namesSenders: isGroup }),
-    [messages, viewer.id, isGroup],
+    () =>
+      buildThreadRows(messages, {
+        viewer: { id: viewer.id, role: viewer.role },
+        conversationType: conversation.type,
+      }),
+    [messages, viewer.id, viewer.role, conversation.type],
   )
 
   /**
@@ -539,6 +544,13 @@ export function ThreadScreen({
     [],
   )
 
+  /**
+   * Where the row a scroll asked for should land: the top of the screen for a
+   * day's start, the middle for a quoted message. Read by the retry below, which
+   * is handed the index and nothing about why it was asked for.
+   */
+  const scrollViewPositionRef = useRef(1)
+
   const onScrollToIndexFailed = useCallback(
     (info: { index: number; averageItemLength: number }) => {
       listRef.current?.scrollToOffset({
@@ -548,10 +560,77 @@ export function ThreadScreen({
       // One frame is not enough on a cold window: the rows have to mount and
       // measure before the second attempt has anything better to go on.
       setTimeout(() => {
-        listRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 1 })
+        listRef.current?.scrollToIndex({
+          index: info.index,
+          animated: false,
+          viewPosition: scrollViewPositionRef.current,
+        })
       }, 80)
     },
     [],
+  )
+
+  /**
+   * A tap on a reply's quote: the original it answers, and how many older pages
+   * have been asked for while looking for it. Null when nothing is being looked
+   * for. See `jumpStep`.
+   */
+  const [jump, setJump] = useState<{ targetId: string; pagesLoaded: number } | null>(null)
+  /** The original a jump landed on, flashed so the eye finds it. */
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
+
+  /* eslint-disable react-hooks/set-state-in-effect -- the walk advances when a
+     page of history lands, which is the outside world answering; each step is
+     decided by what arrived, so it cannot move into the tap that started it. */
+  useEffect(() => {
+    if (!jump) return
+    const step = jumpStep(rows, jump.targetId, {
+      pagesLoaded: jump.pagesLoaded,
+      loadingOlder,
+      canLoadOlder: hasOlder && Boolean(onLoadOlder),
+    })
+
+    if (step.kind === 'wait') return
+    if (step.kind === 'scroll') {
+      setJump(null)
+      scrollViewPositionRef.current = 0.5
+      listRef.current?.scrollToIndex({
+        index: step.index,
+        animated: !reduceMotion,
+        viewPosition: 0.5,
+      })
+      setHighlightedId(jump.targetId)
+      return
+    }
+    if (step.kind === 'give-up') {
+      setJump(null)
+      setRefusal('The original message is no longer available.')
+      return
+    }
+
+    // Counted whether or not the load fetched anything. One that had nothing to
+    // ask for changes no rows, and the count is what still brings this to an end.
+    onLoadOlder?.()
+    setJump({ ...jump, pagesLoaded: jump.pagesLoaded + 1 })
+  }, [jump, rows, loadingOlder, hasOlder, onLoadOlder, reduceMotion])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!highlightedId) return
+    const done = setTimeout(() => setHighlightedId(null), 1600)
+    return () => clearTimeout(done)
+  }, [highlightedId])
+
+  /** Asked by a bubble whose quote was tapped, with the reply's own id. */
+  const jumpToQuoted = useCallback(
+    (replyId: string) => {
+      const reply = messages.find((message) => message.id === replyId)
+      const targetId = reply?.replyTo?.id
+      if (!targetId) return
+      setHighlightedId(null)
+      setJump({ targetId, pagesLoaded: 0 })
+    },
+    [messages],
   )
 
   const jumpToDayStart = useCallback(() => {
@@ -560,6 +639,7 @@ export function ThreadScreen({
     // `viewPosition: 1` is the top of the screen on an inverted list: the
     // transform flips the axis, so the scroll's "end" is what the reader sees
     // first.
+    scrollViewPositionRef.current = 1
     listRef.current?.scrollToIndex({
       index: mark.dividerIndex,
       animated: !reduceMotion,
@@ -676,7 +756,7 @@ export function ThreadScreen({
    * A message this device is still carrying has no id the server would know.
    */
   const canShowInfo = useCallback(
-    (anchor: ReactionAnchor) => anchor.outgoing && !isLocalId(anchor.messageId),
+    (anchor: ReactionAnchor) => anchor.mine && !isLocalId(anchor.messageId),
     [],
   )
 
@@ -850,7 +930,8 @@ export function ThreadScreen({
           messageId={item.message.id}
           body={content.body}
           attachments={attachmentViews(item.message.attachments)}
-          outgoing={isOutgoing(item.message, viewer.id)}
+          outgoing={item.stance.isMine}
+          colleague={item.stance.variant === 'colleague'}
           status={item.message.receiptStatus}
           createdAt={item.message.createdAt}
           edited={Boolean(item.message.editedAt)}
@@ -860,7 +941,10 @@ export function ThreadScreen({
           timeRevealed={revealedTimeId === item.message.id}
           onRevealTime={revealTime}
           senderName={item.senderName}
+          senderRole={item.senderRole}
           quoted={quotedById.get(item.message.id)}
+          onPressQuote={item.message.replyTo ? jumpToQuoted : undefined}
+          highlighted={highlightedId === item.message.id}
           reactions={groupReactions(item.message.reactions)}
           currentUserId={viewer.id}
           selected={menuId === item.message.id}
@@ -890,6 +974,8 @@ export function ThreadScreen({
       revealTime,
       latest?.id,
       latestStamp,
+      jumpToQuoted,
+      highlightedId,
     ],
   )
 

@@ -1,13 +1,23 @@
 import {
   FileText,
+  Keyboard as KeyboardIcon,
   Mic,
   Plus,
   Send,
+  Smile,
   Square,
   X,
 } from '@/components/icons'
-import { useEffect, useRef, useState } from 'react'
-import { Alert, Image, Pressable, View } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Alert,
+  BackHandler,
+  Image,
+  Keyboard,
+  Pressable,
+  View,
+  type TextInput,
+} from 'react-native'
 import {
   RecordingPresets,
   requestRecordingPermissionsAsync,
@@ -24,6 +34,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AttachmentSheet } from '@/components/chat/attachment-sheet'
+import { EMOJI_PANEL_FALLBACK_HEIGHT, EmojiPanel } from '@/components/chat/emoji-panel'
 import { SavedResponsePicker } from '@/components/chat/saved-response-picker'
 import { VideoThumb } from '@/components/chat/video-thumb'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
@@ -190,6 +201,22 @@ export function Composer({
    * typing. Kept in a ref: it changes on every keystroke and nothing draws it.
    */
   const selectionRef = useRef<{ start: number; end: number } | null>(null)
+  const inputRef = useRef<TextInput>(null)
+  // The latest draft and setter, for `insertEmoji` — see there.
+  const valueRef = useRef(value)
+  const onChangeTextRef = useRef(onChangeText)
+  useEffect(() => {
+    valueRef.current = value
+    onChangeTextRef.current = onChangeText
+  })
+  /**
+   * Whether the emoji panel stands where the keyboard was. Messenger's smiley:
+   * one tap swaps the keyboard for the panel, the keyboard icon in its place —
+   * or a tap on the field — swaps it back.
+   */
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  /** The keyboard's last height, so the panel replaces it without the thread jumping. */
+  const [panelHeight, setPanelHeight] = useState(EMOJI_PANEL_FALLBACK_HEIGHT)
   const [staged, setStaged] = useState<AttachmentView | null>(null)
   const [recording, setRecording] = useState(false)
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -252,6 +279,27 @@ export function Composer({
       })()
     }
   }, [])
+
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', (event) => {
+      const height = Math.round(event.endCoordinates.height)
+      if (height > 0) setPanelHeight(height)
+      // The keyboard came back by some other road than the toggle — a focus
+      // from elsewhere — and two inputs cannot share the space.
+      setEmojiOpen(false)
+    })
+    return () => sub.remove()
+  }, [])
+
+  // Back closes the panel before it leaves the thread, as it would a keyboard.
+  useEffect(() => {
+    if (!emojiOpen) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setEmojiOpen(false)
+      return true
+    })
+    return () => sub.remove()
+  }, [emojiOpen])
 
   useEffect(() => {
     meteringRef.current = recorderState.metering ?? null
@@ -336,6 +384,7 @@ export function Composer({
         return
       }
       if (outcome !== 'proceed') return
+      setEmojiOpen(false)
       await setAudioModeAsync({
         playsInSilentMode: true,
         allowsRecording: true,
@@ -426,6 +475,37 @@ export function Composer({
     selectionRef.current = { start: next.caret, end: next.caret }
     setPickerOpen(false)
   }
+
+  function toggleEmoji() {
+    if (emojiOpen) {
+      // Focusing brings the keyboard back, and its show event closes the panel.
+      // Closed here as well, for a field whose keyboard was already up.
+      setEmojiOpen(false)
+      inputRef.current?.focus()
+      return
+    }
+    Keyboard.dismiss()
+    setEmojiOpen(true)
+  }
+
+  /**
+   * Puts an emoji where the caret was, replacing a selection the way typing does.
+   *
+   * Reads the draft through a ref and is itself stable: the emoji keyboard
+   * memoises its grid forever and calls whichever handler it was first given, so
+   * a handler closing over `value` would insert every emoji into the draft as it
+   * stood when the panel opened — each tap replacing the last.
+   */
+  const insertEmoji = useCallback((emoji: string) => {
+    const current = valueRef.current
+    const caret = selectionRef.current ?? { start: current.length, end: current.length }
+    const start = Math.min(caret.start, current.length)
+    const end = Math.min(Math.max(caret.end, start), current.length)
+    const next = current.slice(0, start) + emoji + current.slice(end)
+    valueRef.current = next
+    onChangeTextRef.current(next)
+    selectionRef.current = { start: start + emoji.length, end: start + emoji.length }
+  }, [])
 
   function handleSend() {
     if (recording) return
@@ -526,7 +606,10 @@ export function Composer({
             accessibilityRole="button"
             accessibilityLabel="Attach"
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            onPress={() => setAttachOpen(true)}
+            onPress={() => {
+              setEmojiOpen(false)
+              setAttachOpen(true)
+            }}
             className="mb-0.5 size-11 items-center justify-center rounded-full bg-line/35 border border-line/80"
           >
             <Plus color={colors.inkSoft} size={20} />
@@ -539,17 +622,36 @@ export function Composer({
                 onClear={() => setStaged(null)}
               />
             ) : null}
-            <Input
-              value={value}
-              onChangeText={onChangeText}
-              onSelectionChange={(event) => {
-                selectionRef.current = event.nativeEvent.selection
-              }}
-              placeholder={replyTo ? 'Write a reply…' : 'Type a message…'}
-              accessibilityLabel="Message"
-              multiline
-              className="max-h-28 min-h-7 h-auto border-0 bg-transparent px-1 py-1 font-sans text-base text-ink"
-            />
+            <View className="flex-row items-end">
+              <Input
+                ref={inputRef}
+                value={value}
+                onChangeText={onChangeText}
+                onSelectionChange={(event) => {
+                  selectionRef.current = event.nativeEvent.selection
+                }}
+                // A tap on the field while the panel is up asks for the keyboard.
+                onFocus={() => setEmojiOpen(false)}
+                placeholder={replyTo ? 'Write a reply…' : 'Type a message…'}
+                accessibilityLabel="Message"
+                multiline
+                className="max-h-28 min-h-7 h-auto min-w-0 flex-1 border-0 bg-transparent px-1 py-1 font-sans text-base text-ink"
+              />
+              {/* Inside the field, trailing, where Messenger keeps it. */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={emojiOpen ? 'Show keyboard' : 'Emoji'}
+                hitSlop={10}
+                onPress={toggleEmoji}
+                className="mb-0.5 ml-1 size-7 items-center justify-center rounded-full active:opacity-60"
+              >
+                {emojiOpen ? (
+                  <KeyboardIcon color={colors.primary} size={20} />
+                ) : (
+                  <Smile color={colors.primary} size={21} />
+                )}
+              </Pressable>
+            </View>
           </View>
 
           {showMic ? (
@@ -576,6 +678,10 @@ export function Composer({
           )}
         </View>
       )}
+
+      {emojiOpen && !recording ? (
+        <EmojiPanel height={panelHeight} onEmojiSelected={insertEmoji} />
+      ) : null}
 
       <AttachmentSheet
         visible={attachOpen}
