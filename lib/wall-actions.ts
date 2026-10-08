@@ -159,30 +159,6 @@ export function canReplyToWallPost(viewer: WallPostViewer): boolean {
   return viewer.role === 'customer'
 }
 
-/** How much of a Post's body a reply reference quotes before it is cut off. */
-export const WALL_POST_REPLY_QUOTE_MAX = 120
-
-/**
- * The reference to a Post seeded into the composer when somebody replies to
- * it (#77) — never a link, since a Post has no permalink this app can open,
- * and never a structured quote either: `CONTEXT.md`'s Reply to a Post is a
- * plain reference in the composer, editable like anything else typed there,
- * not the quoted-message strip a Message reply draws above it.
- *
- * A blank line follows it so the cursor lands ready for what the person
- * actually wants to ask, rather than mid-quote.
- */
-export function wallPostReplyDraft(post: WallPost): string {
-  const body = post.body?.trim()
-  if (!body) return `Re: ${post.author.name}’s post\n\n`
-
-  const quoted =
-    body.length > WALL_POST_REPLY_QUOTE_MAX
-      ? `${body.slice(0, WALL_POST_REPLY_QUOTE_MAX - 1).trimEnd()}…`
-      : body
-  return `Re: “${quoted}”\n\n`
-}
-
 /**
  * One sentence for an edit or a removal the API refused, or nothing.
  *

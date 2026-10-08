@@ -1,4 +1,5 @@
 import {
+  parseContact,
   parseConversation,
   parseConversations,
   parseMessage,
@@ -152,6 +153,33 @@ describe('parseConversation', () => {
       type: 'support_dm',
       organizationId: null,
     })
+  })
+
+  test('reads whether a staff onboarding row is still open', () => {
+    const open = parseConversation(staffRow({ organizationId: null, onboardingOpen: true }))
+    expect(open).toMatchObject({ organizationId: null, onboardingOpen: true })
+    const ended = parseConversation(staffRow({ organizationId: null, onboardingOpen: false }))
+    expect(ended).toMatchObject({ organizationId: null, onboardingOpen: false })
+  })
+
+  /*
+   * Closed unless the API says it is open: an API that predates the field, or a value this
+   * build cannot read, must not offer to place a Customer who may already belong somewhere.
+   */
+  test('reads a staff row with no or an unreadable onboardingOpen as closed', () => {
+    expect(parseConversation(staffRow({ organizationId: null }))).toMatchObject({
+      onboardingOpen: false,
+    })
+    expect(
+      parseConversation(staffRow({ organizationId: null, onboardingOpen: 'true' })),
+    ).toMatchObject({ onboardingOpen: false })
+  })
+
+  test("adds no onboardingOpen to a Customer's own onboarding row", () => {
+    const own = parseConversation(
+      customerSupportRow({ organizationId: null, onboardingOpen: true }),
+    )
+    expect(own).not.toHaveProperty('onboardingOpen')
   })
 
   test('still refuses a group that belongs to no organization', () => {
@@ -436,5 +464,35 @@ describe('parseNotes', () => {
     })
 
     expect(parseNotes([note(), tombstone]).map((parsed) => parsed.id)).toEqual(['note-1'])
+  })
+})
+
+describe('parseContact', () => {
+  const row = {
+    id: 'cust-1',
+    name: 'Mara Lin',
+    kind: 'customer',
+    role: 'customer',
+    conversationId: 'conv-1',
+  }
+
+  test('reads the organizations a conversation with the contact can belong to', () => {
+    const parsed = parseContact({
+      ...row,
+      organizations: [
+        { id: 'org-1', name: 'Talo' },
+        { id: 'org-2', name: 'Northwind' },
+        { id: 'org-3' },
+      ],
+    })
+    expect(parsed?.organizations).toEqual([
+      { id: 'org-1', name: 'Talo' },
+      { id: 'org-2', name: 'Northwind' },
+    ])
+  })
+
+  test('an empty list and an absent field stay different', () => {
+    expect(parseContact({ ...row, organizations: [] })?.organizations).toEqual([])
+    expect(parseContact(row)?.organizations).toBeNull()
   })
 })

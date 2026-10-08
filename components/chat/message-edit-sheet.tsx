@@ -127,6 +127,7 @@ function EditSheet({
 
           <Text variant="meta" className="text-muted">
             Everyone in the conversation sees the new wording, and the message is marked as edited.
+            The version you are replacing stays in its edit history.
           </Text>
 
           <TextInput

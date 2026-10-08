@@ -9,6 +9,7 @@ import {
   parseLabel,
   parseLabels,
   parseMessage,
+  parseMessageHistory,
   parseMessageReceipts,
   parseMessages,
   parseNote,
@@ -28,6 +29,7 @@ import type {
   LabelColor,
   Message,
   MessageAttachment,
+  MessageHistory,
   MessageReceipts,
   Organization,
   StaffDirectoryUser,
@@ -100,6 +102,23 @@ export async function createStaffDm(
   const outcome = await authenticatedRequest('/conversations/staff', {
     method: 'POST',
     body: { userId, ...(organizationId ? { organizationId } : {}) },
+  })
+  return readOutcome(outcome, parseConversation)
+}
+
+/**
+ * A Customer's Support DM in one organization, found or created, for staff holding
+ * `message_customers`. The staff side of `ensureSupportConversation`, and the call the web
+ * client makes for the same thing. `organizationId` is needed only when the two share more than
+ * one organization; the schema is `.strict()`, so an undefined value has to be an absent key.
+ */
+export async function startCustomerConversation(
+  customerId: string,
+  organizationId?: string,
+): Promise<ApiResult<Conversation>> {
+  const outcome = await authenticatedRequest('/conversations/support/with-customer', {
+    method: 'POST',
+    body: { customerId, ...(organizationId ? { organizationId } : {}) },
   })
   return readOutcome(outcome, parseConversation)
 }
@@ -192,10 +211,18 @@ export async function listMessages(
 }
 
 export type SendMessageDraft = {
-  /** Trimmed by the caller. The API refuses a message with neither body nor attachments. */
+  /**
+   * Trimmed by the caller. The API refuses a message with no body, no
+   * attachments and no Post.
+   */
   body: string
   /** The message being answered, when the composer had a reply open. */
   replyToMessageId?: string
+  /**
+   * The Post this message is about (a Reply to a Post). Enough on its own: the
+   * API takes a message that is only a Post, with no body and no attachments.
+   */
+  wallPostId?: string
   /**
    * Already uploaded. Every URL here names an object the API stored, which is
    * what `uploadAttachment` answers with — a device URI would be accepted by the
@@ -236,6 +263,7 @@ export async function sendMessage(
         ...(draft.body === '' ? {} : { body: draft.body }),
         messageType: draft.messageType ?? 'text',
         ...(draft.replyToMessageId ? { replyToMessageId: draft.replyToMessageId } : {}),
+        ...(draft.wallPostId ? { wallPostId: draft.wallPostId } : {}),
         ...(draft.attachments && draft.attachments.length > 0
           ? { attachments: draft.attachments.map(sendableAttachment) }
           : {}),
@@ -327,6 +355,21 @@ export async function fetchMessageReceipts(
     `/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/receipts`,
   )
   return readOutcome(outcome, parseMessageReceipts)
+}
+
+/**
+ * Every wording one message has had, oldest first, ending with its current
+ * body. Open to everyone who can read the message; the API leaves the writer
+ * out for a Customer, so nothing here branches on a role.
+ */
+export async function fetchMessageHistory(
+  id: string,
+  messageId: string,
+): Promise<ApiResult<MessageHistory>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}/history`,
+  )
+  return readOutcome(outcome, parseMessageHistory)
 }
 
 export async function removeReaction(

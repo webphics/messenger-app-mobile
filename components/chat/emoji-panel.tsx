@@ -16,7 +16,7 @@ const THEME = {
     icon: colors.muted,
     iconActive: colors.primary,
     container: colors.surface,
-    containerActive: '#EEEAF8',
+    containerActive: colors.primarySoft,
   },
   search: {
     background: colors.bg,
@@ -24,7 +24,7 @@ const THEME = {
     placeholder: colors.muted,
     icon: colors.muted,
   },
-  emoji: { selected: '#EEEAF8' },
+  emoji: { selected: colors.primarySoft },
 }
 
 const STYLES = {

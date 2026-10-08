@@ -15,6 +15,7 @@ import { AlertCircle, X } from '@/components/icons'
 import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
 import { MessageActions } from '@/components/chat/message-actions'
 import { MessageEditSheet } from '@/components/chat/message-edit-sheet'
+import { MessageHistorySheet } from '@/components/chat/message-history-sheet'
 import { ThreadDayPill } from '@/components/chat/thread-day-pill'
 import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
 import { ThreadHeader } from '@/components/chat/thread-header'
@@ -50,6 +51,7 @@ import {
   quoteLayoutMode,
   type BubbleContent,
 } from '@/lib/message-attachment'
+import { offersEditHistory } from '@/lib/message-history'
 import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
@@ -62,6 +64,8 @@ import {
   type ReactionAnchor,
 } from '@/lib/overlay-frame'
 import type { Conversation, Message, UserRole } from '@/lib/types'
+import { useWallPostReplyDraft } from '@/lib/use-wall-post-reply-draft'
+import { wallPostHref } from '@/lib/wall-route'
 
 export type ThreadViewer = {
   id: string
@@ -83,12 +87,11 @@ type ThreadScreenProps = {
   supportAssignment: boolean
   organizationNames?: ReadonlyMap<string, string>
   /**
-   * What the composer opens holding, read once on mount. Reply on a Post
-   * (#77) is the one caller today — a reference to the Post, seeded so the
-   * person can ask about it without typing it themselves, and editable like
-   * anything else in the box.
+   * The Post a Reply on a Post (#77) opened this thread with, read once on
+   * mount. It waits in the composer and goes out as a card with the next
+   * message, or on its own; the person can leave it out.
    */
-  initialDraft?: string
+  initialWallPostId?: string
   /** True only while the first page is out and there is nothing yet to draw. */
   loading?: boolean
   /**
@@ -370,7 +373,7 @@ export function ThreadScreen({
   viewer,
   supportAssignment,
   organizationNames,
-  initialDraft,
+  initialWallPostId,
   loading = false,
   failure = null,
   onRetry,
@@ -396,7 +399,8 @@ export function ThreadScreen({
   const listRef = useRef<FlatList<ThreadRow>>(null)
   const reduceMotion = useReducedMotion()
   const stickToLatestRef = useRef(false)
-  const [draft, setDraft] = useState(initialDraft ?? '')
+  const [draft, setDraft] = useState('')
+  const pendingPost = useWallPostReplyDraft(initialWallPostId, conversation.organizationId)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const [menu, setMenu] = useState<ReactionAnchor | null>(null)
   /**
@@ -430,11 +434,13 @@ export function ThreadScreen({
    * a message is in flight — and a failure that only ever appeared over a
    * composer would vanish exactly when it stopped being recoverable.
    */
-  const notice = refusal ?? sendError
+  const notice = refusal ?? sendError ?? pendingPost.notice
+  const dismissPostNotice = pendingPost.dismissNotice
   const dismissNotice = useCallback(() => {
     setRefusal(null)
     onDismissSendError?.()
-  }, [onDismissSendError])
+    dismissPostNotice()
+  }, [onDismissSendError, dismissPostNotice])
 
 
   /**
@@ -822,6 +828,31 @@ export function ThreadScreen({
     [messages],
   )
 
+  /**
+   * The message whose edit history is open, by id rather than whole, unlike the
+   * edit sheet: the history should follow the message as it changes, so an edit
+   * landing over the socket while it is open re-reads it (`useMessageHistory`).
+   */
+  const [historyMessageId, setHistoryMessageId] = useState<string | null>(null)
+  const historyMessage = useMemo(
+    () => (historyMessageId ? (messages.find((item) => item.id === historyMessageId) ?? null) : null),
+    [historyMessageId, messages],
+  )
+
+  /** Any edited message the server holds, whoever sent it and whatever the thread allows. */
+  const canShowHistory = useCallback(
+    (messageId: string) => {
+      const message = messages.find((item) => item.id === messageId)
+      return message !== undefined && offersEditHistory(message)
+    },
+    [messages],
+  )
+
+  const openEditHistory = useCallback((messageId: string) => {
+    setMenu(null)
+    setHistoryMessageId(messageId)
+  }, [])
+
   const openMenu = useCallback((payload: OpenMenuPayload) => {
     const host = hostRef.current
     if (!host) return
@@ -873,7 +904,8 @@ export function ThreadScreen({
    */
   function send(payload: ComposerSendPayload): boolean {
     const body = payload.body.trim()
-    if (!body && !payload.attachment) return false
+    const wallPost = pendingPost.wallPost
+    if (!body && !payload.attachment && !wallPost) return false
 
     if (payload.attachment) {
       const reason = rejectUploadReason(payload.attachment)
@@ -899,8 +931,11 @@ export function ThreadScreen({
     onSendMessage({
       body,
       replyTo: quoted,
+      ...(wallPost ? { wallPost } : {}),
       ...(payload.attachment ? { attachments: [payload.attachment] } : {}),
     })
+    // One card per Post: it goes with this message and not the next.
+    if (wallPost) pendingPost.clear()
     return true
   }
 
@@ -908,6 +943,11 @@ export function ThreadScreen({
     if (!stickToLatestRef.current) return
     stickToLatestRef.current = false
     listRef.current?.scrollToOffset({ offset: 0, animated: true })
+  }, [])
+
+  /** A Reply to a Post's card opens the Post, judged again for this reader there. */
+  const openWallPost = useCallback((postId: string) => {
+    router.push(wallPostHref(postId))
   }, [])
 
   const renderItem = useCallback(
@@ -935,6 +975,7 @@ export function ThreadScreen({
           status={item.message.receiptStatus}
           createdAt={item.message.createdAt}
           edited={Boolean(item.message.editedAt)}
+          onOpenEditHistory={offersEditHistory(item.message) ? openEditHistory : undefined}
           endsRun={item.endsRun}
           showTime={item.message.id === latest?.id}
           timeLabel={item.message.id === latest?.id ? latestStamp : undefined}
@@ -944,6 +985,8 @@ export function ThreadScreen({
           senderRole={item.senderRole}
           quoted={quotedById.get(item.message.id)}
           onPressQuote={item.message.replyTo ? jumpToQuoted : undefined}
+          wallPost={item.message.wallPost}
+          onOpenWallPost={openWallPost}
           highlighted={highlightedId === item.message.id}
           reactions={groupReactions(item.message.reactions)}
           currentUserId={viewer.id}
@@ -976,6 +1019,8 @@ export function ThreadScreen({
       latestStamp,
       jumpToQuoted,
       highlightedId,
+      openEditHistory,
+      openWallPost,
     ],
   )
 
@@ -1068,6 +1113,8 @@ export function ThreadScreen({
           onSend={send}
           replyTo={replyQuote}
           onCancelReply={() => setReplyTo(null)}
+          wallPost={pendingPost.wallPost}
+          onRemoveWallPost={pendingPost.clear}
           keyboardInset={keyboardInset}
           savedResponses={savedResponses}
         />
@@ -1083,6 +1130,9 @@ export function ThreadScreen({
           }
           onReply={readOnly ? undefined : () => handleReply(menu.messageId)}
           onEdit={canEdit(menu.messageId) ? () => openEditSheet(menu.messageId) : undefined}
+          onHistory={
+            canShowHistory(menu.messageId) ? () => openEditHistory(menu.messageId) : undefined
+          }
           onInfo={canShowInfo(menu) ? () => showMessageInfo(menu.messageId) : undefined}
         />
       ) : null}
@@ -1099,6 +1149,12 @@ export function ThreadScreen({
           onSave={(body) => onEditMessage(messageToEdit.id, body)}
         />
       ) : null}
+
+      <MessageHistorySheet
+        conversationId={conversation.id}
+        message={historyMessage}
+        onClose={() => setHistoryMessageId(null)}
+      />
     </View>
   )
 

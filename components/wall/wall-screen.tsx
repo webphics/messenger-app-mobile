@@ -17,7 +17,6 @@ import { colors } from '@/lib/tokens'
 import { useComposableWallOrganizations } from '@/lib/use-composable-wall-organizations'
 import { useWall, useWallSearch, type WallBodyView } from '@/lib/use-wall'
 import { useWallPostReply } from '@/lib/use-wall-post-reply'
-import { wallPostReplyDraft } from '@/lib/wall-actions'
 import { wallSavedHref } from '@/lib/wall-route'
 import { wallKindColor, wallKindLabel } from '@/lib/wall-kind'
 import { WALL_SORT_OPTIONS } from '@/lib/wall-sort'
@@ -173,8 +172,8 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
   const { notice, viewer } = wall
 
   /**
-   * Reply (#77): the viewer's own support conversation, opened with a
-   * reference to the tapped Post seeded into the composer. Lives here rather
+   * Reply (#77): the viewer's own support conversation, opened with the tapped
+   * Post waiting in the composer to go out as a card that opens it. Lives here rather
    * than on `WallScreen` because every Wall presentation this body draws —
    * the default one, a shared named Wall, Saved — offers the same Reply on
    * the same card.
@@ -184,7 +183,7 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
   const onReply = useCallback(
     (post: WallPost) => {
       void replyToPost(post).then((id) => {
-        if (id) router.push(chatHref(id, wallPostReplyDraft(post)))
+        if (id) router.push(chatHref(id, post.id))
       })
     },
     [replyToPost],

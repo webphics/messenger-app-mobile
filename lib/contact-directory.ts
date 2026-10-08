@@ -31,23 +31,32 @@ export type ContactIntent =
   | { kind: 'open'; conversationId: string }
   /** A staff DM, bound to the one organization named or to whichever the API picks. */
   | { kind: 'staff-dm'; userId: string; organizationId?: string }
-  /** Several shared organizations: the person picks which the DM belongs to. */
-  | { kind: 'choose'; userId: string; organizations: Organization[] }
+  /**
+   * A Customer's support thread, from the staff side
+   * (`POST /conversations/support/with-customer`): found or created, in the one
+   * organization named or in whichever the API finds the two share.
+   */
+  | { kind: 'customer'; customerId: string; organizationId?: string }
+  /**
+   * Several organizations: the person picks which the conversation belongs to,
+   * and `with` says which request the pick goes to.
+   */
+  | { kind: 'choose'; userId: string; with: 'staff-dm' | 'customer'; organizations: Organization[] }
   /** A Customer's support thread with one company, created if it is their first. */
   | { kind: 'support'; organizationId: string }
   /** Nothing a tap can do, and why. */
   | { kind: 'unavailable'; reason: string }
 
 /**
- * What the directory says about this staff member, where the directory has been
- * read.
+ * What the staff directory says about this staff member, where the directory
+ * has been read.
  *
- * `GET /conversations/contacts` does not carry `sharedOrganizations` and
- * `GET /conversations/staff` does, so the People screen reads both and this is
- * how the second reaches the first. Null is *not* the same as an empty list:
- * null is the staff directory not having answered — which it never does for a
- * Customer, who is refused it — and an empty list is a pair who share no
- * organization and can hold no DM at all.
+ * Every contact row now carries its own `organizations`, and that is what a tap
+ * reads. This is the fallback for a row that does not carry the field, from
+ * `GET /conversations/staff`'s `sharedOrganizations`. Null is *not* the same as
+ * an empty list: null is the staff directory not having answered — which it
+ * never does for a Customer, who is refused it — and an empty list is a pair
+ * who share no organization and can hold no DM at all.
  */
 export type SharedOrganizations = Organization[] | null
 
@@ -58,28 +67,40 @@ export type SharedOrganizations = Organization[] | null
  * Admin reaches anybody. A thread that already exists still opens; only a new
  * one is out of reach. Required, so a caller that forgets it fails to compile
  * rather than offering a DM the API would refuse.
+ *
+ * The organizations are the row's own (`GET /conversations/contacts`), and only
+ * where the row carries none at all the staff directory's `shared`. With more
+ * than one the person is asked which before anything opens, even when the row
+ * names a thread: that thread is one organization's, and each of the others
+ * holds its own. With exactly one, a new conversation is bound to it.
  */
 export function contactIntent(
   contact: Contact,
   shared: SharedOrganizations,
   viewer: StaffDmViewer | null,
 ): ContactIntent {
-  // The API already resolved this, for every kind. A row that names a thread is
-  // a row with nothing left to decide, and that includes a Customer — whose
-  // support thread the viewer can open but could never create.
-  if (contact.conversationId) {
-    return { kind: 'open', conversationId: contact.conversationId }
-  }
+  const organizations = contact.organizations ?? shared
 
   if (contact.kind === 'company') {
+    if (contact.conversationId) return { kind: 'open', conversationId: contact.conversationId }
     // A company row is one organization, and its id is the organization's.
     return { kind: 'support', organizationId: contact.id }
   }
 
-  // `reachableContacts` keeps these off the screen; this answers for a caller
-  // that did not narrow first, rather than offering a create nothing backs.
   if (contact.kind === 'customer') {
-    return { kind: 'unavailable', reason: 'No support thread yet' }
+    // Staff are sent customer rows only while they hold `message_customers`, so
+    // every one of these can be started; the API still judges the request.
+    if (organizations && organizations.length > 1) {
+      return { kind: 'choose', userId: contact.id, with: 'customer', organizations }
+    }
+    if (contact.conversationId) return { kind: 'open', conversationId: contact.conversationId }
+    if (organizations?.length === 0) {
+      return { kind: 'unavailable', reason: 'You share no organization' }
+    }
+    const only = organizations?.[0]
+    return only
+      ? { kind: 'customer', customerId: contact.id, organizationId: only.id }
+      : { kind: 'customer', customerId: contact.id }
   }
 
   /*
@@ -92,33 +113,48 @@ export function contactIntent(
    * here as null on a row that looks like a colleague, and is refused: this
    * client knows which roles the API accepts, and a role it has never heard of
    * is not one of them.
+   *
+   * A thread the row already names still opens, here and below: only a new DM
+   * is out of reach, so the choice of organization is too.
    */
-  if (contact.role !== 'admin' && contact.role !== 'agent') {
+  const role = contact.role === 'admin' || contact.role === 'agent' ? contact.role : null
+  const canStart = role !== null && canHoldStaffDm(viewer, role)
+  const choosing = canStart && organizations !== null && organizations.length > 1
+
+  if (contact.conversationId && !choosing) {
+    return { kind: 'open', conversationId: contact.conversationId }
+  }
+
+  if (role === null) {
     return { kind: 'unavailable', reason: 'Not a staff account' }
   }
 
-  if (!canHoldStaffDm(viewer, contact.role)) {
+  if (!canStart) {
     const reason =
       viewer?.role === 'agent' ? "You can't message other agents" : "You can't message staff"
     return { kind: 'unavailable', reason }
   }
 
-  // Staff, with no thread yet. The organization a DM binds to is the staff
-  // directory's answer, and the rules for reading it already exist — one binds
-  // silently, several are a choice, none means no DM can exist. Reused rather
-  // than restated so the two screens cannot drift.
+  // The organization a DM binds to: one binds silently, several are a choice,
+  // none means no DM can exist. `staffDmIntent` holds those rules for the staff
+  // directory, and is reused rather than restated so the two screens cannot drift.
   const intent = staffDmIntent({
     id: contact.id,
     name: contact.name,
-    role: contact.role,
-    sharedOrganizations: shared,
+    role,
+    sharedOrganizations: organizations,
   })
 
   if (intent.kind === 'impossible') {
     return { kind: 'unavailable', reason: 'You share no organization' }
   }
   if (intent.kind === 'choose') {
-    return { kind: 'choose', userId: contact.id, organizations: intent.organizations }
+    return {
+      kind: 'choose',
+      userId: contact.id,
+      with: 'staff-dm',
+      organizations: intent.organizations,
+    }
   }
   return intent.organizationId === undefined
     ? { kind: 'staff-dm', userId: contact.id }
@@ -140,17 +176,21 @@ export function sharedOrganizationsById(
 
 /**
  * The rows a tap can do something with, which is every row but a Customer with
- * no support thread.
+ * no support thread and no organization to start one in.
  *
- * Staff holding `message_customers` are sent those Customers too, with a null
- * `conversationId`. Starting a conversation with a Customer is web-only — this
- * client has no request for it — so such a row could only ever read
- * "unavailable". It is left out instead of drawn as a dead row. A Customer
- * viewer is never sent customer rows, so nothing of theirs is narrowed.
+ * Staff holding `message_customers` are sent Customers with a null
+ * `conversationId` too, and `POST /conversations/support/with-customer` starts
+ * one — but only in an organization the two share, so a Customer whose row
+ * lists none could only ever read "unavailable". It is left out instead of
+ * drawn as a dead row. A Customer viewer is never sent customer rows, so
+ * nothing of theirs is narrowed.
  */
 export function reachableContacts(contacts: Contact[]): Contact[] {
   return contacts.filter(
-    (contact) => contact.kind !== 'customer' || contact.conversationId !== null,
+    (contact) =>
+      contact.kind !== 'customer' ||
+      contact.conversationId !== null ||
+      contact.organizations?.length !== 0,
   )
 }
 

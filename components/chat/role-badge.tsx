@@ -15,17 +15,17 @@ const ROLE_BADGE: Record<UserRole, { label: string; className: string }> = {
  * one tint per role, and the word always spelled out so the distinction does
  * not rest on colour alone.
  */
-export function RoleBadge({ role, className }: { role: UserRole; className?: string }) {
+export function RoleBadge({ role }: { role: UserRole }) {
   const badge = ROLE_BADGE[role]
   if (!badge) return null
 
   return (
     <View
-      className={cn('h-4 shrink-0 justify-center rounded-full px-1.5', badge.className, className)}
+      className={cn('h-4 shrink-0 justify-center rounded-full px-1.5', badge.className)}
     >
       <Text
         variant="label"
-        className="text-[10px] uppercase leading-none tracking-wide text-role-ink"
+        className="uppercase leading-none tracking-wide text-role-ink"
       >
         {badge.label}
       </Text>

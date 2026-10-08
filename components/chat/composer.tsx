@@ -38,6 +38,7 @@ import { EMOJI_PANEL_FALLBACK_HEIGHT, EmojiPanel } from '@/components/chat/emoji
 import { SavedResponsePicker } from '@/components/chat/saved-response-picker'
 import { VideoThumb } from '@/components/chat/video-thumb'
 import { VoiceNotePlayer } from '@/components/chat/voice-note-player'
+import { WallPostReferenceStrip } from '@/components/chat/wall-post-reference-card'
 import { Waveform } from '@/components/chat/waveform'
 import { Input } from '@/components/ui/input'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
@@ -58,7 +59,7 @@ import {
 import { motion } from '@/lib/motion'
 import { settleDownEnter } from '@/lib/motion-enter'
 import { colors, screenBottomPad } from '@/lib/tokens'
-import type { AttachmentKind, AttachmentView } from '@/lib/types'
+import type { AttachmentKind, AttachmentView, MessageWallPost } from '@/lib/types'
 
 export type ComposerSendPayload = {
   body: string
@@ -84,6 +85,12 @@ type ComposerProps = {
   onSend: (payload: ComposerSendPayload) => boolean
   replyTo?: ComposerReplyPreview | null
   onCancelReply?: () => void
+  /**
+   * The Post waiting to go out with the next message (a Reply to a Post). It is
+   * enough to send on its own, so the send control is offered with nothing typed.
+   */
+  wallPost?: MessageWallPost | null
+  onRemoveWallPost?: () => void
   /** Overlap the thread already lifted the composer by; see lib/keyboard-inset.ts. */
   keyboardInset?: number
   /**
@@ -187,6 +194,8 @@ export function Composer({
   onSend,
   replyTo,
   onCancelReply,
+  wallPost = null,
+  onRemoveWallPost,
   keyboardInset = 0,
   savedResponses = null,
 }: ComposerProps) {
@@ -236,8 +245,8 @@ export function Composer({
   const heldAudioSessionRef = useRef(false)
   const meteringRef = useRef<number | null>(null)
 
-  const canSend = value.trim().length > 0 || staged != null
-  const showMic = !recording && !staged && value.trim().length === 0
+  const canSend = value.trim().length > 0 || staged != null || wallPost != null
+  const showMic = !recording && !staged && !wallPost && value.trim().length === 0
   const ready = useSharedValue(canSend || recording ? 1 : 0.92)
   // The keyboard covers the home indicator / nav bar, so once the thread has
   // lifted the composer by that much, its own safe-area gap is redundant.
@@ -510,7 +519,7 @@ export function Composer({
   function handleSend() {
     if (recording) return
     const body = value.trim()
-    if (!body && !staged) return
+    if (!body && !staged && !wallPost) return
 
     // Cleared only once the message is on its way. A send refused before it
     // starts — a file over the limit, a type the API will not take — leaves the
@@ -527,6 +536,15 @@ export function Composer({
       className="border-t border-line bg-surface"
       style={{ paddingBottom: bottom }}
     >
+      {wallPost ? (
+        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+          <WallPostReferenceStrip
+            reference={wallPost}
+            onRemove={() => onRemoveWallPost?.()}
+          />
+        </Animated.View>
+      ) : null}
+
       {replyTo ? (
         <Animated.View
           entering={settleDownEnter(!!reduceMotion)}
@@ -632,7 +650,13 @@ export function Composer({
                 }}
                 // A tap on the field while the panel is up asks for the keyboard.
                 onFocus={() => setEmojiOpen(false)}
-                placeholder={replyTo ? 'Write a reply…' : 'Type a message…'}
+                placeholder={
+                  wallPost
+                    ? 'Add a message about this post…'
+                    : replyTo
+                      ? 'Write a reply…'
+                      : 'Type a message…'
+                }
                 accessibilityLabel="Message"
                 multiline
                 className="max-h-28 min-h-7 h-auto min-w-0 flex-1 border-0 bg-transparent px-1 py-1 font-sans text-base text-ink"

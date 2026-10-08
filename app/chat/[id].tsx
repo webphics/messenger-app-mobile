@@ -61,13 +61,13 @@ function useRouteId(): string | undefined {
 }
 
 /**
- * The reference a Reply on a Post (#77) seeded the composer with, read once on
+ * The Post a Reply on a Post (#77) opened this thread with, read once on
  * arrival. A param rather than anything on the conversation itself — it
  * belongs to this one visit, and a route param is naturally gone on the next.
  */
-function useInitialDraft(): string | undefined {
-  const draft = useLocalSearchParams<{ draft?: string }>().draft;
-  return typeof draft === "string" && draft !== "" ? draft : undefined;
+function useInitialWallPostId(): string | undefined {
+  const post = useLocalSearchParams<{ post?: string }>().post;
+  return typeof post === "string" && post !== "" ? post : undefined;
 }
 
 /**
@@ -82,11 +82,13 @@ function useInitialDraft(): string | undefined {
 export default function ChatScreen() {
   const id = useRouteId();
   const role = getSession().role;
-  const initialDraft = useInitialDraft();
+  const initialWallPostId = useInitialWallPostId();
 
   if (!id) return <Redirect href={ROLE_HREF[role]} />;
 
-  return <ConversationScreen routeId={id} role={role} initialDraft={initialDraft} />;
+  return (
+    <ConversationScreen routeId={id} role={role} initialWallPostId={initialWallPostId} />
+  );
 }
 
 /**
@@ -139,11 +141,11 @@ function ChatNotice({
 function ConversationScreen({
   routeId,
   role,
-  initialDraft,
+  initialWallPostId,
 }: {
   routeId: string;
   role: UserRole;
-  initialDraft?: string;
+  initialWallPostId?: string;
 }) {
   const inbox = useConversationInbox();
   const user = getSessionUser();
@@ -315,7 +317,7 @@ function ConversationScreen({
         capabilities: user.capabilities,
       }}
       supportAssignment={supportAssignment}
-      initialDraft={initialDraft}
+      initialWallPostId={initialWallPostId}
       organizationNames={inbox.organizationNames}
       loading={thread.loading}
       failure={thread.failure}

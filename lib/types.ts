@@ -210,6 +210,13 @@ export type StaffConversation = ConversationBase & {
   members: ConversationStaffPerson[]
   labels: Label[]
   /**
+   * Whether this is an Onboarding thread that is still live: a Support DM with no organization
+   * whose Customer holds no membership right now, as the API read it. False once they have
+   * joined one, though Staff can still open the thread by id. `parseConversation` always sets it
+   * and reads anything but `true` as false; optional only because fixtures predate it.
+   */
+  onboardingOpen?: boolean
+  /**
    * Group-only; `null` for every other type. Optional because most fixtures in
    * this codebase predate it and carry no group at all; a real payload always
    * sends it.
@@ -314,6 +321,25 @@ export type MessageReplyTo = {
   preview: string | null
 }
 
+/**
+ * The Post a Reply to a Post was sent about (`CONTEXT.md`), as it looked when
+ * the message was sent. `id` is what the card opens; the rest draws it without
+ * reading the Post, and still draws it after the Post is edited or taken down.
+ * `authorName` is the author as a Customer is shown them, so a Staff author is
+ * the company for every reader. `imageUrl` is the API's own, resolved where it
+ * is drawn.
+ */
+export type MessageWallPost = {
+  id: string
+  organizationId: string
+  kind: WallPostKind
+  authorName: string
+  title: string | null
+  excerpt: string | null
+  imageUrl: string | null
+  postedAt: string
+}
+
 /** One reaction by one person. The API does not group them; `lib/message-react` does. */
 export type MessageReaction = {
   emoji: string
@@ -353,6 +379,12 @@ type MessageBase = {
    */
   editableUntil: string | null
   replyTo: MessageReplyTo | null
+  /**
+   * Set only on a Reply to a Post, and absent rather than null otherwise: the
+   * Store compares parsed messages by value, so a field every message carried
+   * would change the shape of every one of them.
+   */
+  wallPost?: MessageWallPost
   reactions: MessageReaction[]
   attachments: MessageAttachment[]
   receiptStatus: ReceiptStatus
@@ -391,6 +423,30 @@ export type MessageReceipt = {
 export type MessageReceipts = {
   readBy: MessageReceipt[]
   deliveredTo: MessageReceipt[]
+}
+
+/**
+ * One wording a message has had, from `GET .../messages/:messageId/history`.
+ *
+ * `writtenBy` is null wherever the API will not name the writer: to a Customer
+ * always, and in an announcements thread for everyone. A Customer is told that
+ * an Agent's reply changed and what it said before, never who changed it.
+ */
+export type MessageVersion = {
+  body: string
+  writtenAt: string
+  writtenBy: ConversationStaffPerson | null
+}
+
+/**
+ * Every wording, oldest first, ending with the current body. `originalRecorded`
+ * is false on a message edited before history was kept: its first version is
+ * then an earlier edit, not what was sent.
+ */
+export type MessageHistory = {
+  messageId: string
+  originalRecorded: boolean
+  versions: MessageVersion[]
 }
 
 export function isStaffMessage(message: Message): message is StaffMessage {
@@ -578,6 +634,15 @@ export type Contact = {
   /** Null on a company, which is an organization rather than somebody. */
   role: UserRole | null
   conversationId: string | null
+  /**
+   * The organizations a conversation between the viewer and this contact can
+   * belong to — each a valid `organizationId` for a new one. More than one means
+   * the viewer is asked which before anything opens, even with a
+   * `conversationId`: that thread is one organization's, and each of the others
+   * holds its own. Empty means no new conversation can be started. Null is the
+   * row not carrying the field at all, which is not an answer of none.
+   */
+  organizations: Organization[] | null
 }
 
 /**

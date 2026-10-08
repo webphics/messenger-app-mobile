@@ -1,5 +1,6 @@
 import { asRecord } from '@/lib/api-envelope'
 import { parseAccess } from '@/lib/conversation-access'
+import { parseMessageWallPost } from '@/lib/message-wall-post'
 import type {
   Contact,
   ContactKind,
@@ -13,11 +14,13 @@ import type {
   LabelColor,
   Message,
   MessageAttachment,
+  MessageHistory,
   MessageReaction,
   MessageReceipt,
   MessageReceipts,
   MessageReplyTo,
   MessageType,
+  MessageVersion,
   Organization,
   ReceiptStatus,
   StaffDirectoryUser,
@@ -248,6 +251,9 @@ export function parseConversation(value: unknown): Conversation | null {
       otherUser: staffPerson(record.otherUser),
       members: staffPeople(record.members),
       labels: labels(record.labels),
+      // Closed unless the API says otherwise: a payload that predates the field, or garbles it,
+      // must not offer to place a Customer who may already belong somewhere.
+      onboardingOpen: flag(record.onboardingOpen),
       writePolicy: oneOf(record.writePolicy, WRITE_POLICIES),
       // Deprecated in the API's schema and kept only while installed builds read
       // it. The composer reads `access` instead; see `lib/conversation-access`.
@@ -339,6 +345,7 @@ export function parseMessage(value: unknown): Message | null {
   const createdAt = timestamp(record.createdAt)
   if (!id || !createdAt) return null
 
+  const wallPost = parseMessageWallPost(record.wallPost)
   const base = {
     id,
     body: nullableText(record.body) ?? '',
@@ -356,6 +363,9 @@ export function parseMessage(value: unknown): Message | null {
     // the field) and unreadable read as null too, so the answer is no Edit.
     editableUntil: timestamp(record.editableUntil) ?? null,
     replyTo: replyTo(record.replyTo),
+    // Set only on a Reply to a Post, for the reason `addressedToCustomer` is set
+    // only when true: every other message keeps the shape it already had.
+    ...(wallPost ? { wallPost } : {}),
     reactions: records(record.reactions).flatMap((item) => {
       const parsed = reaction(item)
       return parsed ? [parsed] : []
@@ -397,6 +407,32 @@ export function parseMessageReceipts(value: unknown): MessageReceipts | null {
     })
 
   return { readBy: read(record.readBy), deliveredTo: read(record.deliveredTo) }
+}
+
+/**
+ * A version with no body or no time is dropped rather than drawn: a history row
+ * that cannot say what was written or when has nothing to show. A writer the API
+ * sent and this build cannot read is null, which is the Customer's answer too —
+ * absent a name, nothing is claimed about who wrote it.
+ */
+export function parseMessageHistory(value: unknown): MessageHistory | null {
+  const record = asRecord(value)
+  if (!record) return null
+  const messageId = text(record.messageId)
+  if (!messageId) return null
+
+  const versions = records(record.versions).flatMap((item): MessageVersion[] => {
+    const body = typeof item.body === 'string' ? item.body : null
+    const writtenAt = timestamp(item.writtenAt)
+    if (body === null || !writtenAt) return []
+    return [{ body, writtenAt, writtenBy: staffPerson(item.writtenBy) }]
+  })
+
+  return {
+    messageId,
+    originalRecorded: record.originalRecorded === true,
+    versions,
+  }
 }
 
 export function parseMessages(value: unknown): Message[] {
@@ -536,6 +572,9 @@ export function parseContact(value: unknown): Contact | null {
     kind,
     role: oneOf(record.role, ROLES),
     conversationId: nullableText(record.conversationId),
+    // Absent is null rather than empty: empty is the API saying no conversation
+    // can be started, and a row that says nothing must not be disabled for it.
+    organizations: Array.isArray(record.organizations) ? organizations(record.organizations) : null,
   }
 }
 

@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { Alert } from "react-native";
 import {
   Redirect,
+  router,
   useGlobalSearchParams,
   useLocalSearchParams,
   usePathname,
@@ -8,15 +10,40 @@ import {
 
 import { ConversationDetailsScreen } from "@/components/chat/conversation-details-screen";
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
-import { chatDetailsIdFromRoute } from "@/lib/chat-route-id";
+import { can } from "@/lib/capabilities";
+import { chatDetailsIdFromRoute, chatHref } from "@/lib/chat-route-id";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { detailsView, threadActionsView } from "@/lib/conversation-access";
 import { ROLE_HREF } from "@/lib/hub-routes";
-import { getSession } from "@/lib/session";
+import { placeableOnboardingCustomer } from "@/lib/onboarding-placement";
+import { getSession, getSessionUser } from "@/lib/session";
+import type { Conversation, Organization } from "@/lib/types";
 import { useChatSectionConversation } from "@/lib/use-chat-section-conversation";
 import { useConversationDetails } from "@/lib/use-conversation-details";
+import { useOnboardingPlacement } from "@/lib/use-onboarding-placement";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useThreadManagement } from "@/lib/use-thread-management";
+
+/**
+ * How long a refetch waits after the thread and this screen are popped. The refetch drops the
+ * Onboarding thread's row, and the thread screen answers a missing row by replacing its message
+ * list; done while it is still animating out, that crashed Fabric ("child already has a
+ * parent"). `InteractionManager` does not help: the stack registers no interaction, so it runs
+ * at once. Comfortably longer than the native stack's pop animation.
+ */
+const AFTER_POP_MS = 1000;
+
+/**
+ * Back to the hub under the thread, then the list refetched once the transition is over, for
+ * the reason `AFTER_POP_MS` gives. `andThen` runs between the two, for a route pushed onto the
+ * hub. The timer is deliberately not cleared on unmount: the pop it waits out is this screen
+ * unmounting.
+ */
+function dismissToHubThenReload(reload: () => void, andThen?: () => void): void {
+  router.dismissTo(ROLE_HREF[getSession().role]);
+  andThen?.();
+  setTimeout(reload, AFTER_POP_MS);
+}
 
 /**
  * What a conversation is, beside what was said in it.
@@ -57,7 +84,7 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
    * into the shared list — so the chip appears here and the inbox row behind
    * gains it in the same update, without either screen refetching.
    */
-  const { addConversation } = useConversationInbox();
+  const { addConversation, reload } = useConversationInbox();
   /**
    * Labels and notes as the API offers them to this viewer, with the label
    * Capability this client cannot see already applied.
@@ -88,6 +115,47 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
   const actions = threadActionsView(ready ? section.conversation.access : undefined);
   const manages = actions.transfer || actions.close || actions.reopen;
 
+  /**
+   * Placing the Customer of an Onboarding thread, in the web client's flow: say who was added
+   * where, then open the Customer's support conversation in that organization (asked which
+   * when there were several), or go back to the conversation list.
+   *
+   * Every way out goes through `dismissTo` before the reload: the thread screen sits under
+   * this one, and a thread screen whose row leaves the list asks the API for it again and puts
+   * it back (`app/chat/[id].tsx`). Staff may still read the Onboarding thread, so that ask
+   * succeeds, and the row the reload just dropped would return. Both screens have to go.
+   */
+  const viewer = getSessionUser();
+  const placeable = placeableOnboardingCustomer(viewer, ready ? section.conversation : null);
+  // Back to the hub, the route in the stack under the thread, with the list refetched after the
+  // transition. Not the Chats tab, though the web lands on its inbox: switching to that tab
+  // here, with or without a refetch beside it, crashed Fabric on the emulator every time
+  // ("child already has a parent" in the list's clipping view). `dismissTo` on the tab's own
+  // href also finds no such route in the stack and replaces this screen alone, leaving the
+  // thread under it to put its row back.
+  const leaveThread = useCallback(() => dismissToHubThenReload(reload), [reload]);
+  const placement = useOnboardingPlacement(placeable, {
+    canOpenChat: can(viewer, "message_customers"),
+    onPlaced: useCallback(
+      (placed: Organization[]) => {
+        Alert.alert(
+          `${placeable?.name ?? "Customer"} added to ${placed
+            .map((organization) => organization.name)
+            .join(", ")}`,
+        );
+      },
+      [placeable?.name],
+    ),
+    onOpened: useCallback(
+      (opened: Conversation) => {
+        addConversation(opened);
+        dismissToHubThenReload(reload, () => router.push(chatHref(opened.id)));
+      },
+      [addConversation, reload],
+    ),
+    onLeave: leaveThread,
+  });
+
   if (section.status === "loading") return <AppLoadingScreen />;
   if (section.status === "denied") return <Redirect href={ROLE_HREF[section.home]} />;
 
@@ -100,6 +168,7 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
       management={manages ? management : undefined}
       threadActions={actions}
       offered={offered}
+      placement={placeable ? { customer: placeable, placement } : undefined}
     />
   );
 }

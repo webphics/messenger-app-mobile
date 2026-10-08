@@ -1,4 +1,5 @@
 import { messageStance, namesItsSender } from '@/lib/bubble-stance'
+import { isOutgoing } from '@/lib/thread-state'
 import type { Message, UserRole } from '@/lib/types'
 
 const BASE = {
@@ -38,6 +39,7 @@ describe('messageStance', () => {
   ] as const)('%s', (_, message, viewer, type, side, variant) => {
     const stance = messageStance(message, viewer, type)
     expect([stance.side, stance.variant]).toEqual([side, variant])
+    expect(stance.isMine).toBe(isOutgoing(message, viewer.id))
   })
 })
 

@@ -6,7 +6,7 @@ import {
   listStaffDirectory,
   transferConversation,
 } from '@/lib/conversation-api'
-import type { ApiFailure } from '@/lib/api-result'
+import { refusalSentence } from '@/lib/api-result'
 import { assignmentModeChanged, assignmentRefusal } from '@/lib/conversation-failure'
 import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 import { transferCandidates } from '@/lib/thread-actions'
@@ -56,18 +56,6 @@ export type ThreadManagement = {
   pending: 'transfer' | 'close' | 'reopen' | null
   /** Why the last attempt was refused, or null. Cleared when the next one starts. */
   error: string | null
-}
-
-/**
- * An expired session says nothing, the same convention the rest of this app
- * follows: the auth layer is already on its way to sign-in, and a sentence
- * about a transfer would arrive on a screen that is leaving.
- */
-function refusal(failure: ApiFailure, fallback: string): string | null {
-  if (failure.kind === 'refused') return failure.message
-  if (failure.kind === 'unreachable') return 'No connection. Try again.'
-  if (failure.kind === 'unauthorised') return null
-  return fallback
 }
 
 export function useThreadManagement(
@@ -151,7 +139,7 @@ export function useThreadManagement(
       setError(
         switchedOff
           ? assignmentRefusal(result.failure)
-          : refusal(result.failure, 'The conversation could not be transferred.'),
+          : refusalSentence(result.failure, 'The conversation could not be transferred.'),
       )
     })
   }, [writeRefused])
@@ -171,7 +159,7 @@ export function useThreadManagement(
       notify.current(result.value)
       return null
     }
-    return refusal(result.failure, 'The conversation could not be closed.')
+    return refusalSentence(result.failure, 'The conversation could not be closed.')
   }, [writeRefused])
 
   const reopen = useCallback(() => {
@@ -192,7 +180,7 @@ export function useThreadManagement(
       setError(
         result.failure.kind === 'refused' && result.failure.code === 'conversation_not_closed'
           ? 'This conversation is already open.'
-          : refusal(result.failure, 'The conversation could not be reopened.'),
+          : refusalSentence(result.failure, 'The conversation could not be reopened.'),
       )
     })
   }, [writeRefused])

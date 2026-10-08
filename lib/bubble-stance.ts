@@ -1,3 +1,4 @@
+import { isOutgoing } from '@/lib/thread-state'
 import { isStaffMessage, type ConversationType, type Message, type UserRole } from '@/lib/types'
 
 /**
@@ -13,17 +14,21 @@ export type BubbleStance = {
    * speaks for the company, `incoming` the surface fill for the other side.
    */
   variant: 'mine' | 'colleague' | 'incoming'
-  /** The viewer wrote it. Only the sender has receipts, Message info, Edit and Delete. */
+  /**
+   * The viewer wrote it. Only the sender has receipts, Message info, Edit and Delete.
+   * Decided by `isOutgoing` in `lib/thread-state`, so a screen asking of a bare
+   * message and one asking of its row always agree.
+   */
   isMine: boolean
 }
 
 /**
- * The conversation kinds where the company speaks as one voice. A Customer holds
+ * The conversation kind where the company speaks as one voice. A Customer holds
  * a Support DM with the company rather than with whichever staff member is
  * holding it, so every company-side message belongs on the same side whoever
  * typed it. A Staff DM and a Group are per person.
  */
-const ONE_VOICE_CONVERSATIONS: ReadonlySet<ConversationType> = new Set(['support_dm'])
+const ONE_VOICE_CONVERSATION: ConversationType = 'support_dm'
 
 const MINE: BubbleStance = { side: 'end', variant: 'mine', isMine: true }
 const COLLEAGUE: BubbleStance = { side: 'end', variant: 'colleague', isMine: false }
@@ -47,15 +52,13 @@ export function messageStance(
   viewer: { id: string; role: UserRole },
   conversationType: ConversationType | undefined,
 ): BubbleStance {
-  if (!isStaffMessage(message)) return message.fromCompany ? INCOMING : MINE
-
-  if (message.sender.id === viewer.id) return MINE
+  if (isOutgoing(message, viewer.id)) return MINE
+  if (!isStaffMessage(message)) return INCOMING
 
   const speaksForCompany =
     viewer.role !== 'customer' &&
     message.sender.role !== 'customer' &&
-    conversationType !== undefined &&
-    ONE_VOICE_CONVERSATIONS.has(conversationType)
+    conversationType === ONE_VOICE_CONVERSATION
 
   return speaksForCompany ? COLLEAGUE : INCOMING
 }

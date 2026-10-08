@@ -13,6 +13,7 @@ const CSS_NAME: Record<keyof typeof colors, string> = {
   muted: "muted",
   line: "line",
   primary: "primary",
+  primarySoft: "primary-soft",
   primaryForeground: "primary-foreground",
   success: "success",
   danger: "danger",

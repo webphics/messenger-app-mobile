@@ -24,6 +24,7 @@ import {
 } from '@/components/icons'
 import { InScreenHeader } from '@/components/in-screen-header'
 import { DetailsCard } from '@/components/chat/details-card'
+import { OnboardingPlacementSection } from '@/components/chat/onboarding-placement-section'
 import { ThreadManagementSection } from '@/components/chat/thread-management-section'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -58,10 +59,12 @@ import type {
   LabelsState,
 } from '@/lib/use-conversation-details'
 import type { ThreadManagement } from '@/lib/use-thread-management'
+import type { OnboardingPlacement } from '@/lib/use-onboarding-placement'
 import { isStaffConversation } from '@/lib/types'
 import type {
   Conversation,
   ConversationNote,
+  ConversationPerson,
   ConversationStaffPerson,
   Label,
 } from '@/lib/types'
@@ -82,6 +85,11 @@ type ConversationDetailsScreenProps = {
   threadActions?: ThreadActionsView
   /** Whether the API offers labels, the notes, and the field to add one. None when absent. */
   offered?: DetailsView
+  /**
+   * Placing the Customer of an Onboarding thread in organizations, for a viewer who may.
+   * Absent everywhere else. See `placeableOnboardingCustomer`.
+   */
+  placement?: { customer: ConversationPerson; placement: OnboardingPlacement }
 }
 
 /**
@@ -110,6 +118,7 @@ export function ConversationDetailsScreen({
   management,
   threadActions = threadActionsView(undefined),
   offered = detailsView(undefined),
+  placement,
 }: ConversationDetailsScreenProps) {
   const insets = useSafeAreaInsets()
   const keyboardInset = useKeyboardInset()
@@ -234,6 +243,13 @@ export function ConversationDetailsScreen({
           <SharedInChatRow conversationId={conversation.id} />
 
           {isGroup && members.length > 0 ? <MembersSection members={members} /> : null}
+
+          {placement ? (
+            <OnboardingPlacementSection
+              customer={placement.customer}
+              placement={placement.placement}
+            />
+          ) : null}
 
           {management ? (
             <ThreadManagementSection

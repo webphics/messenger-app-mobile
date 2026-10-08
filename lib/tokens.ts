@@ -21,6 +21,8 @@ export const colors = {
   muted: "#646066",
   line: "#E7E4E2",
   primary: "#6253A3",
+  /** Lavender Mist: soft selected/active wash (`bg-primary-soft`). */
+  primarySoft: "#EEEAF8",
   primaryForeground: "#FFFFFF",
   success: "#3F724F",
   danger: "#B12C30",

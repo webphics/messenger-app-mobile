@@ -5,6 +5,7 @@ import {
   ensureSupportConversation,
   listContacts,
   listStaffDirectory,
+  startCustomerConversation,
 } from '@/lib/conversation-api'
 import { failureNotice } from '@/lib/conversation-failure'
 import {
@@ -29,12 +30,13 @@ import type { Contact } from '@/lib/types'
  * `lib/contact-directory` exists to prevent.
  *
  * Two requests, not one. `GET /conversations/contacts` is the list and answers
- * for every role; `GET /conversations/staff` is what names the organizations a
- * pair share, which is what a staff DM binds to and which the contacts payload
- * does not carry. The second is staff-only — a Customer is refused it — and it
- * is allowed to fail on its own: a directory that never answered leaves the
- * binding to the API, which is a decision `contactIntent` already knows how to
- * take.
+ * for every role, and each row names the organizations a conversation with that
+ * contact can belong to. `GET /conversations/staff` names the organizations a
+ * pair of staff share, and is read only as the fallback for a row that carries
+ * no `organizations` of its own. The second is staff-only — a Customer is
+ * refused it — and it is allowed to fail on its own: a directory that never
+ * answered leaves the binding to the API, which is a decision `contactIntent`
+ * already knows how to take.
  */
 
 const NO_CONTACTS: Contact[] = []
@@ -154,9 +156,13 @@ export function useContactDirectory(
         const result =
           intent.kind === 'support'
             ? await ensureSupportConversation(intent.organizationId)
-            : intent.kind === 'choose'
-              ? await createStaffDm(intent.userId, organizationId)
-              : await createStaffDm(intent.userId, intent.organizationId)
+            : intent.kind === 'customer'
+              ? await startCustomerConversation(intent.customerId, intent.organizationId)
+              : intent.kind === 'choose'
+                ? intent.with === 'customer'
+                  ? await startCustomerConversation(intent.userId, organizationId)
+                  : await createStaffDm(intent.userId, organizationId)
+                : await createStaffDm(intent.userId, intent.organizationId)
 
         setBusyId(null)
         if (!result.ok) {

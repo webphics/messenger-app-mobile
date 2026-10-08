@@ -571,6 +571,9 @@ export function useThreadMessages(
       ),
       ...(carried.attachments.length > 0 ? { attachments: carried.attachments } : {}),
       ...(quoted && !isLocalId(quoted) ? { replyToMessageId: quoted } : {}),
+      // Carried on the message itself rather than beside it, so a send the
+      // Outbox brings back still names its Post when somebody taps Retry.
+      ...(carried.wallPost ? { wallPostId: carried.wallPost.id } : {}),
     })
 
     delivering.current.delete(message.id)
@@ -592,8 +595,8 @@ export function useThreadMessages(
       if (!conversationId || !author) return
       const body = draft.body.trim()
       const attachments = draft.attachments ?? []
-      // The API refuses a message that is neither, and so does the composer.
-      if (!body && attachments.length === 0) return
+      // The API refuses a message that is none of the three, and so does the composer.
+      if (!body && attachments.length === 0 && !draft.wallPost) return
 
       void deliver(
         conversationId,
@@ -602,6 +605,7 @@ export function useThreadMessages(
           body,
           author,
           replyTo: draft.replyTo,
+          wallPost: draft.wallPost,
           // Device URIs for now. `deliver` uploads them and writes back what the
           // API stored, so the bubble is drawn from this phone until it can be
           // drawn from the server.

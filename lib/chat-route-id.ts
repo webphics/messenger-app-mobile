@@ -4,12 +4,13 @@ import type { Href } from 'expo-router'
  * Native Expo Router needs the dynamic segment in `params`, not only a string
  * path.
  *
- * `draft` seeds the composer on arrival — Reply on a Post (#77) is the one
- * caller today, and it travels as a param rather than through the shared
- * conversation list because it belongs to this one visit, not to the thread.
+ * `postId` is the Post a Reply to a Post (#77) opens the thread with: it waits
+ * in the composer and goes out as a card with the next message. It travels as
+ * a param rather than through the shared conversation list because it belongs
+ * to this one visit, not to the thread.
  */
-export function chatHref(id: string, draft?: string): Href {
-  return { pathname: '/chat/[id]', params: draft ? { id, draft } : { id } }
+export function chatHref(id: string, postId?: string): Href {
+  return { pathname: '/chat/[id]', params: postId ? { id, post: postId } : { id } }
 }
 
 /**

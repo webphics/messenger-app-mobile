@@ -3,6 +3,7 @@ import type {
   ConversationType,
   Message,
   MessageAttachment,
+  MessageWallPost,
   UserRole,
 } from '@/lib/types'
 import { isStaffMessage } from '@/lib/types'
@@ -83,6 +84,11 @@ export type SendDraft = {
   body: string
   /** The message being answered, or null when this is not a reply. */
   replyTo: Message | null
+  /**
+   * The Post this message is about (a Reply to a Post), or absent. It is
+   * enough to send on its own, with no body and nothing attached.
+   */
+  wallPost?: MessageWallPost | null
   /**
    * Staged on this device and not yet uploaded — device URIs, in the shape the
    * picker and the recorder produce. Whatever sends this uploads them first;
@@ -539,6 +545,7 @@ export type MessageDraft = {
   body: string
   author: MessageAuthor
   replyTo?: Message | null
+  wallPost?: MessageWallPost | null
   attachments?: MessageAttachment[]
   /** Defaults to now. Named so a test can fix it. */
   sentAt?: string
@@ -572,6 +579,9 @@ export function draftMessage(draft: MessageDraft): Message {
     replyTo: draft.replyTo
       ? { id: draft.replyTo.id, preview: draft.replyTo.body.slice(0, REPLY_PREVIEW_LENGTH) }
       : null,
+    // The card goes up with the bubble, so the Post is on screen before the API
+    // has answered; its copy, drawn from the API's own snapshot, replaces this.
+    ...(draft.wallPost ? { wallPost: draft.wallPost } : {}),
     reactions: [],
     attachments,
     receiptStatus: 'sent' as const,

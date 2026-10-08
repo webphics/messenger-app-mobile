@@ -117,3 +117,18 @@ export function query(
 export function acknowledged(): void {
   return undefined
 }
+
+/**
+ * The sentence a screen prints for a failed write, `fallback` for a body this
+ * client could not read.
+ *
+ * An expired session says nothing, the convention every write in this app
+ * follows: the auth layer is already on its way to sign-in, and a sentence
+ * about the write would arrive on a screen that is leaving.
+ */
+export function refusalSentence(failure: ApiFailure, fallback: string): string | null {
+  if (failure.kind === 'refused') return failure.message
+  if (failure.kind === 'unreachable') return 'No connection. Try again.'
+  if (failure.kind === 'unauthorised') return null
+  return fallback
+}

@@ -8,6 +8,7 @@ import {
   RotateCcw,
 } from '@/components/icons'
 import { Dimensions, Image, Pressable, View } from 'react-native'
+import type { AccessibilityActionEvent } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
@@ -26,6 +27,7 @@ import { ImagePreviewModal } from '@/components/chat/image-preview-modal'
 import { MessageMedia } from '@/components/chat/message-media'
 import { RoleBadge } from '@/components/chat/role-badge'
 import { VideoThumb } from '@/components/chat/video-thumb'
+import { WallPostReferenceCard } from '@/components/chat/wall-post-reference-card'
 import { LinkedText, linkTint } from '@/components/ui/linked-text'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
@@ -51,6 +53,7 @@ import type { DeliveryState } from '@/lib/thread-state'
 import type {
   AttachmentKind,
   AttachmentView,
+  MessageWallPost,
   ReceiptStatus,
   UserRole,
 } from '@/lib/types'
@@ -114,6 +117,14 @@ type MessageBubbleProps = {
    * and the props here are flattened so a memoised row compares scalars.
    */
   edited?: boolean
+  /**
+   * Opens the message's edit history. Offered on an edited message to every
+   * reader, read-only threads included: what a message used to say is history,
+   * not participation. Tapping "(edited)" opens it, and so does the bubble's
+   * "Show edit history" accessibility action, since the marker itself is hidden
+   * from assistive tech.
+   */
+  onOpenEditHistory?: (messageId: string) => void
   /**
    * Whether this bubble states its own time without being asked.
    *
@@ -195,6 +206,10 @@ type MessageBubbleProps = {
   onPressQuote?: (messageId: string) => void
   /** Set briefly on the original a quote tap landed on, so the eye finds it. */
   highlighted?: boolean
+  /** The Post a Reply to a Post was sent about, drawn as a card above the bubble. */
+  wallPost?: MessageWallPost
+  /** A tap on that card, with the Post's id: the Post opens. */
+  onOpenWallPost?: (postId: string) => void
 }
 
 const SWIPE_REPLY = 56
@@ -624,6 +639,8 @@ const ReactionBadge = memo(function ReactionBadge({
 
 /** Shared, so a bubble with nothing attached is handed the same array every render. */
 const NO_ATTACHMENTS: AttachmentView[] = []
+/** One array for every edited bubble, so a memoised row is not handed a new one each render. */
+const EDIT_HISTORY_ACTIONS = [{ name: 'editHistory', label: 'Show edit history' }]
 
 /**
  * What a screen reader is told a bubble is.
@@ -647,6 +664,7 @@ export const MessageBubble = memo(function MessageBubble({
   status,
   createdAt,
   edited,
+  onOpenEditHistory,
   showTime,
   timeLabel,
   timeRevealed,
@@ -667,6 +685,8 @@ export const MessageBubble = memo(function MessageBubble({
   onToggleReaction,
   onPressQuote,
   highlighted,
+  wallPost,
+  onOpenWallPost,
 }: MessageBubbleProps) {
   const bubbleRef = useRef<View>(null)
   const sizeRef = useRef({ width: 0, height: 0 })
@@ -770,6 +790,13 @@ export const MessageBubble = memo(function MessageBubble({
     onPressQuote?.(messageId)
   }, [messageId, onPressQuote])
 
+  const handleOpenWallPost = useCallback(
+    (postId: string) => {
+      onOpenWallPost?.(postId)
+    },
+    [onOpenWallPost],
+  )
+
   const quoteGesture = useMemo(
     () =>
       onPressQuote && quoted
@@ -833,7 +860,8 @@ export const MessageBubble = memo(function MessageBubble({
         */
         // Nor where the text carries a link: the link's own press and this tap
         // would race for the same touch, and the link is what was meant.
-        ...(onRevealTime && !attachment && !bodyHasLink
+        // Nor where a Post's card is drawn, which is a control of its own.
+        ...(onRevealTime && !attachment && !bodyHasLink && !wallPost
           ? [
               (quoteGesture
                 ? Gesture.Tap().requireExternalGestureToFail(quoteGesture)
@@ -882,6 +910,7 @@ export const MessageBubble = memo(function MessageBubble({
     [
       attachment,
       bodyHasLink,
+      wallPost,
       handleRevealTime,
       handleReply,
       quoteGesture,
@@ -927,6 +956,14 @@ export const MessageBubble = memo(function MessageBubble({
     [attachmentLabel(attachments, outgoing), edited ? 'edited' : null]
       .filter(Boolean)
       .join(', ') || undefined
+
+  const historyAvailable = Boolean(edited && onOpenEditHistory)
+  const a11yActions = historyAvailable ? EDIT_HISTORY_ACTIONS : undefined
+  const onA11yAction = historyAvailable
+    ? (event: AccessibilityActionEvent) => {
+        if (event.nativeEvent.actionName === 'editHistory') onOpenEditHistory?.(messageId)
+      }
+    : undefined
 
   return (
     <Animated.View
@@ -992,6 +1029,8 @@ export const MessageBubble = memo(function MessageBubble({
                   collapsable={false}
                   accessibilityRole="button"
                   accessibilityLabel={a11yLabel}
+                  accessibilityActions={a11yActions}
+                  onAccessibilityAction={onA11yAction}
                   onLayout={(e) => {
                     sizeRef.current = {
                       width: e.nativeEvent.layout.width,
@@ -1024,6 +1063,50 @@ export const MessageBubble = memo(function MessageBubble({
                 />
               </View>
             ) : null}
+            {/*
+              A Reply to a Post: the Post the message is about, above the words
+              about it. When there are no words, the card is the whole message,
+              so it takes the bubble's place: it is what the long press measures
+              and what the reactions hang off.
+            */}
+            {wallPost ? (
+              <View
+                className={cn(
+                  'relative overflow-visible',
+                  end ? 'self-end' : 'self-start',
+                  showMainBubble || fused ? 'mb-1' : reactions.length > 0 && 'mb-2',
+                )}
+              >
+                <View
+                  ref={showMainBubble || fused ? undefined : bubbleRef}
+                  collapsable={false}
+                  onLayout={
+                    showMainBubble || fused
+                      ? undefined
+                      : (e) => {
+                          sizeRef.current = {
+                            width: e.nativeEvent.layout.width,
+                            height: e.nativeEvent.layout.height,
+                          }
+                        }
+                  }
+                >
+                  <WallPostReferenceCard
+                    reference={wallPost}
+                    end={end}
+                    onPress={handleOpenWallPost}
+                  />
+                </View>
+                {showMainBubble || fused ? null : (
+                  <ReactionBadge
+                    reactions={reactions}
+                    end={end}
+                    currentUserId={currentUserId}
+                    onToggleReaction={handleToggleReaction}
+                  />
+                )}
+              </View>
+            ) : null}
             {showMainBubble ? (
             <View
               className={cn(
@@ -1042,6 +1125,8 @@ export const MessageBubble = memo(function MessageBubble({
                 collapsable={false}
                 accessibilityRole="button"
                 accessibilityLabel={a11yLabel}
+                accessibilityActions={a11yActions}
+                onAccessibilityAction={onA11yAction}
                 onLayout={(e) => {
                   sizeRef.current = {
                     width: e.nativeEvent.layout.width,
@@ -1105,12 +1190,19 @@ export const MessageBubble = memo(function MessageBubble({
                       an incoming one. One muted token is legible on one and nearly
                       invisible on the other. The label itself is in the accessible
                       name of the bubble, so it is not read out twice.
+
+                      Tapping it opens the edit history, so "edited" is never a claim
+                      the reader cannot check.
                     */}
                     {edited ? (
                       <Text
                         variant="body"
                         accessibilityElementsHidden
                         importantForAccessibility="no"
+                        onPress={
+                          onOpenEditHistory ? () => onOpenEditHistory(messageId) : undefined
+                        }
+                        suppressHighlighting
                         className={cn(
                           'text-[12px] opacity-70',
                           outgoing ? 'text-primary-foreground' : 'text-ink',

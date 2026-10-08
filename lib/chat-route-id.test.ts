@@ -21,9 +21,16 @@ test('the two sections do not read each other’s routes', () => {
   expect(chatMediaIdFromRoute(undefined, '/chat/details/conv-a')).toBeUndefined()
 })
 
-test('chatHref omits the param rather than carrying an empty draft', () => {
+test('chatHref omits the param rather than carrying an empty Post', () => {
   expect(chatHref('conv-assigned', '')).toEqual({
     pathname: '/chat/[id]',
     params: { id: 'conv-assigned' },
+  })
+})
+
+test('chatHref carries the Post a Reply to a Post opens the thread with', () => {
+  expect(chatHref('conv-assigned', 'post-1')).toEqual({
+    pathname: '/chat/[id]',
+    params: { id: 'conv-assigned', post: 'post-1' },
   })
 })

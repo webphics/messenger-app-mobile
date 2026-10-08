@@ -13,6 +13,7 @@ function contact(overrides: Partial<Contact> = {}): Contact {
     kind: 'staff',
     role: 'agent',
     conversationId: null,
+    organizations: null,
     ...overrides,
   }
 }
@@ -24,7 +25,7 @@ const TALO = { id: 'org-1', name: 'Talo' }
 const NORTHWIND = { id: 'org-2', name: 'Northwind' }
 
 describe('contactIntent', () => {
-  test('a row naming a thread opens it, whatever kind the row is', () => {
+  test('a row naming a thread and no choice of organization opens it, whatever kind the row is', () => {
     for (const kind of ['staff', 'customer', 'company'] as const) {
       expect(contactIntent(contact({ kind, conversationId: 'conv-1' }), null, AGENT_WITH_STAFF_DM)).toEqual({
         kind: 'open',
@@ -53,6 +54,7 @@ describe('contactIntent', () => {
     expect(contactIntent(contact(), [TALO, NORTHWIND], AGENT_WITH_STAFF_DM)).toEqual({
       kind: 'choose',
       userId: 'user-1',
+      with: 'staff-dm',
       organizations: [TALO, NORTHWIND],
     })
   })
@@ -80,6 +82,81 @@ describe('contactIntent', () => {
   })
 })
 
+describe("contactIntent, reading the row's own organizations", () => {
+  const customer = (overrides: Partial<Contact> = {}) =>
+    contact({ id: 'cust-1', kind: 'customer', role: 'customer', ...overrides })
+
+  test("the row's organizations win over the staff directory", () => {
+    expect(contactIntent(contact({ organizations: [TALO] }), [TALO, NORTHWIND], AGENT_WITH_STAFF_DM)).toEqual({
+      kind: 'staff-dm',
+      userId: 'user-1',
+      organizationId: 'org-1',
+    })
+    expect(contactIntent(contact({ organizations: [] }), [TALO], AGENT_WITH_STAFF_DM).kind).toBe('unavailable')
+  })
+
+  test('a staff member in several organizations is a choice even when a thread exists', () => {
+    expect(
+      contactIntent(
+        contact({ conversationId: 'conv-1', organizations: [TALO, NORTHWIND] }),
+        null,
+        AGENT_WITH_STAFF_DM,
+      ),
+    ).toEqual({ kind: 'choose', userId: 'user-1', with: 'staff-dm', organizations: [TALO, NORTHWIND] })
+  })
+
+  test('a staff thread still opens when no new DM could be started in another organization', () => {
+    expect(
+      contactIntent(
+        contact({ conversationId: 'conv-1', organizations: [TALO, NORTHWIND] }),
+        null,
+        AGENT_WITHOUT_STAFF_DM,
+      ),
+    ).toEqual({ kind: 'open', conversationId: 'conv-1' })
+  })
+
+  test('a staff thread in the one organization opens', () => {
+    expect(
+      contactIntent(contact({ conversationId: 'conv-1', organizations: [TALO] }), null, AGENT_WITH_STAFF_DM),
+    ).toEqual({ kind: 'open', conversationId: 'conv-1' })
+  })
+
+  test('a customer in several organizations is a choice even when a thread exists', () => {
+    for (const conversationId of [null, 'conv-1']) {
+      expect(
+        contactIntent(customer({ conversationId, organizations: [TALO, NORTHWIND] }), null, AGENT_WITH_STAFF_DM),
+      ).toEqual({ kind: 'choose', userId: 'cust-1', with: 'customer', organizations: [TALO, NORTHWIND] })
+    }
+  })
+
+  test('a customer in one organization opens its thread, or starts one there', () => {
+    expect(
+      contactIntent(customer({ conversationId: 'conv-1', organizations: [TALO] }), null, AGENT_WITH_STAFF_DM),
+    ).toEqual({ kind: 'open', conversationId: 'conv-1' })
+    expect(contactIntent(customer({ organizations: [TALO] }), null, AGENT_WITH_STAFF_DM)).toEqual({
+      kind: 'customer',
+      customerId: 'cust-1',
+      organizationId: 'org-1',
+    })
+  })
+
+  test('a customer with no thread and no organizations named leaves the binding to the API', () => {
+    expect(contactIntent(customer(), null, AGENT_WITH_STAFF_DM)).toEqual({
+      kind: 'customer',
+      customerId: 'cust-1',
+    })
+  })
+
+  test('a customer sharing no organization cannot be started', () => {
+    expect(contactIntent(customer({ organizations: [] }), null, AGENT_WITH_STAFF_DM).kind).toBe('unavailable')
+  })
+
+  test('a company row is one organization and never a choice', () => {
+    const company = contact({ kind: 'company', role: null, id: 'org-1', organizations: [TALO] })
+    expect(contactIntent(company, null, null)).toEqual({ kind: 'support', organizationId: 'org-1' })
+  })
+})
+
 describe('sharedOrganizationsById', () => {
   test('an empty list and an unanswered directory stay different', () => {
     const directory: StaffDirectoryUser[] = [
@@ -94,10 +171,16 @@ describe('sharedOrganizationsById', () => {
 })
 
 describe('reachableContacts', () => {
-  test('drops a Customer with no support thread and keeps the order of the rest', () => {
+  test('drops a Customer with no thread and no organization to start one in, keeping the order of the rest', () => {
     const first = contact({ id: 'a' })
-    const dead = contact({ id: 'b', kind: 'customer', role: 'customer' })
-    const last = contact({ id: 'c', kind: 'customer', role: 'customer', conversationId: 'conv-1' })
+    const dead = contact({ id: 'b', kind: 'customer', role: 'customer', organizations: [] })
+    const last = contact({ id: 'c', kind: 'customer', role: 'customer', conversationId: 'conv-1', organizations: [] })
     expect(reachableContacts([first, dead, last])).toEqual([first, last])
+  })
+
+  test('keeps a Customer with no thread yet, since one can be started', () => {
+    const shared = contact({ id: 'b', kind: 'customer', role: 'customer', organizations: [TALO] })
+    const unsaid = contact({ id: 'c', kind: 'customer', role: 'customer' })
+    expect(reachableContacts([shared, unsaid])).toEqual([shared, unsaid])
   })
 })

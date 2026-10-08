@@ -15,6 +15,10 @@ colors:
   success: "#3F724F"
   danger: "#B12C30"
   amber: "#D09033"
+  role-admin: "#CCEAE1"
+  role-agent: "#DAE1FD"
+  role-customer: "#F1D9EE"
+  role-ink: "#6253A3"
 typography:
   display:
     fontFamily: "Manrope-ExtraBold, Manrope, system-ui, sans-serif"
@@ -156,7 +160,7 @@ Personality is **friendly and direct**: soft full pills, rounded cards, tactile 
 - Manrope for UI; JetBrains Mono for code-like fragments only
 - Soft rounded cards (~24px) and chat bubbles (~22px); pills are fully round
 - Hybrid elevation: border-first, soft card lift, stronger shadow only on overlays (composer is border-only at rest)
-- Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes
+- Role clarity via uppercase eyebrows (SUPPORT / AGENT / ADMIN), not per-role palettes — one exception: the chat **Role badge** beside a sender name in a bubble carries a per-role tint (`role-*`), matching the web client's `RoleBadge`, and always spells the role out so the tint is never the only signal
 - Ops hubs stay quiet: Graphite stats, neutral icon chips; amber for unassigned attention; Lavender Mist for secondary CTAs
 
 ## Colors
@@ -183,6 +187,13 @@ Omit as a second brand accent. Status colors below are functional, not brand.
 - **Success** (`#3F724F`): Online dots, positive pills.
 - **Danger** (`#B12C30`): Errors, destructive actions.
 - **Amber** (`#D09033`): Warning / attention pills.
+
+### Role tints (Role badge only)
+Soft per-role washes for the chat Role badge (`components/chat/role-badge.tsx`), mirroring the web client's `RoleBadge`. Used nowhere else — not hubs, headers, rows, avatars, or the greeting eyebrow.
+- **Role Admin** (`#CCEAE1`, `bg-role-admin`): Admin badge wash.
+- **Role Agent** (`#DAE1FD`, `bg-role-agent`): Agent badge wash.
+- **Role Customer** (`#F1D9EE`, `bg-role-customer`): Customer badge wash.
+- **Role Ink** (`#6253A3`, `text-role-ink`): Badge label on every role tint (ChatRoute Lavender in light).
 
 ### Named Rules
 **The One Signal Rule.** ChatRoute Lavender occupies a small share of any screen. If lavender is everywhere, the Clear Desk failed.
@@ -308,6 +319,7 @@ Friendly and direct: obvious primary, soft secondary, clear press feedback (tact
 - **Outgoing:** ChatRoute Lavender fill, white text, ~22px radius, tighter bottom-right.
 - **Incoming:** White / bubble-in + `line` border, Graphite text, tighter bottom-left.
 - **Receipts:** Tick icons only; read tint ChatRoute Lavender.
+- **Role badge:** Beside the sender name in groups and Support DMs. Full pill, 16px tall (`h-4 px-1.5`), uppercase `label` (`text-xs`) in `text-role-ink` on its `bg-role-*` tint; the role word is always drawn. The only per-role colour in the app.
 - **Reactions / reply:** Same-window overlay tray (not Modal-as-cell); honor reduced motion.
 
 ### Hub carousel (signature)

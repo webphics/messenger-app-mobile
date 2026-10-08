@@ -1,4 +1,4 @@
-import { readOutcome } from '@/lib/api-result'
+import { readOutcome, refusalSentence } from '@/lib/api-result'
 
 /** A response that reached the API and was refused with this body. */
 function refusedWith(status: number, body: unknown) {
@@ -17,5 +17,16 @@ describe('readOutcome refusals', () => {
     expect(refusedWith(400, { code: 'toString', message: 'Bad request.' })).toMatchObject({
       failure: { message: 'Bad request.' },
     })
+  })
+})
+
+describe('refusalSentence', () => {
+  test.each([
+    ['repeats the refusal', { kind: 'refused', message: 'Not yours.' } as const, 'Not yours.'],
+    ['names the network', { kind: 'unreachable' } as const, 'No connection. Try again.'],
+    ['says nothing for an expired session', { kind: 'unauthorised' } as const, null],
+    ['falls back for a body it could not read', { kind: 'malformed' } as const, 'Fallback.'],
+  ])('%s', (_, failure, expected) => {
+    expect(refusalSentence(failure, 'Fallback.')).toBe(expected)
   })
 })

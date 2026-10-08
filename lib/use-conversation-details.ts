@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { refusalSentence } from '@/lib/api-result'
 import {
   attachLabel,
   createNote,
   detachLabel,
   listLabels,
   listNotes,
-  type ApiFailure,
 } from '@/lib/conversation-api'
 import type { Conversation, ConversationNote, Label } from '@/lib/types'
 import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
@@ -79,19 +79,6 @@ export type ConversationDetails = {
   addNote: (text: string) => void
   addingNote: boolean
   noteError: string | null
-}
-
-/**
- * An expired session says nothing here, the same convention
- * `conversation-failure.ts`'s `assignmentRefusal` follows: the auth layer is
- * already moving to sign-in, and a label/note-specific sentence would arrive
- * on a screen that is leaving.
- */
-function refusal(failure: ApiFailure, fallback: string): string | null {
-  if (failure.kind === 'refused') return failure.message
-  if (failure.kind === 'unreachable') return 'No connection. Try again.'
-  if (failure.kind === 'unauthorised') return null
-  return fallback
 }
 
 export function useConversationDetails({
@@ -206,7 +193,7 @@ export function useConversationDetails({
           return
         }
         setLabelError(
-          refusal(
+          refusalSentence(
             result.failure,
             change === 'attach' ? 'The label could not be added.' : 'The label could not be removed.',
           ),
@@ -248,7 +235,7 @@ export function useConversationDetails({
         setAddingNote(false)
 
         if (!result.ok) {
-          setNoteError(refusal(result.failure, 'The note could not be saved.'))
+          setNoteError(refusalSentence(result.failure, 'The note could not be saved.'))
           return
         }
         setNotes((held) =>

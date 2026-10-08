@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Info, Pencil, Reply } from "@/components/icons";
+import { Clock, Info, Pencil, Reply } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -47,6 +47,11 @@ type MessageActionsProps = {
    * `lib/conversation-access` decides, so this is offered only where it works.
    */
   onEdit?: () => void;
+  /**
+   * The message's edit history. Present on any edited message the server holds,
+   * whoever sent it: every reader may check what a message used to say.
+   */
+  onHistory?: () => void;
 };
 
 export function MessageActions({
@@ -56,6 +61,7 @@ export function MessageActions({
   onReply,
   onInfo,
   onEdit,
+  onHistory,
 }: MessageActionsProps) {
   const reduceMotion = useReducedMotion();
   // The tray appears where a finger just was, so Reduce Motion keeps the fade
@@ -81,7 +87,7 @@ export function MessageActions({
   }));
 
   /*
-    Reply, then Edit, then Info: most often wanted first, and the one that
+    Reply, then Edit, then History, then Info: most often wanted first, and the one that
     leaves the thread for a screen of its own last. Each is absent rather than
     disabled where it does not apply, which is `wall-post-actions`' rule too —
     a control that opens onto a refusal is worse than no control.
@@ -101,6 +107,14 @@ export function MessageActions({
       Icon: Pencil,
       onPress: () => {
         onEdit();
+      },
+    },
+    onHistory && {
+      label: "History",
+      accessibilityLabel: "Edit history",
+      Icon: Clock,
+      onPress: () => {
+        onHistory();
       },
     },
     onInfo && {
