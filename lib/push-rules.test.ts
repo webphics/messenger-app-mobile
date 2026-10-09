@@ -1,6 +1,9 @@
 import {
   PERMISSION_TRIGGERS,
   conversationIdFromPush,
+  platformDrawsInForeground,
+  pushRouteFromNotification,
+  pushRouteFromPush,
   notificationIdFromPush,
   notificationIdsForConversation,
   shouldAskForPermission,
@@ -219,5 +222,61 @@ describe('the notifications standing in the shade for one conversation', () => {
     ['a record where the list should be', { 0: presented('a', 'cnv_01') }],
   ])('answers nothing rather than throwing for %s', (_case, shade) => {
     expect(notificationIdsForConversation(shade, 'cnv_01')).toEqual([])
+  })
+})
+
+describe('the screen a tapped notification about no conversation names', () => {
+  function response(data: unknown) {
+    return {
+      actionIdentifier: 'expo.modules.notifications.actions.DEFAULT',
+      notification: { request: { content: { data } } },
+    }
+  }
+
+  const base = { notificationPublicId: 'ntf_01', conversationPublicId: null, preview: 'x' }
+
+  it.each([
+    ['a reaction on a Post', { ...base, kind: 'wall_post_reaction', wallPostPublicId: 'pst_01' }, { screen: 'wall-post', postId: 'pst_01' }],
+    ['a new Post', { ...base, kind: 'wall_post', wallPostPublicId: 'pst_02' }, { screen: 'wall-post', postId: 'pst_02' }],
+    ['an invitation', { ...base, kind: 'organization_invitation', wallPostPublicId: null }, { screen: 'invitations' }],
+    ['a Customer joining an organization', { ...base, kind: 'customer_joined_organization', wallPostPublicId: null }, { screen: 'conversations' }],
+    ['a Customer signing up inside an organization', { ...base, kind: 'customer_registered', wallPostPublicId: null }, { screen: 'conversations' }],
+  ])('opens the right screen for %s', (_case, data, expected) => {
+    expect(pushRouteFromPush(response(data))).toEqual(expected)
+  })
+
+  it('leaves a notification naming a conversation to the thread', () => {
+    expect(
+      pushRouteFromPush(response({ ...base, kind: 'customer_registered', conversationPublicId: 'cnv_01' })),
+    ).toBeNull()
+  })
+
+  it.each([
+    ['a Post kind with no Post', { ...base, kind: 'wall_post_reaction', wallPostPublicId: null }],
+    ['a kind this build has no screen for', { ...base, kind: 'broadcast' }],
+    ['nothing', null],
+  ])('answers null for %s', (_case, data) => {
+    expect(pushRouteFromPush(response(data))).toBeNull()
+  })
+
+  it('reads an arriving notification the same way', () => {
+    const notification = {
+      request: { content: { data: { ...base, kind: 'organization_invitation' } } },
+    }
+    expect(pushRouteFromNotification(notification)).toEqual({ screen: 'invitations' })
+  })
+})
+
+describe('which arriving notifications the platform draws while the app is open', () => {
+  const arriving = (data: unknown) => ({ request: { content: { data } } })
+
+  it.each([
+    ['a reaction on a Message', { kind: 'message_reaction', conversationPublicId: 'cnv_01' }, true],
+    ['a reaction on a Post', { kind: 'wall_post_reaction', conversationPublicId: null, wallPostPublicId: 'pst_01' }, true],
+    ['an invitation', { kind: 'organization_invitation', conversationPublicId: null }, true],
+    ['a new Message, which the app draws itself', { kind: 'message', conversationPublicId: 'cnv_01' }, false],
+    ['a dispatch this build cannot read', null, false],
+  ])('%s', (_case, data, expected) => {
+    expect(platformDrawsInForeground(arriving(data))).toBe(expected)
   })
 })

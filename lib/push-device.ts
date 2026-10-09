@@ -8,11 +8,14 @@ import {
   conversationIdFromPush,
   notificationIdFromPush,
   notificationIdsForConversation,
+  platformDrawsInForeground,
+  pushRouteFromPush,
   shouldAskForPermission,
   shouldOfferSystemSettings,
   type PermissionStanding,
   type PermissionTrigger,
   type PushPermission,
+  type PushRoute,
 } from '@/lib/push-rules'
 
 /**
@@ -72,14 +75,21 @@ const Notifications: typeof NotificationsModule | null =
  * documents it that way. Guarded like everything else here: a build with no
  * native side has no handler to set and is not failed by saying so.
  */
+//
+// The exception is a notification nothing in the app draws (a reaction on a Post or a
+// Message, an invitation, a Customer arriving): the app has no notification list, so the
+// platform's banner is the only way somebody looking at the app sees one.
 try {
   Notifications?.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: false,
-      shouldShowList: false,
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-    }),
+    handleNotification: async (notification) => {
+      const unseenInApp = platformDrawsInForeground(notification)
+      return {
+        shouldShowBanner: unseenInApp,
+        shouldShowList: unseenInApp,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }
+    },
   })
 } catch {
   // No native module to hand this to. Nothing arrives, so nothing is drawn.
@@ -324,6 +334,25 @@ export function takeTappedConversation(): string | null {
 }
 
 /**
+ * The screen the tap that started this launch asked for, when it named no conversation.
+ * Handed out once, on the same terms as `takeTappedConversation`, which answers null for
+ * the same tap.
+ */
+export function takeTappedRoute(): PushRoute | null {
+  if (Notifications === null) return null
+  try {
+    const response = Notifications.getLastNotificationResponse()
+    const route = pushRouteFromPush(response)
+    if (route === null) return null
+
+    launchTap = notificationIdFromPush(response)
+    return route
+  } catch {
+    return null
+  }
+}
+
+/**
  * Subscribe to taps while the app is running. Answers the unsubscribe.
  *
  * These never reach the Launch gate — there is no launch to gate, and the person
@@ -332,13 +361,16 @@ export function takeTappedConversation(): string | null {
  */
 export function addPushTapListener(
   onTap: (conversationId: string) => void,
+  /** A tap on a notification about no conversation: a Post, the invitations, the list. */
+  onRouteTap?: (route: PushRoute) => void,
 ): () => void {
   if (Notifications === null) return () => {}
   try {
     const subscription = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const conversationId = conversationIdFromPush(response)
-        if (conversationId === null) return
+        const route = conversationId === null ? pushRouteFromPush(response) : null
+        if (conversationId === null && route === null) return
 
         // The launch's own tap, reported a second time. Forgotten as it is
         // dropped: the next report of this notification is a person tapping it
@@ -349,7 +381,8 @@ export function addPushTapListener(
           return
         }
 
-        onTap(conversationId)
+        if (conversationId !== null) onTap(conversationId)
+        else if (route !== null) onRouteTap?.(route)
       },
     )
     return () => subscription.remove()

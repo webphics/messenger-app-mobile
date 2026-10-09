@@ -1,6 +1,6 @@
 import type { MessageReaction } from '@/lib/types'
 
-export const REACT_EMOJIS = ['❤️', '😆', '😮', '😢', '😡', '👎'] as const
+export const REACT_EMOJIS = ['❤️', '😆', '😮', '😢', '😡'] as const
 
 /**
  * The reactions on one message, gathered per emoji for the chip row.

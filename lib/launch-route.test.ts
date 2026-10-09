@@ -2,6 +2,7 @@ import type { AuthState } from "@/lib/auth-machine";
 import { chatHref } from "@/lib/chat-route-id";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
 import { launchDestination } from "@/lib/launch-route";
+import { wallPostHref } from "@/lib/wall-route";
 import { ONBOARDING_HREF } from "@/lib/onboarding-gate";
 import type { ConversationFetch, SessionUser, UserRole } from "@/lib/types";
 
@@ -140,5 +141,35 @@ describe("an account with no name", () => {
 
   test("still waits for the fetch", () => {
     expect(launchDestination(nameless(), "outstanding")).toEqual({ kind: "wait" });
+  });
+});
+
+describe("a tapped notification about no conversation", () => {
+  test("opens the Post over the Hub", () => {
+    expect(
+      launchDestination(signedIn("agent"), "answered", null, { screen: "wall-post", postId: "pst_01" }),
+    ).toEqual({ kind: "navigate", href: wallPostHref("pst_01"), behind: ROLE_HREF.agent });
+  });
+
+  test("opens the role's own Settings for an invitation", () => {
+    expect(launchDestination(signedIn("admin"), "answered", null, { screen: "invitations" })).toEqual({
+      kind: "navigate",
+      href: "/(admin)/(home)/settings",
+      behind: ROLE_HREF.admin,
+    });
+  });
+
+  test("opens the role's conversation list for a Customer arriving", () => {
+    expect(launchDestination(signedIn("agent"), "answered", null, { screen: "conversations" })).toEqual({
+      kind: "navigate",
+      href: "/(agent)/conversations",
+      behind: ROLE_HREF.agent,
+    });
+  });
+
+  test("a tapped thread outranks it", () => {
+    expect(
+      launchDestination(signedIn("agent"), "answered", "cnv_01", { screen: "conversations" }),
+    ).toEqual({ kind: "navigate", href: chatHref("cnv_01"), behind: ROLE_HREF.agent });
   });
 });

@@ -1,5 +1,6 @@
 import type { Href } from "expo-router";
 
+import type { PushRoute } from "@/lib/push-rules";
 import type { UserRole } from "@/lib/types";
 
 /** Where anyone without a session goes. */
@@ -41,6 +42,29 @@ export function messagesHref(role: UserRole): Href {
   return role === "admin"
     ? ("/(admin)/conversations" as Href)
     : ("/(agent)/conversations" as Href);
+}
+
+/** Where a person's Settings screen is, which is where their invitations wait. */
+export function settingsHref(role: UserRole): Href {
+  if (role === "customer") return CUSTOMER_HREF.settings;
+  return role === "admin"
+    ? ("/(admin)/(home)/settings" as Href)
+    : ("/(agent)/(home)/settings" as Href);
+}
+
+/** The screen a tapped notification about no conversation opens, for this role. */
+export function pushRouteHref(route: PushRoute, role: UserRole): Href {
+  switch (route.screen) {
+    case "wall-post":
+      // Spelled out rather than taken from `lib/wall-route`'s `wallPostHref`, which builds the
+      // same path: this module is on the launch path, and a launch may not load a Wall module
+      // (`wall-launch-isolation.test.ts`). The two agree, and that test of the launch says so.
+      return { pathname: "/wall/post/[id]", params: { id: route.postId } } as unknown as Href;
+    case "invitations":
+      return settingsHref(role);
+    case "conversations":
+      return messagesHref(role);
+  }
 }
 
 export function knowledgeListHref(group: "agent" | "admin"): Href {

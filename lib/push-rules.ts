@@ -193,6 +193,73 @@ export function conversationIdFromPush(response: unknown): string | null {
 }
 
 /**
+ * Where a tap on a notification about no conversation goes. A conversation's tap is
+ * `conversationIdFromPush`, and opens the thread; these are the kinds the app has no
+ * notification list for, so their push is the only place they are ever seen.
+ */
+export type PushRoute =
+  | { screen: 'wall-post'; postId: string }
+  | { screen: 'invitations' }
+  | { screen: 'conversations' }
+
+/** The route a notification's payload names, or null for one this build has none for. */
+function routeOf(request: Record<string, unknown> | null): PushRoute | null {
+  const data = asRecord(asRecord(request?.content)?.data)
+  if (!data) return null
+  // A thread is the answer whenever one is named, whatever the kind.
+  if (asId(data.conversationPublicId)) return null
+
+  switch (data.kind) {
+    case 'wall_post':
+    case 'wall_post_reaction': {
+      const postId = asId(data.wallPostPublicId)
+      return postId ? { screen: 'wall-post', postId } : null
+    }
+    case 'organization_invitation':
+      return { screen: 'invitations' }
+    case 'customer_registered':
+    case 'customer_joined_organization':
+      return { screen: 'conversations' }
+    default:
+      return null
+  }
+}
+
+/**
+ * The screen a tapped notification about no conversation asks for, or null: for a
+ * conversation's notification (that is `conversationIdFromPush`), and for a dispatch this
+ * build cannot read, which leaves the launch going where it was going.
+ */
+export function pushRouteFromPush(response: unknown): PushRoute | null {
+  return routeOf(requestOf(response))
+}
+
+/**
+ * The same, read off a notification arriving rather than one tapped.
+ */
+export function pushRouteFromNotification(notification: unknown): PushRoute | null {
+  return routeOf(requestOfNotification(notification))
+}
+
+/**
+ * Kinds that name a conversation but that nothing in the app draws when they arrive: a new
+ * Message moves its row and raises the In-app banner, a reaction does neither.
+ */
+const UNDRAWN_CONVERSATION_KINDS: readonly string[] = ['message_reaction']
+
+/**
+ * Whether the platform should draw this notification while the app is open: true for the
+ * kinds nothing in the app draws (every routed kind, and a reaction on a Message), false for
+ * the Message kinds the app already tells somebody about itself.
+ */
+export function platformDrawsInForeground(notification: unknown): boolean {
+  const request = requestOfNotification(notification)
+  if (routeOf(request) !== null) return true
+  const kind = asRecord(asRecord(request?.content)?.data)?.kind
+  return typeof kind === 'string' && UNDRAWN_CONVERSATION_KINDS.includes(kind)
+}
+
+/**
  * What the platform calls this notification, or null when it does not say.
  *
  * The one thing about a tap that is not about where it goes: the response that

@@ -12,7 +12,14 @@ import {
 
 import { useAuth } from '@/lib/auth-context'
 import { chatHref } from '@/lib/chat-route-id'
-import { addPushTapListener, takeTappedConversation } from '@/lib/push-device'
+import { pushRouteHref } from '@/lib/hub-routes'
+import {
+  addPushTapListener,
+  takeTappedConversation,
+  takeTappedRoute,
+} from '@/lib/push-device'
+import type { PushRoute } from '@/lib/push-rules'
+import type { UserRole } from '@/lib/types'
 
 /**
  * The thread a tapped notification asked for, held only for as long as nothing
@@ -36,6 +43,8 @@ import { addPushTapListener, takeTappedConversation } from '@/lib/push-device'
 type PushIntentView = {
   /** The thread a launch should open over the Hub, or null for an ordinary one. */
   pendingThread: string | null
+  /** The screen a launch should open over the Hub for a tap about no thread, or null. */
+  pendingRoute: PushRoute | null
   /**
    * Told by the launch screen while it is the screen — which is exactly while a
    * Pending thread is worth holding, because the gate is the only thing that
@@ -51,8 +60,10 @@ const PushIntentContext = createContext<PushIntentView | null>(null)
 export function PushIntentProvider({ children }: { children: ReactNode }) {
   const { state } = useAuth()
   const [pendingThread, setPendingThread] = useState<string | null>(null)
+  const [pendingRoute, setPendingRoute] = useState<PushRoute | null>(null)
 
   const signedIn = state.status === 'signed-in'
+  const role: UserRole | null = state.status === 'signed-in' ? state.user.role : null
   /**
    * Both are facts about the moment a tap arrives, so the listener reads them
    * rather than depending on them: subscribing again every time somebody moved
@@ -64,6 +75,13 @@ export function PushIntentProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     signedInRef.current = signedIn
   }, [signedIn])
+
+  /** Read by the listener for the same reason as `signedInRef`: a route depends on the role. */
+  const roleRef = useRef(role)
+
+  useEffect(() => {
+    roleRef.current = role
+  }, [role])
 
   /**
    * Whether the launch screen is the screen, told by that screen rather than
@@ -95,6 +113,9 @@ export function PushIntentProvider({ children }: { children: ReactNode }) {
     // keyed on nothing, and it cannot cascade.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tapped) setPendingThread(tapped)
+    // A tap on a notification about no thread, held for the gate on the same terms.
+    const tappedRoute = tapped ? null : takeTappedRoute()
+    if (tappedRoute) setPendingRoute(tappedRoute)
 
     return addPushTapListener((conversationId) => {
       // Still on the launch screen: there is no Hub to open this over yet, so
@@ -110,16 +131,26 @@ export function PushIntentProvider({ children }: { children: ReactNode }) {
       // A tap arriving with no session is dropped — the Session end that took
       // the cookie took the Store this thread would have drawn from.
       if (signedInRef.current) router.push(chatHref(conversationId))
+    }, (route) => {
+      // The same two cases as a thread's tap: held for the gate while the launch screen
+      // is up, pushed over wherever somebody is otherwise.
+      if (atLaunchRef.current) {
+        setPendingRoute(route)
+        return
+      }
+      const currentRole = roleRef.current
+      if (signedInRef.current && currentRole) router.push(pushRouteHref(route, currentRole))
     })
   }, [])
 
   const clearPendingThread = useCallback(() => {
     setPendingThread(null)
+    setPendingRoute(null)
   }, [])
 
   const value = useMemo(
-    () => ({ pendingThread, setLaunchOnScreen, clearPendingThread }),
-    [pendingThread, setLaunchOnScreen, clearPendingThread],
+    () => ({ pendingThread, pendingRoute, setLaunchOnScreen, clearPendingThread }),
+    [pendingThread, pendingRoute, setLaunchOnScreen, clearPendingThread],
   )
 
   return <PushIntentContext.Provider value={value}>{children}</PushIntentContext.Provider>

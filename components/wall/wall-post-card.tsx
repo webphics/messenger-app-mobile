@@ -337,6 +337,7 @@ export const WallPostCard = memo(function WallPostCard({
         <View className="flex-row items-center justify-between">
           <WallPostVote
             score={post.score}
+            showScore={viewer.role !== 'customer'}
             myVote={myVote}
             onVote={(direction) => onVote(post.id, direction)}
           />

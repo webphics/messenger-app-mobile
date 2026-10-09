@@ -2,7 +2,8 @@ import type { Href } from "expo-router";
 
 import type { AuthState } from "@/lib/auth-machine";
 import { chatHref } from "@/lib/chat-route-id";
-import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
+import { pushRouteHref, ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
+import type { PushRoute } from "@/lib/push-rules";
 import { needsOnboarding, ONBOARDING_HREF } from "@/lib/onboarding-gate";
 import type { ConversationFetch } from "@/lib/types";
 
@@ -70,6 +71,12 @@ export function launchDestination(
    * as the same value a launch nobody tapped does.
    */
   pendingThread: string | null = null,
+  /**
+   * The screen a tapped notification about no conversation asked for (a Post, the
+   * invitations, the conversation list), or null. Opened over the Hub exactly as a tapped
+   * thread is; a thread outranks it, though one tap never names both.
+   */
+  pendingRoute: PushRoute | null = null,
 ): LaunchDestination {
   switch (state.status) {
     case "hydrating":
@@ -99,8 +106,11 @@ export function launchDestination(
       }
 
       const hub = ROLE_HREF[state.user.role];
-      return pendingThread
-        ? { kind: "navigate", href: chatHref(pendingThread), behind: hub }
+      if (pendingThread) {
+        return { kind: "navigate", href: chatHref(pendingThread), behind: hub };
+      }
+      return pendingRoute
+        ? { kind: "navigate", href: pushRouteHref(pendingRoute, state.user.role), behind: hub }
         : { kind: "navigate", href: hub };
     }
     // A Session cookie is held but the API did not answer, so a tapped thread is

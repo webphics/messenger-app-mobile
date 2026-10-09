@@ -20,7 +20,7 @@ export default function Index() {
   // null on a launch nobody tapped anything to start. Held outside this screen
   // because the tap is reported while the process is still coming up — see
   // `lib/push-intent`.
-  const { pendingThread, setLaunchOnScreen, clearPendingThread } = usePushIntent();
+  const { pendingThread, pendingRoute, setLaunchOnScreen, clearPendingThread } = usePushIntent();
   // Whether the launch screen has hidden the native splash. Until it has, it
   // has to stay mounted — see `showUnreachable`.
   const [launchReady, setLaunchReady] = useState(false);
@@ -53,7 +53,7 @@ export default function Index() {
   // Where Hydration says this person belongs, and whether there is yet anything
   // to show them there. The mapping is `lib/launch-route`; what is left here is
   // only the timing around it.
-  const destination = launchDestination(state, conversationFetch, pendingThread);
+  const destination = launchDestination(state, conversationFetch, pendingThread, pendingRoute);
   const targetHref = destination.kind === "navigate" ? destination.href : null;
   // What has to be on the stack underneath the target before the launch lands on
   // it. Only a tapped notification asks for one, and it is the whole reason Back
