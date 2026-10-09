@@ -79,7 +79,12 @@ function SavedResponseForm({
     organizations.find((organization) => organization.id === organizationId)?.name ?? null;
 
   const submit = useCallback(() => {
-    const invalid = cannedReplyDraftProblem({ organizationId, title, body });
+    const invalid = cannedReplyDraftProblem({
+      organizationId,
+      title,
+      body,
+      requiresOrganization: !editing,
+    });
     if (invalid) {
       setProblem(invalid);
       return;
@@ -106,7 +111,7 @@ function SavedResponseForm({
       onSaved(result.value);
       onClose();
     });
-  }, [body, onClose, onSaved, organizationId, reply, title]);
+  }, [body, editing, onClose, onSaved, organizationId, reply, title]);
 
   return (
     <View
@@ -143,7 +148,12 @@ function SavedResponseForm({
           <Text variant="label" className="uppercase tracking-wide text-muted">
             Organization
           </Text>
-          {editing ? (
+          {editing && reply?.scope === "personal" ? (
+            <Text variant="meta" className="text-ink-soft">
+              Personal{reply.owner?.name ? ` to ${reply.owner.name}` : ""}. Share it with an
+              organization from the list to let everyone there use it.
+            </Text>
+          ) : editing ? (
             <Text variant="meta" className="text-ink-soft">
               {organizationName ?? "Its organization"}. A saved response stays with
               the organization it was created in.

@@ -1095,11 +1095,20 @@ export type AccountSession = {
  * composer instead of retyping it. It belongs to one organization for good, so
  * `organizationId` is read and never written back.
  */
+/**
+ * A saved response: one organization's (`scope: 'organization'`, `organizationId`
+ * set) or one staff member's own (`scope: 'personal'`, `owner` set).
+ */
 export type CannedReply = {
   id: string
-  organizationId: string
+  scope: 'organization' | 'personal'
+  organizationId: string | null
+  /** Null `name` when the account is gone. */
+  owner: { id: string; name: string | null } | null
   title: string
   body: string
+  /** Times it has been put into a composer, everyone together. */
+  useCount: number
   archived: boolean
 }
 

@@ -7,8 +7,11 @@ import type { CannedReply } from '@/lib/types'
  * Pure, and separate from the requests, for the reason `lib/org-parse` is. The
  * same two rules hold: a row this client cannot read is dropped from a list
  * rather than failing the page, and everything a row needs is required, since
- * a saved response with no organization, title or body is not one anybody
- * could send.
+ * a saved response with no title or body is not one anybody could send. It
+ * needs an organization, or an owner when it is personal.
+ *
+ * A row from an API older than personal responses carries no `scope`, owner or
+ * count; it reads as an organization response used zero times.
  *
  * The body is kept exactly as it arrived. Its line breaks are part of what the
  * admin saved, and the API has already trimmed it.
@@ -26,9 +29,32 @@ export function parseCannedReply(value: unknown): CannedReply | null {
   const organizationId = text(record.organizationId)
   const title = text(record.title)
   const body = text(record.body)
-  if (!id || !organizationId || !title || !body) return null
+  if (!id || !title || !body) return null
 
-  return { id, organizationId, title, body, archived: record.archived === true }
+  const ownerRecord = asRecord(record.owner)
+  const ownerId = ownerRecord ? text(ownerRecord.id) : null
+  const scope = record.scope === 'personal' ? 'personal' : 'organization'
+  if (scope === 'personal' && !ownerId) return null
+  if (scope === 'organization' && !organizationId) return null
+
+  const useCount =
+    typeof record.useCount === 'number' && Number.isFinite(record.useCount) && record.useCount > 0
+      ? Math.floor(record.useCount)
+      : 0
+
+  return {
+    id,
+    scope,
+    organizationId: scope === 'organization' ? organizationId : null,
+    owner:
+      scope === 'personal' && ownerId
+        ? { id: ownerId, name: ownerRecord ? text(ownerRecord.name) : null }
+        : null,
+    title,
+    body,
+    useCount,
+    archived: record.archived === true,
+  }
 }
 
 /**

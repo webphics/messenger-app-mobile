@@ -10,12 +10,15 @@ import {
 
 import {
   Archive,
+  Building,
   MessageSquare,
   Plus,
   RotateCcw,
   Trash2,
+  User,
 } from "@/components/icons";
 import { SearchFieldWithClear } from "@/components/search-field-with-clear";
+import { PromoteSavedResponseSheet } from "@/components/hub/promote-saved-response-sheet";
 import { SavedResponseSheet } from "@/components/hub/saved-response-sheet";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
@@ -26,6 +29,8 @@ import {
 } from "@/lib/canned-reply-api";
 import {
   cannedReplyEmptyState,
+  sortCannedReplies,
+  usageLabel,
   visibleCannedReplies,
 } from "@/lib/canned-reply-library";
 import { cn } from "@/lib/cn";
@@ -37,9 +42,12 @@ import type { CannedReply, OrganizationSummary } from "@/lib/types";
 /**
  * The saved responses agents insert from the composer.
  *
- * Admin only — the three write routes are `@Roles(['admin'])` — and scoped per
- * organization: each response names one company's policies, hours and prices,
- * so the organization it belongs to is chosen at creation and never changes.
+ * Admin only (it lives under the Admin Hub). Organization responses are scoped
+ * per organization: each names one company's policies, hours and prices, so the
+ * organization it belongs to is chosen at creation and never changes. Every
+ * staff member's personal responses are listed too, with whose they are, so an
+ * Admin can find good wording and share it with an organization. Most used
+ * first, as the API sends them.
  *
  * The whole library is held, archived rows included, and narrowed on this
  * device. That keeps the archived switch and the search free of requests, and
@@ -66,6 +74,7 @@ export function SavedResponsesScreen() {
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [sheet, setSheet] = useState<SheetState>(null);
+  const [promoting, setPromoting] = useState<CannedReply | null>(null);
   /** Which response has a write out for it, so its row can say it is working. */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -139,18 +148,18 @@ export function SavedResponsesScreen() {
       const replies = known
         ? held.replies.map((row) => (row.id === reply.id ? reply : row))
         : [...held.replies, reply];
-      // The API sorts by title; a new or renamed row goes where a refetch would put it.
-      return {
-        status: "ready",
-        replies: [...replies].sort((a, b) => a.title.localeCompare(b.title)),
-      };
+      // The API sorts most used first; a new or changed row goes where a refetch would put it.
+      return { status: "ready", replies: sortCannedReplies(replies) };
     });
   }, []);
 
-  /** A row created in another organization than the filter's belongs to a list not on screen. */
+  /**
+   * A row created in another organization than the filter's belongs to a list
+   * not on screen. A personal one is the Admin's own, which every list includes.
+   */
   const saved = useCallback(
     (reply: CannedReply) => {
-      if (organizationId && reply.organizationId !== organizationId) return;
+      if (organizationId && reply.organizationId && reply.organizationId !== organizationId) return;
       replace(reply);
     },
     [organizationId, replace],
@@ -226,7 +235,9 @@ export function SavedResponsesScreen() {
   const renderItem = useCallback(
     ({ item }: { item: CannedReply }) => {
       const busy = busyId === item.id;
-      const organizationName = organizationId ? null : organizationNames.get(item.organizationId);
+      const organizationName =
+        organizationId || !item.organizationId ? null : organizationNames.get(item.organizationId);
+      const personal = item.scope === "personal";
       return (
         <View
           className={cn(
@@ -244,7 +255,14 @@ export function SavedResponsesScreen() {
               <Text variant="label" className="shrink font-semibold text-ink" numberOfLines={1}>
                 {item.title}
               </Text>
-              {organizationName ? (
+              {personal ? (
+                <View className="flex-row items-center gap-1 rounded-full bg-line/70 px-2 py-0.5">
+                  <User color={colors.muted} size={11} />
+                  <Text variant="label" className="font-normal text-muted" numberOfLines={1}>
+                    Personal · {item.owner?.name ?? "Former staff"}
+                  </Text>
+                </View>
+              ) : organizationName ? (
                 <View className="rounded-full bg-primary-soft px-2 py-0.5">
                   <Text variant="label" className="font-normal text-primary">
                     {organizationName}
@@ -263,6 +281,13 @@ export function SavedResponsesScreen() {
             <Text variant="meta" className="text-muted" numberOfLines={3}>
               {item.body}
             </Text>
+            <Text
+              variant="label"
+              className="font-normal text-muted"
+              style={{ fontVariant: ["tabular-nums"] }}
+            >
+              {usageLabel(item.useCount)}
+            </Text>
           </TactilePressable>
 
           {busy ? (
@@ -271,6 +296,16 @@ export function SavedResponsesScreen() {
             </View>
           ) : (
             <View className="flex-row">
+              {personal ? (
+                <TactilePressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Share ${item.title} with an organization`}
+                  onPress={() => setPromoting(item)}
+                  className="size-11 items-center justify-center rounded-full"
+                >
+                  <Building color={colors.primary} size={18} />
+                </TactilePressable>
+              ) : null}
               <TactilePressable
                 accessibilityRole="button"
                 accessibilityLabel={
@@ -475,6 +510,13 @@ export function SavedResponsesScreen() {
         organizations={organizations}
         defaultOrganizationId={organizationId}
         onSaved={saved}
+      />
+
+      <PromoteSavedResponseSheet
+        reply={promoting}
+        organizations={organizations}
+        onClose={() => setPromoting(null)}
+        onPromoted={replace}
       />
     </View>
   );

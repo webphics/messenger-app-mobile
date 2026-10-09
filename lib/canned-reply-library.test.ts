@@ -4,6 +4,9 @@ import {
   cannedReplyDraftProblem,
   cannedReplyEmptyState,
   insertCannedReply,
+  quickCreateTitle,
+  sortCannedReplies,
+  usageLabel,
   visibleCannedReplies,
 } from '@/lib/canned-reply-library'
 import type { CannedReply } from '@/lib/types'
@@ -11,9 +14,12 @@ import type { CannedReply } from '@/lib/types'
 function reply(over: Partial<CannedReply> = {}): CannedReply {
   return {
     id: 'r1',
+    scope: 'organization',
     organizationId: 'org1',
+    owner: null,
     title: 'Refund policy',
     body: 'Refunds are available within 30 days.',
+    useCount: 0,
     archived: false,
     ...over,
   }
@@ -70,6 +76,36 @@ describe('cannedReplyDraftProblem', () => {
       cannedReplyDraftProblem({ ...draft, body: 'a'.repeat(CANNED_REPLY_BODY_MAX + 1) }),
     ).not.toBeNull()
   })
+})
+
+describe('a personal draft', () => {
+  it('needs no organization when told so', () => {
+    const draft = { organizationId: null, title: 'Hours', body: 'Nine to five.' }
+    expect(cannedReplyDraftProblem(draft)).not.toBeNull()
+    expect(cannedReplyDraftProblem({ ...draft, requiresOrganization: false })).toBeNull()
+  })
+})
+
+describe('sortCannedReplies', () => {
+  it('puts the most used first, ties by title', () => {
+    const rows = [
+      reply({ id: 'a', title: 'Alpha', useCount: 1 }),
+      reply({ id: 'g', title: 'Gamma', useCount: 5 }),
+      reply({ id: 'b', title: 'beta', useCount: 5 }),
+    ]
+    expect(sortCannedReplies(rows).map((row) => row.id)).toEqual(['b', 'g', 'a'])
+  })
+})
+
+test('usageLabel says how often', () => {
+  expect(usageLabel(0)).toBe('Not used yet')
+  expect(usageLabel(1)).toBe('Used once')
+  expect(usageLabel(9)).toBe('Used 9 times')
+})
+
+test('quickCreateTitle trims and caps at the title limit', () => {
+  expect(quickCreateTitle('  refund  ')).toBe('refund')
+  expect(quickCreateTitle('x'.repeat(80))).toHaveLength(CANNED_REPLY_TITLE_MAX)
 })
 
 describe('insertCannedReply', () => {

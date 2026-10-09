@@ -11,10 +11,12 @@ import type { CannedReply } from '@/lib/types'
 /**
  * The saved-response endpoints (`/canned-replies`).
  *
- * Reading is open to any staff member; the three writes are
- * `@Roles(['admin'])`, so an Agent reaching one gets `refused` rather than a
- * screen pretending it worked. Nothing here sends a message: a saved response
- * is text, and what an Agent does with it is still a send through the composer.
+ * Reading is open to any staff member, and so is writing a personal response
+ * (no `organizationId`). An organization response needs `manage_canned_replies`,
+ * and promoting a personal one is an Admin's; a refusal arrives as `refused`
+ * rather than a screen pretending it worked. Nothing here sends a message: a
+ * saved response is text, and what an Agent does with it is still a send
+ * through the composer.
  */
 
 /**
@@ -27,24 +29,64 @@ import type { CannedReply } from '@/lib/types'
  * the viewer may reach.
  */
 export async function listCannedReplies(
-  params: { organizationId?: string; includeArchived?: boolean } = {},
+  params: { organizationId?: string; includeArchived?: boolean; personalOnly?: boolean } = {},
 ): Promise<ApiResult<CannedReply[]>> {
   const path = `/canned-replies${query({
     organizationId: params.organizationId,
     // The API honours only the literal `true`, so false is an absent key.
     includeArchived: params.includeArchived ? 'true' : undefined,
+    personalOnly: params.personalOnly ? 'true' : undefined,
   })}`
   return readOutcome(await authenticatedRequest(path), parseCannedReplies)
 }
 
+/**
+ * The composer's library: the thread's organization responses and the viewer's
+ * own personal ones, or only the personal ones where the thread has no
+ * organization (General Support, a staff DM) -- leaving the organization off
+ * would otherwise widen the list to every organization's.
+ */
+export function listPickerCannedReplies(
+  organizationId: string | null,
+): Promise<ApiResult<CannedReply[]>> {
+  return organizationId
+    ? listCannedReplies({ organizationId })
+    : listCannedReplies({ personalOnly: true })
+}
+
+/** With `organizationId`, the organization's; without, the caller's own personal response. */
 export async function createCannedReply(input: {
-  organizationId: string
+  organizationId?: string | null
   title: string
   body: string
 }): Promise<ApiResult<CannedReply>> {
   const outcome = await authenticatedRequest('/canned-replies', {
     method: 'POST',
-    body: input,
+    body: {
+      ...(input.organizationId ? { organizationId: input.organizationId } : {}),
+      title: input.title,
+      body: input.body,
+    },
+  })
+  return readOutcome(outcome, parseCannedReply)
+}
+
+/** Admin only: a personal response becomes an organization's, same id and use count. */
+export async function promoteCannedReply(
+  id: string,
+  organizationId: string,
+): Promise<ApiResult<CannedReply>> {
+  const outcome = await authenticatedRequest(
+    `/canned-replies/${encodeURIComponent(id)}/promote`,
+    { method: 'POST', body: { organizationId } },
+  )
+  return readOutcome(outcome, parseCannedReply)
+}
+
+/** Counts one use: the response was just put into the composer. */
+export async function recordCannedReplyUse(id: string): Promise<ApiResult<CannedReply>> {
+  const outcome = await authenticatedRequest(`/canned-replies/${encodeURIComponent(id)}/use`, {
+    method: 'POST',
   })
   return readOutcome(outcome, parseCannedReply)
 }

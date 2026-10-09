@@ -469,18 +469,18 @@ export function ThreadScreen({
 
   /**
    * Saved responses in the composer: staff only, since the API refuses a
-   * Customer's read, and only in a thread that belongs to an organization —
-   * a staff DM has none, so it has no library to offer.
+   * Customer's read. Every staff thread offers the viewer's personal ones; a
+   * thread that belongs to an organization offers that organization's too.
    */
-  const savedResponsesOrganizationId =
-    viewer.role !== 'customer' ? conversation.organizationId : null
+  const isStaffViewer = viewer.role !== 'customer'
+  const savedResponsesOrganizationId = conversation.organizationId ?? null
   const canManageSavedResponses = can(viewer, 'manage_canned_replies')
   const savedResponses = useMemo(
     () =>
-      savedResponsesOrganizationId
+      isStaffViewer
         ? { organizationId: savedResponsesOrganizationId, canManage: canManageSavedResponses }
         : null,
-    [savedResponsesOrganizationId, canManageSavedResponses],
+    [isStaffViewer, savedResponsesOrganizationId, canManageSavedResponses],
   )
   const rows = useMemo(
     () =>

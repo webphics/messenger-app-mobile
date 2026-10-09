@@ -99,7 +99,8 @@ type ComposerProps = {
    * API refuses a Customer's read — and only in a thread that belongs to an
    * organization, since a response is always one organization's.
    */
-  savedResponses?: { organizationId: string; canManage: boolean } | null
+  /** `organizationId` null: a thread with no organization, offered personal responses only. */
+  savedResponses?: { organizationId: string | null; canManage: boolean } | null
   /**
    * The organizations a Complaint may be about, given only to a Customer in their General
    * Support, where the + sheet offers to mark the next message as one. Absent everywhere else.

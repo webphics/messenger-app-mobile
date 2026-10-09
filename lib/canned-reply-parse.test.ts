@@ -18,9 +18,12 @@ describe('parseCannedReply', () => {
   it('reads a row and keeps the body as written', () => {
     expect(parseCannedReply(row)).toEqual({
       id: 'r1',
+      scope: 'organization',
       organizationId: 'org1',
+      owner: null,
       title: 'Refund policy',
       body: 'Line one.\nLine two.',
+      useCount: 0,
       archived: false,
     })
   })
@@ -37,6 +40,35 @@ describe('parseCannedReply', () => {
   it('drops something that is not a record', () => {
     expect(parseCannedReply(null)).toBeNull()
     expect(parseCannedReply([row])).toBeNull()
+  })
+})
+
+describe('a personal response', () => {
+  const personal = {
+    ...row,
+    scope: 'personal',
+    organizationId: null,
+    owner: { id: 'u1', name: 'Ray' },
+    useCount: 4,
+  }
+
+  it('reads its owner and count, and no organization', () => {
+    expect(parseCannedReply(personal)).toMatchObject({
+      scope: 'personal',
+      organizationId: null,
+      owner: { id: 'u1', name: 'Ray' },
+      useCount: 4,
+    })
+  })
+
+  it('is dropped without an owner, as an organization one is without an organization', () => {
+    expect(parseCannedReply({ ...personal, owner: null })).toBeNull()
+    expect(parseCannedReply({ ...row, organizationId: null })).toBeNull()
+  })
+
+  it('reads a nonsense count as zero', () => {
+    expect(parseCannedReply({ ...personal, useCount: -3 })?.useCount).toBe(0)
+    expect(parseCannedReply({ ...personal, useCount: 'many' })?.useCount).toBe(0)
   })
 })
 

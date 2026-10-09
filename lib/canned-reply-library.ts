@@ -103,17 +103,45 @@ export function insertCannedReply(
 }
 
 /**
+ * Most used first, then by title -- the order the API sends and the one a row
+ * changed on this device has to rejoin. Never mutates `rows`.
+ */
+export function sortCannedReplies(rows: readonly CannedReply[]): CannedReply[] {
+  return [...rows].sort(
+    (a, b) =>
+      b.useCount - a.useCount || a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }),
+  )
+}
+
+/** "Used 3 times", "Used once", "Not used yet". */
+export function usageLabel(count: number): string {
+  if (count <= 0) return 'Not used yet'
+  if (count === 1) return 'Used once'
+  return `Used ${count} times`
+}
+
+/** A search typed into the picker, as the title of the response it is about to create. */
+export function quickCreateTitle(search: string): string {
+  return search.trim().slice(0, CANNED_REPLY_TITLE_MAX)
+}
+
+/**
  * The first thing wrong with a draft, or null. Checked on the trimmed values,
- * because that is what is sent and what the API measures.
+ * because that is what is sent and what the API measures. `organizationId` is
+ * asked for only when `requiresOrganization`: a personal response has none, and
+ * an edit never changes the organization it has.
  */
 export function cannedReplyDraftProblem(draft: {
   organizationId: string | null
   title: string
   body: string
+  requiresOrganization?: boolean
 }): string | null {
   const title = draft.title.trim()
   const body = draft.body.trim()
-  if (!draft.organizationId) return 'Pick the organization it belongs to.'
+  if ((draft.requiresOrganization ?? true) && !draft.organizationId) {
+    return 'Pick the organization it belongs to.'
+  }
   if (title === '') return 'Give it a title.'
   if (title.length > CANNED_REPLY_TITLE_MAX) {
     return `Keep the title to ${CANNED_REPLY_TITLE_MAX} characters.`
