@@ -15,6 +15,7 @@ import {
   CANNED_REPLY_TITLE_MAX,
   cannedReplyDraftProblem,
 } from "@/lib/canned-reply-library";
+import { PLACEHOLDER_HINT } from "@/lib/saved-response-placeholders";
 import { cn } from "@/lib/cn";
 import { failureNotice } from "@/lib/conversation-failure";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
@@ -225,6 +226,9 @@ function SavedResponseForm({
           />
           <Text variant="label" className="font-normal text-muted">
             Line breaks are kept as written. {body.trim().length}/{CANNED_REPLY_BODY_MAX}
+          </Text>
+          <Text variant="label" className="font-normal text-muted">
+            {PLACEHOLDER_HINT}
           </Text>
         </View>
       </ScrollView>

@@ -50,6 +50,7 @@ import {
   formatBytes,
 } from '@/lib/attachments'
 import { insertCannedReply } from '@/lib/canned-reply-library'
+import { fillPlaceholders, type PlaceholderValues } from '@/lib/saved-response-placeholders'
 import {
   downsamplePeaks,
   formatDurationMs,
@@ -99,8 +100,15 @@ type ComposerProps = {
    * API refuses a Customer's read — and only in a thread that belongs to an
    * organization, since a response is always one organization's.
    */
-  /** `organizationId` null: a thread with no organization, offered personal responses only. */
-  savedResponses?: { organizationId: string | null; canManage: boolean } | null
+  /**
+   * `organizationId` null: a thread with no organization, offered personal responses only.
+   * `placeholders` is what a response's `{name}`, `{my_name}` and `{organization}` become.
+   */
+  savedResponses?: {
+    organizationId: string | null
+    canManage: boolean
+    placeholders: PlaceholderValues
+  } | null
   /**
    * The organizations a Complaint may be about, given only to a Customer in their General
    * Support, where the + sheet offers to mark the next message as one. Absent everywhere else.
@@ -760,7 +768,9 @@ export function Composer({
           onClose={() => setPickerOpen(false)}
           organizationId={savedResponses.organizationId}
           canManage={savedResponses.canManage}
-          onSelect={(reply) => handleInsertSavedResponse(reply.body)}
+          onSelect={(reply) =>
+            handleInsertSavedResponse(fillPlaceholders(reply.body, savedResponses.placeholders))
+          }
         />
       ) : null}
     </View>

@@ -25,6 +25,7 @@ import {
 } from '@/lib/canned-reply-library'
 import { cn } from '@/lib/cn'
 import { failureNotice } from '@/lib/conversation-failure'
+import { PLACEHOLDER_HINT } from '@/lib/saved-response-placeholders'
 import { getSession } from '@/lib/session'
 import { colors, screenBottomPad, screenTopPad } from '@/lib/tokens'
 import type { CannedReply } from '@/lib/types'
@@ -290,7 +291,7 @@ function PickerBody({
               value={draft.body}
               onChangeText={(body) => setDraft({ ...draft, body })}
               maxLength={CANNED_REPLY_BODY_MAX}
-              placeholder="The words it puts in the composer…"
+              placeholder="Hi {first_name|there}, …"
               accessibilityLabel="Message"
               multiline
               autoFocus
@@ -298,6 +299,9 @@ function PickerBody({
               editable={!saving}
               className="h-32 rounded-2xl border-line/80 bg-line/35 px-3.5 py-3 font-sans text-base text-ink"
             />
+            <Text variant="label" className="font-normal text-muted">
+              {PLACEHOLDER_HINT}
+            </Text>
           </View>
 
           {canShare ? (

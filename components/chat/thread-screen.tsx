@@ -65,6 +65,7 @@ import {
   type OpenMenuPayload,
   type ReactionAnchor,
 } from '@/lib/overlay-frame'
+import { isStaffConversation } from '@/lib/types'
 import type { Conversation, Message, UserRole } from '@/lib/types'
 import { useWallPostReplyDraft } from '@/lib/use-wall-post-reply-draft'
 import { wallPostHref } from '@/lib/wall-route'
@@ -475,12 +476,35 @@ export function ThreadScreen({
   const isStaffViewer = viewer.role !== 'customer'
   const savedResponsesOrganizationId = conversation.organizationId ?? null
   const canManageSavedResponses = can(viewer, 'manage_canned_replies')
+  const placeholderCustomer = isStaffConversation(conversation)
+    ? (conversation.customer?.name ?? null)
+    : null
+  const placeholderOrganization = isStaffConversation(conversation)
+    ? (conversation.organizationName ??
+      (conversation.organizationId ? organizationNames?.get(conversation.organizationId) : null) ??
+      null)
+    : null
   const savedResponses = useMemo(
     () =>
       isStaffViewer
-        ? { organizationId: savedResponsesOrganizationId, canManage: canManageSavedResponses }
+        ? {
+            organizationId: savedResponsesOrganizationId,
+            canManage: canManageSavedResponses,
+            placeholders: {
+              name: placeholderCustomer,
+              myName: viewer.name,
+              organization: placeholderOrganization,
+            },
+          }
         : null,
-    [isStaffViewer, savedResponsesOrganizationId, canManageSavedResponses],
+    [
+      isStaffViewer,
+      savedResponsesOrganizationId,
+      canManageSavedResponses,
+      placeholderCustomer,
+      placeholderOrganization,
+      viewer.name,
+    ],
   )
   const rows = useMemo(
     () =>
