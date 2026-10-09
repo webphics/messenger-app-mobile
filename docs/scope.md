@@ -349,10 +349,13 @@ Broadcasts are in-inbox announcements (later), not stories.
      organizations may be named is the web client's rule — an Agent's memberships, an Admin's whole
      list — because asking an Agent for `GET /organizations` is a `403` nothing needs.
 
-   Still web-only, and deliberately: Broadcasts, the Activity log and Analytics. **Communities are
-   no longer on that list** — they come to this client along with the Wall, which is a separate
-   feature and a destination of its own. Administering a Community stays on web; a phone gets the
-   member's half. See `CONTEXT.md` for both, and the API's `docs/planning/wall.md`.
+   Broadcasts and Community administration came to the Admin Hub later: an Admin holding
+   `send_broadcasts` or `view_acknowledgements` gets Broadcasts (the sent history, the composer,
+   and who has acknowledged one), and every Admin gets Communities (every Community, with creating
+   one and editing its name and description for a holder of `create_communities`). An Admin's
+   Communities tab lists every Community, not only the ones they belong to. Picking individual
+   people as a Broadcast's audience, and managing a Community's members, Moderators, linked Groups
+   and join requests, stay on web. See `CONTEXT.md`, and the API's `docs/planning/wall.md`.
    Deleting a conversation is web-only too — it is content-destroying, admin-only and undoable by
    nobody, and nothing on a phone needed it.
 

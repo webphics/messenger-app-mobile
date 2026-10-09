@@ -65,15 +65,23 @@ export const MAX_INLINE_GROUPS = 3
  * beside, so the two cannot disagree about which rooms exist.
  *
  * A Community with neither — no membership and no room the viewer holds — is
- * still invisible rather than refused, which is what keeps an Admin's answer
- * from listing every Community in the product.
+ * still invisible rather than refused. An Admin is the exception: they may open
+ * every Community and administering them is their job, so `seesEveryCommunity`
+ * lists them all.
  */
 export function myCommunities(
   communities: readonly Community[],
   viewerId: string | null,
   conversations: readonly Conversation[] = [],
+  /**
+   * An Admin's: they may open every Community (the API's read rule lets an
+   * Admin into all of them), and managing them is their job, so nothing is
+   * narrowed away from them.
+   */
+  seesEveryCommunity = false,
 ): Community[] {
   if (!viewerId) return []
+  if (seesEveryCommunity) return sortCommunities(communities)
 
   const holdsARoomIn = new Set(
     conversations

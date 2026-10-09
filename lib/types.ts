@@ -1179,3 +1179,44 @@ export type ActivityPage = {
   page: number
   pageSize: number
 }
+
+/** Who a Broadcast went to, as it was picked: each list is what the sender chose, not who it reached. */
+export type BroadcastAudience = {
+  userIds: string[]
+  groupIds: string[]
+  communityIds: string[]
+  organizationIds: string[]
+}
+
+/** One sent Broadcast, from `GET /broadcasts`. The recipient list was frozen when it was sent. */
+export type Broadcast = {
+  id: string
+  title: string
+  body: string
+  /** Reached people who turned announcements off. */
+  essential: boolean
+  requiresAcknowledgement: boolean
+  audience: BroadcastAudience
+  recipientCount: number
+  /** Always 0 when nothing was required. */
+  acknowledgedCount: number
+  /** Null for a sender whose account no longer resolves. */
+  createdByName: string | null
+  sentAt: string
+}
+
+/** One recipient of a Broadcast that asked for acknowledgement. */
+export type BroadcastAcknowledgement = {
+  userId: string
+  /** Null for a recipient whose account no longer resolves. */
+  name: string | null
+  acknowledgedAt: string | null
+}
+
+export type BroadcastAcknowledgementReport = {
+  broadcastId: string
+  requiresAcknowledgement: boolean
+  recipientCount: number
+  acknowledgedCount: number
+  recipients: BroadcastAcknowledgement[]
+}

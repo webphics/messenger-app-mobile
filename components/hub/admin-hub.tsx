@@ -5,6 +5,7 @@ import {
   Activity,
   // BookOpen, // hidden with Knowledge
   Building2,
+  Megaphone,
   MessageCircle,
   MessageSquare,
   // Plus, // hidden with Create New Offer
@@ -230,6 +231,26 @@ export function AdminHub() {
             hint="Answers agents insert from the composer"
             accessibilityLabel="Saved responses"
             onPress={() => router.push("/(admin)/saved-responses" as Href)}
+          />
+        ) : null}
+        {mayEnter(me, SCREEN_ACCESS.broadcasts) ? (
+          <ActionRow
+            icon={Megaphone}
+            tone="neutral"
+            title="Broadcasts"
+            hint="Send announcements and see who has read them"
+            accessibilityLabel="Broadcasts"
+            onPress={() => router.push("/(admin)/broadcasts" as Href)}
+          />
+        ) : null}
+        {mayEnter(me, SCREEN_ACCESS.communities) ? (
+          <ActionRow
+            icon={Users}
+            tone="neutral"
+            title="Communities"
+            hint="Every community, and creating new ones"
+            accessibilityLabel="Communities"
+            onPress={() => router.push("/(admin)/communities" as Href)}
           />
         ) : null}
         {mayEnter(me, SCREEN_ACCESS.activity) ? (

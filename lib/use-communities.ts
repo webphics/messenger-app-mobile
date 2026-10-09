@@ -87,6 +87,8 @@ export type CommunityTabView = {
 export function useCommunities(): CommunityTabView {
   const { state } = useAuth()
   const viewerId = state.status === 'signed-in' ? state.user.id : null
+  /** An Admin's tab lists every Community; see `myCommunities`. */
+  const seesEveryCommunity = state.status === 'signed-in' && state.user.role === 'admin'
 
   /**
    * The Conversation list, which is the live copy of every thread a feed names.
@@ -175,13 +177,15 @@ export function useCommunities(): CommunityTabView {
         return
       }
       setFailure(null)
-      // Narrowed before anything is drawn and before anything is written: an
-      // Admin's answer is every Community there is, and one that neither holds
-      // them nor holds a room they can open has to be invisible rather than
-      // refused — on the disk as well as on screen.
-      setCommunities(myCommunities(result.value, viewerId, conversationsRef.current))
+      // Narrowed before anything is drawn and before anything is written, for
+      // everyone but an Admin: a Community somebody neither belongs to nor holds
+      // a room in has to be invisible rather than refused, on the disk as well
+      // as on screen. An Admin may open all of them, so their tab lists all.
+      setCommunities(
+        myCommunities(result.value, viewerId, conversationsRef.current, seesEveryCommunity),
+      )
     })
-  }, [viewerId])
+  }, [viewerId, seesEveryCommunity])
 
   useEffect(() => {
     asked.current.clear()

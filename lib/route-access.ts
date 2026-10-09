@@ -92,6 +92,16 @@ export const SCREEN_ACCESS = {
   'saved-responses': { roles: ['admin'], anyCapability: ['manage_canned_replies'] },
   /** The Audit log. */
   activity: { roles: ['admin'], anyCapability: ['view_team_activity'] },
+  /**
+   * Sent Broadcasts and the composer. Either capability opens it, as on web: sending
+   * draws the composer, the other draws who has acknowledged.
+   */
+  broadcasts: { roles: ['admin'], anyCapability: ['send_broadcasts', 'view_acknowledgements'] },
+  /**
+   * Every Community. An Admin may open all of them; creating and editing are drawn
+   * for a holder of `create_communities` only.
+   */
+  communities: { roles: ['admin'] },
   /** The rule the Hub's carousel is drawn by, so a chart is drawn only where it opens. */
   'chart/[id]': ANALYTICS_ACCESS,
   'offer-add': { roles: ['admin'] },

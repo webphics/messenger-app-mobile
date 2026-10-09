@@ -112,6 +112,16 @@ describe('myCommunities', () => {
       'held',
     ])
   })
+  it('lists every Community for an Admin, member or not, sorted by name', () => {
+    const beta = community({ id: 'b', name: 'Beta', memberIds: ['someone else'] })
+    const alpha = community({ id: 'a', name: 'Alpha', memberIds: [] })
+
+    expect(myCommunities([beta, alpha], 'viewer', [], true).map((row) => row.id)).toEqual(['a', 'b'])
+  })
+
+  it('still lists nothing for nobody signed in, Admin or not', () => {
+    expect(myCommunities([community({ id: 'a' })], null, [], true)).toEqual([])
+  })
 })
 
 describe('sortCommunities', () => {

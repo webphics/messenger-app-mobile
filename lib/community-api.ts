@@ -20,10 +20,10 @@ import type { Community, CommunityFeedRow, GroupJoinOutcome } from '@/lib/types'
  *
  * Two reads and, since #73, the writes a member's own half of a Community
  * needs: joining a linked Group, leaving the Community itself, and — since
- * #88 — taking back an ask that has not been answered yet. Creating,
- * renaming, linking a Group, promoting a Moderator, answering a Join request
- * and every other route on that controller stay on web — see `docs/scope.md`.
- * A phone gets the member's half.
+ * #88 — taking back an ask that has not been answered yet. An Admin's
+ * creating and renaming are `lib/community-admin-api`; linking a Group,
+ * promoting a Moderator, answering a Join request and the rest of that
+ * controller stay on web — see `docs/scope.md`.
  */
 
 /**

@@ -40,6 +40,12 @@ export default function AdminHomeLayout() {
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.activity)}>
         <Stack.Screen name="activity" options={{ title: "Audit log" }} />
       </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.broadcasts)}>
+        <Stack.Screen name="broadcasts" options={{ title: "Broadcasts" }} />
+      </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.communities)}>
+        <Stack.Screen name="communities" options={{ title: "Communities" }} />
+      </Stack.Protected>
       {/* FAQ and Knowledge are hidden for now. These lines only set a
           screen's title; the route files stay where they are, so uncommenting
           is the whole of putting them back. */}
