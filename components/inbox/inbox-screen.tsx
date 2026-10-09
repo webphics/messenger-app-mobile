@@ -1,11 +1,20 @@
 import { useNavigation, useRouter } from "expo-router";
-import { CloudOff, Inbox, ListFilter, MessageCircle, SquarePen } from "@/components/icons";
+import {
+  Building,
+  ChevronDown,
+  CloudOff,
+  Inbox,
+  ListFilter,
+  MessageCircle,
+  SquarePen,
+} from "@/components/icons";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, View } from "react-native";
+import { FlatList, ScrollView, View } from "react-native";
 
 import { ConversationRow } from "@/components/inbox/conversation-row";
 import { ManageInboxesSheet } from "@/components/inbox/manage-inboxes-sheet";
 import { NewChatModal } from "@/components/inbox/new-chat-modal";
+import { OrganizationFilterSheet } from "@/components/inbox/organization-filter-sheet";
 import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
@@ -17,6 +26,7 @@ import {
   inboxChips,
   type InboxChip,
 } from "@/lib/inbox-filter";
+import { organizationPill, reachableSelection } from "@/lib/organization-filter";
 import { useCustomInboxes } from "@/lib/use-custom-inboxes";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { settleEnter } from "@/lib/motion-enter";
@@ -30,10 +40,12 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 
 /**
  * The staff filters' labels. Which of them are offered, and in what order, is
- * `inboxChips` — Mine is not, in a Shared queue.
+ * `inboxChips` — Mine is not, in a Shared queue. The Org pill sits among them,
+ * before Resolved, which the row keeps last.
  *
- * Short labels because there are four of them and the row does not scroll: "All
- * Messages" was affordable beside two chips and is not beside three.
+ * Short labels because the row is read at a glance: "All Messages" was
+ * affordable beside two chips and is not beside five. It scrolls sideways when
+ * a narrow phone cannot fit them.
  */
 const CHIP_LABEL: Record<InboxChip, string> = {
   all: "All",
@@ -200,12 +212,32 @@ export function InboxScreen({
   const chip = activeInboxChip(selectedChip, supportAssignment);
   const [composeOpen, setComposeOpen] = useState(false);
   const [inboxesOpen, setInboxesOpen] = useState(false);
+  const [organizationsOpen, setOrganizationsOpen] = useState(false);
+  const [selectedOrganizations, setSelectedOrganizations] = useState<string[]>([]);
   /*
    * A saved inbox is a set of organizations and nothing else, so it narrows
    * the rows already held rather than fetching a different list. Selecting
    * one therefore costs no request, and works with no signal.
    */
   const savedInboxes = useCustomInboxes(savedInboxesFor);
+  /*
+   * The Org pill offers the organizations a saved inbox may name: every one
+   * for an Admin, an Agent's own. A pick that outlived a membership stops
+   * narrowing rather than hiding rows behind an organization nobody can see.
+   */
+  const filterOrganizations = useMemo(
+    () => (showChips && savedInboxesFor && savedInboxesFor !== "customer" ? savedInboxes.organizations : []),
+    [showChips, savedInboxesFor, savedInboxes.organizations],
+  );
+  const pickedOrganizations = useMemo(
+    () => reachableSelection(selectedOrganizations, filterOrganizations),
+    [selectedOrganizations, filterOrganizations],
+  );
+  const pickedOrganizationIds = useMemo(
+    () => (pickedOrganizations.length > 0 ? new Set(pickedOrganizations) : null),
+    [pickedOrganizations],
+  );
+  const orgPill = organizationPill(filterOrganizations, pickedOrganizations);
   const [epoch, setEpoch] = useState(0);
   const simulated = useSimulatedRefresh(() => {
     setEpoch((n) => n + 1);
@@ -242,6 +274,7 @@ export function InboxScreen({
       organizationNames,
       viewerId,
       organizationIds: savedInboxes.organizationIds,
+      pickedOrganizationIds,
     });
   }, [
     conversations,
@@ -251,8 +284,90 @@ export function InboxScreen({
     organizationNames,
     viewerId,
     savedInboxes.organizationIds,
+    pickedOrganizationIds,
     epoch,
   ]);
+
+  const renderChip = (id: InboxChip) => {
+    const selected = id === chip;
+    return (
+      <TactilePressable
+        key={id}
+        accessibilityRole="button"
+        accessibilityLabel={CHIP_LABEL[id]}
+        accessibilityState={{ selected }}
+        onPress={() => setChip(id)}
+        className={cn(
+          "min-h-9 justify-center rounded-full border px-3.5",
+          selected
+            ? "border-transparent bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+            : "border-line/80 bg-line/35",
+        )}
+      >
+        <Text
+          variant="label"
+          className={selected ? "text-primary-foreground" : "text-ink-soft"}
+        >
+          {CHIP_LABEL[id]}
+        </Text>
+      </TactilePressable>
+    );
+  };
+
+  /*
+   * One organization is a pill named after it that a tap switches on and off;
+   * several are "Org", which opens the list to pick from. It narrows whichever
+   * chip is in force rather than being one, so it is drawn as a toggle (a
+   * soft fill and a ring) rather than in the chips' solid selected fill.
+   */
+  const renderOrganizationPill = () => {
+    if (orgPill.kind === "none") return null;
+    const active = orgPill.active;
+    const single = orgPill.kind === "single" ? orgPill.organization : null;
+    return (
+      <TactilePressable
+        key="organizations"
+        accessibilityRole="button"
+        accessibilityLabel={
+          single
+            ? `Only ${single.name}`
+            : active
+              ? `Organizations, ${pickedOrganizations.length} selected`
+              : "Organizations, none selected"
+        }
+        accessibilityState={single ? { selected: active } : { expanded: organizationsOpen }}
+        onPress={() => {
+          if (single) setSelectedOrganizations(active ? [] : [single.id]);
+          else setOrganizationsOpen(true);
+        }}
+        className={cn(
+          "min-h-9 max-w-48 flex-row items-center gap-1.5 rounded-full border px-3",
+          active ? "border-primary/40 bg-primary-soft" : "border-line/80 bg-line/35",
+        )}
+      >
+        <Building color={active ? colors.primary : colors.muted} size={14} />
+        <Text
+          variant="label"
+          numberOfLines={1}
+          className={cn("shrink", active ? "font-semibold text-primary" : "text-ink-soft")}
+        >
+          {single ? single.name : "Org"}
+        </Text>
+        {!single && active ? (
+          <View className="h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1">
+            <Text
+              variant="label"
+              className="text-[11px] font-semibold text-primary-foreground"
+              style={{ fontVariant: ["tabular-nums"] }}
+            >
+              {pickedOrganizations.length}
+            </Text>
+          </View>
+        ) : null}
+        {!single ? <ChevronDown color={active ? colors.primary : colors.muted} size={14} /> : null}
+      </TactilePressable>
+    );
+  };
 
   const openConversation = useCallback(
     (conversationId: string) => {
@@ -338,35 +453,16 @@ export function InboxScreen({
         ) : null}
 
         {showChips ? (
-          <View className="mt-3 flex-row gap-2">
-            {chips.map((id) => {
-              const selected = id === chip;
-              return (
-                <TactilePressable
-                  key={id}
-                  accessibilityRole="button"
-                  accessibilityLabel={CHIP_LABEL[id]}
-                  accessibilityState={{ selected }}
-                  onPress={() => setChip(id)}
-                  className={cn(
-                    "min-h-9 justify-center rounded-full border px-3.5",
-                    selected
-                      ? "border-transparent bg-primary text-primary-foreground shadow-sm shadow-primary/25"
-                      : "border-line/80 bg-line/35",
-                  )}
-                >
-                  <Text
-                    variant="label"
-                    className={
-                      selected ? "text-primary-foreground" : "text-ink-soft"
-                    }
-                  >
-                    {CHIP_LABEL[id]}
-                  </Text>
-                </TactilePressable>
-              );
-            })}
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="-mx-4 mt-3"
+            contentContainerClassName="flex-row gap-2 px-4"
+          >
+            {chips.filter((id) => id !== "resolved").map(renderChip)}
+            {renderOrganizationPill()}
+            {chips.filter((id) => id === "resolved").map(renderChip)}
+          </ScrollView>
         ) : null}
       </View>
 
@@ -397,6 +493,14 @@ export function InboxScreen({
         visible={inboxesOpen}
         onClose={() => setInboxesOpen(false)}
         view={savedInboxes}
+      />
+
+      <OrganizationFilterSheet
+        visible={organizationsOpen}
+        onClose={() => setOrganizationsOpen(false)}
+        organizations={filterOrganizations}
+        selected={pickedOrganizations}
+        onChange={setSelectedOrganizations}
       />
 
       <NewChatModal

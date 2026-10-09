@@ -11,6 +11,7 @@ import { ConversationDetailsScreen } from "@/components/chat/conversation-detail
 import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { chatDetailsIdFromRoute } from "@/lib/chat-route-id";
 import { useConversationInbox } from "@/lib/conversation-inbox";
+import { withoutAgentClose } from "@/lib/agent-close";
 import { detailsView, threadActionsView } from "@/lib/conversation-access";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import { invitationSummary, placeableOnboardingCustomer } from "@/lib/onboarding-placement";
@@ -87,9 +88,13 @@ function DetailsScreen({ conversationId }: { conversationId: string }) {
   const supportAssignment = useSupportAssignment();
   /**
    * Transfer, Close and Reopen as the API offers them to this viewer, with
-   * the Capabilities this client cannot see already applied.
+   * the Capabilities this client cannot see already applied. Close is not
+   * offered to an Agent (`withoutAgentClose`).
    */
-  const actions = threadActionsView(ready ? section.conversation.access : undefined);
+  const actions = withoutAgentClose(
+    threadActionsView(ready ? section.conversation.access : undefined),
+    getSession().role,
+  );
   const manages = actions.transfer || actions.close || actions.reopen;
 
   /**

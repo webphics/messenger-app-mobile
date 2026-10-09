@@ -127,6 +127,12 @@ export type InboxFilter = {
    * `organizationId` query it also accepts.
    */
   organizationIds?: ReadonlySet<string> | null
+  /**
+   * The organizations picked from the Org pill, or null for none. Narrows on
+   * top of a saved inbox, by the same rule: a thread with no organization
+   * (General Support, a staff DM) is in none of them.
+   */
+  pickedOrganizationIds?: ReadonlySet<string> | null
 }
 
 /**
@@ -144,6 +150,7 @@ export function filterConversations(
     organizationNames = new Map(),
     viewerId,
     organizationIds = null,
+    pickedOrganizationIds = null,
   }: InboxFilter,
 ): Conversation[] {
   const q = query.trim().toLowerCase()
@@ -155,6 +162,10 @@ export function filterConversations(
     if (organizationIds) {
       if (!conversation.organizationId) return false
       if (!organizationIds.has(conversation.organizationId)) return false
+    }
+    if (pickedOrganizationIds && pickedOrganizationIds.size > 0) {
+      if (!conversation.organizationId) return false
+      if (!pickedOrganizationIds.has(conversation.organizationId)) return false
     }
 
     const resolved = isResolved(conversation)
