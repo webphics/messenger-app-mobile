@@ -131,8 +131,6 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
   const busy = actions.busyId === user.id;
   const problem = actions.refusal?.id === user.id ? actions.refusal.message : null;
   const invitable = invitableOrganizations(organizations, user);
-  /** A customer joins on being invited (ADR 0013), so the control does not say Invite. */
-  const joinsOnInvite = user.role === "customer";
 
   const handleToggle = useCallback(() => onToggle(user.id), [onToggle, user.id]);
 
@@ -305,14 +303,14 @@ export const UserDirectoryRow = memo(function UserDirectoryRow({
           {allowed.invite && invitable.length > 0 ? (
             <View className="gap-1.5">
               <Text variant="label" className="uppercase tracking-wide text-muted">
-                {joinsOnInvite ? "Add to" : "Invite to"}
+                Invite to
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {invitable.map((organization) => (
                   <TactilePressable
                     key={organization.id}
                     accessibilityRole="button"
-                    accessibilityLabel={`${joinsOnInvite ? "Add to" : "Invite to"} ${organization.name}`}
+                    accessibilityLabel={`Invite to ${organization.name}`}
                     onPress={() => actions.invite(user, [organization.id])}
                     className="min-h-9 flex-row items-center gap-1.5 justify-center rounded-full border border-line/80 bg-line/35 px-3"
                   >

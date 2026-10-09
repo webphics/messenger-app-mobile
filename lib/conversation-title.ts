@@ -15,11 +15,11 @@ import type { Conversation, ConversationPerson } from '@/lib/types'
 const SUPPORT_FALLBACK = 'Support'
 
 /**
- * What to call the one Support DM with no organization to name it: the onboarding thread, held
- * by a Customer who belongs nowhere yet. Named for what it is for, since there is nothing else
- * to name it after.
+ * What to call the one Support DM with no organization to name it: General Support, which every
+ * Customer keeps whatever organizations they join. Named for what it is, since there is nothing
+ * else to name it after.
  */
-const ONBOARDING_TITLE = 'Getting started'
+export const GENERAL_SUPPORT_TITLE = 'General Support'
 
 /** The other person in a two-sided conversation, or null where there is not one. */
 export function conversationPeer(conversation: Conversation): ConversationPerson | null {
@@ -43,6 +43,21 @@ export function conversationTitle(
     return conversation.title?.trim() || SUPPORT_FALLBACK
   }
 
-  if (!conversation.organizationId) return ONBOARDING_TITLE
+  if (!conversation.organizationId) return GENERAL_SUPPORT_TITLE
   return organizationNames.get(conversation.organizationId)?.trim() || SUPPORT_FALLBACK
+}
+
+/**
+ * Which desk a Staff member's Support DM row belongs to, for the chip beside its title: the
+ * organization's name, or General Support. A Customer's name alone does not say which, since every
+ * Customer has General Support beside their organization threads. Null for a Customer's own rows,
+ * which are titled with it already, and for anything that is not a Support DM.
+ */
+export function conversationOrigin(
+  conversation: Conversation,
+): { label: string; generalSupport: boolean } | null {
+  if (!isStaffConversation(conversation) || conversation.type !== 'support_dm') return null
+  if (!conversation.organizationId) return { label: GENERAL_SUPPORT_TITLE, generalSupport: true }
+  const name = conversation.organizationName?.trim()
+  return name ? { label: name, generalSupport: false } : null
 }

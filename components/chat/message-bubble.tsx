@@ -4,6 +4,7 @@ import {
   Check,
   CheckCheck,
   CornerUpLeft,
+  Lock,
   Reply,
   RotateCcw,
 } from '@/components/icons'
@@ -210,6 +211,11 @@ type MessageBubbleProps = {
   wallPost?: MessageWallPost
   /** A tap on that card, with the Post's id: the Post opens. */
   onOpenWallPost?: (postId: string) => void
+  /**
+   * Drawn over an admin-only message for the readers who are sent one (its Customer and Admins):
+   * "Complaint about … · only visible to admins", or that a reply is private. Null otherwise.
+   */
+  privateLabel?: string | null
 }
 
 const SWIPE_REPLY = 56
@@ -687,6 +693,7 @@ export const MessageBubble = memo(function MessageBubble({
   highlighted,
   wallPost,
   onOpenWallPost,
+  privateLabel = null,
 }: MessageBubbleProps) {
   const bubbleRef = useRef<View>(null)
   const sizeRef = useRef({ width: 0, height: 0 })
@@ -1005,6 +1012,23 @@ export const MessageBubble = memo(function MessageBubble({
                   {senderName}
                 </Text>
                 {senderRole ? <RoleBadge role={senderRole} /> : null}
+              </View>
+            ) : null}
+            {privateLabel ? (
+              <View
+                className={cn(
+                  'mb-1 max-w-full flex-row items-center gap-1 px-1',
+                  end ? 'self-end' : 'self-start',
+                )}
+              >
+                <Lock color={colors.danger} size={11} />
+                <Text
+                  variant="label"
+                  numberOfLines={2}
+                  className="min-w-0 shrink font-medium text-danger"
+                >
+                  {privateLabel}
+                </Text>
               </View>
             ) : null}
             {showQuoteChrome && quoted ? (

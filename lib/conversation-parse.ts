@@ -1,5 +1,6 @@
 import { asRecord } from '@/lib/api-envelope'
 import { parseAccess } from '@/lib/conversation-access'
+import { parseMessageComplaint, parseMessageInvitation } from '@/lib/message-invitation'
 import { parseMessageWallPost } from '@/lib/message-wall-post'
 import type {
   Contact,
@@ -251,9 +252,10 @@ export function parseConversation(value: unknown): Conversation | null {
       otherUser: staffPerson(record.otherUser),
       members: staffPeople(record.members),
       labels: labels(record.labels),
-      // Closed unless the API says otherwise: a payload that predates the field, or garbles it,
-      // must not offer to place a Customer who may already belong somewhere.
+      // False unless the API says otherwise: a payload that predates the field, or garbles it,
+      // offers no invitation control.
       onboardingOpen: flag(record.onboardingOpen),
+      organizationName: text(record.organizationName),
       writePolicy: oneOf(record.writePolicy, WRITE_POLICIES),
       // Deprecated in the API's schema and kept only while installed builds read
       // it. The composer reads `access` instead; see `lib/conversation-access`.
@@ -346,6 +348,8 @@ export function parseMessage(value: unknown): Message | null {
   if (!id || !createdAt) return null
 
   const wallPost = parseMessageWallPost(record.wallPost)
+  const invitation = parseMessageInvitation(record.invitation)
+  const complaint = parseMessageComplaint(record.complaint)
   const base = {
     id,
     body: nullableText(record.body) ?? '',
@@ -366,6 +370,10 @@ export function parseMessage(value: unknown): Message | null {
     // Set only on a Reply to a Post, for the reason `addressedToCustomer` is set
     // only when true: every other message keeps the shape it already had.
     ...(wallPost ? { wallPost } : {}),
+    // The General Support shapes, set only when present for the same reason.
+    ...(invitation ? { invitation } : {}),
+    ...(complaint ? { complaint } : {}),
+    ...(record.adminOnly === true ? { adminOnly: true } : {}),
     reactions: records(record.reactions).flatMap((item) => {
       const parsed = reaction(item)
       return parsed ? [parsed] : []

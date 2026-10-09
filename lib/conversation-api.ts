@@ -231,6 +231,11 @@ export type SendMessageDraft = {
   attachments?: MessageAttachment[]
   /** `text` unless said otherwise; see `sendMessageType`. */
   messageType?: 'text' | 'media' | 'voice'
+  /**
+   * Marks the message as a Complaint: a Customer, in their own General Support, about one of
+   * their organizations, or null for the app itself. Only the Customer and Admins read it.
+   */
+  complaint?: { organizationId: string | null }
 }
 
 /**
@@ -264,6 +269,7 @@ export async function sendMessage(
         messageType: draft.messageType ?? 'text',
         ...(draft.replyToMessageId ? { replyToMessageId: draft.replyToMessageId } : {}),
         ...(draft.wallPostId ? { wallPostId: draft.wallPostId } : {}),
+        ...(draft.complaint ? { complaint: draft.complaint } : {}),
         ...(draft.attachments && draft.attachments.length > 0
           ? { attachments: draft.attachments.map(sendableAttachment) }
           : {}),

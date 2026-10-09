@@ -3,6 +3,7 @@ import type {
   ConversationType,
   Message,
   MessageAttachment,
+  MessageComplaint,
   MessageWallPost,
   UserRole,
 } from '@/lib/types'
@@ -95,6 +96,11 @@ export type SendDraft = {
    * see `useThreadMessages`.
    */
   attachments?: AttachmentView[]
+  /**
+   * Marks the message as a Complaint and says what it is about: a Customer, in
+   * their General Support only. Absent for every other message.
+   */
+  complaint?: MessageComplaint | null
 }
 
 export type ThreadState = {
@@ -166,8 +172,10 @@ export function isSystemMessage(message: Pick<Message, 'messageType'>): boolean 
 export function isMessageVisibleTo(
   role: UserRole,
   conversationType: ConversationType,
-  message: Pick<Message, 'messageType' | 'addressedToCustomer'>,
+  message: Pick<Message, 'messageType' | 'addressedToCustomer' | 'adminOnly'>,
 ): boolean {
+  // An admin-only message (a Complaint, or a reply to one) is never shown to an Agent.
+  if (message.adminOnly === true && role === 'agent') return false
   if (role !== 'customer' || conversationType !== 'support_dm') return true
   return !isSystemMessage(message) || message.addressedToCustomer === true
 }
@@ -547,6 +555,8 @@ export type MessageDraft = {
   replyTo?: Message | null
   wallPost?: MessageWallPost | null
   attachments?: MessageAttachment[]
+  /** A Complaint, carried on the bubble so the label is up before the API answers. */
+  complaint?: MessageComplaint | null
   /** Defaults to now. Named so a test can fix it. */
   sentAt?: string
 }
@@ -582,6 +592,9 @@ export function draftMessage(draft: MessageDraft): Message {
     // The card goes up with the bubble, so the Post is on screen before the API
     // has answered; its copy, drawn from the API's own snapshot, replaces this.
     ...(draft.wallPost ? { wallPost: draft.wallPost } : {}),
+    // Carried on the message itself, so a send the Outbox brings back is still a
+    // Complaint when somebody taps Retry, and the label is drawn from the start.
+    ...(draft.complaint ? { complaint: draft.complaint, adminOnly: true } : {}),
     reactions: [],
     attachments,
     receiptStatus: 'sent' as const,

@@ -47,6 +47,7 @@ export { default as ExternalLink } from "lucide-react-native/icons/external-link
 export { default as Eye } from "lucide-react-native/icons/eye";
 export { default as EyeOff } from "lucide-react-native/icons/eye-off";
 export { default as FileText } from "lucide-react-native/icons/file-text";
+export { default as Flag } from "lucide-react-native/icons/flag";
 export { default as Headphones } from "lucide-react-native/icons/headphones";
 export { default as HelpCircle } from "lucide-react-native/icons/circle-question-mark";
 export { default as House } from "lucide-react-native/icons/house";
@@ -57,6 +58,7 @@ export { default as KeyRound } from "lucide-react-native/icons/key-round";
 export { default as Keyboard } from "lucide-react-native/icons/keyboard";
 export { default as Link } from "lucide-react-native/icons/link";
 export { default as ListFilter } from "lucide-react-native/icons/list-filter";
+export { default as Lock } from "lucide-react-native/icons/lock";
 export { default as LogOut } from "lucide-react-native/icons/log-out";
 export { default as Mail } from "lucide-react-native/icons/mail";
 export { default as MailCheck } from "lucide-react-native/icons/mail-check";

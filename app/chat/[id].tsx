@@ -323,6 +323,7 @@ function ConversationScreen({
       failure={thread.failure}
       onRetry={thread.retry}
       onDismissFailure={thread.dismissFailure}
+      onInvitationJoined={inbox.reload}
       onLoadOlder={thread.loadOlder}
       loadingOlder={thread.loadingOlder}
       hasOlder={thread.hasOlder}

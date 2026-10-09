@@ -1,5 +1,6 @@
 import {
   assignLabel,
+  invitationSummary,
   placeableOnboardingCustomer,
   toggleOrganization,
 } from '@/lib/onboarding-placement'
@@ -97,9 +98,36 @@ describe('toggleOrganization', () => {
 })
 
 describe('assignLabel', () => {
-  test('names one organization in the singular, several by count', () => {
-    expect(assignLabel(0)).toBe('Add to organization')
-    expect(assignLabel(1)).toBe('Add to organization')
-    expect(assignLabel(3)).toBe('Add to 3 organizations')
+  test('names one invitation in the singular, several by count', () => {
+    expect(assignLabel(0)).toBe('Send invitation')
+    expect(assignLabel(1)).toBe('Send invitation')
+    expect(assignLabel(3)).toBe('Invite to 3 organizations')
+  })
+})
+
+describe('invitationSummary', () => {
+  const org = (name: string) => ({ id: name, name })
+
+  test('says who was invited where, and what was skipped', () => {
+    expect(
+      invitationSummary('Ada', {
+        invited: [org('Tech Vanguard')],
+        alreadyInvited: [org('North')],
+        alreadyMembers: [],
+      }),
+    ).toBe('Invitation sent to Ada for Tech Vanguard; already invited to North')
+  })
+
+  test('says why nothing was sent when every organization was skipped', () => {
+    expect(
+      invitationSummary('Ada', {
+        invited: [],
+        alreadyInvited: [org('North')],
+        alreadyMembers: [org('South')],
+      }),
+    ).toBe('Ada is already invited to North, and already in South')
+    expect(invitationSummary('Ada', { invited: [], alreadyInvited: [], alreadyMembers: [] })).toBe(
+      'Ada was not invited to any organization',
+    )
   })
 })

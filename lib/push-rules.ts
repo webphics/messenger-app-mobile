@@ -243,9 +243,10 @@ export function pushRouteFromNotification(notification: unknown): PushRoute | nu
 
 /**
  * Kinds that name a conversation but that nothing in the app draws when they arrive: a new
- * Message moves its row and raises the In-app banner, a reaction does neither.
+ * Message moves its row and raises the In-app banner, a reaction does neither, and nor does an
+ * Invitation card, which is a `system` message the banner never announces.
  */
-const UNDRAWN_CONVERSATION_KINDS: readonly string[] = ['message_reaction']
+const UNDRAWN_CONVERSATION_KINDS: readonly string[] = ['message_reaction', 'organization_invitation']
 
 /**
  * Whether the platform should draw this notification while the app is open: true for the

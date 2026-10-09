@@ -13,6 +13,7 @@ import { useReducedMotion } from 'react-native-reanimated'
 
 import { AlertCircle, X } from '@/components/icons'
 import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
+import { InvitationCard } from '@/components/chat/invitation-card'
 import { MessageActions } from '@/components/chat/message-actions'
 import { MessageEditSheet } from '@/components/chat/message-edit-sheet'
 import { MessageHistorySheet } from '@/components/chat/message-history-sheet'
@@ -52,6 +53,7 @@ import {
   type BubbleContent,
 } from '@/lib/message-attachment'
 import { offersEditHistory } from '@/lib/message-history'
+import { adminOnlyLabel } from '@/lib/message-invitation'
 import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
@@ -108,6 +110,11 @@ type ThreadScreenProps = {
   onRetry?: () => void
   /** Put away a read failure reported beside Messages that are still drawn. */
   onDismissFailure?: () => void
+  /**
+   * After the Customer joins an organization from an Invitation card, so the inbox learns the
+   * membership it now has. Absent where nothing needs telling.
+   */
+  onInvitationJoined?: () => void
   /** Scrolling to the top of the thread asks for the page before it. */
   onLoadOlder?: () => void
   loadingOlder?: boolean
@@ -378,6 +385,7 @@ export function ThreadScreen({
   failure = null,
   onRetry,
   onDismissFailure,
+  onInvitationJoined,
   onLoadOlder,
   loadingOlder = false,
   hasOlder = false,
@@ -402,6 +410,22 @@ export function ThreadScreen({
   const [draft, setDraft] = useState('')
   const pendingPost = useWallPostReplyDraft(initialWallPostId, conversation.organizationId)
   const [replyTo, setReplyTo] = useState<Message | null>(null)
+  /**
+   * The next message marked as a Complaint, and what it is about (null: the app itself). Cleared
+   * once it is sent, so each Complaint is marked on purpose.
+   */
+  const [complaint, setComplaint] = useState<{ organizationId: string | null } | null>(null)
+  /**
+   * The organizations a Complaint may be about: a Customer, in their General Support only, about
+   * one of the organizations they belong to now.
+   */
+  const complaintOrganizations = useMemo(() => {
+    if (viewer.role !== 'customer') return null
+    if (conversation.type !== 'support_dm' || conversation.organizationId) return null
+    return [...(organizationNames ?? new Map<string, string>())]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [viewer.role, conversation.type, conversation.organizationId, organizationNames])
   const [menu, setMenu] = useState<ReactionAnchor | null>(null)
   /**
    * A file this screen refused before it was ever sent.
@@ -928,14 +952,28 @@ export function ThreadScreen({
     // user had scrolled up slightly).
     stickToLatestRef.current = true
 
+    const complaintOrganizationId = complaint?.organizationId ?? null
     onSendMessage({
       body,
       replyTo: quoted,
       ...(wallPost ? { wallPost } : {}),
       ...(payload.attachment ? { attachments: [payload.attachment] } : {}),
+      ...(complaint && complaintOrganizations
+        ? {
+            complaint: {
+              organization: complaintOrganizationId
+                ? {
+                    id: complaintOrganizationId,
+                    name: organizationNames?.get(complaintOrganizationId) ?? '',
+                  }
+                : null,
+            },
+          }
+        : {}),
     })
     // One card per Post: it goes with this message and not the next.
     if (wallPost) pendingPost.clear()
+    setComplaint(null)
     return true
   }
 
@@ -962,6 +1000,16 @@ export function ThreadScreen({
         )
       }
       if (item.type === 'system') {
+        if (item.message.invitation) {
+          return (
+            <InvitationCard
+              invitation={item.message.invitation}
+              sentAt={item.message.createdAt}
+              canAnswer={viewer.role === 'customer'}
+              onJoined={onInvitationJoined}
+            />
+          )
+        }
         return <SystemNotice body={item.message.body} />
       }
       const content = contentOf(item.message)
@@ -987,6 +1035,7 @@ export function ThreadScreen({
           onPressQuote={item.message.replyTo ? jumpToQuoted : undefined}
           wallPost={item.message.wallPost}
           onOpenWallPost={openWallPost}
+          privateLabel={adminOnlyLabel(item.message)}
           highlighted={highlightedId === item.message.id}
           reactions={groupReactions(item.message.reactions)}
           currentUserId={viewer.id}
@@ -1021,6 +1070,8 @@ export function ThreadScreen({
       highlightedId,
       openEditHistory,
       openWallPost,
+      viewer.role,
+      onInvitationJoined,
     ],
   )
 
@@ -1117,6 +1168,9 @@ export function ThreadScreen({
           onRemoveWallPost={pendingPost.clear}
           keyboardInset={keyboardInset}
           savedResponses={savedResponses}
+          complaintOrganizations={complaintOrganizations}
+          complaint={complaint}
+          onComplaintChange={setComplaint}
         />
       )}
       {menu ? (

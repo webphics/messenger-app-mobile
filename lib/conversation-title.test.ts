@@ -1,4 +1,8 @@
-import { conversationPeer, conversationTitle } from '@/lib/conversation-title'
+import {
+  conversationOrigin,
+  conversationPeer,
+  conversationTitle,
+} from '@/lib/conversation-title'
 import type { Conversation, CustomerConversation, StaffConversation } from '@/lib/types'
 
 const LAST_MESSAGE = {
@@ -43,6 +47,30 @@ describe('conversationTitle', () => {
 
   test('a Customer sees their support thread by the organization it belongs to', () => {
     expect(conversationTitle(customerSupport, new Map([['org-1', 'Talo']]))).toBe('Talo')
+  })
+
+  test('a Customer sees the thread with no organization as General Support', () => {
+    expect(conversationTitle({ ...customerSupport, organizationId: null })).toBe('General Support')
+  })
+})
+
+describe('conversationOrigin', () => {
+  test('names the organization of a Staff Support DM row', () => {
+    expect(conversationOrigin(staff({ organizationName: 'Talo' }))).toEqual({
+      label: 'Talo',
+      generalSupport: false,
+    })
+  })
+
+  test('names General Support for the row with no organization', () => {
+    expect(conversationOrigin(staff({ organizationId: null }))).toEqual({
+      label: 'General Support',
+      generalSupport: true,
+    })
+  })
+
+  test('says nothing on a Customer row, which is titled with it already', () => {
+    expect(conversationOrigin(customerSupport)).toBeNull()
   })
 })
 

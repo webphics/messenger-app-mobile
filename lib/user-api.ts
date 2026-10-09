@@ -59,9 +59,9 @@ export async function listUsers(filter: UserFilter = {}): Promise<ApiResult<Mana
 /**
  * Create an account.
  *
- * At least one organization is required by the API, so nobody is created into
- * a vacuum — and what those ids produce is invitations rather than
- * memberships. The password is optional: an account created without one is
+ * At least one organization is required for staff, so nobody on the company's
+ * side is created into a vacuum; a customer may have none. What those ids
+ * produce is invitations rather than memberships. The password is optional: an account created without one is
  * reached by magic link, which is how a Customer account comes into existence
  * everywhere else in this product.
  */

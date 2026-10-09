@@ -1,5 +1,5 @@
 import { memo, useCallback } from "react";
-import { Megaphone } from "@/components/icons";
+import { Building2, Headphones, Megaphone } from "@/components/icons";
 import { View } from "react-native";
 
 import { PresenceDot } from "@/components/ui/presence-dot";
@@ -10,7 +10,11 @@ import {
   isConversationUnread,
   isOffersConversation,
 } from "@/lib/conversation-list";
-import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
+import {
+  conversationOrigin,
+  conversationPeer,
+  conversationTitle,
+} from "@/lib/conversation-title";
 import { formatRelativeTime, initials } from "@/lib/display";
 import { colors } from "@/lib/tokens";
 import type { Conversation } from "@/lib/types";
@@ -36,6 +40,8 @@ export const ConversationRow = memo(function ConversationRow({
   const online = conversationPeer(conversation)?.isOnline === true;
   const hasUnread = isConversationUnread(conversation);
   const unreadCount = conversation.unreadCount ?? 0;
+  const origin = conversationOrigin(conversation);
+  const OriginIcon = origin?.generalSupport ? Headphones : Building2;
 
   const handlePress = useCallback(() => {
     onPress(conversation.id);
@@ -98,6 +104,19 @@ export const ConversationRow = memo(function ConversationRow({
         >
           {conversation.lastMessagePreview?.trim() || NO_MESSAGES}
         </Text>
+        {origin ? (
+          <View
+            className="mt-1.5 flex-row items-center gap-1 self-start"
+            accessibilityLabel={
+              origin.generalSupport ? origin.label : `Organization: ${origin.label}`
+            }
+          >
+            <OriginIcon color={colors.muted} size={12} />
+            <Text variant="label" className="font-medium text-muted" numberOfLines={1}>
+              {origin.label}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {hasUnread && unreadCount > 0 ? (

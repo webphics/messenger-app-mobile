@@ -34,6 +34,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { AttachmentSheet } from '@/components/chat/attachment-sheet'
+import { ComplaintStrip } from '@/components/chat/complaint-strip'
 import { EMOJI_PANEL_FALLBACK_HEIGHT, EmojiPanel } from '@/components/chat/emoji-panel'
 import { SavedResponsePicker } from '@/components/chat/saved-response-picker'
 import { VideoThumb } from '@/components/chat/video-thumb'
@@ -99,6 +100,14 @@ type ComposerProps = {
    * organization, since a response is always one organization's.
    */
   savedResponses?: { organizationId: string; canManage: boolean } | null
+  /**
+   * The organizations a Complaint may be about, given only to a Customer in their General
+   * Support, where the + sheet offers to mark the next message as one. Absent everywhere else.
+   */
+  complaintOrganizations?: readonly { id: string; name: string }[] | null
+  /** The next message's Complaint, while it is marked as one: what it is about (null: the app). */
+  complaint?: { organizationId: string | null } | null
+  onComplaintChange?: (complaint: { organizationId: string | null } | null) => void
 }
 
 const RECORD_OPTIONS = {
@@ -198,6 +207,9 @@ export function Composer({
   onRemoveWallPost,
   keyboardInset = 0,
   savedResponses = null,
+  complaintOrganizations = null,
+  complaint = null,
+  onComplaintChange,
 }: ComposerProps) {
   const insets = useSafeAreaInsets()
   const reduceMotion = useReducedMotion()
@@ -545,6 +557,17 @@ export function Composer({
         </Animated.View>
       ) : null}
 
+      {complaint && complaintOrganizations ? (
+        <Animated.View entering={settleDownEnter(!!reduceMotion)}>
+          <ComplaintStrip
+            organizations={complaintOrganizations}
+            organizationId={complaint.organizationId}
+            onChange={(organizationId) => onComplaintChange?.({ organizationId })}
+            onDismiss={() => onComplaintChange?.(null)}
+          />
+        </Animated.View>
+      ) : null}
+
       {replyTo ? (
         <Animated.View
           entering={settleDownEnter(!!reduceMotion)}
@@ -720,6 +743,12 @@ export function Composer({
             ? () => {
                 pickerAfterSheetRef.current = true
               }
+            : undefined
+        }
+        onStartComplaint={
+          complaintOrganizations && !complaint
+            ? () =>
+                onComplaintChange?.({ organizationId: complaintOrganizations[0]?.id ?? null })
             : undefined
         }
       />

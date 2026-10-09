@@ -274,6 +274,7 @@ describe('which arriving notifications the platform draws while the app is open'
     ['a reaction on a Message', { kind: 'message_reaction', conversationPublicId: 'cnv_01' }, true],
     ['a reaction on a Post', { kind: 'wall_post_reaction', conversationPublicId: null, wallPostPublicId: 'pst_01' }, true],
     ['an invitation', { kind: 'organization_invitation', conversationPublicId: null }, true],
+    ['an Invitation card in General Support', { kind: 'organization_invitation', conversationPublicId: 'cnv_01' }, true],
     ['a new Message, which the app draws itself', { kind: 'message', conversationPublicId: 'cnv_01' }, false],
     ['a dispatch this build cannot read', null, false],
   ])('%s', (_case, data, expected) => {

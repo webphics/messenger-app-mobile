@@ -1,19 +1,17 @@
 import { can, type CapabilityViewer } from '@/lib/capabilities'
 import { isStaffConversation } from '@/lib/types'
-import type { Conversation, ConversationPerson } from '@/lib/types'
+import type { Conversation, ConversationPerson, InviteOutcome } from '@/lib/types'
 
 /**
- * The Customer a staff viewer may place in organizations from this conversation, or null.
+ * The Customer a staff viewer may invite to organizations from this conversation, or null.
  *
- * Only a live Onboarding thread offers it: a Support DM with no organization, which is the one
- * conversation whose purpose is finding out where somebody belongs. The thread ends when its
- * Customer joins an organization but still opens by id (a push, a link, a row restored from the
- * Store) with no organization, so only the API's `onboardingOpen` says the Customer is still
- * unplaced, and anything but `true` offers nothing. Only the staff payload names its Customer,
- * and only a viewer holding `manage_memberships` can make the call. The API still decides
- * whether the viewer covers the organizations they pick, so this answers whether to draw the
- * section, not whether the write will be accepted. The web client asks the same question in
- * `features/inbox/utils/onboarding.utils`.
+ * Only General Support offers it: the Support DM with no organization, where Invitation cards
+ * arrive. It never ends, so it offers it whatever the Customer has joined already; the API reports
+ * `onboardingOpen` true on every General Support, and anything but `true` (an older payload)
+ * offers nothing. Only the staff payload names its Customer, and only a viewer holding
+ * `manage_memberships` can make the call. The API still decides whether the viewer covers the
+ * organizations they pick, so this answers whether to draw the section, not whether the write will
+ * be accepted. The web client asks the same question in `features/inbox/utils/onboarding.utils`.
  */
 export function placeableOnboardingCustomer(
   viewer: CapabilityViewer,
@@ -36,6 +34,24 @@ export function toggleOrganization(selected: readonly string[], id: string): str
 
 /** What the confirm button says for a selection of this size. */
 export function assignLabel(count: number): string {
-  if (count <= 1) return 'Add to organization'
-  return `Add to ${count} organizations`
+  if (count <= 1) return 'Send invitation'
+  return `Invite to ${count} organizations`
+}
+
+/**
+ * What the viewer is told after an invite from General Support. Each list can be empty on its
+ * own, so the sentence is built from whichever are not.
+ */
+export function invitationSummary(
+  name: string,
+  outcome: Pick<InviteOutcome, 'invited' | 'alreadyInvited' | 'alreadyMembers'>,
+): string {
+  const names = (rows: { name: string }[]) => rows.map((row) => row.name).join(', ')
+  const parts = [
+    outcome.invited.length > 0 ? `Invitation sent to ${name} for ${names(outcome.invited)}` : null,
+    outcome.alreadyInvited.length > 0 ? `already invited to ${names(outcome.alreadyInvited)}` : null,
+    outcome.alreadyMembers.length > 0 ? `already in ${names(outcome.alreadyMembers)}` : null,
+  ].filter((part): part is string => part !== null)
+  if (parts.length === 0) return `${name} was not invited to any organization`
+  return outcome.invited.length > 0 ? parts.join('; ') : `${name} is ${parts.join(', and ')}`
 }

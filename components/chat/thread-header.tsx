@@ -13,7 +13,11 @@ import {
   supportStatusTone,
   type StatusTone,
 } from "@/lib/conversation-details";
-import { conversationPeer, conversationTitle } from "@/lib/conversation-title";
+import {
+  conversationOrigin,
+  conversationPeer,
+  conversationTitle,
+} from "@/lib/conversation-title";
 import { initials } from "@/lib/display";
 import { colors } from "@/lib/tokens";
 import { isStaffConversation } from "@/lib/types";
@@ -82,10 +86,14 @@ export function ThreadHeader({
   const online = peer?.isOnline === true;
   // The name is the way into details, so a thread with nothing else to say
   // under it says that, the way Messenger and WhatsApp do.
-  const subtitle =
+  // Which desk a Staff member is looking at -- an organization, or General Support -- leads the
+  // line under a Support DM's name, since every Customer has General Support beside the rest.
+  const origin = conversationOrigin(conversation);
+  const presenceLine =
     participants !== null
       ? `${participants} participants`
       : (peerPresence(conversation) ?? "Tap for details");
+  const subtitle = origin ? `${origin.label} · ${presenceLine}` : presenceLine;
   const pill = headerPill(conversation, supportAssignment);
   const openDetails = () => router.push(chatDetailsHref(conversation.id));
 

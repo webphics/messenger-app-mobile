@@ -574,6 +574,10 @@ export function useThreadMessages(
       // Carried on the message itself rather than beside it, so a send the
       // Outbox brings back still names its Post when somebody taps Retry.
       ...(carried.wallPost ? { wallPostId: carried.wallPost.id } : {}),
+      // Carried on the message for the same reason.
+      ...(carried.complaint
+        ? { complaint: { organizationId: carried.complaint.organization?.id ?? null } }
+        : {}),
     })
 
     delivering.current.delete(message.id)
@@ -606,6 +610,7 @@ export function useThreadMessages(
           author,
           replyTo: draft.replyTo,
           wallPost: draft.wallPost,
+          complaint: draft.complaint,
           // Device URIs for now. `deliver` uploads them and writes back what the
           // API stored, so the bubble is drawn from this phone until it can be
           // drawn from the server.

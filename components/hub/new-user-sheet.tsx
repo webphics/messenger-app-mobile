@@ -20,10 +20,11 @@ import type { ManagedUser, OrganizationSummary, UserRole } from "@/lib/types";
 /**
  * Creating an account.
  *
- * Three things the API insists on and one it does not. An email, a role, and
- * at least one organization — nobody is created into a vacuum, and the
- * organizations become *invitations* rather than memberships, because
- * inviting is the only way into an organization in this product. What it does
+ * What the API insists on: an email, a role, and, for staff, at least one
+ * organization, so nobody on the company's side is created into a vacuum. A
+ * customer may have none: they start in General Support. Every organization
+ * becomes an *invitation* rather than a membership; a customer's arrives as a
+ * card in their General Support. What it does
  * not insist on is a password: an account created without one is reached by
  * magic link, which is how a Customer account comes into existence
  * everywhere else here, so the field says so rather than being required.
@@ -89,7 +90,9 @@ function UserForm({
       setProblem("Enter an email address.");
       return;
     }
-    if (picked.length === 0) {
+    // Staff are invited to at least one; a customer may start in none, in General Support,
+    // and is invited from there.
+    if (picked.length === 0 && role !== "customer") {
       setProblem("Pick at least one organization to invite them to.");
       return;
     }
@@ -213,8 +216,8 @@ function UserForm({
           </Text>
           {organizations.length === 0 ? (
             <Text variant="meta" className="text-muted">
-              There are no organizations yet. Create one first — an account
-              cannot exist outside every organization.
+              There are no organizations yet. A customer can still be created —
+              they start in General Support — but staff need one to join.
             </Text>
           ) : (
             <View className="flex-row flex-wrap gap-2">

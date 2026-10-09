@@ -11,16 +11,13 @@ import type { ConversationPerson } from '@/lib/types'
 import type { OnboardingPlacement } from '@/lib/use-onboarding-placement'
 
 /**
- * Placing the Customer of an Onboarding thread in one or more organizations.
+ * Inviting the Customer of a General Support thread to one or more organizations.
  *
- * Drawn only where `placeableOnboardingCustomer` names somebody. Each organization is a row
- * that toggles, and the button under them commits the selection in one request; that tap is
- * the confirmation, the way picking a name is for Transfer. Nothing is destructive here, and
- * a Customer joins outright, so there is no invitation to wait on.
- *
- * After the write it follows the web client's dialog: placed in several organizations, the
- * viewer is asked which one's support conversation to open, in the words of the web's
- * Choose an organization picker, and may decline, which leaves the thread.
+ * Drawn only where `placeableOnboardingCustomer` names somebody. Each organization is a row that
+ * toggles, and the button under them sends the selection in one request; that tap is the
+ * confirmation, the way picking a name is for Transfer. Nothing is destructive here: each
+ * organization becomes an Invitation card in General Support, and the Customer joins only by
+ * choosing Join on it.
  *
  * Every control here is a plain Pressable dressed as a Button, never the shared Button. Each
  * press changes what this card renders, or leaves the screen, while the Button's Reanimated
@@ -35,57 +32,13 @@ export function OnboardingPlacementSection({
   customer: ConversationPerson
   placement: OnboardingPlacement
 }) {
-  const { organizations, selected, assigning, error, choices, opening } = placement
-
-  if (choices || opening) {
-    return (
-      <DetailsCard icon={Building} title={choices ? 'Choose an organization' : 'Organizations'}>
-        {opening ? (
-          <View accessibilityLiveRegion="polite" className="flex-row items-center gap-2.5">
-            <ActivityIndicator color={colors.primary} />
-            <Text variant="meta" className="text-ink-soft">
-              Opening their conversation…
-            </Text>
-          </View>
-        ) : (
-          <>
-            <Text variant="meta" className="text-ink-soft">
-              This person is in more than one of your organizations, and each one has its own
-              conversation with them. Pick the organization you are messaging for.
-            </Text>
-            <View className="gap-1.5">
-              {(choices ?? []).map((organization) => (
-                <Pressable
-                  key={organization.id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Open their conversation in ${organization.name}`}
-                  onPress={() => placement.choose(organization.id)}
-                  className="min-h-11 justify-center rounded-2xl border border-line/70 px-3.5 active:opacity-70"
-                >
-                  <Text variant="meta" className="font-semibold text-ink">
-                    {organization.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={placement.skipChoice}
-              className={buttonVariants({ variant: 'outline' })}
-            >
-              <Text className={buttonTextVariants({ variant: 'outline' })}>Cancel</Text>
-            </Pressable>
-          </>
-        )}
-      </DetailsCard>
-    )
-  }
+  const { organizations, selected, assigning, error } = placement
 
   return (
     <DetailsCard icon={Building} title="Organizations">
       <Text variant="meta" className="text-ink-soft">
-        {customer.name} is not in any organization yet. Add them to one or more, and this
-        getting-started chat ends for them.
+        Invite {customer.name} to an organization. Each one is sent as an invitation card in this
+        General Support conversation, which they join or decline.
       </Text>
 
       {organizations.status === 'loading' ? (

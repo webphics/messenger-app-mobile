@@ -210,12 +210,16 @@ export type StaffConversation = ConversationBase & {
   members: ConversationStaffPerson[]
   labels: Label[]
   /**
-   * Whether this is an Onboarding thread that is still live: a Support DM with no organization
-   * whose Customer holds no membership right now, as the API read it. False once they have
-   * joined one, though Staff can still open the thread by id. `parseConversation` always sets it
-   * and reads anything but `true` as false; optional only because fixtures predate it.
+   * Whether this is a Customer's General Support: the Support DM with no organization, which every
+   * Customer keeps for good. The API reports it true on every General Support. `parseConversation`
+   * always sets it and reads anything but `true` as false; optional only because fixtures predate it.
    */
   onboardingOpen?: boolean
+  /**
+   * The thread's organization's current name, for the chip on a Staff row. Null for General
+   * Support and anything with no organization; optional because fixtures predate it.
+   */
+  organizationName?: string | null
   /**
    * Group-only; `null` for every other type. Optional because most fixtures in
    * this codebase predate it and carry no group at all; a real payload always
@@ -340,6 +344,27 @@ export type MessageWallPost = {
   postedAt: string
 }
 
+/** Where an Invitation card in General Support stands. */
+export type InvitationCardState = 'pending' | 'joined' | 'declined' | 'withdrawn'
+
+/**
+ * An Invitation card (`CONTEXT.md`): an organization asking the Customer to join it, shown in
+ * their General Support and answered with Join or Decline on `id`. `supportConversationId` is the
+ * Support DM joining opened, set once `state` is `joined`.
+ */
+export type MessageInvitation = {
+  id: string
+  organization: { id: string; name: string }
+  state: InvitationCardState
+  supportConversationId: string | null
+  answeredAt: string | null
+}
+
+/** What a Complaint is about: one of the Customer's organizations, or null for the app itself. */
+export type MessageComplaint = {
+  organization: { id: string; name: string } | null
+}
+
 /** One reaction by one person. The API does not group them; `lib/message-react` does. */
 export type MessageReaction = {
   emoji: string
@@ -385,6 +410,15 @@ type MessageBase = {
    * would change the shape of every one of them.
    */
   wallPost?: MessageWallPost
+  /** Set only on an Invitation card, a `system` message; absent otherwise, like `wallPost`. */
+  invitation?: MessageInvitation
+  /** Set only on a Complaint, which is always `adminOnly`; absent otherwise. */
+  complaint?: MessageComplaint
+  /**
+   * Read only by the conversation's Customer and by Admins: a Complaint, or a reply to an
+   * admin-only message. An Agent is never sent one. Set only when true, like `addressedToCustomer`.
+   */
+  adminOnly?: boolean
   reactions: MessageReaction[]
   attachments: MessageAttachment[]
   receiptStatus: ReceiptStatus
@@ -680,13 +714,12 @@ export type Invitation = {
  * member, or an invitation was already pending. Only the first two are news,
  * and the other two are the reason a repeated invite is not an error.
  *
- * `invited` and `joined` never both carry entries. A Customer joins the moment
- * they are invited and everybody else is offered an invitation (ADR 0013), and
- * the role belongs to the person, so one call takes one path.
+ * `invited` is how it succeeds for every role: a Customer gets an Invitation card
+ * in their General Support, everybody else an invitation answered from Settings.
  */
 export type InviteOutcome = {
   invited: Organization[]
-  /** Memberships this call wrote, with no invitation in between. */
+  /** Always empty now: nobody joins by being invited. Kept because the API still sends it. */
   joined: Organization[]
   alreadyMembers: Organization[]
   alreadyInvited: Organization[]

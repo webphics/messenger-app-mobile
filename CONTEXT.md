@@ -280,7 +280,7 @@ _Avoid_: Handover, reassign (that is what the *event* is called), escalate
 **Close**:
 The assignee ending an engaged Support DM. The API's `close` action, and not final: the Customer
 writing in reopens it, and it returns to whoever closed it — which is why nothing about it reads as
-destructive. Shown in the thread's state as Resolved, the word the product uses for a thread that is
+destructive. General Support is never closed. Shown in the thread's state as Resolved, the word the product uses for a thread that is
 done with.
 _Avoid_: Resolve (as the action's name), archive, delete
 
@@ -311,10 +311,11 @@ is what a Customer's contact row for an organization is called, and the Company 
 organization speaking as a person)
 
 **Invitation**:
-The only way into an organization. An Admin invites and the person accepts; there is no route that
-grants a membership directly, so creating an account takes organization ids that become invitations
-rather than memberships. Answered from Settings, by every role, and the card draws nothing at all
-when there is nothing to answer. Declining answers one ask rather than standing as a refusal, so a
+An organization asking a person to join it. An Admin invites and the person accepts; a Customer's
+arrives as a card in their General Support, answered with Join or Decline, and Joining opens their
+Support DM in that organization from the card. An emailed invitation link or a join link the person
+opens themselves counts as acceptance. Also answered from Settings, by every role, and that card
+draws nothing at all when there is nothing to answer. Declining answers one ask rather than standing as a refusal, so a
 declined organization can be offered again.
 _Avoid_: Add to organization, membership request (the direction is the other way)
 

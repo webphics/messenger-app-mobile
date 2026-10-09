@@ -1,6 +1,7 @@
 import {
   Camera,
   FileText,
+  Flag,
   Image as ImageIcon,
   MessageSquare,
   // Sparkles, // hidden with Quick Response
@@ -63,6 +64,11 @@ type AttachmentSheetProps = {
    * is still animating out.
    */
   onOpenSavedResponses?: () => void
+  /**
+   * Offered only to a Customer in their General Support: marks the next message as a Complaint.
+   * Called as the sheet closes; the strip it raises is part of the composer, not a window.
+   */
+  onStartComplaint?: () => void
 }
 
 /**
@@ -96,7 +102,7 @@ type AttachmentOption =
       icon: typeof ImageIcon
       pick?: never
       insertText?: never
-      open: 'saved-responses'
+      open: 'saved-responses' | 'complaint'
     }
 
 const ATTACHMENT_OPTIONS: AttachmentOption[] = [
@@ -144,6 +150,15 @@ const SAVED_RESPONSES_OPTION: AttachmentOption = {
   subtitle: 'Insert an answer your team has saved',
   icon: MessageSquare,
   open: 'saved-responses',
+}
+
+/** Marks the next message as a Complaint, which only Admins read. */
+const COMPLAINT_OPTION: AttachmentOption = {
+  id: 'complaint',
+  title: 'Send as a complaint',
+  subtitle: 'Only admins will see it',
+  icon: Flag,
+  open: 'complaint',
 }
 
 const DENIED_COPY = {
@@ -194,6 +209,7 @@ export function AttachmentSheet({
   onPicked,
   onInsertText,
   onOpenSavedResponses,
+  onStartComplaint,
 }: AttachmentSheetProps) {
   // Somewhere to start before the sheet has been laid out. Replaced by the
   // real height on the first `onLayout`, which is well before a finger can
@@ -207,11 +223,12 @@ export function AttachmentSheet({
   const reduceMotion = useReducedMotion()
   const [pendingId, setPendingId] = useState<string | null>(null)
   const options = useMemo(
-    () =>
-      onOpenSavedResponses
-        ? [...ATTACHMENT_OPTIONS, SAVED_RESPONSES_OPTION]
-        : ATTACHMENT_OPTIONS,
-    [onOpenSavedResponses],
+    () => [
+      ...ATTACHMENT_OPTIONS,
+      ...(onOpenSavedResponses ? [SAVED_RESPONSES_OPTION] : []),
+      ...(onStartComplaint ? [COMPLAINT_OPTION] : []),
+    ],
+    [onOpenSavedResponses, onStartComplaint],
   )
 
   const measure = useCallback(
@@ -313,6 +330,12 @@ export function AttachmentSheet({
 
   async function handleOption(option: AttachmentOption) {
     if (pendingId) return
+
+    if (option.open === 'complaint') {
+      onStartComplaint?.()
+      dismiss()
+      return
+    }
 
     if (option.open !== undefined) {
       // The composer raises the picker from `onClose`, after this sheet is gone.
