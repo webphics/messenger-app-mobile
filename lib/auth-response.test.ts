@@ -6,6 +6,7 @@ import {
   interpretMagicLinkVerify,
   interpretSession,
   interpretSignIn,
+  interpretSignUp,
   interpretTwoFactorVerify,
   parseSessionUser,
   saysSessionExpired,
@@ -458,6 +459,47 @@ describe("interpretMagicLinkRequest", () => {
     expect(interpretMagicLinkRequest({ reached: false })).toEqual({
       kind: "transport-failure",
     });
+  });
+});
+
+describe("interpretSignUp", () => {
+  function refused(code: string, status = 409): HttpOutcome {
+    return {
+      reached: true,
+      status,
+      body: { statusCode: status, code, message: "From the API." },
+      sessionCookie: null,
+    };
+  }
+
+  test("the API confirming the send is a send", () => {
+    expect(
+      interpretSignUp(ok({ statusCode: 200, data: true, path: "/auth/sign-up" }, null)),
+    ).toEqual({ kind: "sent" });
+  });
+
+  test("a taken username and a taken address are told apart", () => {
+    expect(interpretSignUp(refused("username_already_exists"))).toMatchObject({
+      kind: "username-taken",
+    });
+    expect(interpretSignUp(refused("email_already_exists"))).toMatchObject({
+      kind: "email-taken",
+    });
+  });
+
+  test("any other refusal carries the API's own words", () => {
+    expect(interpretSignUp(refused("validation_failed", 422))).toEqual({
+      kind: "refused",
+      message: "From the API.",
+    });
+  });
+
+  test("a 2xx that does not confirm the send is not a send", () => {
+    expect(interpretSignUp(ok({ data: false }, null))).toMatchObject({ kind: "refused" });
+  });
+
+  test("a request that never got an answer is a transport failure", () => {
+    expect(interpretSignUp({ reached: false })).toEqual({ kind: "transport-failure" });
   });
 });
 

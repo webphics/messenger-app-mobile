@@ -56,6 +56,21 @@ export type MagicLinkRequestOutcome =
   | { kind: "refused"; message: string }
   | { kind: "transport-failure" };
 
+/**
+ * What `POST /auth/sign-up` came back as.
+ *
+ * Unlike a link request, this one is allowed to say an address or a username is
+ * taken: the sign-up form has to tell the person, and the API rate limits the
+ * route per address for that reason (`docs/api/auth.md`). Each gets its own
+ * outcome so the form can put it on the field it is about.
+ */
+export type SignUpOutcome =
+  | { kind: "sent" }
+  | { kind: "username-taken"; message: string }
+  | { kind: "email-taken"; message: string }
+  | { kind: "refused"; message: string }
+  | { kind: "transport-failure" };
+
 export type AuthOutcome =
   | { kind: "signed-in"; cookie: string; user: SessionUser }
   /**
@@ -373,6 +388,43 @@ export function interpretMagicLinkRequest(
     const error = asRecord(outcome.body);
     const code = error?.code;
     const message = nonEmptyString(error?.message);
+
+    return {
+      kind: "refused",
+      message:
+        code === CSRF_REFUSED_CODE
+          ? CSRF_MESSAGE
+          : (message ?? DEFAULT_LINK_REQUEST_REFUSAL),
+    };
+  }
+
+  return asRecord(outcome.body)?.data === true
+    ? { kind: "sent" }
+    : { kind: "refused", message: DEFAULT_LINK_REQUEST_REFUSAL };
+}
+
+const USERNAME_TAKEN_CODE = "username_already_exists";
+const EMAIL_TAKEN_CODE = "email_already_exists";
+
+/** Read a `POST /auth/sign-up` answer. The same shape as a link request, plus the two clashes. */
+export function interpretSignUp(outcome: HttpOutcome): SignUpOutcome {
+  if (!outcome.reached) return { kind: "transport-failure" };
+
+  if (outcome.status < 200 || outcome.status >= 300) {
+    const error = asRecord(outcome.body);
+    const code = error?.code;
+    const message = nonEmptyString(error?.message);
+
+    if (code === USERNAME_TAKEN_CODE) {
+      return { kind: "username-taken", message: "This username is taken. Try another one." };
+    }
+
+    if (code === EMAIL_TAKEN_CODE) {
+      return {
+        kind: "email-taken",
+        message: "An account already uses this email. Go back and sign in with it.",
+      };
+    }
 
     return {
       kind: "refused",

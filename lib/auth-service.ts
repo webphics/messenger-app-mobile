@@ -11,11 +11,13 @@ import {
   interpretMagicLinkVerify,
   interpretSession,
   interpretSignIn,
+  interpretSignUp,
   interpretTwoFactorVerify,
   saysSessionExpired,
   type AuthOutcome,
   type HttpOutcome,
   type MagicLinkRequestOutcome,
+  type SignUpOutcome,
 } from "@/lib/auth-response";
 import type { GoogleResult } from "@/lib/google-auth";
 import {
@@ -56,6 +58,7 @@ const SESSION_PATH = "/auth/session";
 const SIGN_OUT_PATH = "/auth/logout";
 const MAGIC_LINK_REQUEST_PATH = "/auth/magic-link";
 const MAGIC_LINK_VERIFY_PATH = "/auth/magic-link/verify";
+const SIGN_UP_PATH = "/auth/sign-up";
 const GOOGLE_PATH = "/auth/google";
 const TWO_FACTOR_VERIFY_PATH = "/auth/two-factor/verify-totp";
 
@@ -409,6 +412,44 @@ export async function requestMagicLink(
         // one was followed, so every link request from this client was refused.
         identifier: email.trim(),
         ...(person ? { name: person } : {}),
+        url: MAGIC_LINK_ORIGIN,
+      },
+    }),
+  );
+}
+
+/** What a new account is made with, as the sign-up step collected it. */
+export type SignUpRequest = {
+  email: string;
+  name: string;
+  username: string;
+  /** Omitted from the body when blank. */
+  phone: string;
+};
+
+/**
+ * Ask for a sign-up link: the API keeps the name, username and phone until the
+ * link is opened, and opening it creates the account with them.
+ *
+ * Like `requestMagicLink`, nothing is stored and no credential changes hands,
+ * so there is no epoch to capture. Unlike it, the answer may say the address or
+ * the username is taken, because the form has to put that on a field.
+ */
+export async function requestSignUp(input: SignUpRequest): Promise<SignUpOutcome> {
+  if (MAGIC_LINK_ORIGIN === null) {
+    return { kind: "refused", message: MAGIC_LINK_UNCONFIGURED_NOTICE };
+  }
+
+  const phone = input.phone.trim();
+
+  return interpretSignUp(
+    await apiRequest(SIGN_UP_PATH, {
+      method: "POST",
+      body: {
+        email: input.email.trim().toLowerCase(),
+        name: input.name.trim(),
+        username: input.username.trim().toLowerCase(),
+        ...(phone ? { phone } : {}),
         url: MAGIC_LINK_ORIGIN,
       },
     }),

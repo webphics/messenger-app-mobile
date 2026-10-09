@@ -15,12 +15,18 @@ import {
   INITIAL_AUTH_STATE,
   type AuthState,
 } from "@/lib/auth-machine";
-import type { AuthOutcome, MagicLinkRequestOutcome } from "@/lib/auth-response";
+import type {
+  AuthOutcome,
+  MagicLinkRequestOutcome,
+  SignUpOutcome,
+} from "@/lib/auth-response";
 import {
   confirmSession,
   hydrateAuth,
   onSessionExpired,
   requestMagicLink as sendMagicLink,
+  requestSignUp as sendSignUp,
+  type SignUpRequest,
   signInWithGoogle as startGoogleSignIn,
   signInWithPassword,
   signOut as endSession,
@@ -73,6 +79,12 @@ type AuthContextValue = {
     email: string,
     name?: string,
   ) => Promise<MagicLinkRequestOutcome>;
+  /**
+   * Ask for a sign-up link for an address with no account. Outside the state
+   * machine for `requestMagicLink`'s reason: nothing is established until the
+   * link is opened. See `requestSignUp` in `lib/auth-service`.
+   */
+  requestSignUp: (input: SignUpRequest) => Promise<SignUpOutcome>;
   /**
    * Finish a sign-in an account's second factor interrupted, with the code from
    * their authenticator.
@@ -333,6 +345,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const requestSignUp = useCallback(
+    (input: SignUpRequest) => sendSignUp(input),
+    [],
+  );
+
   /**
    * The challenge this provider is holding, or null when it is holding none.
    *
@@ -451,6 +468,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyMagicLink,
       signInWithGoogle,
       requestMagicLink,
+      requestSignUp,
       submitTwoFactorCode,
       cancelTwoFactor,
       accountUpdated,
@@ -466,6 +484,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyMagicLink,
       signInWithGoogle,
       requestMagicLink,
+      requestSignUp,
       submitTwoFactorCode,
       cancelTwoFactor,
       accountUpdated,

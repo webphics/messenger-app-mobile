@@ -1,7 +1,7 @@
 import type { AccountState } from "@/lib/account-state";
 
 /**
- * The three screens sign-in is, and what moves between them.
+ * The four screens sign-in is, and what moves between them.
  *
  * The web client's shape, mirrored (`login-form.tsx`, `type LoginStep`): the
  * identifier is asked for alone, what it turns out to need follows it, and a
@@ -32,26 +32,33 @@ import type { AccountState } from "@/lib/account-state";
 export type SignInStep =
   /** The identifier, and Google. The only step that offers another way in. */
   | "identifier"
-  /** Whatever this identifier actually needs: a password, or a link. */
+  /** Whatever this identifier's account needs: a password, or a link. */
   | "credentials"
+  /**
+   * The identifier matched no account. Asks who the person is before the link
+   * that creates the account goes out, so it arrives with a name and a username.
+   */
+  | "sign-up"
   /** A link has gone. Says where, and offers another. */
   | "link-sent";
+
+/** Which request the link on `link-sent` came from, so resending and going back repeat it. */
+export type LinkPurpose = "sign-in" | "sign-up";
+
+/** The step an answered probe leads to. */
+export function stepForAccount(state: AccountState): "credentials" | "sign-up" {
+  return state.exists ? "credentials" : "sign-up";
+}
 
 export const FIRST_STEP: SignInStep = "identifier";
 
 /**
- * Which of three things step two is about.
- *
- * Only the first is about a password. The other two draw the same controls and
- * are worded apart because "your account has no password" and "you have no
- * account" are different news, and one line covering both would be vague enough
- * to be useless to either person.
+ * Which of two things the credentials step is about. An identifier with no
+ * account never reaches it: `stepForAccount` sends it to `sign-up`.
  */
-export type CredentialsMode = "password" | "no-password" | "new-account";
+export type CredentialsMode = "password" | "no-password";
 
 export function credentialsMode(state: AccountState): CredentialsMode {
-  if (!state.exists) return "new-account";
-
   return state.hasPassword ? "password" : "no-password";
 }
 
@@ -61,16 +68,25 @@ export function showsPasswordField(mode: CredentialsMode): boolean {
 }
 
 export const STEP_COPY: Record<
-  "identifier" | "link-sent",
+  "identifier" | "sign-up" | "link-sent" | "sign-up-link-sent",
   { title: string; description: string }
 > = {
   identifier: {
     title: "Welcome back",
     description: "Sign in to access your queue and chats",
   },
+  "sign-up": {
+    title: "Let's get you started",
+    description:
+      "No account uses this yet. Tell us who you are and we'll email you a link that creates it.",
+  },
   "link-sent": {
     title: "Check your email",
     description: "We sent you a link that signs you in. No password needed.",
+  },
+  "sign-up-link-sent": {
+    title: "Check your email",
+    description: "We sent you a link that creates your account and signs you in.",
   },
 };
 
@@ -87,27 +103,27 @@ export const CREDENTIALS_COPY: Record<
     description:
       "This account has no password. We can email you a link that signs you in.",
   },
-  "new-account": {
-    title: "Let's get you started",
-    description: "No account uses this address yet. A sign-in link will create one.",
-  },
 };
 
 /**
  * Where back goes, or null when there is nowhere behind this step.
  *
- * `link-sent` returns to the credentials step rather than to the identifier,
- * because the address is not what somebody is reconsidering when they have just
- * been told a link went to it.
+ * `link-sent` returns to the step that sent the link rather than to the
+ * identifier, because the address is not what somebody is reconsidering when
+ * they have just been told a link went to it.
  */
-export function previousStep(step: SignInStep): SignInStep | null {
+export function previousStep(
+  step: SignInStep,
+  linkPurpose: LinkPurpose = "sign-in",
+): SignInStep | null {
   switch (step) {
     case "identifier":
       return null;
     case "credentials":
+    case "sign-up":
       return "identifier";
     case "link-sent":
-      return "credentials";
+      return linkPurpose === "sign-up" ? "sign-up" : "credentials";
   }
 }
 

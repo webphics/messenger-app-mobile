@@ -46,13 +46,23 @@ import {
   CREDENTIALS_COPY,
   type CredentialsMode,
   FIRST_STEP,
+  type LinkPurpose,
   STEP_COPY,
   type SignInStep,
   credentialsMode,
   previousStep,
   showsIdentifierRow,
   showsPasswordField,
+  stepForAccount,
 } from "@/lib/sign-in-steps";
+import {
+  SIGN_UP_FIELD_ORDER,
+  type SignUpFieldErrors,
+  type SignUpFields,
+  signUpDefaults,
+  signUpFieldErrors,
+  signUpNeedsEmail,
+} from "@/lib/sign-up-fields";
 import type { SeedAccount } from "@/lib/seed-accounts";
 import { CHALLENGE_COPY, codeError } from "@/lib/two-factor-challenge";
 import { colors, screenTopPad } from "@/lib/tokens";
@@ -61,12 +71,13 @@ import { colors, screenTopPad } from "@/lib/tokens";
 const BRAND_LOCKUP_ASPECT = 900 / 587;
 
 /**
- * The only way into the app, in the three steps the web client asks in
+ * The only way into the app, in the steps the web client asks in
  * (`login-form.tsx`, `type LoginStep`).
  *
  * The identifier is asked for alone, and what follows it is whatever that
  * identifier actually needs: a password for an account that has one, the link
- * for an account that does not and for an address nobody holds yet.
+ * for an account that does not, and the sign-up step for an identifier nobody
+ * holds yet.
  *
  * Step one asks the API which of those it is (`POST /auth/account-state`), and
  * it did not used to — this screen was written when the API refused to say
@@ -75,14 +86,11 @@ const BRAND_LOCKUP_ASPECT = 900 / 587;
  * telling for free and telling under a budget. A failed probe stays on step one
  * rather than guessing which screen to draw.
  *
- * There was a second screen beside this one — a registration form — and it
- * posted nowhere, because the API has no self-registration endpoint. An account
- * comes into existence one way on mobile: someone asks for a sign-in link and
- * verifies it. So the link below is not a convenience, it is the sign-up path.
- * What it no longer does is ask for a name on the way: a link-made account
- * arrives with none, and the onboarding gate asks for it once the session
- * exists, which is the one place that question is asked of every account
- * however it was made.
+ * An account comes into existence one way on mobile: the sign-up step sends
+ * `POST /auth/sign-up` with a name, a username and an optional phone, and
+ * opening the link it mails creates the account with them. The onboarding gate
+ * stays behind it for an account that still arrives without a name, such as one
+ * made by an older build.
  */
 
 /**
@@ -159,6 +167,7 @@ export function SignInForm() {
     signIn,
     signInWithGoogle,
     requestMagicLink,
+    requestSignUp,
     submitTwoFactorCode,
     cancelTwoFactor,
   } = useAuth();
@@ -212,6 +221,18 @@ export function SignInForm() {
   const [identifierFieldError, setIdentifierFieldError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [linkRequest, setLinkRequest] = useState<LinkRequest>(NO_LINK_REQUEST);
+  /** Which request the standing link came from, so a resend and Back repeat it. */
+  const [linkPurpose, setLinkPurpose] = useState<LinkPurpose>("sign-in");
+  /**
+   * The sign-up step's fields, and the identifier they were opened for. Kept
+   * across a step back so a typo fixed on step one does not cost what was typed
+   * here, and reset when step one names someone else.
+   */
+  const [signUp, setSignUp] = useState<{ for: string; fields: SignUpFields }>({
+    for: "",
+    fields: signUpDefaults(""),
+  });
+  const [signUpErrors, setSignUpErrors] = useState<SignUpFieldErrors>({});
   /**
    * Whether the machine's standing notice still describes what is on screen.
    *
@@ -254,6 +275,12 @@ export function SignInForm() {
   const identifierRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const codeRef = useRef<TextInput>(null);
+  const signUpRefs = {
+    name: useRef<TextInput>(null),
+    username: useRef<TextInput>(null),
+    email: useRef<TextInput>(null),
+    phone: useRef<TextInput>(null),
+  };
   /**
    * What the last attempt came back with — the server's own words for a refusal,
    * the two-factor explanation, or a network message. Cleared by the machine the
@@ -337,7 +364,7 @@ export function SignInForm() {
   }
 
   function goBack() {
-    const target = previousStep(step);
+    const target = previousStep(step, linkPurpose);
     if (target === null || anyRequestOut) return;
 
     setStep(target);
@@ -377,7 +404,7 @@ export function SignInForm() {
     const sending = normaliseIdentifier(identifier);
     const known = readCachedAccountState(accountCache, sending, Date.now());
     if (known) {
-      enterCredentials(known);
+      enterStepFor(known);
       return;
     }
 
@@ -401,18 +428,99 @@ export function SignInForm() {
       }
 
       setAccountCache(cacheAccountState(sending, result.value, Date.now()));
-      enterCredentials(result.value);
+      enterStepFor(result.value);
     } finally {
       setProbing(false);
     }
   }
 
   /** Move to step two knowing what it has to draw, and open on the right field. */
-  function enterCredentials(state: AccountState) {
+  function enterStepFor(state: AccountState) {
+    if (stepForAccount(state) === "sign-up") {
+      const typed = normaliseIdentifier(identifier);
+      if (signUp.for !== typed) {
+        setSignUp({ for: typed, fields: signUpDefaults(identifier) });
+        setSignUpErrors({});
+      }
+      setStep("sign-up");
+      focusAfterPaint(signUpRefs.name);
+      return;
+    }
+
     const mode = credentialsMode(state);
     setCredentials(mode);
     setStep("credentials");
     if (showsPasswordField(mode)) focusAfterPaint(passwordRef);
+  }
+
+  function setSignUpField(field: keyof SignUpFields, value: string) {
+    setSignUp((prev) => ({ ...prev, fields: { ...prev.fields, [field]: value } }));
+    setSignUpErrors((prev) => ({ ...prev, [field]: undefined }));
+  }
+
+  /**
+   * Ask for a sign-up link: the name, username and phone travel with it, and
+   * opening it creates the account with them.
+   *
+   * Unlike a sign-in link this one is allowed to say a username or an address is
+   * taken, and says so on the field it is about. An address can only be taken
+   * here if someone signed up with it after step one checked, so the cached
+   * answer for it is dropped and the row above is the way back to sign in.
+   */
+  async function onRequestSignUp() {
+    if (anyRequestOut) return;
+
+    const needsEmail = signUpNeedsEmail(identifier);
+    const fields = needsEmail
+      ? signUp.fields
+      : { ...signUp.fields, email: normaliseIdentifier(identifier) };
+    const errors = signUpFieldErrors(fields);
+    setSignUpErrors(errors);
+
+    const firstError = SIGN_UP_FIELD_ORDER.find((field) => errors[field]);
+    if (firstError) {
+      hapticWarning();
+      signUpRefs[firstError].current?.focus();
+      return;
+    }
+
+    setNoticeStale(false);
+    setLinkRequest((prev) => ({ ...prev, sending: true, failure: null }));
+
+    const outcome = await requestSignUp(fields);
+    if (outcome.kind === "sent") {
+      hapticSuccess();
+      setLinkPurpose("sign-up");
+      setLinkRequest({ sentTo: fields.email.trim().toLowerCase(), sending: false, failure: null });
+      setStep("link-sent");
+      return;
+    }
+
+    hapticWarning();
+
+    if (outcome.kind === "username-taken") {
+      setLinkRequest((prev) => ({ ...prev, sending: false }));
+      setSignUpErrors({ username: outcome.message });
+      if (step === "sign-up") signUpRefs.username.current?.focus();
+      else setStep("sign-up");
+      return;
+    }
+
+    if (outcome.kind === "email-taken" && needsEmail) {
+      setLinkRequest((prev) => ({ ...prev, sending: false }));
+      setSignUpErrors({ email: outcome.message });
+      if (step === "sign-up") signUpRefs.email.current?.focus();
+      else setStep("sign-up");
+      return;
+    }
+
+    if (outcome.kind === "email-taken") setAccountCache(null);
+
+    setLinkRequest((prev) => ({
+      ...prev,
+      sending: false,
+      failure: outcome.kind === "transport-failure" ? OFFLINE_NOTICE : outcome.message,
+    }));
   }
 
   async function onSubmit() {
@@ -478,6 +586,7 @@ export function SignInForm() {
     }
 
     hapticSuccess();
+    setLinkPurpose("sign-in");
     setLinkRequest({ sentTo: sending, sending: false, failure: null });
     setStep("link-sent");
   }
@@ -527,7 +636,7 @@ export function SignInForm() {
     setProbeFailure(null);
     // A seed account has a password by construction — that is what the picker
     // filled in — so step two is asked for it without spending a probe.
-    enterCredentials({ exists: true, hasPassword: true });
+    enterStepFor({ exists: true, hasPassword: true });
   }
 
   /**
@@ -569,7 +678,10 @@ export function SignInForm() {
     ? CHALLENGE_COPY
     : step === "credentials"
       ? CREDENTIALS_COPY[credentials ?? "password"]
-      : STEP_COPY[step];
+      : step === "link-sent" && linkPurpose === "sign-up"
+        ? STEP_COPY["sign-up-link-sent"]
+        : STEP_COPY[step];
+  const signUpNeedsEmailField = signUpNeedsEmail(identifier);
 
   return (
     // Shrinking the scroll viewport is what keeps a focused field above the
@@ -806,6 +918,116 @@ export function SignInForm() {
             </View>
           ) : null}
 
+          {step === "sign-up" ? (
+            <>
+              <View className="mt-5">
+                <Text variant="label" className="mb-1.5 text-ink">
+                  Full name
+                </Text>
+                <Input
+                  ref={signUpRefs.name}
+                  className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
+                  placeholder="Jordan Ellis"
+                  accessibilityLabel="Full name"
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  autoComplete="name"
+                  textContentType="name"
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => signUpRefs.username.current?.focus()}
+                  value={signUp.fields.name}
+                  onChangeText={(v) => setSignUpField("name", v)}
+                />
+                <FieldError message={signUpErrors.name ?? null} />
+              </View>
+
+              <View className="mt-4">
+                <Text variant="label" className="mb-1.5 text-ink">
+                  Username
+                </Text>
+                <Input
+                  ref={signUpRefs.username}
+                  className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
+                  placeholder="jordan_e"
+                  accessibilityLabel="Username"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  autoComplete="username-new"
+                  textContentType="username"
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() =>
+                    (signUpNeedsEmailField ? signUpRefs.email : signUpRefs.phone).current?.focus()
+                  }
+                  value={signUp.fields.username}
+                  onChangeText={(v) => setSignUpField("username", v)}
+                />
+                <Text variant="meta" className="mt-1.5 text-muted">
+                  1 to 20 letters, numbers or underscores.
+                </Text>
+                <FieldError message={signUpErrors.username ?? null} />
+              </View>
+
+              {/* Asked for only when step one was a username: an address typed
+                  there is already in the row above. */}
+              {signUpNeedsEmailField ? (
+                <View className="mt-4">
+                  <Text variant="label" className="mb-1.5 text-ink">
+                    Email
+                  </Text>
+                  <Input
+                    ref={signUpRefs.email}
+                    className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
+                    placeholder="name@company.com"
+                    accessibilityLabel="Email"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    autoComplete="email"
+                    textContentType="emailAddress"
+                    returnKeyType="next"
+                    submitBehavior="submit"
+                    onSubmitEditing={() => signUpRefs.phone.current?.focus()}
+                    value={signUp.fields.email}
+                    onChangeText={(v) => setSignUpField("email", v)}
+                  />
+                  <FieldError message={signUpErrors.email ?? null} />
+                </View>
+              ) : null}
+
+              <View className="mt-4">
+                <Text variant="label" className="mb-1.5 text-ink">
+                  Phone{" "}
+                  <Text variant="label" className="text-muted">
+                    (optional)
+                  </Text>
+                </Text>
+                <Input
+                  ref={signUpRefs.phone}
+                  className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base text-ink"
+                  placeholder="+8801712345678"
+                  accessibilityLabel="Phone number, optional"
+                  keyboardType="phone-pad"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  autoComplete="tel"
+                  textContentType="telephoneNumber"
+                  returnKeyType="go"
+                  onSubmitEditing={() => void onRequestSignUp()}
+                  value={signUp.fields.phone}
+                  onChangeText={(v) => setSignUpField("phone", v)}
+                />
+                <Text variant="meta" className="mt-1.5 text-muted">
+                  Include the country code, or leave it blank.
+                </Text>
+                <FieldError message={signUpErrors.phone ?? null} />
+              </View>
+            </>
+          ) : null}
+
           {/* Deliberately not cleared when the step changes. The confirmation
               names where a link went, and going back to look at the password
               does not move it. */}
@@ -819,7 +1041,7 @@ export function SignInForm() {
               </View>
               <View className="min-w-0 flex-1">
                 <Text variant="label" className="text-ink">
-                  Sign-in link sent
+                  {linkPurpose === "sign-up" ? "Sign-up link sent" : "Sign-in link sent"}
                 </Text>
                 {/* Names the identifier, and nothing else. The same sentence
                     appears whether or not it has an account. */}
@@ -876,14 +1098,33 @@ export function SignInForm() {
             </Button>
           ) : null}
 
-          {/* The link, on the two steps where an identifier has been settled on.
-              Step one does not offer it: asking for a link is a request, and
-              step one makes none. */}
-          {step !== "identifier" ? (
+          {step === "sign-up" ? (
+            <Button
+              className="mt-6 min-h-12 w-full"
+              onPress={() => void onRequestSignUp()}
+              disabled={anyRequestOut}
+              accessibilityState={{ disabled: anyRequestOut, busy: sendingLink }}
+            >
+              {sendingLink ? (
+                <ActivityIndicator size="small" color={colors.primaryForeground} />
+              ) : null}
+              <Text>Email me a sign-up link</Text>
+            </Button>
+          ) : null}
+
+          {/* The link, on the steps where an identifier has been settled on and
+              its account found, and again once it has gone. Step one does not
+              offer it: asking for a link is a request, and step one makes none.
+              A resend after a sign-up repeats the sign-up. */}
+          {step === "credentials" || step === "link-sent" ? (
             <Button
               variant="outline"
               className="mt-4 min-h-12 w-full"
-              onPress={() => void onRequestLink()}
+              onPress={() =>
+                void (step === "link-sent" && linkPurpose === "sign-up"
+                  ? onRequestSignUp()
+                  : onRequestLink())
+              }
               disabled={anyRequestOut}
               accessibilityState={{ disabled: anyRequestOut, busy: sendingLink }}
             >
@@ -951,13 +1192,10 @@ export function SignInForm() {
                 </Text>
               ) : null}
 
-              {/* Where “Don’t have an account? Create one” used to link to a form
-                  that posted nowhere. Verifying a link is how an account is
-                  made, so the sentence names that rather than sending anyone
-                  looking for a screen that no longer exists. */}
+              {/* An identifier nobody holds goes to the sign-up step, so there is
+                  no separate screen to link to. */}
               <Text variant="meta" className="mt-4 text-center text-muted">
-                No account yet? Continue with your email — the link makes one
-                when you open it.
+                No account yet? Continue with your email and we will set one up.
               </Text>
             </>
           ) : null}
