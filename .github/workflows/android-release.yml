@@ -30,8 +30,8 @@
 # archive**, so uncommitted and gitignored files are not in the build: that is
 # why `google-services.json` is tracked at the repo root, and why a local
 # `pnpm build:apk:eas` builds HEAD rather than the working tree. And its prebuild
-# regenerates `android/local.properties`, dropping the `cmake.dir` pin that
-# `build-apk.mjs` wrote; `scripts/eas-local-properties.mjs` puts it back through
+# regenerates `android/local.properties`, dropping any `cmake.dir` pin;
+# `scripts/eas-local-properties.mjs` writes it back through
 # the `eas-build-post-install` hook, because without it the NDK build loops on
 # "ninja: build.ninja still dirty" until the job times out.
 #
@@ -52,24 +52,19 @@
 # handoff.
 #
 # `build` stays a single step, because it is a single command. Splitting prebuild
-# from Gradle in YAML would mean reimplementing what build-apk.mjs does between
-# them (local.properties, the CMake 3.30+ pick, the splash drawable), and the two
-# copies would drift. A failed build cannot be resumed part-way in any case: the
+# from Gradle in YAML would mean reimplementing what EAS and the
+# `eas-build-post-install` hook do between them (local.properties, the CMake
+# 3.30+ pick), and the two copies would drift. A failed build cannot be resumed part-way in any case: the
 # runner and its Gradle output are gone. The ~/.gradle cache is what makes the
 # retry cheaper.
 #
-# What it gives up: the APK is signed with the template debug keystore, which is
-# a fixed, publicly known key. Good for internal distribution and sideloading,
-# and its SHA-1 is stable, so it is the one registered against the Android OAuth
-# client. It cannot go to the Play Store — that needs a real upload keystore, and
-# what switching to one involves is `credentials/README.md`.
-#
-# EAS will not use `signingConfigs.debug` on its own: it resolves credentials
-# before the build and, under `--non-interactive`, either aborts or signs with
-# whatever keystore is on the EAS servers for this project — a different SHA-1,
-# which breaks Google sign-in. So the profile sets `"credentialsSource": "local"`
-# and `credentials.json` names a committed copy of that same template keystore.
-# It is committed because it is not a secret; a real one would not be.
+# Signing: the APK is signed with the keystore EAS holds for
+# `com.thechatroute.app` (SHA-1 7F:DF:F1:45:…:E1:76), the same key the cloud
+# `preview` and `development` builds use. EAS downloads it with EXPO_TOKEN before
+# the build, so nothing secret lives in the repo. That SHA-1 is the one
+# registered on the Android OAuth client in Google Cloud project
+# `chat-route-official`; an APK signed with any other key fails Google sign-in
+# with "This android application is not registered to use OAuth2.0".
 #
 # Triggers on a pushed version tag, not on a branch push, so merging to main
 # builds nothing. The tag is the release: its prefix picks the environment the
@@ -112,7 +107,8 @@ env:
   # with it. The `on.push.tags` patterns above have to agree with this.
   RELEASE_TAG_PREFIX: chatroute-v
 
-  # One ABI. See ANDROID_ABIS in scripts/build-apk.mjs.
+  # One ABI, matching the `production` profile's gradleCommand in eas.json.
+  # Only the release notes read it; the build takes its ABI from that profile.
   ANDROID_ABIS: arm64-v8a
 
 # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
@@ -338,9 +334,7 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      # Sets JAVA_HOME, which build-apk.mjs requires: its javaHome() has a
-      # Windows fallback and nothing else, so on Linux an unset JAVA_HOME is a
-      # hard exit rather than a search.
+      # Sets JAVA_HOME for Gradle, which the EAS local build runs on this runner.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -348,9 +342,10 @@ jobs:
 
       # The runner's SDK ships CMake 3.22.1, and under it every CMake project in
       # this tree — :app, reanimated, worklets, screens — loops on "ninja: error:
-      # manifest 'build.ninja' still dirty after 100 tries". build-apk.mjs picks
-      # the newest 3.30+ it can find and only *warns* when there is none, so
-      # without this step the build starts and then hangs until the timeout.
+      # manifest 'build.ninja' still dirty after 100 tries".
+      # scripts/eas-local-properties.mjs picks the newest 3.30+ it can find and
+      # only *warns* when there is none, so without this step the build starts
+      # and then hangs until the timeout.
       - name: Install CMake 3.30.5
         run: |
           set -euo pipefail
@@ -518,7 +513,7 @@ jobs:
           PRERELEASE: ${{ needs.target.outputs.prerelease }}
         run: |
           set -euo pipefail
-          NOTES="ChatRoute Android ${VERSION} (${ANDROID_ABIS}, debug-signed). Built from ${GITHUB_SHA}."
+          NOTES="ChatRoute Android ${VERSION} (${ANDROID_ABIS}). Built from ${GITHUB_SHA}."
 
           FLAGS=()
           if [ "$PRERELEASE" = true ]; then

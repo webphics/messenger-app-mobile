@@ -1,14 +1,16 @@
 /**
- * Restores the CMake pin that `build-apk.mjs` used to write, for builds that go
- * through `eas build` instead.
+ * Pins the CMake the NDK build runs with, for builds that go through `eas build`.
  *
- * The reason is unchanged and is documented at length in `build-apk.mjs`: the
- * SDK ships CMake 3.22.1, and under it every CMake project in this tree --
- * `:app`, reanimated, worklets, screens -- dies with
+ * The SDK ships CMake 3.22.1 and AGP picks it unless told otherwise. Under it
+ * every CMake project in this tree -- `:app`, reanimated, worklets, screens --
+ * dies with
  *
  *     ninja: error: manifest 'build.ninja' still dirty after 100 tries
  *
- * and the build does not fail, it spins until the job's timeout. `cmake.dir` in
+ * because `file(GLOB ... CONFIGURE_DEPENDS)` re-triggers regeneration on every
+ * pass and the regeneration never settles. It reproduces from a fresh
+ * `node_modules` on a single ABI, and 3.30.5 builds the same tree without
+ * complaint. The build does not fail, it spins until the job's timeout. `cmake.dir` in
  * `android/local.properties` is the only thing AGP reads to override the pick,
  * and EAS runs its own `expo prebuild`, which regenerates that file and drops
  * whatever was in it. So the pin has to be rewritten from inside the build,
@@ -40,8 +42,7 @@ if (!sdk || !existsSync(sdk)) {
   process.exit(0);
 }
 
-// Same rule as build-apk.mjs's cmakeDir(): newest installed at or above 3.30,
-// and a warning rather than an exit when there is none, so a machine without it
+// Newest installed at or above 3.30, and a warning rather than an exit when there is none, so a machine without it
 // still attempts the build instead of being silently misconfigured here.
 function cmakeDir() {
   const cmakeRoot = join(sdk, "cmake");

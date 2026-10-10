@@ -116,15 +116,12 @@ SHA-1 of the certificate the build was signed with**. Every fingerprint that sig
 sign in from has to be registered against the Android OAuth client in the Google console. A build
 signed with an unregistered certificate fails Google sign-in with nothing on screen to explain it.
 
-Two certificates sign builds of this app:
-
-| Build                                                                         | Signed with                                                                    | SHA-1                                                         |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
-| CI release, `pnpm build:apk`, `pnpm build:apk:eas`, `pnpm build:apk:emulator` | The Android template debug keystore, committed as `credentials/debug.keystore` | `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` |
-| EAS cloud builds (`development`, `preview` profiles, `pnpm build:android`)    | The keystore EAS holds for this project                                        | Shown by `eas credentials --platform android`                 |
-
-The first is already registered. Check the second before blaming anything else when Google sign-in
-fails in a development client.
+Every build profile signs with the one keystore EAS holds for this project: the CI release,
+`pnpm build:apk:eas`, `pnpm build:apk:emulator`, and the cloud `development` and `preview` builds.
+Its SHA-1 is `7F:DF:F1:45:D2:FD:DC:9D:7C:8F:07:AD:B5:61:45:4C:A1:91:E1:76`, registered on the
+"Chat Route Android" client in Google Cloud project `chat-route-official`. A build signed any other
+way fails Google sign-in with `This android application is not registered to use OAuth2.0` in
+logcat. `eas credentials --platform android` shows and downloads the keystore.
 
 `google-services.json` is **not** part of sign-in. It is the Firebase config for push, its
 `oauth_client` array is empty, and nothing in the sign-in path reads it. The root copy is tracked on
@@ -214,9 +211,8 @@ Actions tab. Re-pushing the same tag replaces the APK on its Release.
 The build runs `eas build --platform android --profile production --local` on an `ubuntu-latest`
 runner, which is the same command as `pnpm build:apk:eas`. It uses no EAS build credits, but the NDK
 compile takes tens of minutes; `~/.gradle` is cached between runs. The APK is `arm64-v8a` only,
-signed with the template debug keystore (see the fingerprint table above). That is fine for
-internal distribution and sideloading, and it cannot go to the Play Store. What moving to a real
-upload keystore involves is in `credentials/README.md`.
+signed with the EAS-held keystore (see the fingerprint section above), which EAS downloads with
+`EXPO_TOKEN` before the build.
 
 There is no iOS build in CI.
 
@@ -248,19 +244,17 @@ the shipped bundle, so anyone holding the APK can read them anyway.
 
 | Command                   | Where it builds                                                    | Output                                                |
 | ------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------- |
-| `pnpm build:apk`          | Gradle on this machine. Windows, needs JDK 17 and the Android SDK. | `dist/chatroute-release.apk`, `arm64-v8a` + `x86_64`  |
 | `pnpm build:apk:eas`      | EAS local build, same as CI. Builds `HEAD`, not the working tree.  | `dist/chatroute-release.apk`, `arm64-v8a`             |
 | `pnpm build:apk:emulator` | EAS local build, `emulator` profile                                | `dist/chatroute-emulator.apk`, `arm64-v8a` + `x86_64` |
 | `pnpm build:android`      | EAS cloud, `preview` profile. Uses a build credit.                 | APK on the EAS install page                           |
 
-An `arm64-v8a`-only APK crashes on launch on an x86_64 emulator. Use `pnpm build:apk` or
-`pnpm build:apk:emulator` for an emulator. Set `ANDROID_ABIS` to override the ABIs `pnpm build:apk`
-builds.
+An `arm64-v8a`-only APK crashes on launch on an x86_64 emulator. Use `pnpm build:apk:emulator` or
+`pnpm build:android` for an emulator.
 
 ### Native configuration
 
 `app.json`, `app.config.js` and `plugins/` are the native project. `android/` and `ios/` are
 generated from them and gitignored. A change to any of them reaches a phone only through a build
-(`pnpm build:apk --prebuild`, or a fresh development client), so nothing in `plugins/` takes effect
+(`pnpm build:apk:emulator`, an EAS build, or a fresh development client), so nothing in `plugins/` takes effect
 on a running Metro. That includes the backup rules keeping the Store out of a device backup
 (ADR-0011): the exclusion is real in the build, not in the bundle.

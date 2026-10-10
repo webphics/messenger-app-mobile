@@ -31,8 +31,7 @@ from the README, `eas.json` and `app.config.js`.
      "ios": { "distribution": "store" }
    }
    ```
-   alongside the Android block (remove `credentialsSource: "local"` for iOS, or scope it to
-   Android; it points at an Android keystore). Keep `simulator: true` only in `development`.
+   alongside the Android block. Keep `simulator: true` only in `development`.
 4. **Push for iOS.** With the APNs key on EAS, `expo-notifications` reads a token on a device
    build; the API's `POST /push/devices` already accepts an Expo token regardless of platform.
    Verify on a real iPhone; the simulator receives no remote push. Then restore the _Built to be

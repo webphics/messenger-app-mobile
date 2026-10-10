@@ -14,8 +14,8 @@
 				"simulator": true
 			},
 			"env": {
-				"EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-a4nk5g8l894p17fan5armmpml25plpso.apps.googleusercontent.com",
+				"EXPO_PUBLIC_API_URL": "https://api.thechatroute.com",
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-s7g54hlj8g0m404u9bb6bpde53g7gk6s.apps.googleusercontent.com",
 				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com"
 			}
 		},
@@ -25,8 +25,8 @@
 				"buildType": "apk"
 			},
 			"env": {
-				"EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-a4nk5g8l894p17fan5armmpml25plpso.apps.googleusercontent.com",
+				"EXPO_PUBLIC_API_URL": "https://api.thechatroute.com",
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-s7g54hlj8g0m404u9bb6bpde53g7gk6s.apps.googleusercontent.com",
 				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com"
 			}
 		},
@@ -39,14 +39,13 @@
 		},
 		"production": {
 			"distribution": "internal",
-			"credentialsSource": "local",
 			"android": {
 				"gradleCommand": ":app:assembleRelease -PreactNativeArchitectures=arm64-v8a",
 				"applicationArchivePath": "android/app/build/outputs/apk/release/app-release.apk"
 			},
 			"env": {
-				"EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-a4nk5g8l894p17fan5armmpml25plpso.apps.googleusercontent.com",
+				"EXPO_PUBLIC_API_URL": "https://api.thechatroute.com",
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-s7g54hlj8g0m404u9bb6bpde53g7gk6s.apps.googleusercontent.com",
 				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com"
 			}
 		}
