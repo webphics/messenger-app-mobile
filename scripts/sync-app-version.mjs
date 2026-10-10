@@ -16,7 +16,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 const source = readFileSync("app.json", "utf8");
 
-const pattern = /^(\s{4}"version":\s*)"[^"]*"/m;
+// Two tabs or four spaces: app.json has been indented both ways.
+const pattern = /^((?:\t\t|\s{4})"version":\s*)"[^"]*"/m;
 if (!pattern.test(source)) {
   console.error('app.json has no `"version"` line at the top of `expo` to update.');
   process.exit(1);
