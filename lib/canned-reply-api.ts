@@ -11,9 +11,10 @@ import type { CannedReply } from '@/lib/types'
 /**
  * The saved-response endpoints (`/canned-replies`).
  *
- * Reading is open to any staff member, and so is writing a personal response
- * (no `organizationId`). An organization response needs `manage_canned_replies`,
- * and promoting a personal one is an Admin's; a refusal arrives as `refused`
+ * Reading is open to any staff member, and so is creating a response, personal
+ * (no `organizationId`) or for an organization they cover. Editing an
+ * organization response needs `manage_canned_replies`, and promoting a personal
+ * one is an Admin's; a refusal arrives as `refused`
  * rather than a screen pretending it worked. Nothing here sends a message: a
  * saved response is text, and what an Agent does with it is still a send
  * through the composer.

@@ -53,10 +53,11 @@ import type { CannedReply } from '@/lib/types'
 type SavedResponsePickerProps = {
   visible: boolean
   onClose: () => void
-  /** The thread's organization; null for one with none, offered personal responses only. */
+  /**
+   * The thread's organization; null for one with none, offered personal responses only. Any
+   * staff member may save a new response to it; editing one needs `manage_canned_replies`.
+   */
   organizationId: string | null
-  /** Holds `manage_canned_replies`: may save to the organization, and is shown the library. */
-  canManage: boolean
   onSelect: (reply: CannedReply) => void
 }
 
@@ -90,7 +91,6 @@ function keyExtractor(item: CannedReply) {
 function PickerBody({
   onClose,
   organizationId,
-  canManage,
   onSelect,
 }: Omit<SavedResponsePickerProps, 'visible'>) {
   const insets = useSafeAreaInsets()
@@ -99,7 +99,7 @@ function PickerBody({
   const [draft, setDraft] = useState<Draft | null>(null)
   const [saving, setSaving] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
-  const canShare = canManage && organizationId !== null
+  const canShare = organizationId !== null
 
   // Read on every opening rather than cached: the body mounts with the sheet,
   // and a library somebody changed a minute ago should be the one offered.

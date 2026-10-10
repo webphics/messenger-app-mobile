@@ -24,7 +24,7 @@ import { InScreenHeader } from '@/components/in-screen-header'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import { attachmentViews, primaryAttachmentView } from '@/lib/attachment-view'
-import { can, type Capability } from '@/lib/capabilities'
+import type { Capability } from '@/lib/capabilities'
 import { chatMessageInfoHref } from '@/lib/chat-route-id'
 import { readStampLabel } from '@/lib/message-read-stamp'
 import { useMessageReceipts } from '@/lib/use-message-receipts'
@@ -475,7 +475,6 @@ export function ThreadScreen({
    */
   const isStaffViewer = viewer.role !== 'customer'
   const savedResponsesOrganizationId = conversation.organizationId ?? null
-  const canManageSavedResponses = can(viewer, 'manage_canned_replies')
   const placeholderCustomer = isStaffConversation(conversation)
     ? (conversation.customer?.name ?? null)
     : null
@@ -489,7 +488,6 @@ export function ThreadScreen({
       isStaffViewer
         ? {
             organizationId: savedResponsesOrganizationId,
-            canManage: canManageSavedResponses,
             placeholders: {
               name: placeholderCustomer,
               myName: viewer.name,
@@ -500,7 +498,6 @@ export function ThreadScreen({
     [
       isStaffViewer,
       savedResponsesOrganizationId,
-      canManageSavedResponses,
       placeholderCustomer,
       placeholderOrganization,
       viewer.name,

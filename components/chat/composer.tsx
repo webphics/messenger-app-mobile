@@ -106,7 +106,6 @@ type ComposerProps = {
    */
   savedResponses?: {
     organizationId: string | null
-    canManage: boolean
     placeholders: PlaceholderValues
   } | null
   /**
@@ -767,7 +766,6 @@ export function Composer({
           visible={pickerOpen}
           onClose={() => setPickerOpen(false)}
           organizationId={savedResponses.organizationId}
-          canManage={savedResponses.canManage}
           onSelect={(reply) =>
             handleInsertSavedResponse(fillPlaceholders(reply.body, savedResponses.placeholders))
           }
