@@ -94,4 +94,40 @@ describe('filterConversations', () => {
     }).map((c) => c.id)
     expect(ids).toEqual(['conv-assigned'])
   })
+
+  describe('unread', () => {
+    const counted = { ...assigned, id: 'conv-counted', unreadCount: 2 }
+    const countedRead = { ...assigned, id: 'conv-counted-read', unreadCount: 0 }
+    // Outside the list endpoint the count is null, and the last message decides.
+    const uncounted = {
+      ...assigned,
+      id: 'conv-uncounted',
+      unreadCount: null,
+      lastMessageMine: false,
+      lastMessageRead: false,
+    }
+    const ownLast = { ...uncounted, id: 'conv-own-last', lastMessageMine: true }
+    const list = [counted, countedRead, uncounted, ownLast]
+
+    test('keeps only threads with something unread', () => {
+      expect(
+        filterConversations(list, { query: '', chip: 'all', unreadOnly: true }).map((c) => c.id),
+      ).toEqual([counted.id, uncounted.id])
+    })
+
+    test('off, it narrows nothing', () => {
+      expect(filterConversations(list, { query: '', chip: 'all' })).toHaveLength(list.length)
+    })
+
+    test('narrows within the chip in force', () => {
+      const closedUnread = { ...closed, unreadCount: 1 }
+      expect(
+        filterConversations([...list, closedUnread], {
+          query: '',
+          chip: 'resolved',
+          unreadOnly: true,
+        }).map((c) => c.id),
+      ).toEqual([closedUnread.id])
+    })
+  })
 })

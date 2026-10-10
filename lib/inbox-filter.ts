@@ -1,5 +1,9 @@
 import { conversationTitle } from '@/lib/conversation-title'
-import { findOffersConversation, sortConversations } from '@/lib/conversation-list'
+import {
+  findOffersConversation,
+  isConversationUnread,
+  sortConversations,
+} from '@/lib/conversation-list'
 import { canViewConversation, type ConversationViewer } from '@/lib/rbac'
 import { isStaffConversation } from '@/lib/types'
 import type { Conversation } from '@/lib/types'
@@ -133,6 +137,12 @@ export type InboxFilter = {
    * (General Support, a staff DM) is in none of them.
    */
   pickedOrganizationIds?: ReadonlySet<string> | null
+  /**
+   * Keep only the threads with something the viewer has not read. A toggle on
+   * top of the chip rather than a chip of its own, so "unread in Mine" is a
+   * question the row can ask.
+   */
+  unreadOnly?: boolean
 }
 
 /**
@@ -151,6 +161,7 @@ export function filterConversations(
     viewerId,
     organizationIds = null,
     pickedOrganizationIds = null,
+    unreadOnly = false,
   }: InboxFilter,
 ): Conversation[] {
   const q = query.trim().toLowerCase()
@@ -174,6 +185,7 @@ export function filterConversations(
     // Without a viewer there is nobody for a thread to belong to, so the chip
     // answers with nothing rather than with everything.
     if (chip === 'mine' && !mine?.has(conversation.id)) return false
+    if (unreadOnly && !isConversationUnread(conversation)) return false
     if (!q) return true
 
     const title = conversationTitle(conversation, organizationNames).toLowerCase()

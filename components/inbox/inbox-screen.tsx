@@ -1,6 +1,7 @@
 import { useNavigation, useRouter } from "expo-router";
 import {
   Building,
+  CheckCheck,
   ChevronDown,
   CloudOff,
   Inbox,
@@ -20,6 +21,7 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { chatHref } from "@/lib/chat-route-id";
 import { cn } from "@/lib/cn";
+import { isConversationUnread } from "@/lib/conversation-list";
 import {
   activeInboxChip,
   filterConversations,
@@ -40,8 +42,8 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 
 /**
  * The staff filters' labels. Which of them are offered, and in what order, is
- * `inboxChips` — Mine is not, in a Shared queue. The Org pill sits among them,
- * before Resolved, which the row keeps last.
+ * `inboxChips` — Mine is not, in a Shared queue. The Unread toggle and the Org
+ * pill sit among them, before Resolved, which the row keeps last.
  *
  * Short labels because the row is read at a glance: "All Messages" was
  * affordable beside two chips and is not beside five. It scrolls sideways when
@@ -62,8 +64,33 @@ function InboxItemSeparator() {
   return <View className="h-3" />;
 }
 
-function InboxEmpty({ showChips }: { showChips: boolean }) {
+function InboxEmpty({
+  showChips,
+  caughtUp,
+}: {
+  showChips: boolean;
+  /** Unread is on and nothing is: a good outcome, not a failed search. */
+  caughtUp: boolean;
+}) {
   const reduceMotion = useReducedMotion();
+  if (caughtUp) {
+    return (
+      <Animated.View
+        entering={settleEnter(!!reduceMotion)}
+        className="items-center px-4 py-16"
+      >
+        <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
+          <CheckCheck color={colors.primary} size={26} />
+        </View>
+        <Text variant="title" className="mt-4 text-ink">
+          No unread conversations
+        </Text>
+        <Text variant="meta" className="mt-1 text-center text-muted">
+          You have read everything here. Turn off Unread to see every conversation.
+        </Text>
+      </Animated.View>
+    );
+  }
   return (
     <Animated.View
       entering={settleEnter(!!reduceMotion)}
@@ -168,6 +195,12 @@ function InboxError({
 type InboxScreenProps = {
   conversations: Conversation[];
   showChips: boolean;
+  /**
+   * Whether to offer the Unread toggle. Separate from `showChips` because a
+   * Customer has no status chips and still has threads to catch up on. Off on
+   * the pool, which is one queue rather than a list to narrow.
+   */
+  showUnreadFilter?: boolean;
   showCompose: boolean;
   title: string;
   /** Names a Customer's own support threads, which carry no title of their own. */
@@ -192,6 +225,7 @@ type InboxScreenProps = {
 export function InboxScreen({
   conversations,
   showChips,
+  showUnreadFilter = false,
   showCompose,
   title,
   organizationNames,
@@ -210,6 +244,8 @@ export function InboxScreen({
   const chips = inboxChips(supportAssignment);
   // A Mine left selected when assignment went off filters as All, and shows as it.
   const chip = activeInboxChip(selectedChip, supportAssignment);
+  const [selectedUnreadOnly, setUnreadOnly] = useState(false);
+  const unreadOnly = showUnreadFilter && selectedUnreadOnly;
   const [composeOpen, setComposeOpen] = useState(false);
   const [inboxesOpen, setInboxesOpen] = useState(false);
   const [organizationsOpen, setOrganizationsOpen] = useState(false);
@@ -275,6 +311,7 @@ export function InboxScreen({
       viewerId,
       organizationIds: savedInboxes.organizationIds,
       pickedOrganizationIds,
+      unreadOnly,
     });
   }, [
     conversations,
@@ -285,8 +322,15 @@ export function InboxScreen({
     viewerId,
     savedInboxes.organizationIds,
     pickedOrganizationIds,
+    unreadOnly,
     epoch,
   ]);
+  // How many of the rows the other filters leave are unread, so the toggle
+  // says what turning it on would keep.
+  const unreadTotal = useMemo(
+    () => (unreadOnly ? visible.length : visible.filter(isConversationUnread).length),
+    [unreadOnly, visible],
+  );
 
   const renderChip = (id: InboxChip) => {
     const selected = id === chip;
@@ -368,6 +412,44 @@ export function InboxScreen({
       </TactilePressable>
     );
   };
+
+  /*
+   * Unread narrows whichever chip is in force, like the Org pill, so it is
+   * drawn the same way: a toggle with a soft fill and a ring when on. The
+   * count is part of the accessible name, since a pressable collapses the
+   * badge it contains.
+   */
+  const renderUnreadToggle = () => (
+    <TactilePressable
+      key="unread"
+      accessibilityRole="button"
+      accessibilityLabel={unreadTotal > 0 ? `Unread, ${unreadTotal}` : "Unread"}
+      accessibilityState={{ selected: unreadOnly }}
+      onPress={() => setUnreadOnly((on) => !on)}
+      className={cn(
+        "min-h-9 flex-row items-center gap-1.5 rounded-full border px-3",
+        unreadOnly ? "border-primary/40 bg-primary-soft" : "border-line/80 bg-line/35",
+      )}
+    >
+      <Text
+        variant="label"
+        className={unreadOnly ? "font-semibold text-primary" : "text-ink-soft"}
+      >
+        Unread
+      </Text>
+      {unreadTotal > 0 ? (
+        <View className="h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1">
+          <Text
+            variant="label"
+            className="text-[11px] font-semibold text-primary-foreground"
+            style={{ fontVariant: ["tabular-nums"] }}
+          >
+            {unreadTotal > 99 ? "99+" : String(unreadTotal)}
+          </Text>
+        </View>
+      ) : null}
+    </TactilePressable>
+  );
 
   const openConversation = useCallback(
     (conversationId: string) => {
@@ -452,16 +534,17 @@ export function InboxScreen({
           </View>
         ) : null}
 
-        {showChips ? (
+        {showChips || showUnreadFilter ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             className="-mx-4 mt-3"
             contentContainerClassName="flex-row gap-2 px-4"
           >
-            {chips.filter((id) => id !== "resolved").map(renderChip)}
-            {renderOrganizationPill()}
-            {chips.filter((id) => id === "resolved").map(renderChip)}
+            {showChips ? chips.filter((id) => id !== "resolved").map(renderChip) : null}
+            {showUnreadFilter ? renderUnreadToggle() : null}
+            {showChips ? renderOrganizationPill() : null}
+            {showChips ? chips.filter((id) => id === "resolved").map(renderChip) : null}
           </ScrollView>
         ) : null}
       </View>
@@ -483,7 +566,7 @@ export function InboxScreen({
           ) : error ? (
             <InboxError title={error.title} hint={error.hint} onRetry={onRefresh} />
           ) : (
-            <InboxEmpty showChips={showChips} />
+            <InboxEmpty showChips={showChips} caughtUp={unreadOnly && !query.trim()} />
           )
         }
         refreshControl={makeRefreshControl(refreshing, onRefresh)}

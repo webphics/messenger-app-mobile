@@ -162,6 +162,7 @@ export function RoleConversationsScreen({
           refreshing={inbox.refreshing}
           onRefresh={inbox.reload}
           showChips={isStaff}
+          showUnreadFilter
           showCompose={showCompose}
           viewerId={user?.id}
           savedInboxesFor={user?.role ?? null}
