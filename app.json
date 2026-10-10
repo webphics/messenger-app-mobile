@@ -42,6 +42,7 @@
 				}
 			],
 			"expo-font",
+			"expo-asset",
 			[
 				"expo-navigation-bar",
 				{
