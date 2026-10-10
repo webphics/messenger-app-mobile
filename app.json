@@ -1,115 +1,115 @@
 {
-  "expo": {
-    "name": "ChatRoute",
-    "slug": "chatroute",
-    "version": "1.0.7",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "chatroute",
-    "userInterfaceStyle": "light",
-    "updates": {
-      "enabled": false
-    },
-    "ios": {
-      "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.zeestglobal.chatroute",
-      "supportsTablet": true
-    },
-    "android": {
-      "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "predictiveBackGestureEnabled": false,
-      "blockedPermissions": [
-        "android.permission.READ_MEDIA_AUDIO"
-      ],
-      "softwareKeyboardLayoutMode": "resize",
-      "package": "com.zeestglobal.chatroute"
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/splash-icon.png"
-        }
-      ],
-      "expo-font",
-      [
-        "expo-navigation-bar",
-        {
-          "enforceContrast": false,
-          "style": "dark"
-        }
-      ],
-      "expo-sharing",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach screenshots to a support conversation.",
-          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation."
-        }
-      ],
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false
-        }
-      ],
-      "./plugins/with-system-bar-insets",
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach them to a support conversation.",
-          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save attachments you receive to your photo library.",
-          "isAccessMediaLocationEnabled": false
-        }
-      ],
-      "expo-video",
-      "expo-image",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations.",
-          "recordAudioAndroid": true
-        }
-      ],
-      "./plugins/with-store-excluded-from-backup",
-      "./plugins/with-scene-lifecycle",
-      "expo-secure-store",
-      "expo-sqlite",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/notification-icon.png",
-          "color": "#6253A3",
-          "defaultChannel": "default"
-        }
-      ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "faad9a83-d245-4c2f-bac3-bca8d61cf1ca"
-      },
-      "router": {},
-      "expo-navigation-bar": {
-        "enforceContrast": false,
-        "style": "dark"
-      }
-    },
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
-    "owner": "webphics"
-  }
+	"expo": {
+		"name": "ChatRoute",
+		"slug": "chatroute",
+		"version": "1.0.7",
+		"orientation": "portrait",
+		"icon": "./assets/images/icon.png",
+		"scheme": "chatroute",
+		"userInterfaceStyle": "light",
+		"updates": {
+			"enabled": false
+		},
+		"ios": {
+			"icon": "./assets/images/icon.png",
+			"bundleIdentifier": "com.thechatroute.app",
+			"supportsTablet": true
+		},
+		"android": {
+			"adaptiveIcon": {
+				"backgroundColor": "#FFFFFF",
+				"foregroundImage": "./assets/images/android-icon-foreground.png",
+				"monochromeImage": "./assets/images/android-icon-monochrome.png"
+			},
+			"predictiveBackGestureEnabled": false,
+			"blockedPermissions": [
+				"android.permission.READ_MEDIA_AUDIO"
+			],
+			"softwareKeyboardLayoutMode": "resize",
+			"package": "com.thechatroute.app"
+		},
+		"web": {
+			"output": "static",
+			"favicon": "./assets/images/favicon.png"
+		},
+		"plugins": [
+			"expo-router",
+			[
+				"expo-splash-screen",
+				{
+					"backgroundColor": "#FFFFFF",
+					"image": "./assets/images/splash-icon.png"
+				}
+			],
+			"expo-font",
+			[
+				"expo-navigation-bar",
+				{
+					"enforceContrast": false,
+					"style": "dark"
+				}
+			],
+			"expo-sharing",
+			[
+				"expo-image-picker",
+				{
+					"photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach screenshots to a support conversation.",
+					"cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation."
+				}
+			],
+			[
+				"expo-camera",
+				{
+					"cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation.",
+					"microphonePermission": false,
+					"recordAudioAndroid": false
+				}
+			],
+			"./plugins/with-system-bar-insets",
+			[
+				"expo-media-library",
+				{
+					"photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach them to a support conversation.",
+					"savePhotosPermission": "Allow $(PRODUCT_NAME) to save attachments you receive to your photo library.",
+					"isAccessMediaLocationEnabled": false
+				}
+			],
+			"expo-video",
+			"expo-image",
+			[
+				"expo-audio",
+				{
+					"microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations.",
+					"recordAudioAndroid": true
+				}
+			],
+			"./plugins/with-store-excluded-from-backup",
+			"./plugins/with-scene-lifecycle",
+			"expo-secure-store",
+			"expo-sqlite",
+			[
+				"expo-notifications",
+				{
+					"icon": "./assets/images/notification-icon.png",
+					"color": "#6253A3",
+					"defaultChannel": "default"
+				}
+			]
+		],
+		"extra": {
+			"eas": {
+				"projectId": "faad9a83-d245-4c2f-bac3-bca8d61cf1ca"
+			},
+			"router": {},
+			"expo-navigation-bar": {
+				"enforceContrast": false,
+				"style": "dark"
+			}
+		},
+		"experiments": {
+			"typedRoutes": true,
+			"reactCompiler": true
+		},
+		"owner": "webphics"
+	}
 }

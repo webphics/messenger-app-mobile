@@ -15,8 +15,8 @@
 			},
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "753090717715-poksq2l0spou5t49m9edlncptb2157uf.apps.googleusercontent.com",
-				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9.apps.googleusercontent.com"
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-a4nk5g8l894p17fan5armmpml25plpso.apps.googleusercontent.com",
+				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com"
 			}
 		},
 		"preview": {
@@ -26,8 +26,8 @@
 			},
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "753090717715-poksq2l0spou5t49m9edlncptb2157uf.apps.googleusercontent.com",
-				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9.apps.googleusercontent.com"
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-a4nk5g8l894p17fan5armmpml25plpso.apps.googleusercontent.com",
+				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com"
 			}
 		},
 		"emulator": {
@@ -46,8 +46,8 @@
 			},
 			"env": {
 				"EXPO_PUBLIC_API_URL": "https://api.zeestglobal.com",
-				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "753090717715-poksq2l0spou5t49m9edlncptb2157uf.apps.googleusercontent.com",
-				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9.apps.googleusercontent.com"
+				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-a4nk5g8l894p17fan5armmpml25plpso.apps.googleusercontent.com",
+				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com"
 			}
 		}
 	}

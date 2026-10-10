@@ -6,7 +6,7 @@ from the README, `eas.json` and `app.config.js`.
 
 ## Today
 
-- Bundle ID `com.zeestglobal.chatroute`, `supportsTablet: true`, version `1.0.5`.
+- Bundle ID `com.thechatroute.app`, `supportsTablet: true`, version `1.0.5`.
 - `eas.json` `development` profile has `"ios": { "simulator": true }`: a simulator binary only,
   for a Mac. No profile builds for a device, no `production` iOS block, no CI job.
 - Google sign-in: the iOS OAuth client exists and is in every `env` block; the URL scheme is
@@ -35,8 +35,8 @@ from the README, `eas.json` and `app.config.js`.
    Android; it points at an Android keystore). Keep `simulator: true` only in `development`.
 4. **Push for iOS.** With the APNs key on EAS, `expo-notifications` reads a token on a device
    build; the API's `POST /push/devices` already accepts an Expo token regardless of platform.
-   Verify on a real iPhone; the simulator receives no remote push. Then restore the *Built to be
-   reachable* paragraph and the push screenshot in `listing.md` / `images.md`.
+   Verify on a real iPhone; the simulator receives no remote push. Then restore the _Built to be
+   reachable_ paragraph and the push screenshot in `listing.md` / `images.md`.
 5. **Universal links.** Serve `/.well-known/apple-app-site-association` from the magic-link origin
    with the Team ID + bundle ID, add `associatedDomains` to `app.config.js`, and set
    `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` in the iOS env. Without it, magic-link sign-in works on iOS only
@@ -44,7 +44,7 @@ from the README, `eas.json` and `app.config.js`.
 6. **Account deletion (guideline 5.1.1(v)).** Apple requires an in-app path to start account
    deletion for any app with account creation. ChatRoute has no in-app creation, which exempts it
    on paper, but reviewers often ask anyway; give the web/admin request URL in the review notes and
-   expect to add a *Delete account* request row in Settings if they push back.
+   expect to add a _Delete account_ request row in Settings if they push back.
 7. **App Store Connect record.** Create the app against the bundle ID, SKU `chatroute-ios`,
    primary language en-GB. Fill App Information, Pricing (free), App Privacy from `listing.md`.
 8. **Build and upload.** From any machine (EAS builds in the cloud, no Mac needed for this step):

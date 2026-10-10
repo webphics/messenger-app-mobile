@@ -21,7 +21,7 @@
  * old one stops receiving push until it is replaced by a new build. Editing
  * this field later is that decision, whether or not it looks like one.
  *
- * The package name and bundle identifier, `com.zeestglobal.chatroute`, are a
+ * The package name and bundle identifier, `com.thechatroute.app`, are a
  * separate decision with a bigger bill. Firebase and the OAuth clients are
  * registered against them, and a phone treats a new one as a different app: it
  * installs beside the old one rather than upgrading it, with an empty keystore
@@ -73,13 +73,13 @@ const { join } = require("node:path");
  * build rather than shipping.
  */
 function iosUrlScheme(clientId) {
-  const trimmed = clientId?.trim();
-  if (!trimmed) return null;
+	const trimmed = clientId?.trim();
+	if (!trimmed) return null;
 
-  const suffix = ".apps.googleusercontent.com";
-  return trimmed.endsWith(suffix)
-    ? `com.googleusercontent.apps.${trimmed.slice(0, -suffix.length)}`
-    : null;
+	const suffix = ".apps.googleusercontent.com";
+	return trimmed.endsWith(suffix)
+		? `com.googleusercontent.apps.${trimmed.slice(0, -suffix.length)}`
+		: null;
 }
 
 /**
@@ -89,27 +89,32 @@ function iosUrlScheme(clientId) {
  * Expo CLI does not promise to be run from the project root.
  */
 function googleServicesFile() {
-  const relative = "./google-services.json";
-  return existsSync(join(__dirname, relative)) ? relative : undefined;
+	const relative = "./google-services.json";
+	return existsSync(join(__dirname, relative)) ? relative : undefined;
 }
 
 module.exports = ({ config }) => {
-  const scheme = iosUrlScheme(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
-  const services = googleServicesFile();
+	const scheme = iosUrlScheme(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
+	const services = googleServicesFile();
 
-  return {
-    ...config,
-    android: {
-      ...config.android,
-      // Spread conditionally: an explicit `undefined` is a key Expo's schema
-      // sees, and it reads it as a path that is empty rather than absent.
-      ...(services ? { googleServicesFile: services } : {}),
-    },
-    plugins: [
-      ...(config.plugins ?? []),
-      ...(scheme
-        ? [["@react-native-google-signin/google-signin", { iosUrlScheme: scheme }]]
-        : []),
-    ],
-  };
+	return {
+		...config,
+		android: {
+			...config.android,
+			// Spread conditionally: an explicit `undefined` is a key Expo's schema
+			// sees, and it reads it as a path that is empty rather than absent.
+			...(services ? { googleServicesFile: services } : {}),
+		},
+		plugins: [
+			...(config.plugins ?? []),
+			...(scheme
+				? [
+						[
+							"@react-native-google-signin/google-signin",
+							{ iosUrlScheme: scheme },
+						],
+					]
+				: []),
+		],
+	};
 };

@@ -35,12 +35,12 @@ silently is `MAGIC_LINK_APP_ORIGINS`, which still names the old scheme.
 
 ## 1. Sign-in takes an `identifier`, not an `email`
 
-| Repo | Commit | |
-| --- | --- | --- |
-| api | `db9522c` | Add email-prefix usernames as a login identifier |
-| api | `0c84b84` | Make the username editable and visible on admin surfaces |
-| app | `6650879` | Accept a username or an email on the login form |
-| app | `520fc57` | Show and edit the username across users and profile |
+| Repo | Commit    |                                                          |
+| ---- | --------- | -------------------------------------------------------- |
+| api  | `db9522c` | Add email-prefix usernames as a login identifier         |
+| api  | `0c84b84` | Make the username editable and visible on admin surfaces |
+| app  | `6650879` | Accept a username or an email on the login form          |
+| app  | `520fc57` | Show and edit the username across users and profile      |
 
 `POST /auth/login` and `POST /auth/magic-link` both replaced `email` with `identifier`. The body is
 `z.strictObject`, so a client still sending `email` fails **twice** — the missing `identifier` and
@@ -61,13 +61,13 @@ An unknown username, an unknown email and a wrong password all return the same
 
 An earlier draft of this file read `6650879` as the current state of the web form. It is not.
 `6e088bf` — 96 files, titled "refactor(inbox)" — rewrote the login form later the same window and
-took the username option back out. `login-schema.ts` on `main` says so in as many words: *"Sign-in is
+took the username option back out. `login-schema.ts` on `main` says so in as many words: _"Sign-in is
 email-only. `/auth/login` and `/auth/magic-link` both still take a username in the same slot, and
 the wire field is still called `identifier`, but nothing in the web app offers that: one field, one
-meaning, one label."*
+meaning, one label."_
 
 Confirmed by running it: `/login` labels the field **Email**, types the input `email`, and refuses
-`adalovelace` with *"Email must be a valid email address."* before any request.
+`adalovelace` with _"Email must be a valid email address."_ before any request.
 
 So three different things are true at once, and they are easy to conflate:
 
@@ -92,12 +92,12 @@ surfaces. This app neither displays nor edits it. A gap, not a break.
 
 ## 2. Invitations became links
 
-| Repo | Commit | |
-| --- | --- | --- |
-| api | `420528f` | Invitation signup links: invite by email, redeem by token |
-| api | `376a516` | Pending invitations response, rate limiting |
-| app | `b31127d` | Invitation redemption page |
-| app | `a778d1f` | Organization filtering on inbox and invitation redemption |
+| Repo | Commit    |                                                           |
+| ---- | --------- | --------------------------------------------------------- |
+| api  | `420528f` | Invitation signup links: invite by email, redeem by token |
+| api  | `376a516` | Pending invitations response, rate limiting               |
+| app  | `b31127d` | Invitation redemption page                                |
+| app  | `a778d1f` | Organization filtering on inbox and invitation redemption |
 
 An admin can invite an address that has no account. The API mails a link; following it creates the
 account and accepts every organization on the invitation in one step.
@@ -112,10 +112,10 @@ account and accepts every organization on the invitation in one step.
 
 Two routes:
 
-| Route | Session | Body | Answers |
-| --- | --- | --- | --- |
-| `GET /invitations/redeem/:token` | none | — | `{ outcome, email, invitedByName, organizations }` |
-| `POST /invitations/redeem/:token` | none | `{ name, password }` | `201` + the login user + `Set-Cookie` |
+| Route                             | Session | Body                 | Answers                                            |
+| --------------------------------- | ------- | -------------------- | -------------------------------------------------- |
+| `GET /invitations/redeem/:token`  | none    | —                    | `{ outcome, email, invitedByName, organizations }` |
+| `POST /invitations/redeem/:token` | none    | `{ name, password }` | `201` + the login user + `Set-Cookie`              |
 
 `outcome` is `signup` (live, no account holds the address), `signin` (live, but the address gained
 an account since — the invitation is waiting inside it), or `invalid`. **A dead token is a `200`,
@@ -126,16 +126,16 @@ nothing.
 in `lib/auth-response.ts` already knows how to read it.
 
 **This app has no link redemption.** `lib/use-invitations.ts` covers something different and still
-correct: the in-app list of invitations addressed to a person who is *already signed in*
+correct: the in-app list of invitations addressed to a person who is _already signed in_
 (`GET /invitations/mine`, accept, decline). The link path is the one that creates an account, and it
 does not exist here.
 
 ## 3. Organization join links
 
-| Repo | Commit | |
-| --- | --- | --- |
-| api | `b67bd4a` | Organization join links: generate, redeem, revoke |
-| app | `3af178f` | Join links: an admin page and a public landing page |
+| Repo | Commit    |                                                     |
+| ---- | --------- | --------------------------------------------------- |
+| api  | `b67bd4a` | Organization join links: generate, redeem, revoke   |
+| app  | `3af178f` | Join links: an admin page and a public landing page |
 
 A shareable link into one or more organizations. Unlike an invitation it names nobody: an admin
 generates it, copies it, and sends it however they like. There is no email and no activity event.
@@ -147,13 +147,13 @@ generates it, copies it, and sends it however they like. There is no email and n
   nothing.**
 - Status (`active` / `used` / `expired` / `revoked`) is derived, never stored.
 
-| Route | Session | Answers |
-| --- | --- | --- |
-| `GET /organization-join-links/redeem/:token` | none | `{ outcome, organizations }`, always `200`, writes nothing |
-| `POST /organization-join-links/redeem/:token` | **required** | `{ joined, alreadyMembers }`, `401` without one |
+| Route                                         | Session      | Answers                                                    |
+| --------------------------------------------- | ------------ | ---------------------------------------------------------- |
+| `GET /organization-join-links/redeem/:token`  | none         | `{ outcome, organizations }`, always `200`, writes nothing |
+| `POST /organization-join-links/redeem/:token` | **required** | `{ joined, alreadyMembers }`, `401` without one            |
 
-**The asymmetry with invitations is the thing to design around.** An invitation link *creates* the
-account. A join link *requires* one — so on a phone, a signed-out person tapping a join link has to
+**The asymmetry with invitations is the thing to design around.** An invitation link _creates_ the
+account. A join link _requires_ one — so on a phone, a signed-out person tapping a join link has to
 sign in or sign up first and have the token survive that trip. See §7.
 
 ## 4. Sign-in is three steps, and onboarding is not one of them
@@ -169,15 +169,15 @@ auth story is mostly in one grab-bag commit**, so date the files rather than tru
 `type LoginStep = "email" | "password" | "magic-link-sent"` — one form across all three, so the
 identifier typed on step one is the one every later step uses.
 
-| Step | Heading | What is on it |
-| --- | --- | --- |
-| `email` | "Welcome back" | the identifier field, and Google — a `GoogleLogin` button plus One Tap |
-| `password` | "Enter your password" | the password field, and a button that asks for a magic link instead |
-| `magic-link-sent` | "Check your email" | confirmation, resend, and a way back |
+| Step              | Heading               | What is on it                                                          |
+| ----------------- | --------------------- | ---------------------------------------------------------------------- |
+| `email`           | "Welcome back"        | the identifier field, and Google — a `GoogleLogin` button plus One Tap |
+| `password`        | "Enter your password" | the password field, and a button that asks for a magic link instead    |
+| `magic-link-sent` | "Check your email"    | confirmation, resend, and a way back                                   |
 
 Every step after the first shows the identifier as a row that is itself the way back to step one.
 
-### Superseded: there *is* a new-user branch now
+### Superseded: there _is_ a new-user branch now
 
 **This section was right when it was written and is no longer true.** The API has since added
 `POST /auth/account-state`, and the web form's step one calls it before advancing. Keep reading for
@@ -209,11 +209,11 @@ or by the link.
 ### What replaced it
 
 `POST /auth/account-state` → `{ exists, hasPassword }`. Unauthenticated, `POST` so the address stays
-out of URLs and access logs, rate limited per identifier *and* per IP, and it carries two booleans
+out of URLs and access logs, rate limited per identifier _and_ per IP, and it carries two booleans
 and nothing else off the row.
 
 **The argument that changed is worth stating, because it is not "we stopped caring".** From the
-route's own schema: *drawing the controls is itself the disclosure* — a second step with no password
+route's own schema: _drawing the controls is itself the disclosure_ — a second step with no password
 field says the address has no password whatever the payload withheld. So the choice was never
 between telling and not telling. It was between telling for free, via a screen anyone can read, and
 telling under a budget. The route is the second. The other three defences above are untouched:
@@ -221,11 +221,11 @@ telling under a budget. The route is the second. The other three defences above 
 
 Step two is therefore one of three things:
 
-| `exists` | `hasPassword` | step two |
-| --- | --- | --- |
-| true | true | "Enter your password" — the password field |
-| true | false | "Check your email instead" — link only |
-| false | false | "Let's get you started" — link only |
+| `exists` | `hasPassword` | step two                                   |
+| -------- | ------------- | ------------------------------------------ |
+| true     | true          | "Enter your password" — the password field |
+| true     | false         | "Check your email instead" — link only     |
+| false    | false         | "Let's get you started" — link only        |
 
 The last two draw identical controls and are worded apart on purpose: "your account has no password"
 and "you have no account" are different news, and one line covering both is useless to either
@@ -258,7 +258,7 @@ function needsOnboarding(user: AuthUser): boolean {
 ```
 
 Any authenticated account whose name is blank is redirected to `/onboarding?redirect=<where they
-were going>` from anywhere, and the redirect is placed *before* the "already signed in, go home"
+were going>` from anywhere, and the redirect is placed _before_ the "already signed in, go home"
 rule so a new account landing back on `/login` reaches it in one hop. The two-factor challenge is
 carved out. The gate runs in both directions: once the name is set, `/onboarding` bounces you out,
 so a bookmark cannot re-ask a settled question.
@@ -290,7 +290,7 @@ sit in front of. There is no onboarding in this app today.
 ## 5. The rest of the window, briefly
 
 - **`20af591` / `3b43402` — broadcast acknowledgement.** The web dashboard is blocked until required
-  broadcasts are acknowledged. This is a gate that sits *after* sign-in, so it shapes what a
+  broadcasts are acknowledged. This is a gate that sits _after_ sign-in, so it shapes what a
   signed-in person sees rather than how they authenticate. This app does not implement it. Whether
   mobile should gate the Hub the same way is a product question nobody has answered.
 - **`34d10ff`, `b8ef6e6`, `422d1eb`, `2aec0e6` — email providers and templates.** Server-side
@@ -301,7 +301,7 @@ sit in front of. There is no onboarding in this app today.
 - **`c0b3667` — `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in deploy.** Web plumbing. This app's Google audience
   arrangement is unchanged; see `ADR-0005`.
 
-## 6. What did *not* change, and it matters
+## 6. What did _not_ change, and it matters
 
 The credential scheme. `docs/api/auth.md` is explicit: **"A native client needs no API change at
 all."**
@@ -325,11 +325,11 @@ client was built against it once and the approach was dropped.
 
 Both new links are built from the **web** origin and only the web origin:
 
-| Link | Built by | Shape |
-| --- | --- | --- |
-| Magic link | `auth.email.ts` | `<origin>/auth/magic-link?token=…` — origin may be native |
-| Invitation | `memberships.email.listener.ts` → `buildRedemptionUrl` | `<ORIGIN_URL[0]>/invitations/redeem?token=…` |
-| Join link | webapp `buildJoinLinkUrl` | `<NEXT_PUBLIC_FRONTEND_URL>/join?token=…` |
+| Link       | Built by                                               | Shape                                                     |
+| ---------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| Magic link | `auth.email.ts`                                        | `<origin>/auth/magic-link?token=…` — origin may be native |
+| Invitation | `memberships.email.listener.ts` → `buildRedemptionUrl` | `<ORIGIN_URL[0]>/invitations/redeem?token=…`              |
+| Join link  | webapp `buildJoinLinkUrl`                              | `<NEXT_PUBLIC_FRONTEND_URL>/join?token=…`                 |
 
 `MAGIC_LINK_APP_ORIGINS` — the allowlist that lets a link point at a custom scheme — is read in
 exactly one place, `src/modules/auth/emails/auth.email.ts`. The invitation listener does not consult
@@ -362,7 +362,7 @@ so doing it once serves all three link shapes.
 2. **Association files on the web origin**, served from `/.well-known/` as `application/json`, with
    no redirect. Android's needs the package name and the **release signing certificate SHA-256**;
    iOS's needs the team id and bundle id.
-   **Both carry the current identity: `com.zeestglobal.chatroute`.** Earlier package names,
+   **Both carry the current identity: `com.thechatroute.app`.** Earlier package names,
    such as `com.anonymous.enki`, will verify nothing.
 3. **Two routes**, mirroring `app/auth/magic-link.tsx`:
    - `app/invitations/redeem.tsx` — `GET` the preview, then branch on `outcome`: `signup` collects
@@ -409,7 +409,7 @@ so doing it once serves all three link shapes.
 
 - [ ] Decide the web host that will carry the association files, and whether one host serves all
       environments or each gets its own.
-- [ ] Publish `assetlinks.json` and `apple-app-site-association` with `com.zeestglobal.chatroute` and
+- [ ] Publish `assetlinks.json` and `apple-app-site-association` with `com.thechatroute.app` and
       both signing fingerprints.
 - [ ] `app.json`: `intentFilters` + `associatedDomains`.
 - [ ] `app/invitations/redeem.tsx` and `lib/invite-link-config.ts` with its contract test.

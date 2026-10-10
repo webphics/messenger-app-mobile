@@ -1,46 +1,46 @@
 {
-  "project_info": {
-    "project_number": "753090717715",
-    "project_id": "messenger-app-508309",
-    "storage_bucket": "messenger-app-508309.firebasestorage.app"
-  },
-  "client": [
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:753090717715:android:6c7f25b56e15be44e2b7e6",
-        "android_client_info": {
-          "package_name": "com.zeestglobal.chatroute"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "753090717715-poksq2l0spou5t49m9edlncptb2157uf.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBzqPxxbFQZNaFuggaVMDezPwVcDQno1O4"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "753090717715-poksq2l0spou5t49m9edlncptb2157uf.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.zeestglobal.chatroute"
-              }
-            }
-          ]
-        }
-      }
-    }
-  ],
-  "configuration_version": "1"
+	"project_info": {
+		"project_number": "225642353646",
+		"project_id": "chat-route-official",
+		"storage_bucket": "chat-route-official.firebasestorage.app"
+	},
+	"client": [
+		{
+			"client_info": {
+				"mobilesdk_app_id": "1:225642353646:android:a1d9a92842e0fdd024b4ff",
+				"android_client_info": {
+					"package_name": "com.thechatroute.app"
+				}
+			},
+			"oauth_client": [
+				{
+					"client_id": "225642353646-s7g54hlj8g0m404u9bb6bpde53g7gk6s.apps.googleusercontent.com",
+					"client_type": 3
+				}
+			],
+			"api_key": [
+				{
+					"current_key": "AIzaSyDxASuCKsvAIvJYCiOQ0q7qD6L0lWgHM-E"
+				}
+			],
+			"services": {
+				"appinvite_service": {
+					"other_platform_oauth_client": [
+						{
+							"client_id": "225642353646-s7g54hlj8g0m404u9bb6bpde53g7gk6s.apps.googleusercontent.com",
+							"client_type": 3
+						},
+						{
+							"client_id": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com",
+							"client_type": 2,
+							"ios_info": {
+								"bundle_id": "com.thechatroute.app"
+							}
+						}
+					]
+				}
+			}
+		}
+	],
+	"configuration_version": "1"
 }

@@ -64,14 +64,14 @@ to open one by hand.
 Google sign-in and push notifications need native modules, and native modules do not run in Expo Go.
 Everything else runs in Expo Go.
 
-| | Expo Go | Development client |
-| --- | --- | --- |
-| Password sign-in | yes | yes |
-| Requesting a magic link | yes | yes |
-| Opening a magic link (`chatroute://`) | no | yes |
-| Google sign-in | **no** | yes |
-| Push notifications | **no** | yes |
-| Everything after sign-in | yes | yes |
+|                                       | Expo Go | Development client |
+| ------------------------------------- | ------- | ------------------ |
+| Password sign-in                      | yes     | yes                |
+| Requesting a magic link               | yes     | yes                |
+| Opening a magic link (`chatroute://`) | no      | yes                |
+| Google sign-in                        | **no**  | yes                |
+| Push notifications                    | **no**  | yes                |
+| Everything after sign-in              | yes     | yes                |
 
 Build one and install it once. After that, `pnpm start` serves it the same way it serves Expo Go.
 
@@ -111,17 +111,17 @@ iOS needs both, and until an iOS client exists the button is disabled there and 
 
 ### Android: the signing certificate fingerprint
 
-Android's OAuth client is identified by the package name (`com.zeestglobal.chatroute`) **plus the
+Android's OAuth client is identified by the package name (`com.thechatroute.app`) **plus the
 SHA-1 of the certificate the build was signed with**. Every fingerprint that signs a build people
 sign in from has to be registered against the Android OAuth client in the Google console. A build
 signed with an unregistered certificate fails Google sign-in with nothing on screen to explain it.
 
 Two certificates sign builds of this app:
 
-| Build | Signed with | SHA-1 |
-| --- | --- | --- |
+| Build                                                                         | Signed with                                                                    | SHA-1                                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------- |
 | CI release, `pnpm build:apk`, `pnpm build:apk:eas`, `pnpm build:apk:emulator` | The Android template debug keystore, committed as `credentials/debug.keystore` | `5E:8F:16:06:2E:A3:CD:2C:4A:0D:54:78:76:BA:A6:F3:8C:AB:F6:25` |
-| EAS cloud builds (`development`, `preview` profiles, `pnpm build:android`) | The keystore EAS holds for this project | Shown by `eas credentials --platform android` |
+| EAS cloud builds (`development`, `preview` profiles, `pnpm build:android`)    | The keystore EAS holds for this project                                        | Shown by `eas credentials --platform android`                 |
 
 The first is already registered. Check the second before blaming anything else when Google sign-in
 fails in a development client.
@@ -145,7 +145,7 @@ selects its without-Firebase path, which writes to `Info.plist` and nothing else
 - **No API change.** The token's audience is still the web client (ADR-0005).
 
 Settle two things before creating the client, because both are expensive to change afterwards. The
-bundle identifier is `com.zeestglobal.chatroute`; once it exists in the Apple Developer portal and an
+bundle identifier is `com.thechatroute.app`; once it exists in the Apple Developer portal and an
 OAuth client, changing it means a new OAuth client, a new Firebase Android app and a new App Store
 record. The iOS client exists (`753090717715-f3aem5m07f9qgpdl37qmempbq42ip9i9`) and is set in every
 `env` block of `eas.json`. It is read at build time, so an installed development client built
@@ -161,8 +161,8 @@ Only Android is wired. APNs needs an Apple Developer account. Nothing in the cli
 Android-specific; iOS needs a key uploaded to Expo and a device build profile.
 
 Dispatch goes through Expo's push service, so the EAS project needs FCM credentials before a
-notification reaches a phone. Run `eas credentials --platform android`, pick *Push Notifications:
-Manage your FCM Api Key*, and upload the service-account key from Firebase project
+notification reaches a phone. Run `eas credentials --platform android`, pick _Push Notifications:
+Manage your FCM Api Key_, and upload the service-account key from Firebase project
 `messenger-app-508309`. Without it a token still reads and still registers; the dispatch fails at
 Expo, with nothing on the phone to say so.
 
@@ -175,17 +175,17 @@ mobile has a transport of its own rather than the browser subscription route, se
 ### CI: the Android Release workflow
 
 `.github/workflows/android-release.yml` builds a release APK when a **version tag** is pushed.
-Pushing to `main` (or any branch) builds nothing. It can also be run by hand from *Actions →
-Android Release → Run workflow*, which takes a *dry run* switch that builds without publishing.
+Pushing to `main` (or any branch) builds nothing. It can also be run by hand from _Actions →
+Android Release → Run workflow_, which takes a _dry run_ switch that builds without publishing.
 
 The tag prefix picks the GitHub environment the build reads its values from, and where the APK goes:
 
-| Tag | Environment | Pre-release |
-| --- | --- | --- |
-| `chatroute-v<version>` | Production | no |
-| `chatroute-development-v<version>` | Development | yes |
-| `chatroute-release-v<version>` | Release | yes |
-| none (manual run from a branch) | Development | nothing is published |
+| Tag                                | Environment | Pre-release          |
+| ---------------------------------- | ----------- | -------------------- |
+| `chatroute-v<version>`             | Production  | no                   |
+| `chatroute-development-v<version>` | Development | yes                  |
+| `chatroute-release-v<version>`     | Release     | yes                  |
+| none (manual run from a branch)    | Development | nothing is published |
 
 Each tag run attaches `chatroute-release.apk` to the GitHub Release for that tag (with generated
 notes) and uploads the same file to the project's builds page on expo.dev. The tag is the version,
@@ -208,7 +208,7 @@ git push --follow-tags
 the `chatroute-vX.Y.Z` tag. Pushing the tag starts the build. For a Development or Release build, run
 `npm version <bump> --tag-version-prefix=chatroute-development-v` (or `chatroute-release-v`) instead.
 
-To retry a failed run, use *Re-run failed jobs* on it, or run the workflow from the tag in the
+To retry a failed run, use _Re-run failed jobs_ on it, or run the workflow from the tag in the
 Actions tab. Re-pushing the same tag replaces the APK on its Release.
 
 The build runs `eas build --platform android --profile production --local` on an `ubuntu-latest`
@@ -224,11 +224,11 @@ There is no iOS build in CI.
 
 Each of the three environments (Production, Development, Release) needs:
 
-| Name | Kind | Notes |
-| --- | --- | --- |
-| `EXPO_PUBLIC_API_URL` | variable | Required. The run fails in its first minute without it. |
+| Name                               | Kind     | Notes                                                                   |
+| ---------------------------------- | -------- | ----------------------------------------------------------------------- |
+| `EXPO_PUBLIC_API_URL`              | variable | Required. The run fails in its first minute without it.                 |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | variable | Optional. Without it the build succeeds and Google sign-in is disabled. |
-| `EXPO_TOKEN` | secret | From *expo.dev → Account Settings → Access Tokens*. |
+| `EXPO_TOKEN`                       | secret   | From _expo.dev → Account Settings → Access Tokens_.                     |
 
 ```bash
 gh variable set EXPO_PUBLIC_API_URL --env Production
@@ -246,12 +246,12 @@ the shipped bundle, so anyone holding the APK can read them anyway.
 
 ### Local builds
 
-| Command | Where it builds | Output |
-| --- | --- | --- |
-| `pnpm build:apk` | Gradle on this machine. Windows, needs JDK 17 and the Android SDK. | `dist/chatroute-release.apk`, `arm64-v8a` + `x86_64` |
-| `pnpm build:apk:eas` | EAS local build, same as CI. Builds `HEAD`, not the working tree. | `dist/chatroute-release.apk`, `arm64-v8a` |
-| `pnpm build:apk:emulator` | EAS local build, `emulator` profile | `dist/chatroute-emulator.apk`, `arm64-v8a` + `x86_64` |
-| `pnpm build:android` | EAS cloud, `preview` profile. Uses a build credit. | APK on the EAS install page |
+| Command                   | Where it builds                                                    | Output                                                |
+| ------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------- |
+| `pnpm build:apk`          | Gradle on this machine. Windows, needs JDK 17 and the Android SDK. | `dist/chatroute-release.apk`, `arm64-v8a` + `x86_64`  |
+| `pnpm build:apk:eas`      | EAS local build, same as CI. Builds `HEAD`, not the working tree.  | `dist/chatroute-release.apk`, `arm64-v8a`             |
+| `pnpm build:apk:emulator` | EAS local build, `emulator` profile                                | `dist/chatroute-emulator.apk`, `arm64-v8a` + `x86_64` |
+| `pnpm build:android`      | EAS cloud, `preview` profile. Uses a build credit.                 | APK on the EAS install page                           |
 
 An `arm64-v8a`-only APK crashes on launch on an x86_64 emulator. Use `pnpm build:apk` or
 `pnpm build:apk:emulator` for an emulator. Set `ANDROID_ABIS` to override the ABIs `pnpm build:apk`
