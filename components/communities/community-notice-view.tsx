@@ -1,7 +1,7 @@
 import { ActivityIndicator, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 
-import { CloudOff, Users } from "@/components/icons";
+import { CloudOff, Users, type IconComponent } from "@/components/icons";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { settleEnter } from "@/lib/motion-enter";
@@ -31,6 +31,8 @@ type CommunityNoticeViewProps = {
   /** A read that did not land, rather than a settled answer about this person. */
   failed: boolean;
   onRetry?: () => void;
+  /** What a settled answer is drawn with. People, unless the list is not of people. */
+  icon?: IconComponent;
 };
 
 export function CommunityNoticeView({
@@ -38,6 +40,7 @@ export function CommunityNoticeView({
   hint,
   failed,
   onRetry,
+  icon: Icon = Users,
 }: CommunityNoticeViewProps) {
   const reduceMotion = useReducedMotion();
   return (
@@ -54,7 +57,7 @@ export function CommunityNoticeView({
         {failed ? (
           <CloudOff color={colors.danger} size={26} />
         ) : (
-          <Users color={colors.primary} size={26} />
+          <Icon color={colors.primary} size={26} />
         )}
       </View>
       <Text variant="title" className="mt-4 text-ink">

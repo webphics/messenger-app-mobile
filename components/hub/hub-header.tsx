@@ -1,14 +1,19 @@
 import { router, type Href } from "expo-router";
-import { Settings } from "@/components/icons";
+import { Bell, Settings } from "@/components/icons";
 import { Image, View } from "react-native";
 
 // import { Avatar, AvatarFallback } from "@/components/ui/avatar"; // hidden with the agent stack
 import { TactilePressable } from "@/components/ui/tactile-pressable";
-// import { Text } from "@/components/ui/text"; // hidden with the agent stack
+import { Text } from "@/components/ui/text";
 // import { initials } from "@/lib/display"; // hidden with the agent stack
 // import { getSession } from "@/lib/session"; // hidden with the agent stack
 // import { PEOPLE } from "@/lib/mock-data"; // hidden with the agent stack
+import { useNotificationBadge } from "@/lib/notification-badge";
+import { unreadBadgeLabel } from "@/lib/notification-feed";
 import { colors } from "@/lib/tokens";
+
+/** The feed, which every role reaches the same way. */
+const NOTIFICATIONS_HREF = "/notifications" as Href;
 
 /** Intrinsic ratios of `brand-mark.png` (600x447) and `brand-wordmark.png` (1200x196). */
 const BRAND_MARK_ASPECT = 600 / 447;
@@ -19,6 +24,9 @@ type HubHeaderProps = {
 };
 
 export function HubHeader({ settingsHref }: HubHeaderProps) {
+  const { unreadCount } = useNotificationBadge();
+  const badge = unreadBadgeLabel(unreadCount);
+
   // Hidden with the agent stack below — it read `PEOPLE` from `lib/mock-data`.
   // const showAgentStack = getSession().role !== "customer";
   // const agents = showAgentStack
@@ -48,7 +56,7 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
         />
       </View>
 
-      {/* Right Actions: Settings */}
+      {/* Right Actions: Notifications, Settings */}
       <View className="flex-row items-center gap-3">
         {/* The "agents online" avatar stack is hidden for now. It was drawn from
             `PEOPLE` in `lib/mock-data` rather than from anything the API knows,
@@ -72,6 +80,28 @@ export function HubHeader({ settingsHref }: HubHeaderProps) {
             ))}
           </View>
         ) : null} */}
+        {/* The bell, rather than a fifth slot on the Tab capsule: the capsule
+            is where somebody works, and this is where they catch up. The count
+            is in the accessible name because a pressable collapses what it
+            contains, so a badge drawn inside it is a number nobody can reach. */}
+        <TactilePressable
+          accessibilityRole="button"
+          accessibilityLabel={badge ? `Notifications, ${badge} unread` : "Notifications"}
+          onPress={() => router.push(NOTIFICATIONS_HREF)}
+          className="size-11 items-center justify-center rounded-full bg-surface border border-line/60 shadow-sm shadow-black/5"
+        >
+          <Bell color={colors.ink} size={20} />
+          {badge ? (
+            <View
+              pointerEvents="none"
+              className="absolute -right-1 -top-1 min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-bg bg-primary px-1"
+            >
+              <Text variant="label" className="text-[10px] font-bold tabular-nums text-primary-foreground">
+                {badge}
+              </Text>
+            </View>
+          ) : null}
+        </TactilePressable>
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Settings"

@@ -1,5 +1,5 @@
 import { asRecord } from '@/lib/api-envelope'
-import type { NotificationSettings } from '@/lib/types'
+import type { AppNotification, NotificationSettings } from '@/lib/types'
 
 /**
  * Reading the notification settings document.
@@ -34,4 +34,58 @@ export function parseNotificationSettings(value: unknown): NotificationSettings 
     mutedConversationIds: ids(record.mutedConversationIds),
     postOrganizationIds: ids(record.postOrganizationIds),
   }
+}
+
+/** A field that is a usable id, or null — an empty string is not one. */
+function optionalId(value: unknown): string | null {
+  return typeof value === 'string' && value !== '' ? value : null
+}
+
+/**
+ * One row of the feed, or null when it cannot be drawn.
+ *
+ * The id, the kind and the time are what a row cannot do without — it is keyed,
+ * routed and grouped on them — so a row missing any of those is dropped rather
+ * than drawn wrong. A title or body that did not arrive is an empty line, and a
+ * reference that did not arrive opens nothing, which is the quiet answer again.
+ */
+export function parseNotification(value: unknown): AppNotification | null {
+  const record = asRecord(value)
+  if (!record) return null
+
+  const id = optionalId(record.id)
+  const kind = optionalId(record.kind)
+  const createdAt = typeof record.createdAt === 'string' ? record.createdAt : null
+  if (!id || !kind || !createdAt || Number.isNaN(Date.parse(createdAt))) return null
+
+  return {
+    id,
+    kind,
+    title: typeof record.title === 'string' ? record.title : '',
+    body: typeof record.body === 'string' ? record.body : '',
+    conversationId: optionalId(record.conversationId),
+    broadcastId: optionalId(record.broadcastId),
+    wallPostId: optionalId(record.wallPostId),
+    readAt: typeof record.readAt === 'string' && record.readAt !== '' ? record.readAt : null,
+    createdAt,
+  }
+}
+
+/**
+ * A page of the feed. Not a list at all is `null`, so a body this build cannot
+ * read is `malformed` rather than an empty feed; rows inside it that cannot be
+ * read are dropped one at a time.
+ */
+export function parseNotifications(value: unknown): AppNotification[] | null {
+  if (!Array.isArray(value)) return null
+  return value.flatMap((item) => {
+    const notification = parseNotification(item)
+    return notification ? [notification] : []
+  })
+}
+
+/** `{ count }`, as the unread count and both mark-read routes answer. */
+export function parseUnreadCount(value: unknown): number | null {
+  const count = asRecord(value)?.count
+  return typeof count === 'number' && Number.isInteger(count) && count >= 0 ? count : null
 }

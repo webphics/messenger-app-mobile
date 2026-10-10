@@ -1060,6 +1060,25 @@ export type NotificationSettings = {
 }
 
 /**
+ * One row of the in-app notification feed, as `GET /notifications` answers it.
+ *
+ * `kind` is a string rather than a closed union: the API adds kinds, and a row
+ * of a kind this build has never heard of is still a row somebody has not read.
+ * It draws with its own title and body and opens whatever thread it names.
+ */
+export type AppNotification = {
+  id: string
+  kind: string
+  title: string
+  body: string
+  conversationId: string | null
+  broadcastId: string | null
+  wallPostId: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+/**
  * One session on this account, as `GET /sessions` answers it.
  *
  * The sessions screen's shape rather than the API's whole row. What is dropped

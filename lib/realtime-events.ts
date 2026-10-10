@@ -5,7 +5,8 @@ import {
   parseStaffDirectoryUser,
 } from '@/lib/conversation-parse'
 import type { Reassignment, ReassignmentReason } from '@/lib/conversation-list'
-import type { Conversation, Message } from '@/lib/types'
+import { parseNotification, parseUnreadCount } from '@/lib/notification-parse'
+import type { AppNotification, Conversation, Message } from '@/lib/types'
 
 /**
  * What the API says over the socket, read into this app's types.
@@ -50,6 +51,12 @@ export const REALTIME_EVENTS = {
    * see `parseGroupJoinRequestAnswered`.
    */
   notificationCreated: 'notification.created',
+  /**
+   * Rows of this person's feed were marked read — here, on another of their
+   * devices, or in a browser. Carries the ids that flipped and the unread count
+   * as it now stands.
+   */
+  notificationRead: 'notification.read',
   /**
    * Somebody else added this person to an organization or removed them from
    * one. Carries only the organization id: what this app shows for it (the
@@ -274,4 +281,42 @@ export function createCountedMessages(limit: number = REMEMBERED_MESSAGES) {
       return true
     },
   }
+}
+
+/** The unread count a notification event carries, or null when it carries none this build can read. */
+function unreadCountOf(record: Record<string, unknown> | null): number | null {
+  return parseUnreadCount({ count: record?.unreadCount })
+}
+
+/**
+ * A `notification.created` payload read whole, for the feed and the bell.
+ *
+ * The row and the count are read separately and either may be missing: a row
+ * this build cannot draw still moves the bell, and a count that did not arrive
+ * leaves the bell where it was rather than at zero.
+ */
+export function parseNotificationCreated(
+  payload: unknown,
+): { notification: AppNotification | null; unreadCount: number | null } | null {
+  const record = asRecord(payload)
+  if (!record) return null
+  const notification = parseNotification(record.notification)
+  const unreadCount = unreadCountOf(record)
+  if (!notification && unreadCount === null) return null
+  return { notification, unreadCount }
+}
+
+/** A `notification.read` payload: which rows flipped, and the count as it now stands. */
+export function parseNotificationRead(
+  payload: unknown,
+): { notificationIds: string[]; unreadCount: number | null } | null {
+  const record = asRecord(payload)
+  if (!record) return null
+  const raw = record.notificationIds
+  const notificationIds = Array.isArray(raw)
+    ? raw.filter((id): id is string => typeof id === 'string' && id !== '')
+    : []
+  const unreadCount = unreadCountOf(record)
+  if (notificationIds.length === 0 && unreadCount === null) return null
+  return { notificationIds, unreadCount }
 }

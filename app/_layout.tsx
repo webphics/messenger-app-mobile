@@ -36,6 +36,7 @@ import { PushRegistration } from "@/components/push/push-registration";
 import { AuthProvider } from "@/lib/auth-context";
 import { ConversationInboxProvider } from "@/lib/conversation-inbox";
 import { InAppBannerProvider } from "@/lib/in-app-banner";
+import { NotificationBadgeProvider } from "@/lib/notification-badge";
 import { PushIntentProvider } from "@/lib/push-intent";
 import { RealtimeProvider } from "@/lib/realtime-context";
 import { ROLE_GROUP_ACCESS, mayEnter } from "@/lib/route-access";
@@ -129,7 +130,12 @@ export default function RootLayout() {
                 — which is to say to none of them. It draws over the Stack
                 rather than beside it; see `lib/in-app-banner`. */}
               <InAppBannerProvider>
-                <RootStack animation={stackAnimation} />
+                {/* Inside the socket, which keeps the count current, and
+                  above the navigator, because the bell on the Hub and the
+                  Notifications screen both move it and must agree. */}
+                <NotificationBadgeProvider>
+                  <RootStack animation={stackAnimation} />
+                </NotificationBadgeProvider>
               </InAppBannerProvider>
             </PushIntentProvider>
           </ConversationInboxProvider>
@@ -231,6 +237,16 @@ function RootStack({
         that route sits here rather than under a role's tabs. */}
       <Stack.Screen
         name="wall/saved"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* The notification feed, reached from the bell on the Hub. Beside
+        Saved and the account screens rather than inside a role group:
+        every role has the same feed, scoped by the API to the caller. */}
+      <Stack.Screen
+        name="notifications"
         options={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },

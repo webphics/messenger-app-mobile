@@ -18,12 +18,14 @@ import {
   parseConversationUpdated,
   parseGroupJoinRequestAnswered,
   parseMessageCreated,
+  parseNotificationCreated,
+  parseNotificationRead,
   parsePostCreated,
   parsePostRemoved,
   parsePostUpdated,
   REALTIME_EVENTS,
 } from '@/lib/realtime-events'
-import type { Conversation, Message } from '@/lib/types'
+import type { AppNotification, Conversation, Message } from '@/lib/types'
 
 /**
  * The socket, and what the screens above it hear from it.
@@ -78,6 +80,14 @@ export type RealtimeEvent =
    * it nothing to rule itself out with.
    */
   | { kind: 'group-join-answered'; groupId: string | null }
+  /**
+   * A row written to this person's notification feed. `notification` is null
+   * for a row this build cannot draw, and `unreadCount` for an event that did
+   * not say — the bell keeps what it had rather than reading zero.
+   */
+  | { kind: 'notification-created'; notification: AppNotification | null; unreadCount: number | null }
+  /** Rows of the feed marked read, wherever that happened. */
+  | { kind: 'notification-read'; notificationIds: string[]; unreadCount: number | null }
   /**
    * The connection came back after dropping. Whatever was emitted while it was
    * down was emitted to nobody, so what is held is unverifiable and has to be
@@ -246,6 +256,14 @@ function useRealtimeConnection(): RealtimeValue {
     socket.on(REALTIME_EVENTS.notificationCreated, (payload: unknown) => {
       const answered = parseGroupJoinRequestAnswered(payload)
       if (answered) emit({ kind: 'group-join-answered', groupId: answered.groupId })
+
+      const created = parseNotificationCreated(payload)
+      if (created) emit({ kind: 'notification-created', ...created })
+    })
+
+    socket.on(REALTIME_EVENTS.notificationRead, (payload: unknown) => {
+      const read = parseNotificationRead(payload)
+      if (read) emit({ kind: 'notification-read', ...read })
     })
 
     // A membership changed on somebody else's device (an admin placing this

@@ -161,6 +161,11 @@ function applyToList(
   // approval landing from elsewhere has no payload here to build one from, so
   // it waits for the next ordinary fetch to pick it up.
   if (event.kind === 'group-join-answered') return conversations
+  // The feed's rows are the bell's and the Notifications screen's. A Message a
+  // row is about arrives on its own event, which is what moves the list.
+  if (event.kind === 'notification-created' || event.kind === 'notification-read') {
+    return conversations
+  }
   if (!viewerId) return conversations
   return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }

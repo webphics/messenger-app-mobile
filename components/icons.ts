@@ -25,6 +25,7 @@ export { default as AlertCircle } from "lucide-react-native/icons/circle-alert";
 export { default as Archive } from "lucide-react-native/icons/archive";
 export { default as ArrowLeftRight } from "lucide-react-native/icons/arrow-left-right";
 export { default as Ban } from "lucide-react-native/icons/ban";
+export { default as Bell } from "lucide-react-native/icons/bell";
 export { default as BellOff } from "lucide-react-native/icons/bell-off";
 export { default as Bookmark } from "lucide-react-native/icons/bookmark";
 export { default as BookOpen } from "lucide-react-native/icons/book-open";
