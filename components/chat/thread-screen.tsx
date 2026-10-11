@@ -20,6 +20,7 @@ import { MessageHistorySheet } from '@/components/chat/message-history-sheet'
 import { ThreadDayPill } from '@/components/chat/thread-day-pill'
 import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
 import { ThreadHeader } from '@/components/chat/thread-header'
+import { TypingIndicator } from '@/components/chat/typing-indicator'
 import { InScreenHeader } from '@/components/in-screen-header'
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
@@ -36,6 +37,7 @@ import {
   type WayOutButton,
 } from '@/lib/conversation-access'
 import type { ApiFailure } from '@/lib/conversation-api'
+import type { Typist } from '@/lib/realtime-events'
 import { conversationTitle } from '@/lib/conversation-title'
 import {
   isLocalId,
@@ -169,6 +171,12 @@ type ThreadScreenProps = {
   assigning?: boolean
   /** What the API said when the last attempt was refused. */
   assignError?: string | null
+  /** Who else is composing here, as the API reported it for this viewer. */
+  typists?: Typist[]
+  /** A draft with words in it changed. The caller throttles it into a heartbeat. */
+  onTyping?: () => void
+  /** The draft emptied or went out. */
+  onStopTyping?: () => void
 }
 
 /**
@@ -402,6 +410,9 @@ export function ThreadScreen({
   onAssign,
   assigning = false,
   assignError = null,
+  typists = [],
+  onTyping,
+  onStopTyping,
 }: ThreadScreenProps) {
   const keyboardInset = useKeyboardInset()
   const hostRef = useRef<View>(null)
@@ -947,6 +958,16 @@ export function ThreadScreen({
    * whether to clear: a refused file stays staged beside the caption it had, so
    * the person can drop it and keep what they wrote.
    */
+  /**
+   * Every change to the draft, which is also what tells the room this person is
+   * writing. Whitespace is not writing: a draft of spaces is an empty one.
+   */
+  function changeDraft(text: string) {
+    setDraft(text)
+    if (text.trim()) onTyping?.()
+    else onStopTyping?.()
+  }
+
   function send(payload: ComposerSendPayload): boolean {
     const body = payload.body.trim()
     const wallPost = pendingPost.wallPost
@@ -966,6 +987,9 @@ export function ThreadScreen({
     }
 
     setRefusal(null)
+    // The words have gone, so the bubble on everyone else's screen goes with
+    // them rather than standing until the server's expiry.
+    onStopTyping?.()
     const quoted = replyTo
     setReplyTo(null)
     // MVCP keeps the prior newest row fixed; after layout, pin offset 0 so the
@@ -1166,6 +1190,12 @@ export function ThreadScreen({
         ) : null}
         <ThreadPlaceholder notice={pageNotice} onRetry={onRetry} />
       </View>
+      {/*
+        Above the composer rather than the newest row of the thread: it sits by
+        the field the typing is happening in, in the same place whether the
+        thread holds a thousand messages or none, and it never moves the list.
+      */}
+      <TypingIndicator typists={typists} isGroup={conversation.type === 'group'} />
       {pageNotice.kind === 'stale' ? (
         <FailureStrip message={pageNotice.message} onDismiss={onDismissFailure} />
       ) : null}
@@ -1181,7 +1211,7 @@ export function ThreadScreen({
       ) : (
         <Composer
           value={draft}
-          onChangeText={setDraft}
+          onChangeText={changeDraft}
           onSend={send}
           replyTo={replyQuote}
           onCancelReply={() => setReplyTo(null)}

@@ -166,6 +166,8 @@ function applyToList(
   if (event.kind === 'notification-created' || event.kind === 'notification-read') {
     return conversations
   }
+  // Who is composing is drawn by the open thread alone and never moves a row.
+  if (event.kind === 'typing') return conversations
   if (!viewerId) return conversations
   return withIncomingMessage(conversations, event.conversationId, event.message, viewerId)
 }
@@ -472,6 +474,9 @@ function useConversationInboxState(): ConversationInboxView {
     // A message already counted still reaches the thread, which merges the
     // newer copy over the older by id; what it must not do is count twice.
     if (event.kind === 'message' && !counted.current?.isFirst(event.message.id)) return
+    // The busiest event on the socket and never about the list, so it does not
+    // even queue an update that would answer the same rows.
+    if (event.kind === 'typing') return
 
     setInbox((current) => {
       if (current.status !== 'ready') return current

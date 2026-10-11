@@ -7,6 +7,8 @@ import {
   useRef,
   type ReactNode,
 } from 'react'
+import { AppState } from 'react-native'
+import type { Socket } from 'socket.io-client'
 
 import { getSessionCookie } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
@@ -23,8 +25,11 @@ import {
   parsePostCreated,
   parsePostRemoved,
   parsePostUpdated,
+  parseTypingUpdated,
   REALTIME_EVENTS,
+  type Typist,
 } from '@/lib/realtime-events'
+import { shouldSendTypingStart } from '@/lib/typing'
 import type { AppNotification, Conversation, Message } from '@/lib/types'
 
 /**
@@ -37,7 +42,7 @@ import type { AppNotification, Conversation, Message } from '@/lib/types'
  * conversation's room; nothing listens on it, because the global connection
  * already receives the same events through the signed-in person's own room.
  * Room membership is what the server checks before it accepts a typing signal,
- * so the seam is here before the feature that needs it.
+ * so the typing this device sends goes out on that second connection.
  *
  * Events reach screens through one subscription rather than through a socket
  * each: the list and the open thread both want `message.created`, and two
@@ -88,6 +93,11 @@ export type RealtimeEvent =
   | { kind: 'notification-created'; notification: AppNotification | null; unreadCount: number | null }
   /** Rows of the feed marked read, wherever that happened. */
   | { kind: 'notification-read'; notificationIds: string[]; unreadCount: number | null }
+  /**
+   * Who is composing in one conversation, as the complete current list. An
+   * empty list is how a stop arrives. See `parseTypingUpdated`.
+   */
+  | { kind: 'typing'; conversationId: string; typists: Typist[] }
   /**
    * The connection came back after dropping. Whatever was emitted while it was
    * down was emitted to nobody, so what is held is unverifiable and has to be
@@ -140,16 +150,51 @@ export function useRealtimeEvents(listener: RealtimeListener): void {
   useEffect(() => subscribe((event) => latest.current(event)), [subscribe])
 }
 
+export type ConversationTyping = {
+  /** Call on every change to a draft that still has words in it. Throttled here. */
+  notifyTyping: () => void
+  /** Call when the draft empties or is sent. */
+  stopTyping: () => void
+}
+
 /**
- * Put this device in one conversation's room while the thread is open.
+ * Put this device in one conversation's room while the thread is open, and
+ * answer the two calls that tell the room this person is composing.
  *
  * The join is re-emitted on every `connect` rather than once at creation: a
  * reconnect gives the socket a new identity server-side, in no room at all, and
  * a one-shot join would leave it that way for the rest of the session. Joining a
  * room already held is a no-op, so re-emitting costs nothing.
+ *
+ * Typing goes out on this connection and never the global one, because the
+ * server accepts a typing signal only from a socket already in the room.
+ * Keystrokes are throttled into a heartbeat (`shouldSendTypingStart`) rather
+ * than driven by a timer, so somebody who stops typing simply stops sending and
+ * the server's own expiry takes the bubble down.
  */
-export function useConversationRoom(conversationId: string | null): void {
+export function useConversationRoom(conversationId: string | null): ConversationTyping {
   const { signedIn } = useRealtime()
+  const socketRef = useRef<Socket | null>(null)
+  /** When the last `typing.start` went out, or zero when none has since a stop. */
+  const lastSentRef = useRef(0)
+
+  const stopTyping = useCallback(() => {
+    const socket = socketRef.current
+    // Nothing was said, so there is nothing to take back: an emptied draft fires
+    // this on every keystroke that leaves it empty.
+    if (!socket || !conversationId || lastSentRef.current === 0) return
+    lastSentRef.current = 0
+    socket.emit(REALTIME_EVENTS.typingStop, { conversationId })
+  }, [conversationId])
+
+  const notifyTyping = useCallback(() => {
+    const socket = socketRef.current
+    if (!socket?.connected || !conversationId) return
+    const now = Date.now()
+    if (!shouldSendTypingStart(lastSentRef.current, now)) return
+    lastSentRef.current = now
+    socket.emit(REALTIME_EVENTS.typingStart, { conversationId })
+  }, [conversationId])
 
   useEffect(() => {
     if (!signedIn || !conversationId) return
@@ -158,19 +203,42 @@ export function useConversationRoom(conversationId: string | null): void {
     if (!cookie) return
 
     const socket = connectRealtime(cookie, { forceNew: true })
+    socketRef.current = socket
+    lastSentRef.current = 0
     socket.on('connect', () => {
+      // A new server-side identity holds no typing, so the next keystroke must
+      // start again rather than be throttled as a heartbeat of nothing.
+      lastSentRef.current = 0
       socket.emit(REALTIME_EVENTS.conversationJoin, { conversationId })
     })
 
+    // The socket is not torn down when the app goes behind something, so a
+    // bubble would otherwise stand for the five seconds the server takes to
+    // expire it while the phone sits in a pocket.
+    const appState = AppState.addEventListener('change', (next) => {
+      if (next === 'active' || lastSentRef.current === 0) return
+      lastSentRef.current = 0
+      socket.emit(REALTIME_EVENTS.typingStop, { conversationId })
+    })
+
     return () => {
+      appState.remove()
       // Told rather than left to be inferred from the disconnect: the server
-      // drops the room with the socket either way, and saying so first makes it
-      // immediate instead of dependent on how soon the drop is noticed.
+      // drops the room and the typing with the socket either way, and saying so
+      // first makes both immediate instead of dependent on how soon the drop is
+      // noticed.
+      if (lastSentRef.current !== 0) {
+        socket.emit(REALTIME_EVENTS.typingStop, { conversationId })
+      }
       socket.emit(REALTIME_EVENTS.conversationLeave, { conversationId })
       socket.removeAllListeners()
       socket.disconnect()
+      if (socketRef.current === socket) socketRef.current = null
+      lastSentRef.current = 0
     }
   }, [signedIn, conversationId])
+
+  return useMemo(() => ({ notifyTyping, stopTyping }), [notifyTyping, stopTyping])
 }
 
 function useRealtimeConnection(): RealtimeValue {
@@ -264,6 +332,11 @@ function useRealtimeConnection(): RealtimeValue {
     socket.on(REALTIME_EVENTS.notificationRead, (payload: unknown) => {
       const read = parseNotificationRead(payload)
       if (read) emit({ kind: 'notification-read', ...read })
+    })
+
+    socket.on(REALTIME_EVENTS.typingUpdated, (payload: unknown) => {
+      const event = parseTypingUpdated(payload)
+      if (event) emit({ kind: 'typing', ...event })
     })
 
     // A membership changed on somebody else's device (an admin placing this

@@ -63,6 +63,20 @@ export const REALTIME_EVENTS = {
    * Support DM rows, the Onboarding thread, the Wall) is re-read from REST.
    */
   membershipChanged: 'membership.changed',
+  /**
+   * Outbound, re-sent as a heartbeat while somebody is composing. The server
+   * accepts it only from a socket already in that conversation's room, which is
+   * why it goes out on the thread's own connection and never the global one.
+   */
+  typingStart: 'typing.start',
+  /** Outbound. Optional: a start expires on its own; this makes the stop immediate. */
+  typingStop: 'typing.stop',
+  /**
+   * Who is composing in one conversation, as the complete current list from this
+   * viewer's side. A stop arrives as a shorter or empty list, never as an event
+   * of its own. See `parseTypingUpdated`.
+   */
+  typingUpdated: 'typing.updated',
 } as const
 
 export type MessageCreated = {
@@ -319,4 +333,44 @@ export function parseNotificationRead(
   const unreadCount = unreadCountOf(record)
   if (notificationIds.length === 0 && unreadCount === null) return null
   return { notificationIds, unreadCount }
+}
+
+/** Somebody composing, as this viewer is allowed to see them. */
+export type Typist = {
+  id: string
+  name: string
+}
+
+/**
+ * A `typing.updated` payload: the complete set of people composing in one
+ * conversation, from this viewer's side.
+ *
+ * The API has already done the disclosure work. The viewer is filtered out of
+ * their own copy, a Customer in a Support DM is sent a single "Support" entry
+ * rather than any staff name, and a Customer in a Group sees Staff as the
+ * company persona. So the list is drawn as it arrives and nothing here decides
+ * who may see whom.
+ *
+ * An entry this build cannot read is dropped rather than failing the whole
+ * list: one bad name should cost one name, not the indicator.
+ */
+export function parseTypingUpdated(
+  payload: unknown,
+): { conversationId: string; typists: Typist[] } | null {
+  const record = asRecord(payload)
+  if (!record) return null
+
+  const conversationId = record.conversationId
+  if (typeof conversationId !== 'string' || conversationId === '') return null
+  if (!Array.isArray(record.typists)) return null
+
+  const typists: Typist[] = []
+  for (const entry of record.typists) {
+    const typist = asRecord(entry)
+    if (!typist) continue
+    const { id, name } = typist
+    if (typeof id !== 'string' || id === '' || typeof name !== 'string') continue
+    typists.push({ id, name })
+  }
+  return { conversationId, typists }
 }

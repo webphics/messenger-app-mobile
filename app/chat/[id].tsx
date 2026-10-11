@@ -27,6 +27,8 @@ import {
   useRealtimeEvents,
   type RealtimeEvent,
 } from "@/lib/realtime-context";
+import type { Typist } from "@/lib/realtime-events";
+import { sameTypists } from "@/lib/typing";
 import { getSession, getSessionUser } from "@/lib/session";
 import { useConversationAssignment } from "@/lib/use-conversation-assignment";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
@@ -42,6 +44,9 @@ import type { Conversation, UserRole } from "@/lib/types";
  * `findOffersConversation`.
  */
 const OFFERS_ALIAS = "offers";
+
+/** One empty list, so a thread nobody is typing in keeps the same prop between renders. */
+const NO_TYPISTS: Typist[] = [];
 
 function useRouteId(): string | undefined {
   const local = useLocalSearchParams<{ id?: string | string[] }>().id;
@@ -274,8 +279,38 @@ function ConversationScreen({
     markRead(openedId);
   });
 
-  // Puts this device in the conversation's room for as long as the thread is up.
-  useConversationRoom(openedId);
+  /**
+   * Who is composing in the open thread, keyed to it so a list held for one
+   * thread is never drawn in the next.
+   *
+   * Held here rather than in the inbox: it is ephemeral, never persisted, and
+   * arrives far more often than anything the list keeps, so writing it there
+   * would re-render every row for a bubble only this screen draws. A reconnect
+   * drops it, because whatever was held from before the drop is unverifiable
+   * and whoever is still typing re-asserts within a heartbeat.
+   */
+  const [typing, setTyping] = useState<{ conversationId: string; typists: Typist[] } | null>(
+    null,
+  );
+  useRealtimeEvents((event: RealtimeEvent) => {
+    if (event.kind === "resync") {
+      setTyping(null);
+      return;
+    }
+    if (event.kind !== "typing" || event.conversationId !== openedId) return;
+    setTyping((current) =>
+      current?.conversationId === event.conversationId &&
+      sameTypists(current.typists, event.typists)
+        ? current
+        : { conversationId: event.conversationId, typists: event.typists },
+    );
+  });
+  const typists =
+    typing && typing.conversationId === openedId ? typing.typists : NO_TYPISTS;
+
+  // Puts this device in the conversation's room for as long as the thread is up,
+  // and is the connection this person's own typing goes out on.
+  const { notifyTyping, stopTyping } = useConversationRoom(openedId);
 
   /**
    * And says so, so that a Message already arriving as a bubble does not also
@@ -339,6 +374,9 @@ function ConversationScreen({
       onAssign={assignment.assign}
       assigning={assignment.assigning}
       assignError={assignment.error}
+      typists={typists}
+      onTyping={notifyTyping}
+      onStopTyping={stopTyping}
     />
   );
 }
