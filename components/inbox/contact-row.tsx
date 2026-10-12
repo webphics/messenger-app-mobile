@@ -1,4 +1,4 @@
-import { Building2, ChevronRight, MessageCircle } from "@/components/icons";
+import { Building2, ChevronRight, Headphones, MessageCircle } from "@/components/icons";
 import { memo, useCallback } from "react";
 import { ActivityIndicator, View } from "react-native";
 
@@ -9,6 +9,7 @@ import {
   contactRowLabel,
   contactSubtitle,
   type ContactIntent,
+  type ContactPick,
 } from "@/lib/contact-directory";
 import { initials } from "@/lib/display";
 import { colors } from "@/lib/tokens";
@@ -20,7 +21,8 @@ import type { Contact } from "@/lib/types";
  * Shared by the People tab and the compose sheet, because they are the same
  * row: `lib/contact-directory` decides what a tap means and this only wears
  * the answer. A row with a thread behind it opens it, one without starts one,
- * one with several organizations to choose between opens the choice inline,
+ * one with several organizations to choose between opens the choice inline
+ * (for an Admin messaging a Customer, always, with General Support offered too),
  * and one a tap cannot act on is disabled with the reason on it rather than
  * failing after a round trip.
  */
@@ -29,8 +31,8 @@ type ContactRowProps = {
   contact: Contact;
   intent: ContactIntent;
   onPress: (contact: Contact) => void;
-  /** Chosen from the organizations this row expanded to offer. */
-  onPickOrganization: (contact: Contact, organizationId: string) => void;
+  /** Chosen from the organizations, or General Support, this row expanded to offer. */
+  onPickOrganization: (contact: Contact, pick: ContactPick) => void;
   /** Set while this row's request is out, so a second tap cannot start a second one. */
   busy: boolean;
   /** Whether this row is showing the organizations to choose between. */
@@ -132,21 +134,48 @@ export const ContactRow = memo(function ContactRow({
       {expanded && intent.kind === "choose" ? (
         <View accessibilityLiveRegion="polite" className="mt-1.5 gap-1.5 pl-6">
           <Text variant="label" className="text-muted">
-            Which organization?
+            {intent.generalSupport ? "Which conversation?" : "Which organization?"}
           </Text>
+          {intent.generalSupport && intent.organizations.length === 0 ? (
+            <Text variant="meta" className="text-muted">
+              Not in any organization yet.
+            </Text>
+          ) : null}
           {intent.organizations.map((organization) => (
             <TactilePressable
               key={organization.id}
               accessibilityRole="button"
               accessibilityLabel={`Start in ${organization.name}`}
-              onPress={() => onPickOrganization(contact, organization.id)}
-              className="min-h-11 justify-center rounded-2xl border border-line/70 bg-surface px-3.5"
+              onPress={() =>
+                onPickOrganization(contact, { kind: "organization", id: organization.id })
+              }
+              className="min-h-11 flex-row items-center gap-2.5 rounded-2xl border border-line/70 bg-surface px-3.5"
             >
-              <Text variant="label" className="text-ink">
+              <Building2 color={colors.inkSoft} size={16} />
+              <Text variant="label" className="min-w-0 flex-1 text-ink" numberOfLines={1}>
                 {organization.name}
               </Text>
             </TactilePressable>
           ))}
+          {intent.generalSupport ? (
+            <TactilePressable
+              accessibilityRole="button"
+              accessibilityLabel="Start in General Support"
+              accessibilityHint="Their conversation with the company as a whole. Only admins see it."
+              onPress={() => onPickOrganization(contact, { kind: "general-support" })}
+              className="min-h-11 flex-row items-center gap-2.5 rounded-2xl border border-primary/25 bg-primary-soft/60 px-3.5 py-2"
+            >
+              <Headphones color={colors.primary} size={16} />
+              <View className="min-w-0 flex-1">
+                <Text variant="label" className="text-ink">
+                  General Support
+                </Text>
+                <Text variant="meta" className="text-muted">
+                  Only admins see it
+                </Text>
+              </View>
+            </TactilePressable>
+          ) : null}
         </View>
       ) : null}
     </View>

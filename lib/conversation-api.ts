@@ -1,4 +1,5 @@
 import { authenticatedRequest } from '@/lib/auth-service'
+import type { ContactPick } from '@/lib/contact-directory'
 import { acknowledged, query, readOutcome } from '@/lib/api-result'
 import type { ApiResult } from '@/lib/api-result'
 import {
@@ -111,14 +112,18 @@ export async function createStaffDm(
  * `message_customers`. The staff side of `ensureSupportConversation`, and the call the web
  * client makes for the same thing. `organizationId` is needed only when the two share more than
  * one organization; the schema is `.strict()`, so an undefined value has to be an absent key.
+ * `generalSupport` opens the Customer's General Support instead, which only an Admin may do.
  */
 export async function startCustomerConversation(
   customerId: string,
-  organizationId?: string,
+  target?: ContactPick,
 ): Promise<ApiResult<Conversation>> {
   const outcome = await authenticatedRequest('/conversations/support/with-customer', {
     method: 'POST',
-    body: { customerId, ...(organizationId ? { organizationId } : {}) },
+    body:
+      target?.kind === 'general-support'
+        ? { customerId, generalSupport: true }
+        : { customerId, ...(target ? { organizationId: target.id } : {}) },
   })
   return readOutcome(outcome, parseConversation)
 }

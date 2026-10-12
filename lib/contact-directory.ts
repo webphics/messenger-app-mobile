@@ -39,13 +39,24 @@ export type ContactIntent =
   | { kind: 'customer'; customerId: string; organizationId?: string }
   /**
    * Several organizations: the person picks which the conversation belongs to,
-   * and `with` says which request the pick goes to.
+   * and `with` says which request the pick goes to. `generalSupport` is set for
+   * an Admin choosing for a Customer, who is always asked, and may pick the
+   * Customer's General Support instead of an organization.
    */
-  | { kind: 'choose'; userId: string; with: 'staff-dm' | 'customer'; organizations: Organization[] }
+  | {
+      kind: 'choose'
+      userId: string
+      with: 'staff-dm' | 'customer'
+      organizations: Organization[]
+      generalSupport?: true
+    }
   /** A Customer's support thread with one company, created if it is their first. */
   | { kind: 'support'; organizationId: string }
   /** Nothing a tap can do, and why. */
   | { kind: 'unavailable'; reason: string }
+
+/** What was picked from a `choose` intent: one organization, or General Support. */
+export type ContactPick = { kind: 'organization'; id: string } | { kind: 'general-support' }
 
 /**
  * What the staff directory says about this staff member, where the directory
@@ -90,6 +101,19 @@ export function contactIntent(
   if (contact.kind === 'customer') {
     // Staff are sent customer rows only while they hold `message_customers`, so
     // every one of these can be started; the API still judges the request.
+    //
+    // An Admin always picks where the chat happens, because besides each
+    // organization's thread they may open the Customer's General Support, which
+    // no Agent ever sees.
+    if (viewer?.role === 'admin') {
+      return {
+        kind: 'choose',
+        userId: contact.id,
+        with: 'customer',
+        organizations: organizations ?? [],
+        generalSupport: true,
+      }
+    }
     if (organizations && organizations.length > 1) {
       return { kind: 'choose', userId: contact.id, with: 'customer', organizations }
     }
@@ -270,7 +294,9 @@ export function contactRowLabel(contact: Contact, intent: ContactIntent): string
     case 'open':
       return `Open conversation with ${contact.name}`
     case 'choose':
-      return `Message ${contact.name}, choose an organization`
+      return intent.generalSupport
+        ? `Message ${contact.name}, choose an organization or General Support`
+        : `Message ${contact.name}, choose an organization`
     case 'unavailable':
       return `${contact.name}, unavailable: ${intent.reason.toLowerCase()}`
     default:

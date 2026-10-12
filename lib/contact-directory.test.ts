@@ -147,6 +147,35 @@ describe("contactIntent, reading the row's own organizations", () => {
     })
   })
 
+  test('an Admin messaging a customer is always asked, with General Support offered', () => {
+    const ADMIN: StaffDmViewer = { role: 'admin', capabilities: [] }
+    for (const conversationId of [null, 'conv-1']) {
+      expect(contactIntent(customer({ conversationId, organizations: [TALO] }), null, ADMIN)).toEqual({
+        kind: 'choose',
+        userId: 'cust-1',
+        with: 'customer',
+        organizations: [TALO],
+        generalSupport: true,
+      })
+    }
+    expect(contactIntent(customer({ organizations: [] }), null, ADMIN)).toEqual({
+      kind: 'choose',
+      userId: 'cust-1',
+      with: 'customer',
+      organizations: [],
+      generalSupport: true,
+    })
+  })
+
+  test('an Agent is never offered General Support', () => {
+    const intent = contactIntent(
+      customer({ organizations: [TALO, NORTHWIND] }),
+      null,
+      AGENT_WITH_STAFF_DM,
+    )
+    expect(intent.kind === 'choose' && intent.generalSupport).toBeFalsy()
+  })
+
   test('a customer sharing no organization cannot be started', () => {
     expect(contactIntent(customer({ organizations: [] }), null, AGENT_WITH_STAFF_DM).kind).toBe('unavailable')
   })

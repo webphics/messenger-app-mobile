@@ -11,6 +11,7 @@ import { failureNotice } from '@/lib/conversation-failure'
 import {
   contactIntent,
   filterContacts,
+  type ContactPick,
   reachableContacts,
   sharedOrganizationsById,
   type ContactIntent,
@@ -63,7 +64,7 @@ export type ContactDirectoryView = {
    * Carry out what a tap means. Answers nothing; the outcome arrives as state,
    * and the thread that came of it is handed to `onOpen` by id.
    */
-  start: (contact: Contact, organizationId?: string) => void
+  start: (contact: Contact, pick?: ContactPick) => void
   /** Whose request is out, so a second tap cannot start a second one. */
   busyId: string | null
   /** Whose request was refused, and what the API said about it. */
@@ -138,7 +139,7 @@ export function useContactDirectory(
   )
 
   const start = useCallback(
-    (contact: Contact, organizationId?: string) => {
+    (contact: Contact, pick?: ContactPick) => {
       const intent = contactIntent(contact, shared.get(contact.id) ?? null, viewer)
 
       if (intent.kind === 'unavailable') return
@@ -157,11 +158,14 @@ export function useContactDirectory(
           intent.kind === 'support'
             ? await ensureSupportConversation(intent.organizationId)
             : intent.kind === 'customer'
-              ? await startCustomerConversation(intent.customerId, intent.organizationId)
+              ? await startCustomerConversation(
+                  intent.customerId,
+                  intent.organizationId ? { kind: 'organization', id: intent.organizationId } : undefined,
+                )
               : intent.kind === 'choose'
                 ? intent.with === 'customer'
-                  ? await startCustomerConversation(intent.userId, organizationId)
-                  : await createStaffDm(intent.userId, organizationId)
+                  ? await startCustomerConversation(intent.userId, pick)
+                  : await createStaffDm(intent.userId, pick?.kind === 'organization' ? pick.id : undefined)
                 : await createStaffDm(intent.userId, intent.organizationId)
 
         setBusyId(null)

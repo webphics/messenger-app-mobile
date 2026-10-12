@@ -13,6 +13,7 @@ import {
   contactChips,
   narrowContacts,
   type ContactChip,
+  type ContactPick,
 } from "@/lib/contact-directory";
 import { settleEnter } from "@/lib/motion-enter";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
@@ -135,9 +136,9 @@ export function ContactList({
   );
 
   const handlePickOrganization = useCallback(
-    (contact: Contact, organizationId: string) => {
+    (contact: Contact, pick: ContactPick) => {
       setExpandedId(null);
-      start(contact, organizationId);
+      start(contact, pick);
     },
     [start],
   );
