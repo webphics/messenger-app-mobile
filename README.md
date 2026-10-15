@@ -171,7 +171,8 @@ mobile has a transport of its own rather than the browser subscription route, se
 
 ### CI: the Android Release workflow
 
-`.github/workflows/android-release.yml` builds a release APK when a **version tag** is pushed.
+`.github/workflows/android-release.yml` builds a release APK and a Play Store AAB when a **version
+tag** is pushed.
 Pushing to `main` (or any branch) builds nothing. It can also be run by hand from _Actions →
 Android Release → Run workflow_, which takes a _dry run_ switch that builds without publishing.
 
@@ -184,8 +185,10 @@ The tag prefix picks the GitHub environment the build reads its values from, and
 | `chatroute-release-v<version>`     | Release     | yes                  |
 | none (manual run from a branch)    | Development | nothing is published |
 
-Each tag run attaches `chatroute-release.apk` to the GitHub Release for that tag (with generated
-notes) and uploads the same file to the project's builds page on expo.dev. The tag is the version,
+Each tag run attaches `chatroute-release.apk` and `chatroute-release.aab` to the GitHub Release for
+that tag (with generated notes) and uploads the APK to the project's builds page on expo.dev. The
+AAB is the file to upload in Google Play Console; the workflow does not upload it to Play itself.
+Both come from one `build` job with an `apk` leg and an `aab` leg that run in parallel. The tag is the version,
 and `expo.version` in `app.json` must equal it, or the run fails in its first minute. A Production
 tag must also point at a commit that is on `main`.
 
@@ -210,9 +213,15 @@ Actions tab. Re-pushing the same tag replaces the APK on its Release.
 
 The build runs `eas build --platform android --profile production --local` on an `ubuntu-latest`
 runner, which is the same command as `pnpm build:apk:eas`. It uses no EAS build credits, but the NDK
-compile takes tens of minutes; `~/.gradle` is cached between runs. The APK is `arm64-v8a` only,
-signed with the EAS-held keystore (see the fingerprint section above), which EAS downloads with
-`EXPO_TOKEN` before the build.
+compile takes tens of minutes; `~/.gradle` is cached between runs. The AAB leg runs the same
+command with `--profile store`, which extends `production` and runs `bundleRelease` instead. Both
+are `arm64-v8a` only, signed with the EAS-held keystore (see the fingerprint section above), which
+EAS downloads with `EXPO_TOKEN` before the build.
+
+`android.versionCode` is derived from `expo.version` in `app.config.js` (`1.0.13` becomes
+`1000013`), so every `pnpm release` gives Play a larger code without a second number to bump. Play
+rejects an AAB whose versionCode it has seen before, so a re-pushed tag builds an AAB Play will
+refuse if that version was already uploaded.
 
 There is no iOS build in CI.
 
@@ -245,6 +254,7 @@ the shipped bundle, so anyone holding the APK can read them anyway.
 | Command                   | Where it builds                                                    | Output                                                |
 | ------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------- |
 | `pnpm build:apk:eas`      | EAS local build, same as CI. Builds `HEAD`, not the working tree.  | `dist/chatroute-release.apk`, `arm64-v8a`             |
+| `pnpm build:aab:eas`      | EAS local build, `store` profile, same as CI's AAB leg.            | `dist/chatroute-release.aab`, `arm64-v8a`             |
 | `pnpm build:apk:emulator` | EAS local build, `emulator` profile                                | `dist/chatroute-emulator.apk`, `arm64-v8a` + `x86_64` |
 | `pnpm build:android`      | EAS cloud, `preview` profile. Uses a build credit.                 | APK on the EAS install page                           |
 

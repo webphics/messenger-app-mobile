@@ -93,6 +93,35 @@ function googleServicesFile() {
 	return existsSync(join(__dirname, relative)) ? relative : undefined;
 }
 
+/**
+ * Android's `versionCode`, derived from `expo.version` so the release never
+ * has to bump two numbers: `1.0.13` becomes `1000013`.
+ *
+ * Google Play refuses an upload whose versionCode it has already seen, so every
+ * release needs a larger one. `pnpm release` bumps `expo.version`, and this
+ * turns that into a code that grows with it. Minor and patch get three digits
+ * each, so both may reach 999; the major may reach 2100 before the result
+ * passes Play's ceiling of 2100000000.
+ *
+ * Without it the code stays at 1, which a phone does not mind but Play does:
+ * the second upload is rejected.
+ */
+function androidVersionCode(version) {
+	const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version ?? "");
+	if (!match) {
+		throw new Error(
+			`expo.version must be X.Y.Z to derive android.versionCode, got "${version}".`,
+		);
+	}
+	const [major, minor, patch] = match.slice(1).map(Number);
+	if (minor > 999 || patch > 999) {
+		throw new Error(
+			`expo.version ${version} does not fit android.versionCode: minor and patch must be 999 or less.`,
+		);
+	}
+	return major * 1_000_000 + minor * 1_000 + patch;
+}
+
 module.exports = ({ config }) => {
 	const scheme = iosUrlScheme(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
 	const services = googleServicesFile();
@@ -101,6 +130,7 @@ module.exports = ({ config }) => {
 		...config,
 		android: {
 			...config.android,
+			versionCode: androidVersionCode(config.version),
 			// Spread conditionally: an explicit `undefined` is a key Expo's schema
 			// sees, and it reads it as a path that is empty rather than absent.
 			...(services ? { googleServicesFile: services } : {}),

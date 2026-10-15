@@ -48,6 +48,14 @@
 				"EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225642353646-s7g54hlj8g0m404u9bb6bpde53g7gk6s.apps.googleusercontent.com",
 				"EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "225642353646-9bb7i7t9tfmj43gvg2195lrqdtu6ifqs.apps.googleusercontent.com"
 			}
+		},
+		"store": {
+			"extends": "production",
+			"distribution": "store",
+			"android": {
+				"gradleCommand": ":app:bundleRelease -PreactNativeArchitectures=arm64-v8a",
+				"applicationArchivePath": "android/app/build/outputs/bundle/release/app-release.aab"
+			}
 		}
 	}
 }

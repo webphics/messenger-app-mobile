@@ -5,10 +5,11 @@ README and `eas.json`; the order is the order the blockers bite.
 
 ## Today
 
-- Builds: `pnpm build:apk:eas` / CI on a `chatroute-v*` tag produce an `arm64-v8a` **APK** signed
-  with the keystore EAS holds for the project (SHA-1 `7F:DF:F1:…:E1:76`). Play wants an **AAB**
-  for new apps.
-- Package: `com.thechatroute.app`. Version `1.0.5` in `app.json` (must match the release tag).
+- Builds: CI on a `chatroute-v*` tag produces an `arm64-v8a` **APK** and **AAB**, both attached to
+  the GitHub Release and both signed with the keystore EAS holds for the project (SHA-1
+  `7F:DF:F1:…:E1:76`). Locally: `pnpm build:apk:eas` and `pnpm build:aab:eas`.
+- Package: `com.thechatroute.app`. `expo.version` in `app.json` must match the release tag;
+  `android.versionCode` is derived from it in `app.config.js` (`1.0.13` → `1000013`).
 - Push: Android wired through Expo's push service; needs the FCM service-account key uploaded to EAS.
 - Google sign-in: works only for builds signed with a SHA-1 registered on the Android OAuth client.
 
@@ -18,15 +19,10 @@ README and `eas.json`; the order is the order the blockers bite.
    signing key. Then register Play's **app signing** SHA-1 (Play Console → Setup → App signing) as
    another Android OAuth client in `chat-route-official`, because that is the certificate on the
    phone, or Google sign-in fails on every store install.
-2. **AAB build profile.** Add a `store` profile to `eas.json`:
-   ```json
-   "store": {
-     "extends": "production",
-     "distribution": "store",
-     "android": { "buildType": "app-bundle" }
-   }
-   ```
-   and drop the `gradleCommand` override so Gradle produces the bundle for every ABI.
+2. **AAB build profile.** Done: the `store` profile in `eas.json` runs `:app:bundleRelease` for
+   `arm64-v8a` only, matching the APK. Play installs it on 64-bit ARM phones and filters out
+   32-bit-only and x86 devices. Adding `armeabi-v7a` and `x86_64` to its `gradleCommand` widens
+   that, at the cost of one more NDK compile per ABI in CI.
 3. **FCM key on EAS.** `eas credentials --platform android` → _Push Notifications: Manage your
    FCM Api Key_ → upload the service-account JSON from Firebase project `chat-route-official`.
    Without it registration succeeds and dispatch fails silently (README).
@@ -52,10 +48,10 @@ pnpm release patch
 git push --follow-tags
 ```
 
-Then build the store bundle (once the profile exists):
+The tag run attaches `chatroute-release.aab` to the GitHub Release. To build it locally instead:
 
 ```bash
-eas build --platform android --profile store
+pnpm build:aab:eas
 ```
 
 Submit with `eas submit --platform android` once a Play service-account JSON is configured, or

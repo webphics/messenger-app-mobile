@@ -1,7 +1,16 @@
-# Builds the Android APK on the runner with Gradle when a version tag is pushed,
-# publishes it as a GitHub Release asset on that tag (`chatroute-v<X.Y.Z>`, asset
-# `chatroute-release.apk`), and
-# uploads the same file to the project's builds page at expo.dev.
+# Builds the Android APK and the Play Store app bundle (AAB) on the runner with
+# Gradle when a version tag is pushed, publishes both as GitHub Release assets on
+# that tag (`chatroute-v<X.Y.Z>`, assets `chatroute-release.apk` and
+# `chatroute-release.aab`), and uploads the APK to the project's builds page at
+# expo.dev. The AAB is the file Google Play Console takes; nothing here uploads
+# it to Play.
+#
+# The two are a matrix on `build`, one leg each, from two eas.json profiles:
+# `production` (assembleRelease, the APK) and `store`, which extends it and
+# swaps in bundleRelease. They run in parallel, so the wall-clock time is one
+# build, but the runner minutes are two. Same keystore, same env, same
+# versionCode (app.config.js derives it from expo.version), so the AAB and the
+# APK are the same release in two packagings.
 #
 # The build runs through `eas build --platform android --profile production
 # --local`, which compiles on this runner rather than on EAS's builders: no build
@@ -45,7 +54,8 @@
 # which is why the split is jobs and not just more steps.
 #
 # What a job boundary costs is the runner, which is thrown away at the end of
-# one, so the APK travels to `release` and `expo-upload` as an Actions artifact.
+# one, so the APK and AAB travel to `release` (and the APK to `expo-upload`) as
+# Actions artifacts.
 # It is kept for a day (retention-days: 1) — long enough to re-run either,
 # short enough that it is not what the repository's storage allowance goes on.
 # The published Release is still the durable copy; the artifact is only the
@@ -74,7 +84,8 @@
 # step, so the two cannot drift.
 #
 # Pushing the same tag again (deleting and re-creating it on a new commit)
-# replaces the APK on the existing GitHub Release.
+# replaces the APK and AAB on the existing GitHub Release. The AAB keeps the
+# same versionCode, so Play refuses it if that version was already uploaded.
 
 name: Android Release
 
@@ -87,7 +98,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Build only — upload the APK as a run artifact and publish no Release
+        description: Build only — upload the APK and AAB as run artifacts and publish no Release
         required: false
         default: false
         type: boolean
@@ -214,6 +225,7 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       tag: ${{ steps.meta.outputs.tag }}
       apk: ${{ steps.meta.outputs.apk }}
+      aab: ${{ steps.meta.outputs.aab }}
       title: ${{ steps.meta.outputs.title }}
 
     steps:
@@ -300,17 +312,33 @@ jobs:
             echo "version=$VERSION"
             echo "tag=${TAG}"
             echo "apk=${APK_BASE}-release.apk"
+            echo "aab=${APK_BASE}-release.aab"
             echo "title=${APP_NAME} Android ${VERSION}${LABEL}"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Version $VERSION → tag ${TAG:-none}, asset ${APK_BASE}-release.apk"
+          echo "Version $VERSION → tag ${TAG:-none}, assets ${APK_BASE}-release.apk and ${APK_BASE}-release.aab"
 
   # The long one. Nothing here publishes anything, so it can be re-run as often
   # as a flaky NDK compile needs without touching a Release or a tag.
+  #
+  # One leg per package format. fail-fast is off so an AAB that fails does not
+  # cancel an APK that was about to finish; "Re-run failed jobs" then re-runs
+  # the failed leg alone. `bundle` is where Metro's output sits inside each
+  # archive, which the inlining check below reads.
   build:
-    name: Build the APK
+    name: Build the ${{ matrix.format == 'aab' && 'AAB' || 'APK' }}
     needs: [target, meta]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - format: apk
+            profile: production
+            bundle: assets/index.android.bundle
+          - format: aab
+            profile: store
+            bundle: base/assets/index.android.bundle
     # Generous rather than tight: a cold cache with no Gradle or NDK output to
     # reuse is the slow case, and a build killed at 45 minutes has produced
     # nothing that a re-run can start from.
@@ -322,6 +350,8 @@ jobs:
     env:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+      # The file this leg produces, named once for every step below.
+      ARCHIVE: ${{ matrix.format == 'aab' && needs.meta.outputs.aab || needs.meta.outputs.apk }}
 
     steps:
       - uses: actions/checkout@v4
@@ -372,8 +402,9 @@ jobs:
       # The `production` profile in eas.json carries its own EXPO_PUBLIC_*
       # values, and EAS spreads a profile's `env` over the runner's
       # (`@expo/build-tools`, dist/context.js), so without this every environment
-      # would bundle what eas.json says. This rewrites the profile in the
-      # runner's checkout only. Nothing is committed, and a local
+      # would bundle what eas.json says. The `store` profile extends `production`
+      # and has no `env` of its own, so this reaches the AAB too. This rewrites
+      # the profile in the runner's checkout only. Nothing is committed, and a local
       # `pnpm build:apk:eas` still reads eas.json as it is.
       #
       # A Google client ID that is not set is removed rather than written as an
@@ -395,15 +426,16 @@ jobs:
 
       # EAS runs `expo prebuild` itself, so there is no prebuild step here and
       # `android/` stays gitignored. --output names the asset directly, which is
-      # why nothing renames it afterwards.
+      # why nothing renames it afterwards. The leg's profile decides whether
+      # Gradle assembles an APK or bundles an AAB.
       #
       # EXPO_TOKEN rather than `eas login`: --non-interactive cannot answer a
       # prompt, and even a --local build authenticates to resolve the project
       # that `extra.eas.projectId` in app.json names.
-      - name: Build the APK with EAS
+      - name: Build the ${{ matrix.format == 'aab' && 'AAB' || 'APK' }} with EAS
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          APK: ${{ needs.meta.outputs.apk }}
+          PROFILE: ${{ matrix.profile }}
           ENVIRONMENT: ${{ needs.target.outputs.environment }}
         run: |
           set -euo pipefail
@@ -414,59 +446,61 @@ jobs:
           mkdir -p dist
           pnpm exec eas build \
             --platform android \
-            --profile production \
+            --profile "$PROFILE" \
             --local \
             --non-interactive \
-            --output "dist/${APK}"
+            --output "dist/${ARCHIVE}"
 
       - name: Check the artifact
-        env:
-          APK: ${{ needs.meta.outputs.apk }}
         run: |
           set -euo pipefail
-          if [ ! -f "dist/${APK}" ]; then
-            echo "::error::EAS reported success but dist/${APK} is not there."
+          if [ ! -f "dist/${ARCHIVE}" ]; then
+            echo "::error::EAS reported success but dist/${ARCHIVE} is not there."
             ls -la dist || true
             exit 1
           fi
-          ls -lh "dist/${APK}"
-          file "dist/${APK}" || true
+          ls -lh "dist/${ARCHIVE}"
+          file "dist/${ARCHIVE}" || true
 
       # The failure this catches is the one the meta job cannot: the variables
       # being set on the runner says nothing about whether EAS forwarded them
       # into the bundle Metro built. Unset, they compile to `undefined` and
       # `lib/api-config.ts` throws at import — an APK that installs and dies on
-      # launch. The bundle is stored uncompressed in the APK, so this reads it
-      # straight out rather than unpacking the whole archive.
+      # launch. An APK and an AAB are both zip files, so this reads the bundle
+      # straight out rather than unpacking the whole archive; an AAB keeps it
+      # under the `base/` module, which is what `matrix.bundle` says.
       - name: Verify the API URL was inlined into the bundle
         env:
-          APK: ${{ needs.meta.outputs.apk }}
+          BUNDLE: ${{ matrix.bundle }}
         run: |
           set -euo pipefail
-          if unzip -p "dist/${APK}" assets/index.android.bundle | grep -qF "$EXPO_PUBLIC_API_URL"; then
+          if unzip -p "dist/${ARCHIVE}" "$BUNDLE" | grep -qF "$EXPO_PUBLIC_API_URL"; then
             echo "EXPO_PUBLIC_API_URL is present in the JS bundle."
           else
-            echo "::error::EXPO_PUBLIC_API_URL is not in the bundle, so this APK would crash on launch or talk to the wrong API. Check that the step pointing eas.json's production profile at this environment ran."
+            echo "::error::EXPO_PUBLIC_API_URL is not in ${BUNDLE} inside ${ARCHIVE}, so this build would crash on launch or talk to the wrong API. Check that the step pointing eas.json's production profile at this environment ran."
             exit 1
           fi
 
-      # A fixed artifact name, because `release` and `expo-upload` download it
-      # by that name and the version is already inside the file.
+      # A fixed artifact name per format (`android-apk`, `android-aab`), because
+      # `release` and `expo-upload` download them by name and the version is
+      # already inside the file.
       #
       # overwrite, because "Re-run all jobs" is a new attempt on the same run id
       # and upload-artifact@v4 otherwise refuses a name a previous attempt has
       # already used.
-      - name: Upload the APK for the publishing jobs
+      - name: Upload the ${{ matrix.format == 'aab' && 'AAB' || 'APK' }} for the publishing jobs
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: dist/${{ needs.meta.outputs.apk }}
+          name: android-${{ matrix.format }}
+          path: dist/${{ env.ARCHIVE }}
           if-no-files-found: error
           retention-days: 1
           overwrite: true
 
   # Seconds, and the only job that writes anything to GitHub. Re-run this one
-  # alone when a release fails; the APK it needs is still attached to the run.
+  # alone when a release fails; the APK and AAB it needs are still attached to
+  # the run. It waits for both legs of `build`, so a Release never goes out with
+  # one of the two files missing.
   #
   # Two guards, and the `publish` one is the load-bearing half: a dispatch can
   # name any branch, so a build tried on one that `target` does not map
@@ -497,11 +531,14 @@ jobs:
     steps:
       # No checkout: `gh release` is given --repo explicitly, so nothing here
       # needs a working tree.
-      - name: Download the APK
+      # Both artifacts into one directory: merge-multiple drops the per-artifact
+      # subdirectory download-artifact would otherwise make.
+      - name: Download the APK and AAB
         uses: actions/download-artifact@v4
         with:
-          name: android-apk
+          pattern: android-*
           path: dist
+          merge-multiple: true
 
       - name: Publish the Release
         env:
@@ -510,10 +547,11 @@ jobs:
           TITLE: ${{ needs.meta.outputs.title }}
           VERSION: ${{ needs.meta.outputs.version }}
           APK: ${{ needs.meta.outputs.apk }}
+          AAB: ${{ needs.meta.outputs.aab }}
           PRERELEASE: ${{ needs.target.outputs.prerelease }}
         run: |
           set -euo pipefail
-          NOTES="ChatRoute Android ${VERSION} (${ANDROID_ABIS}). Built from ${GITHUB_SHA}."
+          NOTES="ChatRoute Android ${VERSION} (${ANDROID_ABIS}). Built from ${GITHUB_SHA}. Install ${APK} directly on a phone; upload ${AAB} to Google Play Console."
 
           FLAGS=()
           if [ "$PRERELEASE" = true ]; then
@@ -531,10 +569,10 @@ jobs:
           # --generate-notes puts the commits and PRs since the previous release
           # under NOTES, which is what a versioned release is for.
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" "dist/${APK}" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release upload "$TAG" "dist/${APK}" "dist/${AAB}" --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" "${FLAGS[@]}"
           else
-            gh release create "$TAG" "dist/${APK}" \
+            gh release create "$TAG" "dist/${APK}" "dist/${AAB}" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "$TITLE" \
@@ -546,7 +584,7 @@ jobs:
           {
             echo "### $TITLE"
             echo
-            echo "[Download ${APK}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"
+            echo "[Download ${APK} and ${AAB}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Puts the same APK on the project's builds page at expo.dev, next to the
