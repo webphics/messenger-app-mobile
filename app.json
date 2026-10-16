@@ -55,7 +55,8 @@
 				"expo-image-picker",
 				{
 					"photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach screenshots to a support conversation.",
-					"cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation."
+					"cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation.",
+					"microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations."
 				}
 			],
 			[
@@ -67,21 +68,14 @@
 				}
 			],
 			"./plugins/with-system-bar-insets",
-			[
-				"expo-media-library",
-				{
-					"photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach them to a support conversation.",
-					"savePhotosPermission": "Allow $(PRODUCT_NAME) to save attachments you receive to your photo library.",
-					"isAccessMediaLocationEnabled": false
-				}
-			],
 			"expo-video",
 			"expo-image",
 			[
 				"expo-audio",
 				{
 					"microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations.",
-					"recordAudioAndroid": true
+					"recordAudioAndroid": true,
+					"enableBackgroundPlayback": false
 				}
 			],
 			"./plugins/with-store-excluded-from-backup",
