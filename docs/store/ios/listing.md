@@ -117,7 +117,7 @@ else; there is no analytics or crash SDK in `package.json`.
 
 | Field            | Text                                                                                                                                                     |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sign-in required | Yes. Demo account: give one Customer, one Agent and one Admin with password sign-in. There is no sign-up screen; accounts are created by an Admin on web |
+| Sign-in required | Yes. Demo account: give one Customer, one Agent and one Admin with password sign-in, plus a spare Customer to test account deletion with. Sign-up exists in the app, but a new account belongs to no organisation, so it sees almost nothing |
 | Contact          | name, phone, email of whoever answers the reviewer                                                                                                       |
 | Notes            | see `publishing.md` → Review notes                                                                                                                       |
 | Attachment       | optional: a 30 s screen recording of sign-in → thread → reply, which shortens review for sign-in-gated apps                                              |

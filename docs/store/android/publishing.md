@@ -60,18 +60,23 @@ upload the AAB by hand in Play Console → Production → Create new release.
 ## Review notes (paste into App access)
 
 ```
-ChatRoute is an internal support messenger; accounts are created by an organisation Admin, so there is no sign-up screen. Use these test accounts with password sign-in:
+ChatRoute is a support messenger used by organisations that run it. People can sign up in the app, but a new account belongs to no organisation until one invites it, so use these test accounts with password sign-in to see every screen:
 
 Customer: <email> / <password>
 Agent:    <email> / <password>
 Admin:    <email> / <password>
 
 Magic-link and Google sign-in are alternatives to the password; the password route is enough to reach every screen. Two-factor is off on these accounts.
+
+Account deletion: Settings > Account > Delete account. Please test it with this spare account rather than the three above:
+
+Spare customer: <email> / <password>
 ```
 
 ## Not done yet (mobile-side)
 
-- Account deletion is Admin-only on web; Play's deletion-request URL must point at the web flow
-  or a support address until a self-service path ships.
+- Account deletion is self-service in the app and on the web (`listing.md`, Data safety). Set
+  Play's _Delete account URL_ to `https://<web origin>/delete-account` once the web build with
+  that page is deployed, and fill in its `[privacy contact email]`.
 - `blockedPermissions` already excludes `READ_MEDIA_AUDIO`; review the permission list in the
   final manifest against the Play _Permissions declaration_ before upload.

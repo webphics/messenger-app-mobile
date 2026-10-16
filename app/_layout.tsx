@@ -288,6 +288,16 @@ function RootStack({
           contentStyle: { backgroundColor: colors.bg },
         }}
       />
+      {/* Deleting this account, which the stores require of an app that
+        creates accounts. A sibling of the screens above for the same
+        reason they are. */}
+      <Stack.Screen
+        name="account/delete"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
       <Stack.Screen
         name="(auth)"
         options={{

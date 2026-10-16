@@ -7,6 +7,7 @@ import {
   Shield,
   ShieldCheck,
   User,
+  UserX,
   type IconComponent,
 } from "@/components/icons";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
@@ -34,20 +35,20 @@ import type { SessionUser } from "@/lib/types";
  * `community/` for the same reason this card does not branch: they belong to the
  * account.
  *
- * ## Three rows, and a list rather than markup
+ * ## A list of rows rather than markup
  *
  * What varies between rows is data: a row is an icon, a name, a sentence saying
  * what is behind it, and where it goes. Adding one is adding an entry to the
  * list `accountRows` returns.
  *
- * Two of the three read the signed-in person, which is why that list is a
+ * Two of them read the signed-in person, which is why that list is a
  * function rather than a constant. The password row says which of the two things
  * its screen will do, and the two-factor row says whether two-factor is on,
  * because a row that made somebody push to find out the state would be a push
  * for nothing. Both facts come off `SessionUser` and neither costs a request.
  *
  * The rows say it in a few words and the screens behind them say it properly.
- * That split is deliberate: a card of three rows that each explained themselves
+ * That split is deliberate: a card of rows that each explained themselves
  * fully would be taller than the profile card above it, and none of it would be
  * read.
  */
@@ -105,6 +106,13 @@ function accountRows(account: SessionUser | null): AccountRow[] {
         ? "On. Turn it off, or generate fresh backup codes."
         : "Off. Codes from an authenticator app are not required to sign in.",
       open: () => router.push("/account/two-factor"),
+    },
+    {
+      key: "delete",
+      icon: UserX,
+      title: "Delete account",
+      hint: "Remove your account and the details on it for good.",
+      open: () => router.push("/account/delete"),
     },
   ];
 }

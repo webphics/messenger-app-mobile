@@ -40,10 +40,12 @@ from the README, `eas.json` and `app.config.js`.
    with the Team ID + bundle ID, add `associatedDomains` to `app.config.js`, and set
    `EXPO_PUBLIC_MAGIC_LINK_ORIGIN` in the iOS env. Without it, magic-link sign-in works on iOS only
    by pasting the link; the reviewer should be given password accounts regardless.
-6. **Account deletion (guideline 5.1.1(v)).** Apple requires an in-app path to start account
-   deletion for any app with account creation. ChatRoute has no in-app creation, which exempts it
-   on paper, but reviewers often ask anyway; give the web/admin request URL in the review notes and
-   expect to add a _Delete account_ request row in Settings if they push back.
+6. **Account deletion (guideline 5.1.1(v)).** Apple requires in-app account deletion for any app
+   that creates accounts, and ChatRoute does: the sign-up step, a magic link to a new address and a
+   first Google sign-in all create one. Settings → Account → _Delete account_ deletes it outright,
+   for every role, after a confirmation (`app/account/delete.tsx`, `POST /auth/delete-account`).
+   A session over a day old is asked to sign in again first. Give the reviewer a spare Customer
+   account to delete, so the demo accounts survive the review.
 7. **App Store Connect record.** Create the app against the bundle ID, SKU `chatroute-ios`,
    primary language en-GB. Fill App Information, Pricing (free), App Privacy from `listing.md`.
 8. **Build and upload.** From any machine (EAS builds in the cloud, no Mac needed for this step):
@@ -83,7 +85,7 @@ auto-increments `buildNumber` when `autoIncrement` is set on the profile. Add
 ## Review notes (paste into App Review Information → Notes)
 
 ```
-ChatRoute is an internal support messenger used by organisations that run it. Accounts are created by an organisation Admin, so there is no sign-up screen in the app. Please use these test accounts with password sign-in:
+ChatRoute is a support messenger used by organisations that run it. People can sign up in the app, but a new account belongs to no organisation until one invites it, so please use these test accounts with password sign-in to see every screen:
 
 Customer: <email> / <password>
 Agent:    <email> / <password>
@@ -91,7 +93,11 @@ Admin:    <email> / <password>
 
 Magic-link and Google sign-in are alternative routes to the same accounts; password sign-in reaches every screen. Two-factor is off on these accounts.
 
-Account deletion: accounts are managed by the organisation's Admin. A person can request deletion at <URL or email>.
+Account deletion: Settings > Account > Delete account deletes the signed-in account after a confirmation, for every role. Please test it with this spare account rather than the three above:
+
+Spare customer: <email> / <password>
+
+The same is available without the app at https://<web origin>/delete-account.
 
 Camera, photo library and microphone are used only to attach a photo, a document or a voice note to a support conversation (see the purpose strings in Info.plist).
 ```

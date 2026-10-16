@@ -93,7 +93,7 @@ First release of ChatRoute for Android.
 | Section | Answer |
 |---|---|
 | Privacy policy | URL required |
-| App access | Restricted: provide one Customer, one Agent and one Admin demo account with password sign-in. There is no registration form (README), so a reviewer cannot get in without them |
+| App access | Restricted: provide one Customer, one Agent and one Admin demo account with password sign-in, plus a spare Customer account the reviewer may delete. The app does have a sign-up step (`POST /auth/sign-up`, magic link, first Google sign-in), but a new account belongs to no organisation, so it sees almost nothing; the demo accounts are what reach every screen |
 | Ads | No ads. "Offers" is an in-app promo carousel from the organisation, not an ad SDK (`PRODUCT.md`) |
 | Content rating | IARC questionnaire: communication app, user-generated content exchanged between signed-in members of one organisation, moderated by that organisation. Expect *Everyone* |
 | Target audience | 18 and over (work tool) |
@@ -109,11 +109,26 @@ First release of ChatRoute for Android.
 | Data | Collected | Shared | Purpose | Optional | Deletable |
 |---|---|---|---|---|---|
 | Name, email, phone | yes | no | account management, app functionality | phone optional | on account deletion |
-| Messages, photos, audio, files | yes | no | app functionality | — | on account deletion |
+| Messages, photos, audio, files | yes | no | app functionality | — | no: kept in the other participants' conversations, without the sender's name, after account deletion |
 | Device push token | yes | no | app functionality (push) | — | removed on sign-out |
 | Crash logs, diagnostics | no | no | — | — | — |
 | Location, contacts, calendar, financial | no | no | — | — | — |
 
-Encrypted in transit: yes. Deletion: signing out destroys the on-device Store and the push
-registration (`session-wipe`); account deletion is done by an Admin on web, and Play wants a public
-URL where a person can request it. Data is not used for advertising or tracking.
+Encrypted in transit: yes. Data is not used for advertising or tracking.
+
+Deletion. Signing out destroys the on-device Store and the push registration (`session-wipe`).
+Anyone can delete their own account:
+
+- **In the app:** Settings → Account → _Delete account_, which explains what goes and asks to
+  confirm (`app/account/delete.tsx`, `POST /auth/delete-account`).
+- **Without the app:** `https://<web origin>/delete-account`, the public page Play's _Delete account
+  URL_ field wants. It describes both routes and links to the web Profile page, which has the same
+  _Delete account_ card. Put this URL in the Data safety form's account deletion question and in
+  the store listing.
+
+What is deleted and what is kept is in `api/docs/planning/account-deletion.md`. In short: the
+account, its contact details, password and Google link, memberships, notifications and devices go
+at once; messages and wall posts the person sent stay in their conversations, shown as from a
+deleted account. Declare that in Data safety as "Messages, photos, audio, files: some data is
+retained" with the reason "other users' conversation history". The two refusals, the workspace
+owner and the last admin, are staff accounts and do not affect Customers.
