@@ -166,10 +166,6 @@ const DENIED_COPY = {
     title: 'Camera access needed',
     body: 'Enable camera access in Settings to take a photo from here.',
   },
-  library: {
-    title: 'Photo access needed',
-    body: 'Enable photo access in Settings to attach images or video.',
-  },
 } as const
 
 function SheetSurface({

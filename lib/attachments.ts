@@ -28,7 +28,7 @@ export type AttachmentOutcome =
   | { status: 'cancelled' }
   | {
       status: 'denied'
-      scope: 'camera' | 'library'
+      scope: 'camera'
       reason: Exclude<PermissionOutcome, 'proceed'>
     }
 
@@ -97,14 +97,15 @@ export function attachmentFromAsset(
   }
 }
 
-/** Photo or video from the device library. */
+/**
+ * Photo or video from the device library.
+ *
+ * Asks for no permission. Android opens the system Photo Picker and iOS opens PHPicker, and
+ * both hand back only what the person chose. Google Play refuses READ_MEDIA_IMAGES and
+ * READ_MEDIA_VIDEO for an app that only attaches the occasional photo, so `app.json` blocks
+ * them and nothing here asks for media library access.
+ */
 export async function pickFromLibrary(): Promise<AttachmentOutcome> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-  const outcome = classifyPermissionOutcome(permission)
-  if (outcome !== 'proceed') {
-    return { status: 'denied', scope: 'library', reason: outcome }
-  }
-
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images', 'videos'],
     quality: 0.8,
