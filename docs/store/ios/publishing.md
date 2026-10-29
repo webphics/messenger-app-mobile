@@ -97,7 +97,7 @@ Account deletion: Settings > Account > Delete account deletes the signed-in acco
 
 Spare customer: <email> / <password>
 
-The same is available without the app at https://<web origin>/delete-account.
+The same is available without the app at https://thechatroute.com/delete-account.
 
 Camera, photo library and microphone are used only to attach a photo, a document or a voice note to a support conversation (see the purpose strings in Info.plist).
 ```

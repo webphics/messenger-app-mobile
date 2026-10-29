@@ -12,9 +12,9 @@ metrics, because there are none (`PRODUCT.md`).
 | Short description | 80 | Internal support messenger. Threads, attachments, voice notes, push. |
 | Category | | Business |
 | Tags | up to 5 | Business communication, Customer support, Team collaboration, Messaging, Productivity |
-| Email | | support contact (required, shown publicly) |
-| Website | | marketing or docs URL |
-| Privacy policy | | required URL |
+| Email | | support@thechatroute.com |
+| Website | | https://thechatroute.com |
+| Privacy policy | | https://thechatroute.com/privacy |
 
 ## Full description (4000)
 
@@ -90,11 +90,13 @@ First release of ChatRoute for Android.
 
 ## App content declarations
 
+Field-by-field answers in Play Console order are in `play-console-app-content.md`.
+
 | Section | Answer |
 |---|---|
-| Privacy policy | URL required |
+| Privacy policy | https://thechatroute.com/privacy |
 | App access | Restricted: provide one Customer, one Agent and one Admin demo account with password sign-in, plus a spare Customer account the reviewer may delete. The app does have a sign-up step (`POST /auth/sign-up`, magic link, first Google sign-in), but a new account belongs to no organisation, so it sees almost nothing; the demo accounts are what reach every screen |
-| Ads | No ads. "Offers" is an in-app promo carousel from the organisation, not an ad SDK (`PRODUCT.md`) |
+| Ads | Yes. No ad SDK, but the Wall's `ad` post kind is labelled *Sponsored* (`lib/wall-kind.ts`), which Play counts as an ad |
 | Content rating | IARC questionnaire: communication app, user-generated content exchanged between signed-in members of one organisation, moderated by that organisation. Expect *Everyone* |
 | Target audience | 18 and over (work tool) |
 | News app | No |
@@ -121,7 +123,7 @@ Anyone can delete their own account:
 
 - **In the app:** Settings → Account → _Delete account_, which explains what goes and asks to
   confirm (`app/account/delete.tsx`, `POST /auth/delete-account`).
-- **Without the app:** `https://<web origin>/delete-account`, the public page Play's _Delete account
+- **Without the app:** `https://thechatroute.com/delete-account`, the public page Play's _Delete account
   URL_ field wants. It describes both routes and links to the web Profile page, which has the same
   _Delete account_ card. Put this URL in the Data safety form's account deletion question and in
   the store listing.

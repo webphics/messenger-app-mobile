@@ -76,7 +76,7 @@ Spare customer: <email> / <password>
 ## Not done yet (mobile-side)
 
 - Account deletion is self-service in the app and on the web (`listing.md`, Data safety). Set
-  Play's _Delete account URL_ to `https://<web origin>/delete-account` once the web build with
-  that page is deployed, and fill in its `[privacy contact email]`.
+  Play's _Delete account URL_ to `https://thechatroute.com/delete-account`. The page is live; its
+  contact address is support@thechatroute.com.
 - `blockedPermissions` already excludes `READ_MEDIA_AUDIO`; review the permission list in the
   final manifest against the Play _Permissions declaration_ before upload.

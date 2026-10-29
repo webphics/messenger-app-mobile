@@ -1,8 +1,10 @@
 import { LogOut } from "@/components/icons";
+import Constants from "expo-constants";
 import { ScrollView, View } from "react-native";
 
 import { AccountCard } from "@/components/settings/account-card";
 import { InvitationsCard } from "@/components/settings/invitations-card";
+import { LegalCard } from "@/components/settings/legal-card";
 import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
 import { PostNotificationsCard } from "@/components/settings/post-notifications-card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -88,6 +90,11 @@ export function SettingsScreen() {
           below ends the one that is. */}
       <AccountCard />
 
+      {/* Static rows that leave the app, so nothing here arrives late above
+          Sign out. The privacy policy has to be reachable from inside the app,
+          not only from the store listing. */}
+      <LegalCard />
+
       <View
         className="mb-4 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
       >
@@ -96,7 +103,7 @@ export function SettingsScreen() {
             Application
           </Text>
           <Text variant="label" className="font-medium text-ink-soft">
-            ChatRoute v1.0.0
+            ChatRoute v{Constants.expoConfig?.version}
           </Text>
         </View>
 
