@@ -1,7 +1,7 @@
 {
   "name": "chatroute",
   "main": "expo-router/entry",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "packageManager": "pnpm@11.3.0",
   "dependencies": {
     "@expo-google-fonts/jetbrains-mono": "^0.4.1",
