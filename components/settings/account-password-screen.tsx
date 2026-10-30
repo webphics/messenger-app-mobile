@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, View, type TextInput } from "react-native";
+import { ActivityIndicator, ScrollView, View, type TextInputInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AlertCircle, Check, Eye, EyeOff } from "@/components/icons";
@@ -106,7 +106,7 @@ function PasswordInput({
   field: PasswordField;
   value: string;
   error: string | undefined;
-  inputRef: React.RefObject<TextInput | null>;
+  inputRef: React.RefObject<TextInputInstance | null>;
   onChangeText: (next: string) => void;
   onSubmitEditing: () => void;
   returnKeyType: "next" | "go";
@@ -226,9 +226,9 @@ export function AccountPasswordScreen() {
    * in the render path. Three names and a lookup that runs inside the handler
    * keep the refs where refs belong, which is everywhere except render.
    */
-  const currentRef = useRef<TextInput>(null);
-  const nextRef = useRef<TextInput>(null);
-  const confirmationRef = useRef<TextInput>(null);
+  const currentRef = useRef<TextInputInstance>(null);
+  const nextRef = useRef<TextInputInstance>(null);
+  const confirmationRef = useRef<TextInputInstance>(null);
 
   const focusField = useCallback((field: PasswordField) => {
     const target =

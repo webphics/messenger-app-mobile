@@ -1,5 +1,5 @@
 import { forwardRef, useState, type Ref } from "react";
-import { TextInput, View } from "react-native";
+import { View, type TextInputInstance } from "react-native";
 
 import { SearchClearButton } from "@/components/search-clear-button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ type HelpSearchFieldProps = {
 
 export const HelpSearchField = forwardRef(function HelpSearchField(
   { onQuery, placeholder = "Search for help" }: HelpSearchFieldProps,
-  ref: Ref<TextInput>,
+  ref: Ref<TextInputInstance>,
 ) {
   const [value, setValue] = useState("");
 

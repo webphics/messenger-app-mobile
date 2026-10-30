@@ -37,6 +37,7 @@
 		},
 		"plugins": [
 			"expo-router",
+			"expo-status-bar",
 			[
 				"expo-splash-screen",
 				{
@@ -82,7 +83,6 @@
 				}
 			],
 			"./plugins/with-store-excluded-from-backup",
-			"./plugins/with-scene-lifecycle",
 			"expo-secure-store",
 			"expo-sqlite",
 			[

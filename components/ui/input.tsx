@@ -1,7 +1,7 @@
 import { cn } from '@/lib/cn';
 import { colors } from '@/lib/tokens';
 import * as React from 'react';
-import { Platform, TextInput } from 'react-native';
+import { Platform, TextInput, type TextInputInstance } from 'react-native';
 
 type InputProps = React.ComponentProps<typeof TextInput> & {
   /** RNR registry leftover (NativeWind). Not a Uniwind TextInput prop — stripped. */
@@ -10,7 +10,7 @@ type InputProps = React.ComponentProps<typeof TextInput> & {
 
 const Input = React.forwardRef(function Input(
   { className, placeholderClassName, ...props }: InputProps,
-  ref: React.Ref<TextInput>,
+  ref: React.Ref<TextInputInstance>,
 ) {
   return (
     <TextInput

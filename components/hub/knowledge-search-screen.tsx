@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import { BookOpen, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, TextInput, View } from "react-native";
+import { FlatList, View, type TextInputInstance } from "react-native";
 
 import { HelpSearchField } from "@/components/hub/help-search-field";
 import { InScreenHeader } from "@/components/in-screen-header";
@@ -22,7 +22,7 @@ type KnowledgeSearchScreenProps = {
 };
 
 export function KnowledgeSearchScreen({ group }: KnowledgeSearchScreenProps) {
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<KnowledgeArticle[]>(listKnowledge);
   const results = useMemo(() => filterKnowledge(items, query), [items, query]);

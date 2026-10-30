@@ -16,7 +16,7 @@ import {
   Keyboard,
   Pressable,
   View,
-  type TextInput,
+  type TextInputInstance,
 } from 'react-native'
 import {
   RecordingPresets,
@@ -230,7 +230,7 @@ export function Composer({
    * typing. Kept in a ref: it changes on every keystroke and nothing draws it.
    */
   const selectionRef = useRef<{ start: number; end: number } | null>(null)
-  const inputRef = useRef<TextInput>(null)
+  const inputRef = useRef<TextInputInstance>(null)
   // The latest draft and setter, for `insertEmoji` — see there.
   const valueRef = useRef(value)
   const onChangeTextRef = useRef(onChangeText)

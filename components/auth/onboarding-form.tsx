@@ -4,7 +4,7 @@ import {
   ActivityIndicator,
   ScrollView,
   View,
-  type TextInput,
+  type TextInputInstance,
 } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -63,7 +63,7 @@ export function OnboardingForm() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const nameRef = useRef<TextInput>(null);
+  const nameRef = useRef<TextInputInstance>(null);
 
   /**
    * Navigating from the answer rather than from the state, unlike the sign-in

@@ -6,6 +6,7 @@ import {
   FlatList,
   Pressable,
   View,
+  type ViewInstance,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -415,7 +416,7 @@ export function ThreadScreen({
   onStopTyping,
 }: ThreadScreenProps) {
   const keyboardInset = useKeyboardInset()
-  const hostRef = useRef<View>(null)
+  const hostRef = useRef<ViewInstance>(null)
   const listRef = useRef<FlatList<ThreadRow>>(null)
   const reduceMotion = useReducedMotion()
   const stickToLatestRef = useRef(false)
@@ -596,10 +597,10 @@ export function ThreadScreen({
     the whole of it, and the topmost row is the largest index on an inverted list.
   */
   const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: { index: number | null }[] }) => {
+    ({ viewableItems }: { viewableItems: { index: number | undefined }[] }) => {
       let top = -1
       for (const item of viewableItems) {
-        if (item.index !== null && item.index > top) top = item.index
+        if (item.index !== undefined && item.index > top) top = item.index
       }
       if (top >= 0) setTopRowIndex(top)
     },
@@ -1161,7 +1162,7 @@ export function ThreadScreen({
               <View className="items-center py-3">
                 <ActivityIndicator accessibilityLabel="Loading older messages…" />
               </View>
-            ) : null
+            ) : undefined
           }
           // Anchor mid-thread when rows insert. Without MVCP, composer height
           // changes yank to offset 0. Without autoscrollToTopThreshold, new

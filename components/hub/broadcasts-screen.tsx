@@ -162,7 +162,7 @@ export function BroadcastsScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
-        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} /> : null}
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} /> : undefined}
         ListEmptyComponent={
           state.status === "loading" ? (
             <View className="py-12">

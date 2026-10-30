@@ -234,7 +234,7 @@ export function CommunityScreen({ communityId }: CommunityScreenProps) {
             <CommunityLoading label="Loading groups" />
           ) : feed.status === "failed" ? (
             <CommunityNoticeView title={feed.title} hint={feed.hint} failed onRetry={refresh} />
-          ) : null
+          ) : undefined
         }
         refreshControl={makeRefreshControl(refreshing, refresh)}
       />

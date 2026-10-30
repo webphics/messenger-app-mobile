@@ -8,7 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { router, useNavigation } from 'expo-router'
+import { router, usePreventRemove } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import {
@@ -182,22 +182,22 @@ export function ConversationDetailsScreen({
   }, [confirmLeave])
 
   // iOS's edge-swipe is a third way out this stack screen allows, and it does
-  // not go through `onBack` or hardware Back at all — only `beforeRemove` sees it.
-  const navigation = useNavigation()
-  useEffect(() => {
-    return navigation.addListener('beforeRemove', (e) => {
-      if (draft.trim() === '') return
-      e.preventDefault()
-      Alert.alert('Discard this note?', 'It has not been added to the conversation yet.', [
-        { text: 'Keep writing', style: 'cancel' },
-        {
-          text: 'Discard',
-          style: 'destructive',
-          onPress: () => navigation.dispatch(e.data.action),
+  // not go through `onBack` or hardware Back at all — only removal prevention
+  // sees it. Discard empties the draft as well, so the prevention is off by the
+  // time `repeat` lets the removal through rather than left on behind it.
+  usePreventRemove(draft.trim() !== '', ({ repeat }) => {
+    Alert.alert('Discard this note?', 'It has not been added to the conversation yet.', [
+      { text: 'Keep writing', style: 'cancel' },
+      {
+        text: 'Discard',
+        style: 'destructive',
+        onPress: () => {
+          setDraft('')
+          repeat()
         },
-      ])
-    })
-  }, [draft, navigation])
+      },
+    ])
+  })
 
   return (
     <View className="flex-1 bg-bg">

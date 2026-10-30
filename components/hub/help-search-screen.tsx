@@ -1,7 +1,7 @@
 import { useFocusEffect } from "expo-router";
 import { HelpCircle, Search } from "@/components/icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, TextInput, View } from "react-native";
+import { FlatList, View, type TextInputInstance } from "react-native";
 
 import { FaqRow } from "@/components/hub/faq-row";
 import { HelpSearchField } from "@/components/hub/help-search-field";
@@ -21,7 +21,7 @@ function keyExtractor(item: FaqItem) {
 }
 
 export function HelpSearchScreen() {
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
   const [faqs, setFaqs] = useState<FaqItem[]>(listFaqs);

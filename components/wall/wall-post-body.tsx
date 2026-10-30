@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { View, type NativeSyntheticEvent, type TextLayoutEventData } from 'react-native'
+import { View, type TextLayoutEvent } from 'react-native'
 
 import { TactilePressable } from '@/components/ui/tactile-pressable'
 import { LinkedText, linkTint } from '@/components/ui/linked-text'
@@ -40,7 +40,7 @@ export function WallPostBody({ body, hasImages }: { body: string; hasImages: boo
   const [overflows, setOverflows] = useState(false)
   const emphasis = EMPHASIS[wallBodyEmphasis(body, hasImages)]
 
-  const measure = useCallback((event: NativeSyntheticEvent<TextLayoutEventData>) => {
+  const measure = useCallback((event: TextLayoutEvent) => {
     setOverflows(event.nativeEvent.lines.length > WALL_BODY_CLAMP_LINES)
   }, [])
 

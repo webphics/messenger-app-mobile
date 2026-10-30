@@ -143,7 +143,7 @@ export function AuditLogScreen() {
                 </Text>
               </TactilePressable>
             </View>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           feed.status === "loading" ? (

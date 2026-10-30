@@ -2,54 +2,38 @@
 # selects the right one; eslint-config-expo's import resolver needs it, and
 # pnpm 11 blocks install scripts until each is explicitly approved.
 #
-# The two `false` entries arrived with `eas-cli` and are declined rather than
-# left unanswered: pnpm 11 exits non-zero on an unresolved entry, which would
-# fail CI's `pnpm install --frozen-lockfile` before any build ran. Neither is
-# needed to run the CLI — `dtrace-provider` is optional native tracing for
-# bunyan, eas-cli's logger, and falls back to a no-op, and `protobufjs`'s
-# postinstall only sets up its own codegen CLI.
+# The `false` entries are declined rather than left unanswered: pnpm 11 exits
+# non-zero on an unresolved entry, which would fail CI's
+# `pnpm install --frozen-lockfile` before any build ran. `dtrace-provider` and
+# `protobufjs` arrived with `eas-cli` and neither is needed to run the CLI:
+# `dtrace-provider` is optional native tracing for bunyan, eas-cli's logger,
+# and falls back to a no-op, and `protobufjs`'s postinstall only sets up its
+# own codegen CLI. `@parcel/watcher` arrived with jest 30's haste map, and its
+# install script compiles from source only when `npm_config_build_from_source`
+# is set; otherwise it loads the prebuilt `@parcel/watcher-<platform>` package.
 allowBuilds:
+  '@parcel/watcher': false
   dtrace-provider: false
   protobufjs: false
   unrs-resolver: true
-minimumReleaseAgeExclude:
-  - '@expo/cli@57.0.27'
-  - '@expo/router-server@57.0.11'
-  - babel-preset-expo@57.0.13
-  - expo-modules-core@57.0.19
-  - expo-modules-jsi@57.1.1
-  - expo@57.0.25
-  - '@expo/ui@57.0.20'
-  - expo-glass-effect@57.0.4
-  - expo-image-picker@57.0.20
-  - expo-linking@57.0.11
-  - expo-notifications@57.0.21
-  - expo-router@57.0.23
-  - expo-sharing@57.0.22
-  - expo-video@57.0.5
-  - '@expo/eas-build-job@24.9.0'
-  - '@expo/eas-json@24.9.0'
-  - '@expo/steps@24.9.0'
-  - eas-cli@24.10.0
 nodeLinker: hoisted
-# eas-cli (through 24.12.1) still depends on @expo/config@55, whose require-utils
-# declares TypeScript ^5 only. The SDK 57 copy of the same package accepts ^6, and
-# this app has no app.config.ts for it to transpile anyway.
+# eas-cli (through 24.14.0, the last 24.x) still depends on @expo/config@55, whose
+# require-utils declares TypeScript ^5 only. The SDK 58 copy of the same package
+# accepts ^6, and this app has no app.config.ts for it to transpile anyway.
 peerDependencyRules:
   allowedVersions:
     '@expo/require-utils@55>typescript': '6'
-# Deprecated packages that SDK 57's own tooling pins, with no version of the owner
-# that drops them: jest-expo@57 (jest 29 and jsdom 20), @expo/config-plugins (xcode),
-# eas-cli's logger (bunyan) and @expo/ngrok. Exact versions, so a new deprecation
-# still warns. Revisit on the next SDK upgrade. ESLint stays on 9 because
-# eslint-config-expo@57 pulls eslint-plugin-react and eslint-plugin-import, which
-# both cap their eslint peer at ^9.
+# Deprecated packages pinned by tooling with no version of the owner that drops
+# them: jest-expo@58 (jsdom 26, through jest-environment-jsdom 30), the babel-jest
+# 29 that @react-native/jest-preset@0.88 still uses (glob 7), eas-cli's own
+# @expo/config-plugins (xcode 3) and logger (bunyan), and @expo/ngrok. Exact
+# versions, so a new deprecation still warns. Revisit on the next SDK upgrade.
+# ESLint stays on 9 because eslint-config-expo@58 pulls eslint-plugin-react and
+# eslint-plugin-import, which both cap their eslint peer at ^9.
 allowedDeprecatedVersions:
-  abab: 2.0.6
-  domexception: 4.0.0
   eslint: 9.39.5
   glob: 6.0.4 || 7.2.3 || 10.5.0
   inflight: 1.0.6
   rimraf: 2.4.5
   uuid: 3.4.0 || 7.0.3 || 8.3.2
-  whatwg-encoding: 2.0.0
+  whatwg-encoding: 3.1.1

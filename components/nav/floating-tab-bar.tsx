@@ -65,7 +65,8 @@ function badgeForRoute(
 export function FloatingTabBar({
   state,
   descriptors,
-  navigation,
+  emitter,
+  navigateToTab,
 }: FloatingTabBarProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -123,18 +124,18 @@ export function FloatingTabBar({
           const badge = badgeForRoute(route.name, conversations, supportAssignment);
 
           const onPress = () => {
-            const event = navigation.emit({
+            const event = emitter.emit({
               type: "tabPress",
               target: route.key,
               canPreventDefault: true,
             });
             if (!focused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
+              navigateToTab(route.key);
             }
           };
 
           const onLongPress = () => {
-            navigation.emit({
+            emitter.emit({
               type: "tabLongPress",
               target: route.key,
             });

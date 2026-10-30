@@ -188,7 +188,7 @@ export function MediaGalleryScreen({
               <View className="items-center py-4">
                 <ActivityIndicator accessibilityLabel="Loading older messages…" />
               </View>
-            ) : null
+            ) : undefined
           }
           refreshControl={
             onRefresh ? makeRefreshControl(refreshing, onRefresh) : undefined

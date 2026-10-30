@@ -461,7 +461,7 @@ export function SavedResponsesScreen() {
                 </Text>
               </TactilePressable>
             </View>
-          ) : empty.kind === "none" ? null : (
+          ) : empty.kind === "none" ? undefined : (
             <View className="items-center px-4 py-12">
               <View className="size-14 items-center justify-center rounded-full bg-primary-soft">
                 <MessageSquare color={colors.primary} size={26} />

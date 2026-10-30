@@ -5,7 +5,7 @@ import {
   Alert,
   ScrollView,
   View,
-  type TextInput,
+  type TextInputInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -180,7 +180,7 @@ export function AccountTwoFactorScreen() {
   const [copied, setCopied] = useState(false);
   const [turnedOff, setTurnedOff] = useState(false);
 
-  const passwordRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
 
   const live = useRef(true);
   useEffect(() => {

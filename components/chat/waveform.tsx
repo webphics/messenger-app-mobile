@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo } from 'react'
 import { Pressable, View } from 'react-native'
-import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler'
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -56,32 +56,33 @@ export const Waveform = memo(function Waveform({
     [onSeek],
   )
 
-  const gesture = useMemo(() => {
-    if (!onSeek) return null
-    return Gesture.Pan()
-      .minDistance(0)
-      .onBegin((e) => {
-        if (width.get() <= 0) return
-        scrub.set(clamp01Worklet(e.x / width.get()))
-      })
-      .onUpdate((e) => {
-        // Shared value only — no `scheduleOnRN` here. A hop per frame is a
-        // React render and a native seek per frame, which is exactly the
-        // stutter this gesture is meant to avoid.
-        if (width.get() <= 0) return
-        scrub.set(clamp01Worklet(e.x / width.get()))
-      })
-      .onEnd(() => {
-        const at = scrub.get()
-        if (at >= 0) scheduleOnRN(commit, at)
-      })
-      .onFinalize(() => {
-        // Held one frame past the commit would be cleaner still, but the
-        // player's own `progress` lands within a frame or two and the bars
-        // fall back to it — a flash of the old position is not worth a timer.
-        scrub.set(-1)
-      })
-  }, [commit, onSeek, scrub, width])
+  // A hook, so it exists whether or not there is anything to seek; `enabled`
+  // and the detector below being left out are what make a plain strip plain.
+  const gesture = usePanGesture({
+    enabled: !!onSeek,
+    minDistance: 0,
+    onBegin: (e) => {
+      if (width.get() <= 0) return
+      scrub.set(clamp01Worklet(e.x / width.get()))
+    },
+    onUpdate: (e) => {
+      // Shared value only — no `scheduleOnRN` here. A hop per frame is a
+      // React render and a native seek per frame, which is exactly the
+      // stutter this gesture is meant to avoid.
+      if (width.get() <= 0) return
+      scrub.set(clamp01Worklet(e.x / width.get()))
+    },
+    onDeactivate: () => {
+      const at = scrub.get()
+      if (at >= 0) scheduleOnRN(commit, at)
+    },
+    onFinalize: () => {
+      // Held one frame past the commit would be cleaner still, but the
+      // player's own `progress` lands within a frame or two and the bars
+      // fall back to it — a flash of the old position is not worth a timer.
+      scrub.set(-1)
+    },
+  })
 
   const strip = (
     <View
@@ -121,7 +122,7 @@ export const Waveform = memo(function Waveform({
     </View>
   )
 
-  if (!gesture) return strip
+  if (!onSeek) return strip
 
   return (
     <GestureDetector gesture={gesture}>

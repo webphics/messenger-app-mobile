@@ -211,7 +211,7 @@ export function NotificationsScreen() {
               <View className="items-center py-4">
                 <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ) : null
+            ) : undefined
           }
         />
       )}

@@ -9,6 +9,8 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   type ScrollView,
+  type ViewInstance,
+  type ScrollViewInstance,
 } from "react-native";
 import Constants, { AppOwnership } from "expo-constants";
 
@@ -71,7 +73,7 @@ export function revealScrollDelta(
 
 function readOverlapFromEvent(
   event: KeyboardEvent,
-  contentRef: React.RefObject<View | null> | undefined,
+  contentRef: React.RefObject<ViewInstance | null> | undefined,
   apply: (next: number) => void,
 ) {
   if (hostResizesForKeyboard()) {
@@ -113,7 +115,7 @@ function readOverlapFromEvent(
  * edge-to-edge and settles a status-bar height too low.
  */
 export function useKeyboardInset(
-  contentRef?: React.RefObject<View | null>,
+  contentRef?: React.RefObject<ViewInstance | null>,
 ): number {
   const [inset, setInset] = useState(0);
 
@@ -158,19 +160,19 @@ export function useKeyboardInset(
  */
 export function useKeyboardAwareScroll(): {
   keyboardInset: number;
-  contentRef: React.RefObject<View | null>;
+  contentRef: React.RefObject<ViewInstance | null>;
   scrollProps: {
-    ref: React.RefObject<ScrollView | null>;
+    ref: React.RefObject<ScrollViewInstance | null>;
     onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
     onLayout: () => void;
     scrollEventThrottle: number;
   };
 } {
-  const contentRef = useRef<View | null>(null);
+  const contentRef = useRef<ViewInstance | null>(null);
   const inset = useKeyboardInset(contentRef);
   const keyboardInset =
     Platform.OS === "android" && !hostResizesForKeyboard() ? inset : 0;
-  const ref = useRef<ScrollView | null>(null);
+  const ref = useRef<ScrollViewInstance | null>(null);
   const offset = useRef(0);
   const pendingReveal = useRef(false);
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { router, useNavigation } from 'expo-router'
-import { ActivityIndicator, Alert, FlatList, ScrollView, View, type ViewToken } from 'react-native'
+import { ActivityIndicator, Alert, FlatList, ScrollView, View, type ListViewToken } from 'react-native'
 import Animated, { useReducedMotion } from 'react-native-reanimated'
 
 import { Bookmark, CloudOff, Newspaper, SquarePen, X } from '@/components/icons'
@@ -217,9 +217,9 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
 
   const [onViewableItemsChanged] = useState(
     () =>
-      ({ viewableItems }: { viewableItems: ViewToken<WallPost>[] }) => {
+      ({ viewableItems }: { viewableItems: ListViewToken[] }) => {
         for (const { item, isViewable } of viewableItems) {
-          if (isViewable) recordViewRef.current(item)
+          if (isViewable) recordViewRef.current(item as WallPost)
         }
       },
   )
@@ -313,14 +313,14 @@ export function WallBody({ wall }: { wall: WallBodyView }) {
             />
           ) : notice.kind === 'empty' ? (
             <WallNothing kind="empty" title={notice.title} hint={notice.hint} />
-          ) : null
+          ) : undefined
         }
         ListFooterComponent={
           wall.loadingOlder ? (
             <View accessibilityLabel="Loading older posts" className="items-center py-6">
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
-          ) : null
+          ) : undefined
         }
         refreshControl={makeRefreshControl(wall.refreshing, wall.refresh)}
       />

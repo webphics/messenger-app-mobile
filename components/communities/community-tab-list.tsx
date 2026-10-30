@@ -188,7 +188,7 @@ export function CommunityTabList() {
         ListHeaderComponent={
           notice.kind === "stale" ? (
             <StaleStrip message={notice.message} onDismiss={communities.dismissFailure} />
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           notice.kind === "loading" ? (
@@ -202,7 +202,7 @@ export function CommunityTabList() {
             />
           ) : notice.kind === "empty" ? (
             <CommunityNoticeView title={notice.title} hint={notice.hint} failed={false} />
-          ) : null
+          ) : undefined
         }
         refreshControl={makeRefreshControl(communities.refreshing, communities.refresh)}
       />

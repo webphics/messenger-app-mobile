@@ -12,15 +12,15 @@ import type {
   UserRole,
 } from "@/lib/types";
 
-const DEMO_PHOTO_URI = Image.resolveAssetSource(
-  require("../assets/offers/payouts.png"),
-).uri;
-const DEMO_PHOTO_2_URI = Image.resolveAssetSource(
-  require("../assets/offers/zero-fee.png"),
-).uri;
-const DEMO_VOICE_URI = Image.resolveAssetSource(
-  require("../assets/chat/voice-note-demo.wav"),
-).uri;
+// `resolveAssetSource` answers null for a source it cannot resolve, which is
+// what jest's asset stub hands it for the `.wav`.
+function assetUri(source: number): string {
+  return Image.resolveAssetSource(source)?.uri ?? "";
+}
+
+const DEMO_PHOTO_URI = assetUri(require("../assets/offers/payouts.png"));
+const DEMO_PHOTO_2_URI = assetUri(require("../assets/offers/zero-fee.png"));
+const DEMO_VOICE_URI = assetUri(require("../assets/chat/voice-note-demo.wav"));
 
 const DEMO_VOICE_PEAKS = Array.from({ length: 48 }, (_, i) => {
   const wave = 0.25 + 0.55 * Math.abs(Math.sin(i / 3.2));

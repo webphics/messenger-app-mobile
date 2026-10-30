@@ -13,7 +13,7 @@ import {
   Image,
   ScrollView,
   View,
-  type TextInput,
+  type TextInputInstance,
 } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -272,14 +272,14 @@ export function SignInForm() {
    * press it will drop is worse than one that says it is busy.
    */
   const anyRequestOut = busy || sendingLink || probing || verifying;
-  const identifierRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const codeRef = useRef<TextInput>(null);
+  const identifierRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const codeRef = useRef<TextInputInstance>(null);
   const signUpRefs = {
-    name: useRef<TextInput>(null),
-    username: useRef<TextInput>(null),
-    email: useRef<TextInput>(null),
-    phone: useRef<TextInput>(null),
+    name: useRef<TextInputInstance>(null),
+    username: useRef<TextInputInstance>(null),
+    email: useRef<TextInputInstance>(null),
+    phone: useRef<TextInputInstance>(null),
   };
   /**
    * What the last attempt came back with — the server's own words for a refusal,
@@ -359,7 +359,7 @@ export function SignInForm() {
    * a focus call made alongside `setStep` is aimed at something that is not
    * there yet.
    */
-  function focusAfterPaint(ref: React.RefObject<TextInput | null>) {
+  function focusAfterPaint(ref: React.RefObject<TextInputInstance | null>) {
     requestAnimationFrame(() => ref.current?.focus());
   }
 

@@ -19,9 +19,9 @@ import {
   type LayoutChangeEvent,
 } from 'react-native'
 import {
-  Gesture,
   GestureDetector,
   GestureHandlerRootView,
+  usePanGesture,
   type PanGesture,
 } from 'react-native-gesture-handler'
 import Animated, {
@@ -274,41 +274,38 @@ export function AttachmentSheet({
    * somebody has plainly started dragging. Everything below runs on the UI
    * thread — the sheet follows the finger whatever React is doing.
    */
-  const drag = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetY([-12, 12])
-        .failOffsetX([-24, 24])
-        .onStart(() => {
-          // Where the sheet actually is, which is not always where it rests: a
-          // finger landing on one still springing open has to carry on from the
-          // frame the eye last saw. Tracking the raw translation instead would
-          // read the sheet as being at 0 and snap it there on the first frame.
-          start.set(y.get())
+  const drag = usePanGesture({
+    activeOffsetY: [-12, 12],
+    failOffsetX: [-24, 24],
+    onActivate: () => {
+      // Where the sheet actually is, which is not always where it rests: a
+      // finger landing on one still springing open has to carry on from the
+      // frame the eye last saw. Tracking the raw translation instead would
+      // read the sheet as being at 0 and snap it there on the first frame.
+      start.set(y.get())
+    },
+    onUpdate: (e) => {
+      // Down is the way out and tracks exactly; up is resistance, because
+      // there is nothing above this sheet to drag it to.
+      const next = start.get() + e.translationY
+      y.set(next >= 0 ? next : next * motion.rubberBand)
+    },
+    onDeactivate: (e) => {
+      if (
+        shouldDismissSheet({
+          // How far down the sheet is, not how far the finger moved — the
+          // two differ for exactly the grab `onActivate` exists to handle.
+          travel: y.get(),
+          velocity: e.velocityY,
+          height: height.get(),
         })
-        .onUpdate((e) => {
-          // Down is the way out and tracks exactly; up is resistance, because
-          // there is nothing above this sheet to drag it to.
-          const next = start.get() + e.translationY
-          y.set(next >= 0 ? next : next * motion.rubberBand)
-        })
-        .onEnd((e) => {
-          if (
-            shouldDismissSheet({
-              // How far down the sheet is, not how far the finger moved — the
-              // two differ for exactly the grab `onStart` exists to handle.
-              travel: y.get(),
-              velocity: e.velocityY,
-              height: height.get(),
-            })
-          ) {
-            scheduleOnRN(dismiss, e.velocityY)
-            return
-          }
-          y.set(withSpring(0, { ...motion.springs.overlay, velocity: e.velocityY }))
-        }),
-    [dismiss, height, start, y],
-  )
+      ) {
+        scheduleOnRN(dismiss, e.velocityY)
+        return
+      }
+      y.set(withSpring(0, { ...motion.springs.overlay, velocity: e.velocityY }))
+    },
+  })
 
   const backdropStyle = useAnimatedStyle(() => ({
     opacity: interpolate(

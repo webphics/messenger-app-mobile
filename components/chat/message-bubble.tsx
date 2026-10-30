@@ -9,8 +9,15 @@ import {
   RotateCcw,
 } from '@/components/icons'
 import { Dimensions, Image, Pressable, View } from 'react-native'
-import type { AccessibilityActionEvent } from 'react-native'
-import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import type { AccessibilityActionEvent, ViewInstance } from 'react-native'
+import {
+  GestureDetector,
+  useCompetingGestures,
+  useLongPressGesture,
+  usePanGesture,
+  useTapGesture,
+  type TapGesture,
+} from 'react-native-gesture-handler'
 import Animated, {
   cancelAnimation,
   withDelay,
@@ -69,8 +76,6 @@ export type QuotedMessage = {
   thumbUri?: string
   layoutMode: QuoteLayoutMode
 }
-
-type TapGesture = ReturnType<typeof Gesture.Tap>
 
 /**
  * Wraps a quote in the gesture that jumps to the original, where there is one.
@@ -695,7 +700,7 @@ export const MessageBubble = memo(function MessageBubble({
   onOpenWallPost,
   privateLabel = null,
 }: MessageBubbleProps) {
-  const bubbleRef = useRef<View>(null)
+  const bubbleRef = useRef<ViewInstance>(null)
   const sizeRef = useRef({ width: 0, height: 0 })
   const isFirstMount = useRef(true)
   const reduceMotion = useReducedMotion()
@@ -804,18 +809,18 @@ export const MessageBubble = memo(function MessageBubble({
     [onOpenWallPost],
   )
 
-  const quoteGesture = useMemo(
-    () =>
-      onPressQuote && quoted
-        ? Gesture.Tap()
-            .maxDuration(LONG_PRESS_MS)
-            .maxDistance(12)
-            .onEnd((_, ok) => {
-              if (ok) scheduleOnRN(handlePressQuote)
-            })
-        : undefined,
-    [handlePressQuote, onPressQuote, quoted],
-  )
+  // Gestures are hooks, so each one exists on every render; `enabled` and
+  // whether a detector is given it decide whether it takes part.
+  const quoteTapEnabled = Boolean(onPressQuote && quoted)
+  const quoteTap = useTapGesture({
+    enabled: quoteTapEnabled,
+    maxDuration: LONG_PRESS_MS,
+    maxDistance: 12,
+    onDeactivate: (e) => {
+      if (!e.canceled) scheduleOnRN(handlePressQuote)
+    },
+  })
+  const quoteGesture = quoteTapEnabled ? quoteTap : undefined
 
   // The original a quote tap landed on flashes once — the long-press dimming,
   // borrowed, so it reads as this bubble being pointed at rather than selected.
@@ -833,102 +838,80 @@ export const MessageBubble = memo(function MessageBubble({
     onRevealTime?.(messageId)
   }, [messageId, onRevealTime])
 
-  const gesture = useMemo(
-    () =>
-      Gesture.Race(
-        ...(onOpenMenu
-          ? [
-              Gesture.LongPress()
-                .minDuration(LONG_PRESS_MS)
-                .maxDistance(12)
-                .onBegin(() => {
-                  tint.set(
-                    withTiming(0.55, { duration: 80, easing: easing.out }),
-                  )
-                })
-                .onStart((e) => {
-                  tint.set(1)
-                  scheduleOnRN(hapticMedium)
-                  scheduleOnRN(reportOpen, e.absoluteX, e.absoluteY)
-                })
-                .onFinalize((_, ok) => {
-                  if (!ok)
-                    tint.set(withTiming(0, { duration: 60, easing: easing.out }))
-                }),
-            ]
-          : []),
-        /*
-          Tap reveals this bubble's own time.
+  const longPress = useLongPressGesture({
+    enabled: !!onOpenMenu,
+    minDuration: LONG_PRESS_MS,
+    maxDistance: 12,
+    onBegin: () => {
+      tint.set(withTiming(0.55, { duration: 80, easing: easing.out }))
+    },
+    onActivate: (e) => {
+      tint.set(1)
+      scheduleOnRN(hapticMedium)
+      scheduleOnRN(reportOpen, e.absoluteX, e.absoluteY)
+    },
+    onFinalize: (e) => {
+      if (e.canceled)
+        tint.set(withTiming(0, { duration: 60, easing: easing.out }))
+    },
+  })
 
-          Only where the bubble has nothing attached: an attachment is drawn
-          inside a control of its own that opens it, and a tap gesture out here
-          would race that control for the same touch. Those bubbles still state
-          their time when they end a run, and Message info reaches the rest.
-        */
-        // Nor where the text carries a link: the link's own press and this tap
-        // would race for the same touch, and the link is what was meant.
-        // Nor where a Post's card is drawn, which is a control of its own.
-        ...(onRevealTime && !attachment && !bodyHasLink && !wallPost
-          ? [
-              (quoteGesture
-                ? Gesture.Tap().requireExternalGestureToFail(quoteGesture)
-                : Gesture.Tap()
-              )
-                .maxDuration(LONG_PRESS_MS)
-                .maxDistance(12)
-                .onEnd((_, ok) => {
-                  if (ok) scheduleOnRN(handleRevealTime)
-                }),
-            ]
-          : []),
-        Gesture.Pan()
-          .activeOffsetX(18)
-          .failOffsetY([-18, 18])
-          .onUpdate((e) => {
-            x.set(rubberBand(e.translationX, SWIPE_LIMIT))
-            if (x.get() >= SWIPE_REPLY && !swipedHaptic.get()) {
-              swipedHaptic.set(true)
-              scheduleOnRN(hapticLight)
-            } else if (x.get() < SWIPE_REPLY) {
-              swipedHaptic.set(false)
-            }
-          })
-          .onEnd((_, ok) => {
-            // `ok` is false where the drag was taken away rather than let go —
-            // a parent claiming the touch, the screen going. The bubble still
-            // goes home, but a reply nobody finished asking for is not opened.
-            if (ok && x.get() >= SWIPE_REPLY) scheduleOnRN(handleReply)
-            // Timing rather than a spring, and this is the one gesture in the
-            // app where that is right: the release is not the drag continuing,
-            // it is the drag being undone. The outcome was already decided the
-            // moment the finger lifted, so there is no momentum worth keeping —
-            // and a spring handed outward velocity pushes the bubble further
-            // right before it comes back, which is the ease-in nobody asked
-            // for. Full speed from the first frame, then settle.
-            x.set(
-              withTiming(0, {
-                duration: motion.durations.release,
-                easing: easing.out,
-              }),
-            )
-            swipedHaptic.set(false)
-          }),
-      ),
-    [
-      attachment,
-      bodyHasLink,
-      wallPost,
-      handleRevealTime,
-      handleReply,
-      quoteGesture,
-      onOpenMenu,
-      onRevealTime,
-      reportOpen,
-      swipedHaptic,
-      tint,
-      x,
-    ],
-  )
+  /*
+    Tap reveals this bubble's own time.
+
+    Only where the bubble has nothing attached: an attachment is drawn
+    inside a control of its own that opens it, and a tap gesture out here
+    would race that control for the same touch. Those bubbles still state
+    their time when they end a run, and Message info reaches the rest.
+  */
+  // Nor where the text carries a link: the link's own press and this tap
+  // would race for the same touch, and the link is what was meant.
+  // Nor where a Post's card is drawn, which is a control of its own.
+  const revealTap = useTapGesture({
+    enabled: Boolean(onRevealTime && !attachment && !bodyHasLink && !wallPost),
+    requireToFail: quoteGesture,
+    maxDuration: LONG_PRESS_MS,
+    maxDistance: 12,
+    onDeactivate: (e) => {
+      if (!e.canceled) scheduleOnRN(handleRevealTime)
+    },
+  })
+
+  const swipe = usePanGesture({
+    activeOffsetX: 18,
+    failOffsetY: [-18, 18],
+    onUpdate: (e) => {
+      x.set(rubberBand(e.translationX, SWIPE_LIMIT))
+      if (x.get() >= SWIPE_REPLY && !swipedHaptic.get()) {
+        swipedHaptic.set(true)
+        scheduleOnRN(hapticLight)
+      } else if (x.get() < SWIPE_REPLY) {
+        swipedHaptic.set(false)
+      }
+    },
+    onDeactivate: (e) => {
+      // `canceled` is where the drag was taken away rather than let go — a
+      // parent claiming the touch, the screen going. The bubble still goes
+      // home, but a reply nobody finished asking for is not opened.
+      if (!e.canceled && x.get() >= SWIPE_REPLY) scheduleOnRN(handleReply)
+      // Timing rather than a spring, and this is the one gesture in the
+      // app where that is right: the release is not the drag continuing,
+      // it is the drag being undone. The outcome was already decided the
+      // moment the finger lifted, so there is no momentum worth keeping —
+      // and a spring handed outward velocity pushes the bubble further
+      // right before it comes back, which is the ease-in nobody asked
+      // for. Full speed from the first frame, then settle.
+      x.set(
+        withTiming(0, {
+          duration: motion.durations.release,
+          easing: easing.out,
+        }),
+      )
+      swipedHaptic.set(false)
+    },
+  })
+
+  const gesture = useCompetingGestures(longPress, revealTap, swipe)
 
   const swipeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: x.get() }],
