@@ -92,7 +92,17 @@
 					"color": "#6253A3",
 					"defaultChannel": "default"
 				}
-			]
+			],
+			[
+				"expo-build-properties",
+				{
+					"android": {
+						"enableMinifyInReleaseBuilds": true,
+						"enableShrinkResourcesInReleaseBuilds": true
+					}
+				}
+			],
+			"./plugins/with-r8-optimize"
 		],
 		"extra": {
 			"eas": {
