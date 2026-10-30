@@ -1,0 +1,42 @@
+# What `eas build` leaves out of the project archive it uploads.
+#
+# Once this file exists EAS reads it INSTEAD of .gitignore, so every rule in
+# .gitignore is restated here. A rule added there has to be added here too, or
+# that file starts reaching the build server. The .env rules matter most.
+
+# --- restated from .gitignore ---
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*
+*.tsbuildinfo
+uniwind-types.d.ts
+example
+/ios
+/android
+.claude/
+
+# --- only here ---
+# Store screenshots and other docs, about 90 MB of PNGs. No build step reads them.
+docs/
+# The shallow clone EAS makes still holds every blob in HEAD, docs/ included,
+# so it is as big again. Nothing in the build reads git history:
+# appVersionSource is local and updates are off.
+.git
+.github/
+.vscode/
