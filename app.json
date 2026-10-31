@@ -13,7 +13,10 @@
 		"ios": {
 			"icon": "./assets/images/icon.png",
 			"bundleIdentifier": "com.thechatroute.app",
-			"supportsTablet": true
+			"supportsTablet": false,
+			"infoPlist": {
+				"ITSAppUsesNonExemptEncryption": false
+			}
 		},
 		"android": {
 			"adaptiveIcon": {
@@ -58,17 +61,9 @@
 			[
 				"expo-image-picker",
 				{
-					"photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach screenshots to a support conversation.",
-					"cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation.",
+					"photosPermission": "Allow $(PRODUCT_NAME) to access your photos so you can attach them to a conversation or a post.",
+					"cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can take a photo for a conversation or a post.",
 					"microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can send voice notes in support conversations."
-				}
-			],
-			[
-				"expo-camera",
-				{
-					"cameraPermission": "Allow $(PRODUCT_NAME) to use the camera so you can attach a photo to a support conversation.",
-					"microphonePermission": false,
-					"recordAudioAndroid": false
 				}
 			],
 			"./plugins/with-system-bar-insets",

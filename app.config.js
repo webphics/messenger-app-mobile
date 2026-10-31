@@ -125,12 +125,19 @@ function androidVersionCode(version) {
 module.exports = ({ config }) => {
 	const scheme = iosUrlScheme(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
 	const services = googleServicesFile();
+	const buildCode = androidVersionCode(config.version);
 
 	return {
 		...config,
+		ios: {
+			...config.ios,
+			// App Store Connect refuses a build number it has already seen for a
+			// version, the same rule Play has for versionCode, so it grows the same way.
+			buildNumber: String(buildCode),
+		},
 		android: {
 			...config.android,
-			versionCode: androidVersionCode(config.version),
+			versionCode: buildCode,
 			// Spread conditionally: an explicit `undefined` is a key Expo's schema
 			// sees, and it reads it as a path that is empty rather than absent.
 			...(services ? { googleServicesFile: services } : {}),
