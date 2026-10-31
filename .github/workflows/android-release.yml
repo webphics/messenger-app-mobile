@@ -1,9 +1,9 @@
 # Builds the Android APK and the Play Store app bundle (AAB) on the runner with
 # Gradle when a version tag is pushed, publishes both as GitHub Release assets on
 # that tag (`chatroute-v<X.Y.Z>`, assets `chatroute-release.apk` and
-# `chatroute-release.aab`), and uploads the APK to the project's builds page at
-# expo.dev. The AAB is the file Google Play Console takes; nothing here uploads
-# it to Play.
+# `chatroute-release.aab`), uploads the APK to the project's builds page at
+# expo.dev, and uploads the AAB to Google Play on the track the tag's
+# environment maps to (see `play-upload`).
 #
 # The two are a matrix on `build`, one leg each, from two eas.json profiles:
 # `production` (assembleRelease, the APK) and `store`, which extends it and
@@ -44,18 +44,18 @@
 # the `eas-build-post-install` hook, because without it the NDK build loops on
 # "ninja: build.ninja still dirty" until the job times out.
 #
-# Five jobs rather than one, because "Re-run failed jobs" works per job: it
+# Six jobs rather than one, because "Re-run failed jobs" works per job: it
 # replays the failed job and everything downstream of it, and leaves the jobs
 # that already passed alone. So a missing environment variable fails in `meta`
 # after ten seconds instead of after the build, and a release that dies on a
-# token, a tag or a bad minute at GitHub, or an upload that dies at Expo, is
+# token, a tag or a bad minute at GitHub, or an upload that dies at Expo or Play, is
 # re-run on its own without recompiling the NDK for another 40 minutes. There
 # is no equivalent for a *step*: a single step cannot be re-run by itself,
 # which is why the split is jobs and not just more steps.
 #
 # What a job boundary costs is the runner, which is thrown away at the end of
-# one, so the APK and AAB travel to `release` (and the APK to `expo-upload`) as
-# Actions artifacts.
+# one, so the APK and AAB travel to `release` (the APK to `expo-upload`, the
+# AAB to `play-upload`) as Actions artifacts.
 # It is kept for a day (retention-days: 1) — long enough to re-run either,
 # short enough that it is not what the repository's storage allowance goes on.
 # The published Release is still the durable copy; the artifact is only the
@@ -121,6 +121,11 @@ env:
   # One ABI, matching the `production` profile's gradleCommand in eas.json.
   # Only the release notes read it; the build takes its ABI from that profile.
   ANDROID_ABIS: arm64-v8a
+
+  # What `play-upload` creates on Play: `draft` while the app is unpublished
+  # there (Play refuses anything else on a draft app), then `completed` to ship
+  # with no click, or `inProgress` for a staged rollout.
+  PLAY_RELEASE_STATUS: draft
 
 # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
 # `build`, inside the Gradle task that embeds the JS. `.env` is gitignored and
@@ -482,7 +487,7 @@ jobs:
           fi
 
       # A fixed artifact name per format (`android-apk`, `android-aab`), because
-      # `release` and `expo-upload` download them by name and the version is
+      # `release`, `expo-upload` and `play-upload` download them by name and the version is
       # already inside the file.
       #
       # overwrite, because "Re-run all jobs" is a new attempt on the same run id
@@ -665,4 +670,103 @@ jobs:
             echo "### ${TITLE} on Expo"
             echo
             echo "[Install ${APK} from expo.dev](${URL})"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Sends the AAB to Google Play, on the track the tag's environment maps to:
+  #
+  #   Development -> internal     Internal testing
+  #   Release     -> alpha        Closed testing
+  #   Production  -> production   Production
+  #
+  # A job of its own for the reason `expo-upload` is one: an upload Play refuses
+  # is re-run alone, without rebuilding and without touching the Release. Same
+  # two guards as `release`, so an unmapped branch or a dry run sends nothing.
+  #
+  # The release lands as whatever PLAY_RELEASE_STATUS says, `draft` until the
+  # app is published on Play, because Play refuses any other status on an app
+  # that is still a draft. A draft reaches nobody until somebody presses "Start
+  # rollout" in Play Console, which is also what makes a Production tag safe to
+  # push before the pipeline has been watched end to end. Once the app is live,
+  # `completed` ships every upload with no click.
+  #
+  # Authenticates with a Google Cloud service account invited to the app in Play
+  # Console, its JSON key held as PLAY_SERVICE_ACCOUNT_JSON on each environment.
+  # An environment without it skips this job with a warning rather than failing
+  # the run, so a Development tag can still build before Play is set up for it.
+  #
+  # Play refuses a versionCode it has seen before, and app.config.js derives
+  # versionCode from expo.version, so re-pushing a tag that already uploaded
+  # fails here and nowhere else. The fix is a new version, not a re-run.
+  play-upload:
+    name: Upload the AAB to Google Play
+    needs: [target, meta, build]
+    if: ${{ needs.target.outputs.publish == 'true' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # For PLAY_SERVICE_ACCOUNT_JSON. Not a deployment of its own; `release` is
+    # the one.
+    environment:
+      name: ${{ needs.target.outputs.environment }}
+      deployment: false
+
+    steps:
+      # `secrets` cannot be read in a step's `if`, so the check is a step that
+      # says whether the rest should run.
+      - name: Pick the Play track
+        id: track
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          ENVIRONMENT: ${{ needs.target.outputs.environment }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PLAY_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "::warning::PLAY_SERVICE_ACCOUNT_JSON is not set on the ${ENVIRONMENT} environment, so nothing goes to Google Play. Add the service account's key with: gh secret set PLAY_SERVICE_ACCOUNT_JSON --env ${ENVIRONMENT} < key.json"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          case "$ENVIRONMENT" in
+            Development) TRACK=internal ;;
+            Release)     TRACK=alpha ;;
+            Production)  TRACK=production ;;
+            *)
+              echo "::error::No Play track for the ${ENVIRONMENT} environment."
+              exit 1
+              ;;
+          esac
+          {
+            echo "upload=true"
+            echo "track=${TRACK}"
+          } >> "$GITHUB_OUTPUT"
+          echo "${ENVIRONMENT} uploads to the ${TRACK} track as ${PLAY_RELEASE_STATUS}"
+
+      - name: Download the AAB
+        if: ${{ steps.track.outputs.upload == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab
+          path: dist
+
+      # Pinned to a commit rather than a tag, because this is the one third-party
+      # action handed a key that can publish to Play, and a tag can be moved.
+      - name: Upload the AAB to Google Play
+        if: ${{ steps.track.outputs.upload == 'true' }}
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.thechatroute.app
+          releaseFiles: dist/${{ needs.meta.outputs.aab }}
+          track: ${{ steps.track.outputs.track }}
+          status: ${{ env.PLAY_RELEASE_STATUS }}
+          releaseName: ${{ needs.meta.outputs.version }}
+
+      - name: Summarise
+        if: ${{ steps.track.outputs.upload == 'true' }}
+        env:
+          TITLE: ${{ needs.meta.outputs.title }}
+          TRACK: ${{ steps.track.outputs.track }}
+        run: |
+          {
+            echo "### ${TITLE} on Google Play"
+            echo
+            echo "Uploaded to the \`${TRACK}\` track as \`${PLAY_RELEASE_STATUS}\`. A draft goes out from Play Console's Release overview."
           } >> "$GITHUB_STEP_SUMMARY"
