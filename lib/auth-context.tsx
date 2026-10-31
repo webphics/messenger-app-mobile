@@ -13,6 +13,7 @@ import { AppState } from "react-native";
 import {
   authTransition,
   INITIAL_AUTH_STATE,
+  type AuthEvent,
   type AuthState,
 } from "@/lib/auth-machine";
 import type {
@@ -27,6 +28,7 @@ import {
   requestMagicLink as sendMagicLink,
   requestSignUp as sendSignUp,
   type SignUpRequest,
+  signInWithApple as startAppleSignIn,
   signInWithGoogle as startGoogleSignIn,
   signInWithPassword,
   signOut as endSession,
@@ -34,6 +36,7 @@ import {
   verifyTwoFactorCode,
 } from "@/lib/auth-service";
 import { CHALLENGE_LIFETIME_MS } from "@/lib/two-factor-challenge";
+import { appleAuthEvent } from "@/lib/apple-auth";
 import { googleAuthEvent } from "@/lib/google-auth";
 import type { ApiResult } from "@/lib/api-result";
 import { updateProfile } from "@/lib/profile-api";
@@ -67,6 +70,8 @@ type AuthContextValue = {
    * earlier — has to survive it.
    */
   signInWithGoogle: () => Promise<boolean>;
+  /** Sign in with Apple, on the terms `signInWithGoogle` keeps. iOS only. */
+  signInWithApple: () => Promise<boolean>;
   /**
    * Ask for a sign-in link. Deliberately outside the state machine: no session
    * is established or refused, so the screen owns the outcome and the answer is
@@ -306,8 +311,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   /**
-   * The third way in, and the same guard again. The event it ends on is chosen
-   * by `googleAuthEvent` rather than here, so there is one place where a Google
+   * The ways in that start with a system sheet — Google's and Apple's — and the
+   * same guard again. The event each ends on is chosen by `googleAuthEvent` or
+   * `appleAuthEvent` rather than here, so there is one place where a provider's
    * outcome becomes an auth fact and it is a pure function with a test file.
    *
    * `submit` is dispatched *after* the account sheet rather than before it,
@@ -319,12 +325,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * double-submit guard does not depend on the machine here: `submitting.current`
    * is already held, and the account sheet is modal anyway.
    */
-  const signInWithGoogle = useCallback(async () => {
+  const runSheetAttempt = useCallback(async (attempt: () => Promise<AuthEvent | null>) => {
     if (submitting.current) return false;
     submitting.current = true;
 
     try {
-      const event = googleAuthEvent(await startGoogleSignIn());
+      const event = await attempt();
       // Null is a dismissed sheet: not an attempt, so there is nothing to
       // announce and nothing on the screen to disturb.
       if (!event) return false;
@@ -339,6 +345,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       submitting.current = false;
     }
   }, []);
+
+  const signInWithGoogle = useCallback(
+    () =>
+      runSheetAttempt(async () => googleAuthEvent(await startGoogleSignIn())),
+    [runSheetAttempt],
+  );
+
+  /** The same sheet-first sequence, with Apple's sheet and `appleAuthEvent`. */
+  const signInWithApple = useCallback(
+    () => runSheetAttempt(async () => appleAuthEvent(await startAppleSignIn())),
+    [runSheetAttempt],
+  );
 
   const requestMagicLink = useCallback(
     (email: string, name?: string) => sendMagicLink(email, name),
@@ -467,6 +485,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       verifyMagicLink,
       signInWithGoogle,
+      signInWithApple,
       requestMagicLink,
       requestSignUp,
       submitTwoFactorCode,
@@ -483,6 +502,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       verifyMagicLink,
       signInWithGoogle,
+      signInWithApple,
       requestMagicLink,
       requestSignUp,
       submitTwoFactorCode,
