@@ -1,9 +1,8 @@
 # Builds the Android APK and the Play Store app bundle (AAB) on the runner with
 # Gradle when a version tag is pushed, publishes both as GitHub Release assets on
 # that tag (`chatroute-v<X.Y.Z>`, assets `chatroute-release.apk` and
-# `chatroute-release.aab`), uploads the APK to the project's builds page at
-# expo.dev, and uploads the AAB to Google Play on the track the tag's
-# environment maps to (see `play-upload`).
+# `chatroute-release.aab`), and uploads the AAB to Google Play on the track
+# the tag's environment maps to (see `play-upload`).
 #
 # The two are a matrix on `build`, one leg each, from two eas.json profiles:
 # `production` (assembleRelease, the APK) and `store`, which extends it and
@@ -44,18 +43,18 @@
 # the `eas-build-post-install` hook, because without it the NDK build loops on
 # "ninja: build.ninja still dirty" until the job times out.
 #
-# Six jobs rather than one, because "Re-run failed jobs" works per job: it
+# Five jobs rather than one, because "Re-run failed jobs" works per job: it
 # replays the failed job and everything downstream of it, and leaves the jobs
 # that already passed alone. So a missing environment variable fails in `meta`
 # after ten seconds instead of after the build, and a release that dies on a
-# token, a tag or a bad minute at GitHub, or an upload that dies at Expo or Play, is
+# token, a tag or a bad minute at GitHub, or an upload that dies at Play, is
 # re-run on its own without recompiling the NDK for another 40 minutes. There
 # is no equivalent for a *step*: a single step cannot be re-run by itself,
 # which is why the split is jobs and not just more steps.
 #
 # What a job boundary costs is the runner, which is thrown away at the end of
-# one, so the APK and AAB travel to `release` (the APK to `expo-upload`, the
-# AAB to `play-upload`) as Actions artifacts.
+# one, so the APK and AAB travel to `release` (and the AAB to `play-upload`)
+# as Actions artifacts.
 # It is kept for a day (retention-days: 1) — long enough to re-run either,
 # short enough that it is not what the repository's storage allowance goes on.
 # The published Release is still the durable copy; the artifact is only the
@@ -165,7 +164,7 @@ jobs:
   # A dispatch from a branch, or from a tag that matches none of the above,
   # builds with Development's values and publishes nothing, so a change to this
   # file can still be tried on a branch without reaching any environment's
-  # Release or Expo.
+  # Release or Play.
   #
   # A dispatch from a version tag behaves like the tag push, so a failed run
   # can be retried from Actions without deleting and re-pushing the tag.
@@ -493,7 +492,7 @@ jobs:
           fi
 
       # A fixed artifact name per format (`android-apk`, `android-aab`), because
-      # `release`, `expo-upload` and `play-upload` download them by name and the version is
+      # `release` and `play-upload` download them by name and the version is
       # already inside the file.
       #
       # overwrite, because "Re-run all jobs" is a new attempt on the same run id
@@ -598,86 +597,6 @@ jobs:
             echo "[Download ${APK} and ${AAB}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # Puts the same APK on the project's builds page at expo.dev, next to the
-  # GitHub Release rather than instead of it, and prints the install link Expo
-  # issues for it. A job of its own for the reason `release` is one: an upload
-  # that fails at Expo is re-run alone, without rebuilding and without touching
-  # the Release, and a Release that fails does not hold this one back. Same two
-  # guards as `release`, so an unmapped branch or a dry run sends nothing to
-  # Expo. Every environment uploads to the same Expo project; the title in the
-  # run summary names which one a build is.
-  #
-  # Expo does not learn the version from this. For an APK, `eas upload` reads
-  # only whether it is a development client and its fingerprint, and there is
-  # no fingerprint without expo-updates, which this project does not use. The
-  # entry on expo.dev is dated rather than versioned, so the version is written
-  # into this run's summary beside the link.
-  expo-upload:
-    name: Upload the APK to Expo
-    needs: [target, meta, build]
-    if: ${{ needs.target.outputs.publish == 'true' && !inputs.dry_run }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # For EXPO_TOKEN. Not a deployment of its own; `release` is the one.
-    environment:
-      name: ${{ needs.target.outputs.environment }}
-      deployment: false
-
-    steps:
-      # A checkout and an install, unlike `release`: eas finds the project from
-      # `extra.eas.projectId` in app.json, and resolving the app config loads
-      # the plugins it names. The install also pins eas-cli to the lockfile.
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Download the APK
-        uses: actions/download-artifact@v4
-        with:
-          name: android-apk
-          path: dist
-
-      - name: Upload the APK to Expo
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          APK: ${{ needs.meta.outputs.apk }}
-          TITLE: ${{ needs.meta.outputs.title }}
-          ENVIRONMENT: ${{ needs.target.outputs.environment }}
-        run: |
-          set -euo pipefail
-          if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo "::error::EXPO_TOKEN is not set on the ${ENVIRONMENT} environment. Add it with: gh secret set EXPO_TOKEN --env ${ENVIRONMENT}"
-            exit 1
-          fi
-
-          # --json prints only `{"url": ...}` on stdout; progress goes to
-          # stderr and stays in the log.
-          RESULT="$(pnpm exec eas upload \
-            --platform android \
-            --build-path "dist/${APK}" \
-            --non-interactive \
-            --json)"
-          URL="$(printf '%s' "$RESULT" | jq -r '.url // empty')"
-          if [ -z "$URL" ]; then
-            echo "::error::eas upload finished without a build link. It printed: ${RESULT}"
-            exit 1
-          fi
-
-          echo "Uploaded to Expo: ${URL}"
-          {
-            echo "### ${TITLE} on Expo"
-            echo
-            echo "[Install ${APK} from expo.dev](${URL})"
-          } >> "$GITHUB_STEP_SUMMARY"
-
   # Sends the AAB to Google Play, on the track the tag's environment maps to:
   #
   #   Development -> internal     Internal testing
@@ -685,7 +604,7 @@ jobs:
   #   Production  -> production   Production (PLAY_PRODUCTION_TRACK, `alpha`
   #                               until Play grants production access)
   #
-  # A job of its own for the reason `expo-upload` is one: an upload Play refuses
+  # A job of its own so that an upload Play refuses
   # is re-run alone, without rebuilding and without touching the Release. Same
   # two guards as `release`, so an unmapped branch or a dry run sends nothing.
   #
