@@ -17,7 +17,7 @@ allowBuilds:
   protobufjs: false
   unrs-resolver: true
 nodeLinker: hoisted
-# eas-cli (through 24.14.0, the last 24.x) still depends on @expo/config@55, whose
+# eas-cli (through 27.2.0) still depends on @expo/config@55, whose
 # require-utils declares TypeScript ^5 only. The SDK 58 copy of the same package
 # accepts ^6, and this app has no app.config.ts for it to transpile anyway.
 peerDependencyRules:
@@ -26,13 +26,15 @@ peerDependencyRules:
 # Deprecated packages pinned by tooling with no version of the owner that drops
 # them: jest-expo@58 (jsdom 26, through jest-environment-jsdom 30), the babel-jest
 # 29 that @react-native/jest-preset@0.88 still uses (glob 7), eas-cli's own
-# @expo/config-plugins (xcode 3) and logger (bunyan), and @expo/ngrok. Exact
+# @expo/config-plugins (xcode 3), logger (bunyan) and update check (http-call),
+# and @expo/ngrok. Exact
 # versions, so a new deprecation still warns. Revisit on the next SDK upgrade.
 # ESLint stays on 9 because eslint-config-expo@58 pulls eslint-plugin-react and
 # eslint-plugin-import, which both cap their eslint peer at ^9.
 allowedDeprecatedVersions:
   eslint: 9.39.5
   glob: 6.0.4 || 7.2.3 || 10.5.0
+  http-call: 5.3.0
   inflight: 1.0.6
   rimraf: 2.4.5
   uuid: 3.4.0 || 7.0.3 || 8.3.2
