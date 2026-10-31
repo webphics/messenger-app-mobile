@@ -1,3 +1,4 @@
+import { isCompanyPersona } from '@/lib/display'
 import { isLocalId, isOutgoing, isSystemMessage } from '@/lib/thread-state'
 import { isStaffMessage, type Message } from '@/lib/types'
 
@@ -12,6 +13,9 @@ import { isStaffMessage, type Message } from '@/lib/types'
  * Block needs a person to block, so it is offered only where the Message names
  * its sender. A Customer's Support DM does not — the company speaks as one
  * voice there — so a Customer can report a reply in it but has nobody to block.
+ * Nor does a Staff member a Customer is shown as the company in a group
+ * (`company:…`): that id is an organization's, and `POST /blocks` takes a
+ * person's.
  */
 export type MessageModeration = {
   report: boolean
@@ -22,6 +26,9 @@ const NOTHING: MessageModeration = { report: false, block: null }
 
 export function messageModeration(message: Message, viewerId: string): MessageModeration {
   if (isLocalId(message.id) || isSystemMessage(message) || isOutgoing(message, viewerId)) return NOTHING
-  const sender = isStaffMessage(message) && message.sender.id !== '' ? message.sender : null
+  const sender =
+    isStaffMessage(message) && message.sender.id !== '' && !isCompanyPersona(message.sender.id)
+      ? message.sender
+      : null
   return { report: true, block: sender ? { id: sender.id, name: sender.name } : null }
 }

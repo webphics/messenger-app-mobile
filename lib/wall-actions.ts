@@ -1,5 +1,6 @@
 import type { ApiFailure } from '@/lib/api-result'
 import { can, type Capability } from '@/lib/capabilities'
+import { isCompanyPersona } from '@/lib/display'
 import type { UserRole, WallPost, WallPostReaction, WallVoteDirection } from '@/lib/types'
 
 /**
@@ -48,6 +49,8 @@ export type WallPostAction =
  * the role: App Review asks that anybody can report what they see and block
  * whoever posted it, and the API's `POST /reports` and `POST /blocks` refuse
  * only yourself. They come last because they are the ones that leave the card.
+ * A Customer reading a Staff member's Post sees the company (`company:…`), an
+ * organization rather than a person, so there is nobody to block — only report.
  */
 export function wallPostActions(post: WallPost, viewer: WallPostViewer): WallPostAction[] {
   const isAuthor = post.author.id === viewer.id
@@ -60,7 +63,7 @@ export function wallPostActions(post: WallPost, viewer: WallPostViewer): WallPos
     isAuthor ? ('delete' as const) : null,
     mayTakeDown && !isAuthor ? ('takedown' as const) : null,
     isAuthor ? null : ('report' as const),
-    isAuthor ? null : ('block' as const),
+    isAuthor || isCompanyPersona(post.author.id) ? null : ('block' as const),
   ].filter((action): action is WallPostAction => action !== null)
 }
 

@@ -35,6 +35,14 @@ describe('Report and Block on a Message', () => {
     expect(messageModeration(message, viewerId)).toEqual({ report: false, block: null })
   })
 
+  it('lets a Customer report Staff shown as the company in a group, with nobody to block', () => {
+    const company: StaffMessage = {
+      ...fromMallory,
+      sender: { id: 'company:org-1', name: 'Acme', role: 'agent' },
+    }
+    expect(messageModeration(company, 'me')).toEqual({ report: true, block: null })
+  })
+
   it('lets a Customer report a reply in their Support DM, with nobody to block', () => {
     const reply: CustomerMessage = { ...base, id: 'msg-2', fromCompany: true }
     expect(messageModeration(reply, 'me')).toEqual({ report: true, block: null })

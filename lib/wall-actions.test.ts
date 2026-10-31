@@ -38,6 +38,11 @@ describe('what a Post offers', () => {
     expect(wallPostActions(post(), stranger)).toEqual(['report', 'block'])
   })
 
+  it('offers report but not block on a Post shown as the company', () => {
+    const company = post({ author: { id: 'company:org-1', name: 'Acme' } })
+    expect(wallPostActions(company, stranger)).toEqual(['report'])
+  })
+
   it('never offers the author a report or a block of their own Post', () => {
     expect(wallPostActions(post({ body: 'Hi' }), author)).toEqual(['copy-body', 'edit', 'delete'])
   })
