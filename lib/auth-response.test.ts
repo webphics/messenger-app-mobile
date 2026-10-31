@@ -10,6 +10,7 @@ import {
   interpretTwoFactorVerify,
   parseSessionUser,
   saysSessionExpired,
+  saysTermsRequired,
   type HttpOutcome,
 } from "@/lib/auth-response";
 
@@ -26,6 +27,7 @@ function apiUser(over: Record<string, unknown> = {}) {
     role: "admin",
     twoFactorEnabled: false,
     hasPassword: true,
+    termsAcceptedAt: "2026-10-31T10:00:00.000Z",
     ...over,
   };
 }
@@ -77,6 +79,7 @@ describe("parseSessionUser", () => {
       hasPassword: true,
       twoFactorEnabled: false,
       supportAssignmentEnabled: false,
+      termsAcceptedAt: "2026-10-31T10:00:00.000Z",
       capabilities: [],
     });
   });
@@ -168,6 +171,7 @@ describe("interpretSignIn", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
       },
     });
@@ -296,6 +300,7 @@ describe("interpretSession", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
       },
     });
@@ -362,6 +367,26 @@ describe("interpretSession", () => {
   test.each([["a truncated user", envelope({ id: "abc" })]])("a malformed success (%s) is reported as malformed", (_label, body) => {
     const outcome: HttpOutcome = { reached: true, status: 200, body, sessionCookie: null };
     expect(interpretSession(outcome, HELD)).toEqual({ kind: "malformed" });
+  });
+});
+
+describe("saysTermsRequired", () => {
+  const answer = (status: number, body: unknown): HttpOutcome => ({
+    reached: true,
+    status,
+    body,
+    sessionCookie: null,
+  });
+
+  test.each([
+    ["a 403 carrying terms_required", answer(403, { code: "terms_required" }), true],
+    ["any other 403", answer(403, { code: "blocked" }), false],
+    ["a 403 with no body", answer(403, null), false],
+    ["the code on another status", answer(422, { code: "terms_required" }), false],
+    ["a 401, which is the session and not the terms", answer(401, { code: "terms_required" }), false],
+    ["no answer at all", { reached: false } as HttpOutcome, false],
+  ])("%s → %s", (_label, outcome, expected) => {
+    expect(saysTermsRequired(outcome)).toBe(expected);
   });
 });
 
@@ -521,6 +546,7 @@ describe("interpretTwoFactorVerify", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
       },
     });
@@ -568,5 +594,18 @@ describe("interpretTwoFactorVerify", () => {
       sessionCookie: null,
     });
     expect(lapsed).toEqual({ kind: "unauthorised", message: CODE_REFUSED_NOTICE });
+  });
+});
+
+describe("termsAcceptedAt", () => {
+  test.each([
+    ["a date", "2026-10-31T10:00:00.000Z", "2026-10-31T10:00:00.000Z"],
+    ["null", null, null],
+    ["absent", undefined, null],
+    ["not a string", 1, null],
+  ])("%s reads as %s", (_label, value, expected) => {
+    const payload = apiUser({ termsAcceptedAt: value });
+    if (value === undefined) delete (payload as Record<string, unknown>).termsAcceptedAt;
+    expect(parseSessionUser(payload)?.termsAcceptedAt).toBe(expected);
   });
 });

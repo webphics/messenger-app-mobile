@@ -227,6 +227,9 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     // queue, which offers nobody an action the API would refuse.
     supportAssignmentEnabled: record.supportAssignmentEnabled === true,
     capabilities: parseCapabilities(record.capabilities),
+    // Absent reads as not accepted: the terms screen asks once more, which is
+    // a smaller failure than letting somebody past a step App Review requires.
+    termsAcceptedAt: nonEmptyString(record.termsAcceptedAt) ?? null,
   };
 }
 
@@ -499,4 +502,16 @@ export function interpretSession(outcome: HttpOutcome, cookie: string): AuthOutc
  */
 export function saysSessionExpired(outcome: HttpOutcome): boolean {
   return outcome.reached && outcome.status === 401;
+}
+
+/**
+ * Whether the API refused a request because this person has not agreed to the
+ * Terms of Use (App Store guideline 1.2). A 403 with that code and nothing
+ * else: every other 403 is a verdict on the request, and the session is fine
+ * either way, so this never ends it — it sends the person to agree.
+ */
+export function saysTermsRequired(outcome: HttpOutcome): boolean {
+  if (!outcome.reached || outcome.status !== 403) return false;
+  const body = outcome.body;
+  return typeof body === "object" && body !== null && (body as { code?: unknown }).code === "terms_required";
 }

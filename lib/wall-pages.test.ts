@@ -4,6 +4,7 @@ import {
   withLivePost,
   withRestoredPost,
   withUpdatedPost,
+  withoutAuthors,
 } from '@/lib/wall-pages'
 import type { WallPost } from '@/lib/types'
 
@@ -69,5 +70,31 @@ describe('folding in what arrives', () => {
     const saved = applyFirstPage([post('c'), post('a')], LIMIT)
     expect(ids(withRestoredPost(saved, post('b'), 1))).toEqual(['c', 'b', 'a'])
     expect(withRestoredPost(saved, post('c'), 0)).toBe(saved)
+  })
+})
+
+describe('hiding the Posts of people the reader blocked', () => {
+  const by = (id: string, authorId: string): WallPost => ({
+    ...post(id),
+    author: { id: authorId, name: authorId },
+  })
+
+  it.each([
+    ['nobody blocked', [], ['c', 'b', 'a']],
+    ['one author blocked', ['mallory'], ['c', 'a']],
+    ['an author with nothing on the Wall', ['eve'], ['c', 'b', 'a']],
+  ])('%s', (_, blocked, expected) => {
+    const read = applyFirstPage([by('c', 'ada'), by('b', 'mallory'), by('a', 'ada')], LIMIT)
+    expect(ids(withoutAuthors(read, new Set(blocked)))).toEqual(expected)
+  })
+
+  it('keeps the cursor on the last Post the API answered with, so paging on is unchanged', () => {
+    const read = applyFirstPage([by('c', 'ada'), by('b', 'ada'), by('a', 'mallory')], LIMIT)
+    expect(withoutAuthors(read, new Set(['mallory'])).cursor).toBe('a')
+  })
+
+  it('hands back the same object when nothing is hidden', () => {
+    const read = applyFirstPage([by('c', 'ada')], LIMIT)
+    expect(withoutAuthors(read, new Set(['mallory']))).toBe(read)
   })
 })

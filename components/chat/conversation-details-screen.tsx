@@ -15,6 +15,7 @@ import {
   AlertCircle,
   ChevronRight,
   FileText,
+  Flag,
   Image as ImageIcon,
   Plus,
   Shield,
@@ -26,6 +27,7 @@ import { InScreenHeader } from '@/components/in-screen-header'
 import { DetailsCard } from '@/components/chat/details-card'
 import { OnboardingPlacementSection } from '@/components/chat/onboarding-placement-section'
 import { ThreadManagementSection } from '@/components/chat/thread-management-section'
+import { ReportSheet } from '@/components/moderation/report-sheet'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { LinkedText, linkTint } from '@/components/ui/linked-text'
@@ -285,9 +287,47 @@ export function ConversationDetailsScreen({
               onChangeDraft={setDraft}
             />
           ) : null}
+
+          {/*
+            Last, apart from everything that runs the group: anybody who can
+            read it may report it, whatever they hold. The API takes the
+            group's own id and resolves its Community and creator itself.
+          */}
+          {isGroup ? <ReportGroupRow conversationId={conversation.id} /> : null}
         </ScrollView>
       </View>
     </View>
+  )
+}
+
+function ReportGroupRow({ conversationId }: { conversationId: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Report group"
+        onPress={() => setOpen(true)}
+        className="min-h-11 flex-row items-center gap-3 rounded-3xl border border-line/70 bg-surface p-4 shadow-md shadow-black/8 active:opacity-70"
+      >
+        <View className="size-11 items-center justify-center rounded-2xl bg-danger/10">
+          <Flag color={colors.danger} size={20} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <Text variant="title" className="text-danger">
+            Report group…
+          </Text>
+          <Text variant="meta" className="mt-0.5 text-muted">
+            Its name, its description or what is posted in it
+          </Text>
+        </View>
+      </Pressable>
+      <ReportSheet
+        visible={open}
+        target={{ targetKind: 'group', targetId: conversationId }}
+        onClose={() => setOpen(false)}
+      />
+    </>
   )
 }
 

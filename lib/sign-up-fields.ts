@@ -73,3 +73,13 @@ export const SIGN_UP_FIELD_ORDER: readonly (keyof SignUpFields)[] = [
   "email",
   "phone",
 ];
+
+/**
+ * The sign-up step's one required box: agreeing to the Terms of Use (App Store
+ * guideline 1.2). A sentence when it is not ticked, null when it is. Checked
+ * beside the fields rather than instead of them, so one submit marks everything
+ * that is missing.
+ */
+export function signUpTermsError(accepted: boolean): string | null {
+  return accepted ? null : "Agree to the Terms of Use to create an account";
+}

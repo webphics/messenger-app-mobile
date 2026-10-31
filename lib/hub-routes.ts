@@ -64,6 +64,10 @@ export function pushRouteHref(route: PushRoute, role: UserRole): Href {
       return settingsHref(role);
     case "conversations":
       return messagesHref(role);
+    case "reports":
+      // Only Admins are sent one; anybody else lands on their own inbox rather
+      // than on a screen their group does not have.
+      return role === "admin" ? ("/(admin)/(home)/reports" as Href) : messagesHref(role);
   }
 }
 

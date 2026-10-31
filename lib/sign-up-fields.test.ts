@@ -3,6 +3,7 @@ import {
   signUpFieldErrors,
   signUpNeedsEmail,
   type SignUpFields,
+  signUpTermsError,
 } from "@/lib/sign-up-fields";
 
 function fields(over: Partial<SignUpFields> = {}): SignUpFields {
@@ -63,5 +64,12 @@ describe("what a submit refuses", () => {
 
   test("the phone is left to the API", () => {
     expect(signUpFieldErrors(fields({ phone: "not a number" })).phone).toBeUndefined();
+  });
+});
+
+describe("the Terms of Use box", () => {
+  test("is required, and says so until it is ticked", () => {
+    expect(signUpTermsError(false)).toMatch(/Terms of Use/);
+    expect(signUpTermsError(true)).toBeNull();
   });
 });

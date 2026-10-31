@@ -46,3 +46,15 @@ test.each([
 ] as [string, string | null][])("%s is nobody kept", (_label, raw) => {
   expect(parseKeptPerson(raw)).toBeNull();
 });
+
+test.each([
+  ["agreed", "2026-10-31T10:00:00.000Z"],
+  ["never agreed", null],
+] as const)("the terms answer is kept when the API gave one: %s", (_label, termsAcceptedAt) => {
+  const kept = parseKeptPerson(serialiseKeptPerson({ ...AGENT, termsAcceptedAt }));
+  expect(kept?.termsAcceptedAt).toBe(termsAcceptedAt);
+});
+
+test("a person kept by a build from before the terms step is unknown, not unagreed", () => {
+  expect(parseKeptPerson(JSON.stringify(AGENT))).not.toHaveProperty("termsAcceptedAt");
+});

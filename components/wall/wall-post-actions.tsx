@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard'
 import { Modal, Pressable, View } from 'react-native'
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { Ban, Copy, Link, Pencil, Trash2 } from '@/components/icons'
+import { Ban, Copy, Flag, Link, Pencil, Trash2, UserX } from '@/components/icons'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
 import { Text } from '@/components/ui/text'
 import { cn } from '@/lib/cn'
@@ -22,7 +22,9 @@ import type { WallPost } from '@/lib/types'
  * than acting here: an edit opens a second sheet of its own
  * (`WallPostEditSheet`) and a removal needs a confirmation first
  * (`WallPostCard`'s `Alert.alert`), neither of which belongs inside a sheet
- * that is about to be dismissed out from under them.
+ * that is about to be dismissed out from under them. `report` and `block` hand
+ * the tap up for the same reason: a report opens its own sheet and a block asks
+ * first.
  */
 
 const LABELS: Record<WallPostAction, { title: string; icon: typeof Copy; destructive?: boolean }> = {
@@ -31,6 +33,13 @@ const LABELS: Record<WallPostAction, { title: string; icon: typeof Copy; destruc
   edit: { title: 'Edit post', icon: Pencil },
   delete: { title: 'Delete post', icon: Trash2, destructive: true },
   takedown: { title: 'Take down', icon: Ban, destructive: true },
+  report: { title: 'Report post…', icon: Flag, destructive: true },
+  block: { title: 'Block…', icon: UserX, destructive: true },
+}
+
+/** The block row names who it blocks; every other row's title is fixed. */
+function titleFor(action: WallPostAction, post: WallPost): string {
+  return action === 'block' ? `Block ${post.author.name}…` : LABELS[action].title
 }
 
 type SheetProps = {
@@ -39,6 +48,8 @@ type SheetProps = {
   actions: WallPostAction[]
   onEdit: () => void
   onRemove: (mode: 'delete' | 'takedown') => void
+  onReport: () => void
+  onBlock: () => void
 }
 
 export function WallPostActionsSheet({
@@ -66,7 +77,7 @@ export function WallPostActionsSheet({
   )
 }
 
-function Sheet({ onClose, post, actions, onEdit, onRemove }: SheetProps) {
+function Sheet({ onClose, post, actions, onEdit, onRemove, onReport, onBlock }: SheetProps) {
   const insets = useSafeAreaInsets()
 
   async function run(action: WallPostAction) {
@@ -78,6 +89,12 @@ function Sheet({ onClose, post, actions, onEdit, onRemove }: SheetProps) {
     if (action === 'delete' || action === 'takedown') {
       onClose()
       onRemove(action)
+      return
+    }
+    if (action === 'report' || action === 'block') {
+      onClose()
+      if (action === 'report') onReport()
+      else onBlock()
       return
     }
 
@@ -103,7 +120,8 @@ function Sheet({ onClose, post, actions, onEdit, onRemove }: SheetProps) {
       >
         <View className="mb-3 h-1 w-10 self-center rounded-full bg-line" />
         {actions.map(action => {
-          const { title, icon: Icon, destructive } = LABELS[action]
+          const { icon: Icon, destructive } = LABELS[action]
+          const title = titleFor(action, post)
           return (
             <TactilePressable
               key={action}

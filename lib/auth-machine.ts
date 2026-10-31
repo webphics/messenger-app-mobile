@@ -145,7 +145,15 @@ export type AuthEvent =
    * was true before they got there until something remounted it. See
    * `docs/adr/ADR-0012-account-self-service-is-pushed-from-settings.md`.
    */
-  | { type: "account-updated"; user: SessionUser };
+  | { type: "account-updated"; user: SessionUser }
+  /**
+   * The API refused a request with `terms_required`: whatever this device held,
+   * the server says this person has not agreed to the Terms of Use. Marks the
+   * person as owing them, in place, so the terms gate (`TermsRedirect`) takes
+   * over from whatever screen sent the request. Nothing else changes: the
+   * session is good, and agreeing is all it takes to carry on.
+   */
+  | { type: "terms-required" };
 
 export const INITIAL_AUTH_STATE: AuthState = { status: "hydrating" };
 
@@ -376,5 +384,12 @@ export function authTransition(state: AuthState, event: AuthEvent): AuthState {
     // event carrying a user follows here.
     case "account-updated":
       return state.status === "signed-in" ? { ...state, user: event.user } : state;
+
+    // Signed-in only, like every event about the person. Already owing the
+    // terms is the same state, so a burst of refusals re-renders nothing.
+    case "terms-required":
+      return state.status === "signed-in" && state.user.termsAcceptedAt !== null
+        ? { ...state, user: { ...state.user, termsAcceptedAt: null } }
+        : state;
   }
 }

@@ -20,6 +20,7 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SeedAccountPicker } from "@/components/auth/seed-account-picker";
+import { TermsCheckbox } from "@/components/auth/terms-checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
@@ -64,6 +65,7 @@ import {
   signUpDefaults,
   signUpFieldErrors,
   signUpNeedsEmail,
+  signUpTermsError,
 } from "@/lib/sign-up-fields";
 import type { SeedAccount } from "@/lib/seed-accounts";
 import { CHALLENGE_COPY, codeError } from "@/lib/two-factor-challenge";
@@ -253,6 +255,12 @@ export function SignInForm() {
     fields: signUpDefaults(""),
   });
   const [signUpErrors, setSignUpErrors] = useState<SignUpFieldErrors>({});
+  /**
+   * The Terms of Use box. Required: the link is not sent until it is ticked,
+   * and the API records the date when the account is created from the link.
+   */
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState<string | null>(null);
   /**
    * Whether the machine's standing notice still describes what is on screen.
    *
@@ -496,6 +504,8 @@ export function SignInForm() {
       : { ...signUp.fields, email: normaliseIdentifier(identifier) };
     const errors = signUpFieldErrors(fields);
     setSignUpErrors(errors);
+    const termsProblem = signUpTermsError(termsAccepted);
+    setTermsError(termsProblem);
 
     const firstError = SIGN_UP_FIELD_ORDER.find((field) => errors[field]);
     if (firstError) {
@@ -503,11 +513,15 @@ export function SignInForm() {
       signUpRefs[firstError].current?.focus();
       return;
     }
+    if (termsProblem) {
+      hapticWarning();
+      return;
+    }
 
     setNoticeStale(false);
     setLinkRequest((prev) => ({ ...prev, sending: true, failure: null }));
 
-    const outcome = await requestSignUp(fields);
+    const outcome = await requestSignUp({ ...fields, acceptTerms: true });
     if (outcome.kind === "sent") {
       hapticSuccess();
       setLinkPurpose("sign-up");
@@ -1131,6 +1145,18 @@ export function SignInForm() {
               {/* The label stays put while it spins, so the control never looks like a different one. */}
               <Text>Sign In</Text>
             </Button>
+          ) : null}
+
+          {step === "sign-up" ? (
+            <TermsCheckbox
+              checked={termsAccepted}
+              onChange={(next) => {
+                setTermsAccepted(next);
+                setTermsError(null);
+              }}
+              error={termsError}
+              disabled={anyRequestOut}
+            />
           ) : null}
 
           {step === "sign-up" ? (

@@ -41,6 +41,18 @@ export type SessionUser = {
    * and `canAny` in `lib/capabilities`.
    */
   capabilities: Capability[]
+  /**
+   * When this person agreed to the Terms of Use, or null when the API says they
+   * have not — a first Google sign-in, a sign-up link opened from an unknown
+   * address, or an account from before the terms step existed. Null is what
+   * sends them to the terms screen before anything else (`lib/onboarding-gate`).
+   *
+   * Optional only for a person this phone kept before the field existed: absent
+   * is *unknown*, and an offline cold start must not stop somebody at a screen
+   * whose only button needs the network. `parseSessionUser` always sets it, so
+   * the first reachable moment replaces unknown with the API's answer.
+   */
+  termsAcceptedAt?: string | null
 }
 
 /** A mock directory entry. Only the Agent and Admin screens still read this. */

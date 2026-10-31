@@ -10,6 +10,7 @@ import {
   hydrateAuth,
   onSessionExpired,
   requestMagicLink,
+  requestSignUp,
   signInWithApple,
   signInWithGoogle,
   signInWithPassword,
@@ -140,6 +141,7 @@ const USER = {
   role: "agent",
   hasPassword: true,
   twoFactorEnabled: false,
+  termsAcceptedAt: "2026-10-31T10:00:00.000Z",
 };
 
 const PARSED_USER = {
@@ -151,6 +153,7 @@ const PARSED_USER = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  termsAcceptedAt: "2026-10-31T10:00:00.000Z",
 };
 
 function ok(data: unknown, sessionCookie: string | null = null) {
@@ -1130,5 +1133,30 @@ describe("verifying a magic link", () => {
     // with is stale — writing it would leave a live cookie for the next launch.
     expect(writeCookie).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
+  });
+});
+
+describe("asking for a sign-up link", () => {
+  test("says the Terms of Use were agreed to, so the account is created with the date", async () => {
+    request.mockResolvedValueOnce({ reached: true, status: 200, body: { data: null }, sessionCookie: null });
+
+    await requestSignUp({
+      email: "Ada@Talo.test",
+      name: "Ada",
+      username: "ada",
+      phone: "",
+      acceptTerms: true,
+    });
+
+    expect(request).toHaveBeenCalledWith("/auth/sign-up", {
+      method: "POST",
+      body: {
+        email: "ada@talo.test",
+        name: "Ada",
+        username: "ada",
+        acceptTerms: true,
+        url: "https://app.example.com",
+      },
+    });
   });
 });

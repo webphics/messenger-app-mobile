@@ -102,6 +102,12 @@ export const SCREEN_ACCESS = {
    * for a holder of `create_communities` only.
    */
   communities: { roles: ['admin'] },
+  /**
+   * The report queue. Every Admin, with no capability: App Review expects a
+   * report answered within a day, so nobody who runs the product is kept out of
+   * the queue by a grant somebody forgot. The API's `GET /reports` asks the same.
+   */
+  reports: { roles: ['admin'] },
   /** The rule the Hub's carousel is drawn by, so a chart is drawn only where it opens. */
   'chart/[id]': ANALYTICS_ACCESS,
   'offer-add': { roles: ['admin'] },

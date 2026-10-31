@@ -53,6 +53,14 @@ function refusalMessage(body: unknown): string {
  */
 const CLIENT_WORDING: ReadonlyMap<string, string> = new Map([
   ['message_not_deletable', 'System notices cannot be deleted, and neither can their attachments.'],
+  // The content filter (App Store guideline 1.2). One sentence for a post, a
+  // message and a group name alike; a send it refuses is withdrawn rather than
+  // offered for Retry (`withdrawSend`).
+  ['objectionable_content', 'This contains language that isn’t allowed on ChatRoute. Edit it and try again.'],
+  ['blocked', 'You can’t message this person.'],
+  // The server's terms gate. The person is moved to the terms screen as well
+  // (`onTermsRequired`), so this is only what the screen they left says.
+  ['terms_required', 'Agree to the Terms of Use to continue.'],
 ])
 
 /** A refusal, carrying the API's code only when it sent one. */

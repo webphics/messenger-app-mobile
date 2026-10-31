@@ -422,6 +422,28 @@ A Post somebody saved for themselves. Private: nobody sees another person's, and
 how many people saved it.
 _Avoid_: Save, favourite, star, pin, collection
 
+**Report**:
+Somebody telling ChatRoute that a Post, a Message or a group breaks the terms, with a reason and an
+optional note. Anybody may report anything they can read but their own. It lands in the Admin's
+**Report queue**, where an open Report past a day is *Overdue* in words, and an Admin removes the
+content, bans whoever posted it, or dismisses it. The person reported is never told who reported
+them.
+_Avoid_: Flag, complaint (a Complaint is a Customer's message in General Support), abuse ticket
+
+**Block**:
+One person hiding another: the API leaves the blocked person's Posts and Messages out of everything
+it answers the blocker with and refuses them a new direct message, and this app takes what is
+already on screen down the moment it lands. Private and silent — the blocked person is not told —
+and undone from Settings.
+_Avoid_: Mute (that is a conversation's), ban (that is an Admin's, and takes the account)
+
+**Terms gate**:
+The screen a signed-in person meets before anything else while the API says they have never
+agreed to the Terms of Use. Ahead of onboarding, and reached the way onboarding is, because a first
+Google sign-in and a sign-up link opened from an unknown address create an account without the
+sign-up form's checkbox.
+_Avoid_: EULA screen, consent screen
+
 **Viewer count**:
 How many distinct people have seen a Post, its author excluded, counted once per person ever. Not a
 Receipt — a Receipt says a Message reached the people it was addressed to, and a Post is addressed to
