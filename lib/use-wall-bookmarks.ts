@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
+import { useBlockedIds } from '@/lib/blocks-context'
 import {
   nextWallPostVote,
   toggleWallPostReaction,
@@ -25,6 +26,7 @@ import {
   applyOlderPage,
   canPageBack,
   emptyWall,
+  withoutAuthors,
   withoutLivePost,
   withRestoredPost,
   withUpdatedPost,
@@ -77,6 +79,7 @@ export function useWallBookmarks(): WallBodyView {
   )
 
   const [read, setRead] = useState<WallPages>(emptyWall)
+  const blockedIds = useBlockedIds()
   const [loading, setLoading] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -308,9 +311,12 @@ export function useWallBookmarks(): WallBodyView {
     [read],
   )
 
+  // Same rule as the Wall: a blocked author's saved Post is hidden, not unsaved.
+  const shown = useMemo(() => withoutAuthors(read, blockedIds), [read, blockedIds])
+
   return {
-    posts: read.posts,
-    notice: wallBookmarksNotice({ drawn: read.posts.length, loading, failure }),
+    posts: shown.posts,
+    notice: wallBookmarksNotice({ drawn: shown.posts.length, loading, failure }),
     loadingOlder,
     refreshing,
     canLoadOlder: canPageBack(read),

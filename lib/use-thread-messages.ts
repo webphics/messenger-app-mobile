@@ -32,11 +32,14 @@ import {
   emptyThread,
   failSend,
   findUnsent,
+  isFinalSendRefusal,
   isLocalId,
   mergeMessages,
   refuseSend,
   LOCAL_ID_PREFIX,
   threadMessages,
+  withdrawSend,
+  withoutSenders,
   type DeliveryState,
   type MessageAuthor,
   type SendDraft,
@@ -45,6 +48,7 @@ import {
 } from '@/lib/thread-state'
 import { toggleReaction } from '@/lib/message-react'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
+import { useBlockedIds } from '@/lib/blocks-context'
 import { useSupportAssignment } from '@/lib/use-support-assignment'
 import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
@@ -588,7 +592,12 @@ export function useThreadMessages(
       setState((thread) => applySentMessage(thread, message.id, sent.value))
       return
     }
-    setState((thread) => failSend(thread, message.id))
+    // Refused for its words, or because the other person blocked this one: a
+    // retry would be refused again, so it leaves the thread rather than waiting
+    // under *Retry*, and the notice says why.
+    setState((thread) =>
+      isFinalSendRefusal(sent.failure) ? withdrawSend(thread, message.id) : failSend(thread, message.id),
+    )
     setSendError(sendNotice ?? sendFailureMessage(sent.failure))
   }, [refusedWrite])
 
@@ -809,7 +818,24 @@ export function useThreadMessages(
     void saveThread(ownerId, conversationId, state)
   }, [conversationId, ownerId, state])
 
-  const messages = useMemo(() => threadMessages(state), [state])
+  /**
+   * Who this reader blocked. Their Messages are hidden from what is drawn
+   * (`withoutSenders`), and a block landing while the thread is open re-reads
+   * it, so what comes back is the API's own filtered history rather than only
+   * this phone's.
+   */
+  const blockedIds = useBlockedIds()
+  const blockedCount = useRef(blockedIds.size)
+  useEffect(() => {
+    const grew = blockedIds.size > blockedCount.current
+    blockedCount.current = blockedIds.size
+    if (grew) reload('resync')
+  }, [blockedIds, reload])
+
+  const messages = useMemo(
+    () => withoutSenders(threadMessages(state), blockedIds),
+    [state, blockedIds],
+  )
   const delivery = useMemo(() => deliveryStates(state.unsent), [state.unsent])
 
   const dismissFailure = useCallback(() => setFailure(null), [])

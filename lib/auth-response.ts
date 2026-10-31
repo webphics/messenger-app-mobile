@@ -223,6 +223,9 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     // queue, which offers nobody an action the API would refuse.
     supportAssignmentEnabled: record.supportAssignmentEnabled === true,
     capabilities: parseCapabilities(record.capabilities),
+    // Absent reads as not accepted: the terms screen asks once more, which is
+    // a smaller failure than letting somebody past a step App Review requires.
+    termsAcceptedAt: nonEmptyString(record.termsAcceptedAt) ?? null,
   };
 }
 

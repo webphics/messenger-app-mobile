@@ -5,6 +5,7 @@ import { Bookmark, ExternalLink, MoreVertical, Reply } from '@/components/icons'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { TactilePressable } from '@/components/ui/tactile-pressable'
 import { Text } from '@/components/ui/text'
+import { ReportSheet } from '@/components/moderation/report-sheet'
 import { WallPostActionsSheet } from '@/components/wall/wall-post-actions'
 import { WallPostBody } from '@/components/wall/wall-post-body'
 import { WallPostCollage } from '@/components/wall/wall-post-collage'
@@ -14,6 +15,7 @@ import { WallPostReactions } from '@/components/wall/wall-post-reactions'
 import { WallPostViewCount } from '@/components/wall/wall-post-view-count'
 import { WallPostVote } from '@/components/wall/wall-post-vote'
 import type { ApiResult } from '@/lib/api-result'
+import { useBlockPerson } from '@/lib/use-block-person'
 import { avatarInitials, formatRelativeTime } from '@/lib/display'
 import {
   wallDeadline,
@@ -112,6 +114,8 @@ export const WallPostCard = memo(function WallPostCard({
 }: WallPostCardProps) {
   const [actionsOpen, setActionsOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const blockPerson = useBlockPerson()
   const { images, videos, documents } = useMemo(
     () => groupWallAttachments(post.attachments),
     [post.attachments],
@@ -375,6 +379,18 @@ export const WallPostCard = memo(function WallPostCard({
         actions={actions}
         onEdit={() => setEditOpen(true)}
         onRemove={confirmRemove}
+        onReport={() => setReportOpen(true)}
+        onBlock={() => void blockPerson(post.author)}
+      />
+
+      {/*
+        A block needs nothing back from here: the Wall reads who is blocked
+        (`useBlockedIds`) and this card leaves the list the moment it lands.
+      */}
+      <ReportSheet
+        visible={reportOpen}
+        target={{ targetKind: 'wall_post', targetId: post.id }}
+        onClose={() => setReportOpen(false)}
       />
 
       <WallPostEditSheet

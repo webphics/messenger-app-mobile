@@ -241,6 +241,7 @@ describe('the screen a tapped notification about no conversation names', () => {
     ['an invitation', { ...base, kind: 'organization_invitation', wallPostPublicId: null }, { screen: 'invitations' }],
     ['a Customer joining an organization', { ...base, kind: 'customer_joined_organization', wallPostPublicId: null }, { screen: 'conversations' }],
     ['a Customer signing up inside an organization', { ...base, kind: 'customer_registered', wallPostPublicId: null }, { screen: 'conversations' }],
+    ['a report for an Admin to review', { ...base, kind: 'content_reported', wallPostPublicId: null }, { screen: 'reports' }],
   ])('opens the right screen for %s', (_case, data, expected) => {
     expect(pushRouteFromPush(response(data))).toEqual(expected)
   })

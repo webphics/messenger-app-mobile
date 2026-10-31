@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
-import { ROLE_HREF } from "@/lib/hub-routes";
+import { signedInDestination } from "@/lib/onboarding-gate";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { settleDownEnter, settleEnter } from "@/lib/motion-enter";
 import { colors, screenTopPad } from "@/lib/tokens";
@@ -122,7 +122,7 @@ export function OnboardingForm() {
       }
 
       hapticSuccess();
-      router.replace(ROLE_HREF[result.value.role]);
+      router.replace(signedInDestination(result.value));
     } finally {
       setSaving(false);
     }

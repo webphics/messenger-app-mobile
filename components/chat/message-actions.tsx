@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Clock, Info, Pencil, Reply } from "@/components/icons";
+import { Clock, Flag, Info, Pencil, Reply, UserX } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -52,6 +52,17 @@ type MessageActionsProps = {
    * whoever sent it: every reader may check what a message used to say.
    */
   onHistory?: () => void;
+  /**
+   * Report the message. Absent on the viewer's own, on one still being carried
+   * and on a System notice — `messageModeration` decides.
+   */
+  onReport?: () => void;
+  /**
+   * Block whoever sent it. Absent where the message names no sender person,
+   * which a Customer's Support DM never does. `blockLabel` names them.
+   */
+  onBlock?: () => void;
+  blockLabel?: string;
 };
 
 export function MessageActions({
@@ -62,6 +73,9 @@ export function MessageActions({
   onInfo,
   onEdit,
   onHistory,
+  onReport,
+  onBlock,
+  blockLabel = "Block",
 }: MessageActionsProps) {
   const reduceMotion = useReducedMotion();
   // The tray appears where a finger just was, so Reduce Motion keeps the fade
@@ -88,7 +102,8 @@ export function MessageActions({
 
   /*
     Reply, then Edit, then History, then Info: most often wanted first, and the one that
-    leaves the thread for a screen of its own last. Each is absent rather than
+    leaves the thread for a screen of its own last. Report and Block follow,
+    apart from the rest because they are about the sender rather than the words. Each is absent rather than
     disabled where it does not apply, which is `wall-post-actions`' rule too —
     a control that opens onto a refusal is worse than no control.
   */
@@ -123,6 +138,26 @@ export function MessageActions({
       Icon: Info,
       onPress: () => {
         onInfo();
+      },
+    },
+    // Last, and drawn in the danger colour: both leave the thread for a
+    // question of their own (a reason, a confirmation).
+    onReport && {
+      label: "Report…",
+      accessibilityLabel: "Report message",
+      Icon: Flag,
+      danger: true,
+      onPress: () => {
+        onReport();
+      },
+    },
+    onBlock && {
+      label: `${blockLabel}…`,
+      accessibilityLabel: blockLabel,
+      Icon: UserX,
+      danger: true,
+      onPress: () => {
+        onBlock();
       },
     },
   ].filter((pill): pill is Exclude<typeof pill, false | undefined> => Boolean(pill));
@@ -201,8 +236,11 @@ export function MessageActions({
             onPress={pill.onPress}
             className="mt-2 min-h-11 flex-row items-center gap-2 rounded-full border border-line/80 bg-surface px-5 py-2 shadow-2xl shadow-black/20"
           >
-            <pill.Icon color={colors.primary} size={18} />
-            <Text variant="meta" className="font-semibold text-primary">
+            <pill.Icon color={"danger" in pill ? colors.danger : colors.primary} size={18} />
+            <Text
+              variant="meta"
+              className={"danger" in pill ? "font-semibold text-danger" : "font-semibold text-primary"}
+            >
               {pill.label}
             </Text>
           </TactilePressable>

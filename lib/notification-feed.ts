@@ -78,6 +78,10 @@ export function notificationDestination(
     case 'customer_registered':
       return thread ?? { kind: 'route', route: { screen: 'conversations' } }
 
+    case 'content_reported':
+      // A report names no thread; it is answered in the Admin's review queue.
+      return { kind: 'route', route: { screen: 'reports' } }
+
     case 'customer_joined_organization':
       // The organization's Support DM is opened by a separate listener as the
       // membership lands, so the row cannot name it.

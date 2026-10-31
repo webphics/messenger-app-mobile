@@ -2,7 +2,9 @@ import { parseSessionUser } from "@/lib/auth-response";
 import { ROLE_HREF } from "@/lib/hub-routes";
 import {
   ONBOARDING_HREF,
+  TERMS_HREF,
   needsOnboarding,
+  needsTerms,
   signedInDestination,
 } from "@/lib/onboarding-gate";
 
@@ -18,6 +20,7 @@ describe("through the parser, which is where the substitution lives", () => {
     name,
     email: "onboarding-probe@talo.test",
     role: "customer",
+    termsAcceptedAt: "2026-10-31T10:00:00.000Z",
   });
 
   test("the parser really does substitute the address — the premise of this gate", () => {
@@ -53,5 +56,36 @@ describe("through the parser, which is where the substitution lives", () => {
   test("case and padding do not smuggle a blank name past the gate", () => {
     const user = parseSessionUser(payload("  ONBOARDING-PROBE@TALO.TEST  "));
     expect(needsOnboarding(user!)).toBe(true);
+  });
+});
+
+describe("the terms gate, through the parser", () => {
+  const payload = (overrides: Record<string, unknown>) => ({
+    id: "e0d3c1a2-0000-4000-8000-000000000000",
+    name: "Ada Lovelace",
+    email: "ada@talo.test",
+    role: "customer",
+    ...overrides,
+  });
+
+  test.each([
+    ["the API says they never agreed", { termsAcceptedAt: null }, true],
+    ["the API leaves the field out", {}, true],
+    ["the API has a date", { termsAcceptedAt: "2026-10-31T10:00:00.000Z" }, false],
+  ])("%s: owed the terms screen is %s", (_, overrides, expected) => {
+    expect(needsTerms(parseSessionUser(payload(overrides))!)).toBe(expected);
+  });
+
+  test("the terms come before onboarding, and before the Hub", () => {
+    const nameless = parseSessionUser(payload({ name: "", termsAcceptedAt: null }))!;
+    expect(signedInDestination(nameless)).toBe(TERMS_HREF);
+    const agreed = parseSessionUser(payload({ name: "", termsAcceptedAt: "2026-10-31T10:00:00.000Z" }))!;
+    expect(signedInDestination(agreed)).toBe(ONBOARDING_HREF);
+  });
+
+  test("a person kept from before the field existed is not stopped offline", () => {
+    const kept = parseSessionUser(payload({ termsAcceptedAt: "2026-10-31T10:00:00.000Z" }))!;
+    const { termsAcceptedAt: _unknown, ...older } = kept;
+    expect(needsTerms(older)).toBe(false);
   });
 });

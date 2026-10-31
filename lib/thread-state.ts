@@ -758,3 +758,41 @@ export function isOutgoing(message: Message, viewerId: string): boolean {
 export function messageSenderName(message: Message): string | undefined {
   return isStaffMessage(message) ? message.sender.name : undefined
 }
+
+/**
+ * The thread without the Messages of people the reader blocked.
+ *
+ * Applied to what is drawn rather than to what is held, for the reason
+ * `withoutAuthors` is on the Wall: the cursor stays the oldest Message the API
+ * answered with, an unblock brings them back without a request, and Messages
+ * the Store Restores from before the block are hidden the same way as ones a
+ * page brings — the Store is never written to say otherwise. A Customer's
+ * Support DM names no sender, so nothing in one can match. Hands back the same
+ * array when nothing is hidden.
+ */
+export function withoutSenders(messages: Message[], senderIds: ReadonlySet<string>): Message[] {
+  if (senderIds.size === 0) return messages
+  const hidden = (message: Message) => isStaffMessage(message) && senderIds.has(message.sender.id)
+  return messages.some(hidden) ? messages.filter((message) => !hidden(message)) : messages
+}
+
+/**
+ * A send the API refused for what it said rather than for how it travelled,
+ * taken out of the thread rather than marked *Not sent*.
+ *
+ * Retrying it would only be refused again — the words are the problem, or the
+ * person on the other end blocked this one — so offering *Retry* is a promise
+ * nothing can keep, and an Outbox entry would bring that promise back tomorrow.
+ * The composer's notice says why instead.
+ */
+export function withdrawSend(state: ThreadState, localId: string): ThreadState {
+  if (!state.unsent.some((entry) => entry.message.id === localId)) return state
+  return { ...state, unsent: state.unsent.filter((entry) => entry.message.id !== localId) }
+}
+
+/** The refusal codes `withdrawSend` is for: ones a second attempt cannot change. */
+const FINAL_SEND_REFUSALS: ReadonlySet<string> = new Set(['objectionable_content', 'blocked'])
+
+export function isFinalSendRefusal(failure: { kind: string; code?: string }): boolean {
+  return failure.kind === 'refused' && failure.code !== undefined && FINAL_SEND_REFUSALS.has(failure.code)
+}

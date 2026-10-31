@@ -34,13 +34,17 @@ const stranger: WallPostViewer = { id: 'user-2', role: 'customer', capabilities:
 const admin: WallPostViewer = { id: 'user-3', role: 'admin', capabilities: ['remove_wall_posts'] }
 
 describe('what a Post offers', () => {
-  it('offers nothing at all when there is nothing to offer, so no control is drawn', () => {
-    expect(wallPostActions(post(), stranger)).toEqual([])
+  it('offers any other reader report and block, and nothing else on a Post with no text or link', () => {
+    expect(wallPostActions(post(), stranger)).toEqual(['report', 'block'])
+  })
+
+  it('never offers the author a report or a block of their own Post', () => {
+    expect(wallPostActions(post({ body: 'Hi' }), author)).toEqual(['copy-body', 'edit', 'delete'])
   })
 
   it('offers the author edit and delete, and a holder of remove_wall_posts takedown only on somebody else’s Post', () => {
     expect(wallPostActions(post(), author)).toEqual(['edit', 'delete'])
-    expect(wallPostActions(post(), admin)).toEqual(['takedown'])
+    expect(wallPostActions(post(), admin)).toEqual(['takedown', 'report', 'block'])
     const own: WallPostViewer = { id: 'user-1', role: 'admin', capabilities: ['remove_wall_posts'] }
     expect(wallPostActions(post(), own)).toEqual(['edit', 'delete'])
   })

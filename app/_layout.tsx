@@ -34,6 +34,7 @@ import { useViewer } from "@/lib/use-viewer";
 import { SessionEndRedirect } from "@/components/auth/session-end";
 import { PushRegistration } from "@/components/push/push-registration";
 import { AuthProvider } from "@/lib/auth-context";
+import { BlocksProvider } from "@/lib/blocks-context";
 import { ConversationInboxProvider } from "@/lib/conversation-inbox";
 import { InAppBannerProvider } from "@/lib/in-app-banner";
 import { NotificationBadgeProvider } from "@/lib/notification-badge";
@@ -134,7 +135,12 @@ export default function RootLayout() {
                   above the navigator, because the bell on the Hub and the
                   Notifications screen both move it and must agree. */}
                 <NotificationBadgeProvider>
-                  <RootStack animation={stackAnimation} />
+                  {/* Above the navigator, because the Wall, an open thread
+                    and Settings all read who is blocked and must agree the
+                    moment a block lands. See `lib/blocks-context`. */}
+                  <BlocksProvider>
+                    <RootStack animation={stackAnimation} />
+                  </BlocksProvider>
                 </NotificationBadgeProvider>
               </InAppBannerProvider>
             </PushIntentProvider>
@@ -283,6 +289,15 @@ function RootStack({
         confirmed to work. */}
       <Stack.Screen
         name="account/two-factor"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+      {/* The people this account has blocked, and unblocking them. A sibling
+        of the account screens above for the same reason they are. */}
+      <Stack.Screen
+        name="account/blocked"
         options={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.bg },

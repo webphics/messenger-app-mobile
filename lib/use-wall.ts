@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
+import { useBlockedIds } from '@/lib/blocks-context'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import {
   flipWallPostBookmark,
@@ -36,6 +37,7 @@ import {
   canPageBack,
   emptyWall,
   withLivePost,
+  withoutAuthors,
   withoutLivePost,
   withBroadcastPost,
   withUpdatedPost,
@@ -246,6 +248,8 @@ function useWallPages(
   const searching = searchTerm !== undefined
 
   const [read, setRead] = useState<WallPages>(emptyWall)
+  /** Whose Posts this reader blocked — hidden from what is drawn, see `withoutAuthors`. */
+  const blockedIds = useBlockedIds()
   const [loading, setLoading] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -715,10 +719,12 @@ function useWallPages(
     }
   })
 
+  const shown = useMemo(() => withoutAuthors(read, blockedIds), [read, blockedIds])
+
   return {
-    posts: read.posts,
+    posts: shown.posts,
     notice: wallNotice({
-      drawn: read.posts.length,
+      drawn: shown.posts.length,
       loading,
       failure,
       named: wallId !== undefined,

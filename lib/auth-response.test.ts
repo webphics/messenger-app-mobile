@@ -26,6 +26,7 @@ function apiUser(over: Record<string, unknown> = {}) {
     role: "admin",
     twoFactorEnabled: false,
     hasPassword: true,
+    termsAcceptedAt: "2026-10-31T10:00:00.000Z",
     ...over,
   };
 }
@@ -77,6 +78,7 @@ describe("parseSessionUser", () => {
       hasPassword: true,
       twoFactorEnabled: false,
       supportAssignmentEnabled: false,
+      termsAcceptedAt: "2026-10-31T10:00:00.000Z",
       capabilities: [],
     });
   });
@@ -168,6 +170,7 @@ describe("interpretSignIn", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
       },
     });
@@ -296,6 +299,7 @@ describe("interpretSession", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
       },
     });
@@ -521,6 +525,7 @@ describe("interpretTwoFactorVerify", () => {
         hasPassword: true,
         twoFactorEnabled: false,
         supportAssignmentEnabled: false,
+        termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
       },
     });
@@ -568,5 +573,18 @@ describe("interpretTwoFactorVerify", () => {
       sessionCookie: null,
     });
     expect(lapsed).toEqual({ kind: "unauthorised", message: CODE_REFUSED_NOTICE });
+  });
+});
+
+describe("termsAcceptedAt", () => {
+  test.each([
+    ["a date", "2026-10-31T10:00:00.000Z", "2026-10-31T10:00:00.000Z"],
+    ["null", null, null],
+    ["absent", undefined, null],
+    ["not a string", 1, null],
+  ])("%s reads as %s", (_label, value, expected) => {
+    const payload = apiUser({ termsAcceptedAt: value });
+    if (value === undefined) delete (payload as Record<string, unknown>).termsAcceptedAt;
+    expect(parseSessionUser(payload)?.termsAcceptedAt).toBe(expected);
   });
 });

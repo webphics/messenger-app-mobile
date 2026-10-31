@@ -425,6 +425,12 @@ export type SignUpRequest = {
   username: string;
   /** Omitted from the body when blank. */
   phone: string;
+  /**
+   * The Terms of Use box on the sign-up step. Sent only when true: the API
+   * stamps the date onto the account when the link creates it, and an account
+   * that arrives without one meets the terms gate on its first sign-in.
+   */
+  acceptTerms: boolean;
 };
 
 /**
@@ -450,6 +456,7 @@ export async function requestSignUp(input: SignUpRequest): Promise<SignUpOutcome
         name: input.name.trim(),
         username: input.username.trim().toLowerCase(),
         ...(phone ? { phone } : {}),
+        ...(input.acceptTerms ? { acceptTerms: true } : {}),
         url: MAGIC_LINK_ORIGIN,
       },
     }),

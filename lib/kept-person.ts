@@ -28,8 +28,8 @@ import type { SessionUser } from "@/lib/types";
  * until the API confirms which it is.
  */
 export function serialiseKeptPerson(user: SessionUser): string {
-  const { id, name, email, role, supportAssignmentEnabled } = user;
-  return JSON.stringify({ id, name, email, role, supportAssignmentEnabled });
+  const { id, name, email, role, supportAssignmentEnabled, termsAcceptedAt } = user;
+  return JSON.stringify({ id, name, email, role, supportAssignmentEnabled, termsAcceptedAt });
 }
 
 /** The kept person, or null when there is none and when what is there is not one. */
@@ -37,7 +37,17 @@ export function parseKeptPerson(raw: string | null): SessionUser | null {
   if (!raw) return null;
 
   try {
-    return parseSessionUser(JSON.parse(raw));
+    const record: unknown = JSON.parse(raw);
+    const person = parseSessionUser(record);
+    // A person kept by a build from before the terms step carries no answer
+    // either way. Unknown rather than "never agreed": an offline cold start must
+    // not stop them at a screen whose only button needs the network, and the
+    // first reachable session read brings the API's answer.
+    if (person && typeof record === "object" && record !== null && !("termsAcceptedAt" in record)) {
+      const { termsAcceptedAt: _unknown, ...kept } = person;
+      return kept;
+    }
+    return person;
   } catch {
     // Not JSON at all. Same answer as a shape that parsed and was not a person.
     return null;

@@ -201,6 +201,8 @@ export type PushRoute =
   | { screen: 'wall-post'; postId: string }
   | { screen: 'invitations' }
   | { screen: 'conversations' }
+  /** The Admin's report queue, for a `content_reported` push. */
+  | { screen: 'reports' }
 
 /** The route a notification's payload names, or null for one this build has none for. */
 function routeOf(request: Record<string, unknown> | null): PushRoute | null {
@@ -220,6 +222,8 @@ function routeOf(request: Record<string, unknown> | null): PushRoute | null {
     case 'customer_registered':
     case 'customer_joined_organization':
       return { screen: 'conversations' }
+    case 'content_reported':
+      return { screen: 'reports' }
     default:
       return null
   }

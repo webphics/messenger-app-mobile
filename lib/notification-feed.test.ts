@@ -103,6 +103,13 @@ describe('notificationDestination', () => {
     })
   })
 
+  test('a report opens the Admin’s review queue', () => {
+    expect(notificationDestination(row({ kind: 'content_reported' }), ADMIN)).toEqual({
+      kind: 'route',
+      route: { screen: 'reports' },
+    })
+  })
+
   test('a Customer joining an organization opens the inbox', () => {
     expect(notificationDestination(row({ kind: 'customer_joined_organization' }), ADMIN)).toEqual({
       kind: 'route',
