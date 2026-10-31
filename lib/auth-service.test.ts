@@ -10,12 +10,14 @@ import {
   hydrateAuth,
   onSessionExpired,
   requestMagicLink,
+  signInWithApple,
   signInWithGoogle,
   signInWithPassword,
   signOut,
   verifyMagicLink,
   verifyTwoFactorCode,
 } from "@/lib/auth-service";
+import { requestAppleCredential } from "@/lib/apple-session";
 import { releaseGoogleSession, requestGoogleIdToken } from "@/lib/google-session";
 import {
   clearKeptPerson,
@@ -66,6 +68,11 @@ jest.mock("@/lib/google-session", () => ({
   releaseGoogleSession: jest.fn(async () => undefined),
 }));
 
+// Apple's sheet, the same way. What it decides is `lib/apple-auth.test.ts`'s.
+jest.mock("@/lib/apple-session", () => ({
+  requestAppleCredential: jest.fn(async () => ({ kind: "failed" })),
+}));
+
 // The Store and the downloaded documents both sit behind native modules, and
 // what they do with a wipe is tested where each of them owns one. What matters
 // here is only which moments reach this at all.
@@ -96,6 +103,9 @@ const googleToken = requestGoogleIdToken as jest.MockedFunction<
 >;
 const releaseGoogle = releaseGoogleSession as jest.MockedFunction<
   typeof releaseGoogleSession
+>;
+const appleCredential = requestAppleCredential as jest.MockedFunction<
+  typeof requestAppleCredential
 >;
 const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCookie>;
 const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
@@ -512,6 +522,72 @@ describe("signInWithGoogle", () => {
 
     expect(writeCookie).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
+  });
+});
+
+describe("signInWithApple", () => {
+  const CREDENTIAL = {
+    kind: "credential" as const,
+    idToken: "eyJraWQiOiJXNldjT0tCIn0.apple-minted.signature",
+    authorizationCode: "c1a9f0e2b7d34.0.abcd",
+    givenName: "Ada",
+  };
+
+  test("sends the token, the code and the name, and stores the session", async () => {
+    appleCredential.mockResolvedValueOnce(CREDENTIAL);
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await expect(signInWithApple()).resolves.toEqual({
+      kind: "settled",
+      outcome: { kind: "signed-in", cookie: ISSUED, user: PARSED_USER },
+    });
+
+    // The code goes up too: it is what the API revokes the grant with when the
+    // account is deleted.
+    expect(request).toHaveBeenCalledWith("/auth/apple", {
+      method: "POST",
+      body: {
+        idToken: CREDENTIAL.idToken,
+        authorizationCode: CREDENTIAL.authorizationCode,
+        givenName: "Ada",
+      },
+    });
+    expect(writeCookie).toHaveBeenCalledWith(ISSUED);
+    expect(getSessionCookie()).toBe(ISSUED);
+  });
+
+  test("a dismissed sheet asks the API nothing and changes nothing", async () => {
+    setSessionCookie(STORED);
+    appleCredential.mockResolvedValueOnce({ kind: "cancelled" });
+
+    await expect(signInWithApple()).resolves.toEqual({ kind: "cancelled" });
+
+    expect(request).not.toHaveBeenCalled();
+    expect(getSessionCookie()).toBe(STORED);
+  });
+
+  test("a credential the API refuses leaves nothing here", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    appleCredential.mockResolvedValueOnce(CREDENTIAL);
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: {},
+      sessionCookie: null,
+    });
+
+    await expect(signInWithApple()).resolves.toEqual({
+      kind: "settled",
+      outcome: {
+        kind: "unauthorised",
+        message: "That Apple ID was not accepted. Try again, or sign in with your email.",
+      },
+    });
+
+    expect(getSessionCookie()).toBeNull();
+    expect(getSessionUser()).toBeNull();
+    expect(clearCookie).toHaveBeenCalled();
   });
 });
 

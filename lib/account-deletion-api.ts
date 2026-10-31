@@ -13,6 +13,11 @@ const DELETE_ACCOUNT_PATH = "/auth/delete-account";
  * by link or with Google and has no password to give. `lib/account-deletion`
  * turns that refusal into the button that offers it.
  *
+ * An account that signs in with Apple has its Apple grant revoked by the API as
+ * part of this same request (`api/docs/planning/apple-sign-in.md`), which App
+ * Review requires; there is nothing on the device to revoke, so nothing here
+ * changes for it.
+ *
  * Nothing local is cleared here. On success the caller signs out through
  * `useAuth().signOut`, which is the one path that wipes this device
  * (`lib/session-wipe`) and lands on sign-in.

@@ -120,6 +120,10 @@ export const LINK_REFUSED_NOTICE =
 export const GOOGLE_REFUSED_NOTICE =
   "That Google account was not accepted. Try another account, or sign in with your email.";
 
+/** `GOOGLE_REFUSED_NOTICE`, for an Apple ID: nobody typed anything to check. */
+export const APPLE_REFUSED_NOTICE =
+  "That Apple ID was not accepted. Try again, or sign in with your email.";
+
 /**
  * What to say when a two-factor code is refused.
  *
@@ -338,6 +342,15 @@ export function interpretMagicLinkVerify(outcome: HttpOutcome): AuthOutcome {
  */
 export function interpretGoogleSignIn(outcome: HttpOutcome): AuthOutcome {
   return interpretIssuedSession(outcome, GOOGLE_REFUSED_NOTICE);
+}
+
+/**
+ * Read a `POST /auth/apple` response. The same route shape as Google's, through
+ * the same interpreter and with the same two-factor stance; only the backstop
+ * sentence names Apple.
+ */
+export function interpretAppleSignIn(outcome: HttpOutcome): AuthOutcome {
+  return interpretIssuedSession(outcome, APPLE_REFUSED_NOTICE);
 }
 
 /**

@@ -5,7 +5,10 @@ import {
   setSessionCookie,
   type ApiRequestOptions,
 } from "@/lib/api-client";
+import type { AppleResult } from "@/lib/apple-auth";
+import { requestAppleCredential } from "@/lib/apple-session";
 import {
+  interpretAppleSignIn,
   interpretGoogleSignIn,
   interpretMagicLinkRequest,
   interpretMagicLinkVerify,
@@ -60,6 +63,7 @@ const MAGIC_LINK_REQUEST_PATH = "/auth/magic-link";
 const MAGIC_LINK_VERIFY_PATH = "/auth/magic-link/verify";
 const SIGN_UP_PATH = "/auth/sign-up";
 const GOOGLE_PATH = "/auth/google";
+const APPLE_PATH = "/auth/apple";
 const TWO_FACTOR_VERIFY_PATH = "/auth/two-factor/verify-totp";
 
 /**
@@ -365,6 +369,29 @@ export async function signInWithGoogle(): Promise<GoogleResult> {
   // account that would have worked.
   if (outcome.kind !== "signed-in") await releaseGoogleSession();
 
+  return { kind: "settled", outcome };
+}
+
+/**
+ * Sign in with Apple, and trade the credential for a session here.
+ *
+ * `signInWithGoogle` without its last step: there is no native session to
+ * release afterwards, because Apple keeps none on the device for this app to
+ * hold. The authorization code goes up with the token so the API can exchange
+ * it for the grant it revokes when the account is deleted
+ * (`api/docs/planning/apple-sign-in.md`).
+ */
+export async function signInWithApple(): Promise<AppleResult> {
+  const attempt = await requestAppleCredential();
+  if (attempt.kind !== "credential") return attempt;
+
+  const { kind: _kind, ...body } = attempt;
+  const startedAt = credentialEpoch;
+  const outcome = interpretAppleSignIn(
+    await apiRequest(APPLE_PATH, { method: "POST", body }),
+  );
+
+  await applyOutcome(outcome, startedAt);
   return { kind: "settled", outcome };
 }
 

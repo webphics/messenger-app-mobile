@@ -170,6 +170,17 @@ it is the second account-creation path beside the Magic link. Dismissing the she
 not a failure.
 _Avoid_: Google OAuth, social login, SSO, Sign in with Google (as the name in code)
 
+**Apple sign-in**:
+The fourth way in, iOS only: the system Sign in with Apple sheet, an ID token and an authorization code,
+and the same Session cookie as the other three. There because App Store guideline 4.8 asks an app
+offering Google sign-in for an option that collects only a name and an email and can hide the email;
+the person may share neither name nor real address, so a relay address is an ordinary account email.
+The code goes to the API with the token so deleting the account can revoke the grant
+(`api/docs/planning/apple-sign-in.md`). Like Google, a first sign-in creates a Customer account, it
+needs a Development client built after it was added, and dismissing the sheet is a Cancellation. The
+button is Apple's own and is not drawn where the device cannot offer it.
+_Avoid_: Apple ID login, SIWA, Sign in with Apple (as the name in code)
+
 **Audience arrangement**:
 The reason mobile Google sign-in needs no API change: the app is configured with the *web* OAuth
 client alongside the platform one, so Google mints the ID token with the web client as its audience —
@@ -184,7 +195,7 @@ app needs it. Built from the `development` profile in `eas.json`.
 _Avoid_: Dev build (as the name for the profile), custom client, standalone build (that is a release)
 
 **Cancellation**:
-Dismissing the Google account sheet. A distinct outcome from a failure: it surfaces no message, clears
+Dismissing the Google account sheet or the Apple sheet. A distinct outcome from a failure: it surfaces no message, clears
 nothing that was typed, and returns to sign-in unchanged.
 _Avoid_: Abort, dismissal error, cancelled sign-in error
 

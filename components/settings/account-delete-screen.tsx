@@ -32,7 +32,7 @@ import { colors, screenBottomPad } from "@/lib/tokens";
  */
 const REMOVED = [
   "Your name, email address, phone number, username and photo",
-  "Your password, Google sign-in and two-factor settings",
+  "Your password, your Google and Apple sign-ins, and two-factor settings",
   "Your memberships in organizations and any invitations waiting for you",
   "Your notifications, and every device signed in to this account",
 ];
