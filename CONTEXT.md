@@ -175,10 +175,13 @@ The fourth way in, iOS only: the system Sign in with Apple sheet, an ID token an
 and the same Session cookie as the other three. There because App Store guideline 4.8 asks an app
 offering Google sign-in for an option that collects only a name and an email and can hide the email;
 the person may share neither name nor real address, so a relay address is an ordinary account email.
-The code goes to the API with the token so deleting the account can revoke the grant
-(`api/docs/planning/apple-sign-in.md`). Like Google, a first sign-in creates a Customer account, it
-needs a Development client built after it was added, and dismissing the sheet is a Cancellation. The
-button is Apple's own and is not drawn where the device cannot offer it.
+The sheet is opened with the hash of a single-use nonce the API issues first, so a token can be
+presented once; an API without Apple configured says so at that step, before the sheet opens. The code
+goes to the API with the token so deleting the account can revoke the grant
+(`api/docs/planning/apple-sign-in.md`). Apple shares the name once, so it is kept in the keychain
+under the Apple user id until an account holds it. Like Google, a first sign-in creates a Customer
+account, it needs a Development client built after it was added, and dismissing the sheet is a
+Cancellation. The button is Apple's own and is drawn only on iOS, where the device can offer it.
 _Avoid_: Apple ID login, SIWA, Sign in with Apple (as the name in code)
 
 **Audience arrangement**:

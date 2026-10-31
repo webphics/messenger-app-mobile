@@ -20,11 +20,14 @@ import {
 import { requestAppleCredential } from "@/lib/apple-session";
 import { releaseGoogleSession, requestGoogleIdToken } from "@/lib/google-session";
 import {
+  clearAppleName,
   clearKeptPerson,
   clearRetiredCredential,
   clearSessionCookie,
+  readAppleName,
   readKeptPerson,
   readSessionCookie,
+  writeAppleName,
   writeKeptPerson,
   writeSessionCookie,
 } from "@/lib/keychain";
@@ -95,6 +98,9 @@ jest.mock("@/lib/keychain", () => ({
   readKeptPerson: jest.fn(async () => null),
   writeKeptPerson: jest.fn(async () => undefined),
   clearKeptPerson: jest.fn(async () => undefined),
+  readAppleName: jest.fn(async () => null),
+  writeAppleName: jest.fn(async () => undefined),
+  clearAppleName: jest.fn(async () => undefined),
 }));
 
 const request = apiRequest as jest.MockedFunction<typeof apiRequest>;
@@ -107,6 +113,9 @@ const releaseGoogle = releaseGoogleSession as jest.MockedFunction<
 const appleCredential = requestAppleCredential as jest.MockedFunction<
   typeof requestAppleCredential
 >;
+const readAppleNameMock = readAppleName as jest.MockedFunction<typeof readAppleName>;
+const writeAppleNameMock = writeAppleName as jest.MockedFunction<typeof writeAppleName>;
+const clearAppleNameMock = clearAppleName as jest.MockedFunction<typeof clearAppleName>;
 const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCookie>;
 const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
 const clearCookie = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
@@ -526,15 +535,23 @@ describe("signInWithGoogle", () => {
 });
 
 describe("signInWithApple", () => {
+  const NONCE = "q3Jx0b2Tn7yWc1d4FvKpL8sE6aRz9uMhGiN5oYtQwXe";
+  const HASHED = "6b1d3f0c2a9e94f";
+  const APPLE_USER = "000123.0a1b2c3d4e5f.0456";
   const CREDENTIAL = {
     kind: "credential" as const,
+    appleUserId: APPLE_USER,
     idToken: "eyJraWQiOiJXNldjT0tCIn0.apple-minted.signature",
     authorizationCode: "c1a9f0e2b7d34.0.abcd",
-    givenName: "Ada",
   };
 
-  test("sends the token, the code and the name, and stores the session", async () => {
-    appleCredential.mockResolvedValueOnce(CREDENTIAL);
+  function nonceIssued() {
+    request.mockResolvedValueOnce(ok({ nonce: NONCE, hashedNonce: HASHED }));
+  }
+
+  test("asks for a nonce, opens the sheet with its hash, and sends the raw nonce back", async () => {
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce({ ...CREDENTIAL, givenName: "Ada" });
     request.mockResolvedValueOnce(ok(USER, ISSUED));
 
     await expect(signInWithApple()).resolves.toEqual({
@@ -542,13 +559,16 @@ describe("signInWithApple", () => {
       outcome: { kind: "signed-in", cookie: ISSUED, user: PARSED_USER },
     });
 
+    expect(request).toHaveBeenNthCalledWith(1, "/auth/apple/nonce", { method: "POST", body: {} });
+    expect(appleCredential).toHaveBeenCalledWith(HASHED);
     // The code goes up too: it is what the API revokes the grant with when the
     // account is deleted.
-    expect(request).toHaveBeenCalledWith("/auth/apple", {
+    expect(request).toHaveBeenNthCalledWith(2, "/auth/apple", {
       method: "POST",
       body: {
         idToken: CREDENTIAL.idToken,
         authorizationCode: CREDENTIAL.authorizationCode,
+        nonce: NONCE,
         givenName: "Ada",
       },
     });
@@ -556,19 +576,79 @@ describe("signInWithApple", () => {
     expect(getSessionCookie()).toBe(ISSUED);
   });
 
-  test("a dismissed sheet asks the API nothing and changes nothing", async () => {
+  test("a server without Apple says so before the sheet opens", async () => {
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 503,
+      body: { code: "apple_sign_in_unavailable" },
+      sessionCookie: null,
+    });
+
+    await expect(signInWithApple()).resolves.toEqual({ kind: "unavailable" });
+    expect(appleCredential).not.toHaveBeenCalled();
+  });
+
+  test("no network for the nonce is the offline outcome, and the sheet stays shut", async () => {
+    request.mockResolvedValueOnce({ reached: false });
+
+    await expect(signInWithApple()).resolves.toEqual({
+      kind: "settled",
+      outcome: { kind: "transport-failure" },
+    });
+    expect(appleCredential).not.toHaveBeenCalled();
+  });
+
+  test("a dismissed sheet asks the API nothing more and changes nothing", async () => {
     setSessionCookie(STORED);
+    nonceIssued();
     appleCredential.mockResolvedValueOnce({ kind: "cancelled" });
 
     await expect(signInWithApple()).resolves.toEqual({ kind: "cancelled" });
 
-    expect(request).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledTimes(1);
     expect(getSessionCookie()).toBe(STORED);
+  });
+
+  // Apple shares the name once. A first attempt the API never answers must not
+  // lose it: it is kept, sent again on the retry, and let go once signed in.
+  test("the name from a failed first attempt is kept and sent on the retry", async () => {
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce({ ...CREDENTIAL, givenName: "Ada", familyName: "Lovelace" });
+    request.mockResolvedValueOnce({ reached: false });
+
+    await signInWithApple();
+
+    expect(writeAppleNameMock).toHaveBeenCalledWith(APPLE_USER, {
+      givenName: "Ada",
+      familyName: "Lovelace",
+    });
+    expect(clearAppleNameMock).not.toHaveBeenCalled();
+
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce(CREDENTIAL);
+    readAppleNameMock.mockResolvedValueOnce({ givenName: "Ada", familyName: "Lovelace" });
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await signInWithApple();
+
+    expect(readAppleNameMock).toHaveBeenCalledWith(APPLE_USER);
+    expect(request).toHaveBeenLastCalledWith("/auth/apple", {
+      method: "POST",
+      body: {
+        idToken: CREDENTIAL.idToken,
+        authorizationCode: CREDENTIAL.authorizationCode,
+        nonce: NONCE,
+        givenName: "Ada",
+        familyName: "Lovelace",
+      },
+    });
+    expect(clearAppleNameMock).toHaveBeenCalledWith(APPLE_USER);
   });
 
   test("a credential the API refuses leaves nothing here", async () => {
     setSessionCookie(STORED);
     setSessionUser(PARSED_USER);
+    nonceIssued();
     appleCredential.mockResolvedValueOnce(CREDENTIAL);
     request.mockResolvedValueOnce({
       reached: true,

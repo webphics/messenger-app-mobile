@@ -38,8 +38,12 @@ export async function isAppleSignInAvailable(): Promise<boolean> {
  * Name and email are the only scopes there are, and both are asked for: the
  * person can still withhold the name and hide the address behind a relay one,
  * which is the choice the guideline is about.
+ *
+ * `hashedNonce` is the SHA-256 of a nonce the API issued. Apple writes it into
+ * the ID token, which binds the token to that single-use nonce and is what
+ * stops a captured token being presented twice.
  */
-export async function requestAppleCredential(): Promise<AppleAttempt> {
+export async function requestAppleCredential(hashedNonce: string): Promise<AppleAttempt> {
   try {
     return interpretAppleCredential(
       await AppleAuthentication.signInAsync({
@@ -47,6 +51,7 @@ export async function requestAppleCredential(): Promise<AppleAttempt> {
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
+        nonce: hashedNonce,
       }),
     );
   } catch (error) {

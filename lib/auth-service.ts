@@ -5,7 +5,13 @@ import {
   setSessionCookie,
   type ApiRequestOptions,
 } from "@/lib/api-client";
-import type { AppleResult } from "@/lib/apple-auth";
+import {
+  appleNameSettled,
+  appleNameToSend,
+  hasAppleName,
+  interpretAppleNonce,
+  type AppleResult,
+} from "@/lib/apple-auth";
 import { requestAppleCredential } from "@/lib/apple-session";
 import {
   interpretAppleSignIn,
@@ -28,11 +34,14 @@ import {
   requestGoogleIdToken,
 } from "@/lib/google-session";
 import {
+  clearAppleName,
   clearKeptPerson,
   clearRetiredCredential,
   clearSessionCookie,
+  readAppleName,
   readKeptPerson,
   readSessionCookie,
+  writeAppleName,
   writeKeptPerson,
   writeSessionCookie,
 } from "@/lib/keychain";
@@ -64,6 +73,7 @@ const MAGIC_LINK_VERIFY_PATH = "/auth/magic-link/verify";
 const SIGN_UP_PATH = "/auth/sign-up";
 const GOOGLE_PATH = "/auth/google";
 const APPLE_PATH = "/auth/apple";
+const APPLE_NONCE_PATH = "/auth/apple/nonce";
 const TWO_FACTOR_VERIFY_PATH = "/auth/two-factor/verify-totp";
 
 /**
@@ -375,23 +385,49 @@ export async function signInWithGoogle(): Promise<GoogleResult> {
 /**
  * Sign in with Apple, and trade the credential for a session here.
  *
- * `signInWithGoogle` without its last step: there is no native session to
- * release afterwards, because Apple keeps none on the device for this app to
- * hold. The authorization code goes up with the token so the API can exchange
- * it for the grant it revokes when the account is deleted
- * (`api/docs/planning/apple-sign-in.md`).
+ * Three steps where Google has two. A nonce first, from the API, because the
+ * sheet has to be opened with it: the token Apple mints carries its hash, and
+ * the API spends the nonce, so a token can be presented once. Asking first also
+ * means a server with no Apple configuration says so before the sheet opens,
+ * not after the person has authorised the app.
+ *
+ * The code goes up with the token so the API can exchange it for the grant it
+ * revokes when the account is deleted (`api/docs/planning/apple-sign-in.md`).
+ * The name Apple shares once is kept on the device until an account holds it.
+ * There is no native session to release afterwards: Apple keeps none on the
+ * device for this app to hold.
  */
 export async function signInWithApple(): Promise<AppleResult> {
-  const attempt = await requestAppleCredential();
+  const issued = interpretAppleNonce(
+    await apiRequest(APPLE_NONCE_PATH, { method: "POST", body: {} }),
+  );
+  if (issued.kind === "unreached") {
+    return { kind: "settled", outcome: { kind: "transport-failure" } };
+  }
+  if (issued.kind !== "nonce") return issued;
+
+  const attempt = await requestAppleCredential(issued.hashedNonce);
   if (attempt.kind !== "credential") return attempt;
 
-  const { kind: _kind, ...body } = attempt;
+  const { kind: _kind, appleUserId, givenName, familyName, ...credential } = attempt;
+  const shared = { givenName, familyName };
+  if (hasAppleName(shared)) await writeAppleName(appleUserId, shared);
+  const name = appleNameToSend(
+    shared,
+    hasAppleName(shared) ? null : await readAppleName(appleUserId),
+  );
+
   const startedAt = credentialEpoch;
   const outcome = interpretAppleSignIn(
-    await apiRequest(APPLE_PATH, { method: "POST", body }),
+    await apiRequest(APPLE_PATH, {
+      method: "POST",
+      body: { ...credential, nonce: issued.nonce, ...name },
+    }),
   );
 
   await applyOutcome(outcome, startedAt);
+  if (appleNameSettled(outcome)) await clearAppleName(appleUserId);
+
   return { kind: "settled", outcome };
 }
 
