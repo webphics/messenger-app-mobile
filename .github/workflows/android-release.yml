@@ -127,6 +127,12 @@ env:
   # with no click, or `inProgress` for a staged rollout.
   PLAY_RELEASE_STATUS: draft
 
+  # The track a Production tag uploads to. `alpha` (closed testing) while the
+  # app is still earning production access, which Play grants only after a
+  # closed test with 12 testers for 14 days; an upload to `production` before
+  # then is refused. Set it to `production` once access is granted.
+  PLAY_PRODUCTION_TRACK: alpha
+
 # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
 # `build`, inside the Gradle task that embeds the JS. `.env` is gitignored and
 # absent from the checkout, so it never reaches the bundle. `eas.json`'s
@@ -676,7 +682,8 @@ jobs:
   #
   #   Development -> internal     Internal testing
   #   Release     -> alpha        Closed testing
-  #   Production  -> production   Production
+  #   Production  -> production   Production (PLAY_PRODUCTION_TRACK, `alpha`
+  #                               until Play grants production access)
   #
   # A job of its own for the reason `expo-upload` is one: an upload Play refuses
   # is re-run alone, without rebuilding and without touching the Release. Same
@@ -727,7 +734,7 @@ jobs:
           case "$ENVIRONMENT" in
             Development) TRACK=internal ;;
             Release)     TRACK=alpha ;;
-            Production)  TRACK=production ;;
+            Production)  TRACK="$PLAY_PRODUCTION_TRACK" ;;
             *)
               echo "::error::No Play track for the ${ENVIRONMENT} environment."
               exit 1
@@ -755,7 +762,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.thechatroute.app
           releaseFiles: dist/${{ needs.meta.outputs.aab }}
-          track: ${{ steps.track.outputs.track }}
+          tracks: ${{ steps.track.outputs.track }}
           status: ${{ env.PLAY_RELEASE_STATUS }}
           releaseName: ${{ needs.meta.outputs.version }}
 
