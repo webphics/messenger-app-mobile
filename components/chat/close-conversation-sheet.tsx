@@ -12,6 +12,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
+import { useSheetKeyboardInset } from '@/lib/keyboard-inset'
 import { colors, screenBottomPad } from '@/lib/tokens'
 
 /** The API's bound on a close summary, the same as a note's and a message body's. */
@@ -74,6 +75,7 @@ function SummarySheet({
   onConfirm,
 }: Omit<CloseConversationSheetProps, 'visible'>) {
   const insets = useSafeAreaInsets()
+  const { ref: backdropRef, keyboardInset } = useSheetKeyboardInset()
   const [summary, setSummary] = useState('')
   const [closing, setClosing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,7 +102,11 @@ function SummarySheet({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1 justify-end"
     >
-      <View className="flex-1 justify-end bg-black/40">
+      <View
+        ref={backdropRef}
+        className="flex-1 justify-end bg-black/40"
+        style={{ paddingBottom: keyboardInset }}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Cancel"

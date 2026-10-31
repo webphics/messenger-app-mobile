@@ -26,6 +26,7 @@ import {
 import { rejectUploadReason } from '@/lib/attachment-upload'
 import type { ApiResult } from '@/lib/api-result'
 import { cn } from '@/lib/cn'
+import { useSheetKeyboardInset } from '@/lib/keyboard-inset'
 import { colors, screenBottomPad } from '@/lib/tokens'
 import { wallActionRefusal, WALL_POST_BODY_MAX } from '@/lib/wall-actions'
 import {
@@ -128,6 +129,7 @@ function ComposeSheet({
   onCreate: (input: WallPostCreateInput) => Promise<ApiResult<WallPost>>
 }) {
   const insets = useSafeAreaInsets()
+  const { ref: backdropRef, keyboardInset } = useSheetKeyboardInset()
   const needsChoice = wallComposeNeedsOrganizationChoice(organizations.length)
 
   const [organizationId, setOrganizationId] = useState<string | null>(
@@ -264,7 +266,11 @@ function ComposeSheet({
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end">
-      <View className="flex-1 justify-end bg-black/40">
+      <View
+        ref={backdropRef}
+        className="flex-1 justify-end bg-black/40"
+        style={{ paddingBottom: keyboardInset }}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Cancel"

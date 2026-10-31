@@ -12,6 +12,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
+import { useSheetKeyboardInset } from '@/lib/keyboard-inset'
 import { MESSAGE_BODY_MAX } from '@/lib/message-edit'
 import { colors, screenBottomPad } from '@/lib/tokens'
 import type { Message } from '@/lib/types'
@@ -77,6 +78,7 @@ function EditSheet({
   onSave: (body: string) => Promise<string | null>
 }) {
   const insets = useSafeAreaInsets()
+  const { ref: backdropRef, keyboardInset } = useSheetKeyboardInset()
   const [body, setBody] = useState(message.body)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -103,7 +105,11 @@ function EditSheet({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1 justify-end"
     >
-      <View className="flex-1 justify-end bg-black/40">
+      <View
+        ref={backdropRef}
+        className="flex-1 justify-end bg-black/40"
+        style={{ paddingBottom: keyboardInset }}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Cancel"

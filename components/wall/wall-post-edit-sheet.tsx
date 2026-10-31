@@ -5,6 +5,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { Button } from '@/components/ui/button'
 import { Text } from '@/components/ui/text'
 import type { ApiResult } from '@/lib/api-result'
+import { useSheetKeyboardInset } from '@/lib/keyboard-inset'
 import { colors, screenBottomPad } from '@/lib/tokens'
 import { WALL_POST_BODY_MAX, wallActionRefusal } from '@/lib/wall-actions'
 import type { WallPostEditInput } from '@/lib/wall-api'
@@ -63,6 +64,7 @@ function EditSheet({
   onSave: (input: WallPostEditInput) => Promise<ApiResult<WallPost>>
 }) {
   const insets = useSafeAreaInsets()
+  const { ref: backdropRef, keyboardInset } = useSheetKeyboardInset()
   const [body, setBody] = useState(post.body ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -92,7 +94,11 @@ function EditSheet({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1 justify-end"
     >
-      <View className="flex-1 justify-end bg-black/40">
+      <View
+        ref={backdropRef}
+        className="flex-1 justify-end bg-black/40"
+        style={{ paddingBottom: keyboardInset }}
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Cancel"

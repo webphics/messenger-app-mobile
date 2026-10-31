@@ -147,6 +147,24 @@ export function useKeyboardInset(
 }
 
 /**
+ * Keyboard lift for a bottom sheet drawn inside a `Modal`.
+ *
+ * The sheets wrap themselves in an iOS-only `KeyboardAvoidingView`, which is
+ * all iOS needs. On Android a Modal is its own window and edge-to-edge stops
+ * it resizing for the IME, so the field sits under the keyboard unless
+ * something lifts it. Put `ref` on the backdrop that fills the modal and
+ * apply `keyboardInset` to it as `paddingBottom`.
+ */
+export function useSheetKeyboardInset(): {
+  ref: React.RefObject<ViewInstance | null>;
+  keyboardInset: number;
+} {
+  const ref = useRef<ViewInstance | null>(null);
+  const inset = useKeyboardInset(ref);
+  return { ref, keyboardInset: Platform.OS === "android" ? inset : 0 };
+}
+
+/**
  * Keyboard handling for a scrolling form.
  *
  * iOS already does this natively through `automaticallyAdjustKeyboardInsets`,
