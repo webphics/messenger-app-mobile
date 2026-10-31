@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
+import { unblockedSince } from '@/lib/blocked-people'
 import { useBlockedIds } from '@/lib/blocks-context'
 import {
   nextWallPostVote,
@@ -104,6 +105,18 @@ export function useWallBookmarks(): WallBodyView {
       setRead(applyFirstPage(result.value, WALL_BOOKMARKS_PAGE_LIMIT))
     })
   }, [])
+
+  /**
+   * An unblock re-reads the first page: the API left that person's Posts out
+   * of every page it answered while the block stood, so they are not here to
+   * be shown again (`withoutAuthors` only hides what was read).
+   */
+  const lastBlocked = useRef(blockedIds)
+  useEffect(() => {
+    const unblocked = unblockedSince(lastBlocked.current, blockedIds)
+    lastBlocked.current = blockedIds
+    if (unblocked) loadFirst()
+  }, [blockedIds, loadFirst])
 
   useEffect(() => {
     loadFirst()

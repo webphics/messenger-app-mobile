@@ -838,9 +838,11 @@ export function ThreadScreen({
   const moderationFor = useCallback(
     (messageId: string) => {
       const message = messages.find((item) => item.id === messageId)
-      return message ? messageModeration(message, viewer.id) : { report: false, block: null }
+      return message
+        ? messageModeration(message, viewer.id, conversation.type)
+        : { report: false, block: null }
     },
-    [messages, viewer.id],
+    [messages, viewer.id, conversation.type],
   )
 
   const menuModeration = useMemo(

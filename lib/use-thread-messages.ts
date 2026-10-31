@@ -49,6 +49,7 @@ import {
 import { toggleReaction } from '@/lib/message-react'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import { useBlockedIds } from '@/lib/blocks-context'
+import { blocksApplyTo } from '@/lib/message-moderation'
 import { useSupportAssignment } from '@/lib/use-support-assignment'
 import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
@@ -188,6 +189,9 @@ function restoredThread(
   if (!ownerId || !conversationId || !viewer) return emptyThread()
   return restoreThread(ownerId, conversationId, viewer, MESSAGE_PAGE_LIMIT)
 }
+
+/** Nobody's Messages hidden: a Support DM, which blocks do not reach. */
+const NO_BLOCKED_SENDERS: ReadonlySet<string> = new Set()
 
 export function useThreadMessages(
   conversation: Conversation | null,
@@ -820,16 +824,19 @@ export function useThreadMessages(
 
   /**
    * Who this reader blocked. Their Messages are hidden from what is drawn
-   * (`withoutSenders`), and a block landing while the thread is open re-reads
-   * it, so what comes back is the API's own filtered history rather than only
-   * this phone's.
+   * (`withoutSenders`), except in a Support DM, which blocks do not reach
+   * (`blocksApplyTo`). A block or an unblock landing while the thread is open
+   * re-reads its newest page: the API filters its pages, so after an unblock
+   * the Messages it left out while the block stood come back only by asking.
    */
-  const blockedIds = useBlockedIds()
+  const allBlockedIds = useBlockedIds()
+  const blockedIds =
+    conversation && !blocksApplyTo(conversation.type) ? NO_BLOCKED_SENDERS : allBlockedIds
   const blockedCount = useRef(blockedIds.size)
   useEffect(() => {
-    const grew = blockedIds.size > blockedCount.current
+    const changed = blockedIds.size !== blockedCount.current
     blockedCount.current = blockedIds.size
-    if (grew) reload('resync')
+    if (changed) reload('resync')
   }, [blockedIds, reload])
 
   const messages = useMemo(

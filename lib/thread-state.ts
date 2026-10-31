@@ -764,11 +764,12 @@ export function messageSenderName(message: Message): string | undefined {
  *
  * Applied to what is drawn rather than to what is held, for the reason
  * `withoutAuthors` is on the Wall: the cursor stays the oldest Message the API
- * answered with, an unblock brings them back without a request, and Messages
- * the Store Restores from before the block are hidden the same way as ones a
- * page brings — the Store is never written to say otherwise. A Customer's
- * Support DM names no sender, so nothing in one can match. Hands back the same
- * array when nothing is hidden.
+ * answered with, and Messages the Store Restores from before the block are
+ * hidden the same way as ones a page brings — the Store is never written to say
+ * otherwise. An unblock shows again only what this phone still held; what the
+ * API left out of its pages while the block stood comes back with a re-read,
+ * which `useThreadMessages` asks for. Not applied in a Support DM
+ * (`blocksApplyTo`). Hands back the same array when nothing is hidden.
  */
 export function withoutSenders(messages: Message[], senderIds: ReadonlySet<string>): Message[] {
   if (senderIds.size === 0) return messages

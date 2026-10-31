@@ -58,6 +58,9 @@ const CLIENT_WORDING: ReadonlyMap<string, string> = new Map([
   // offered for Retry (`withdrawSend`).
   ['objectionable_content', 'This contains language that isn’t allowed on ChatRoute. Edit it and try again.'],
   ['blocked', 'You can’t message this person.'],
+  // The server's terms gate. The person is moved to the terms screen as well
+  // (`onTermsRequired`), so this is only what the screen they left says.
+  ['terms_required', 'Agree to the Terms of Use to continue.'],
 ])
 
 /** A refusal, carrying the API's code only when it sent one. */

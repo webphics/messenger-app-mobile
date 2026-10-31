@@ -71,6 +71,28 @@ export function needsTerms(user: SessionUser): boolean {
 }
 
 /**
+ * Where somebody who owes the terms may still be: the gate itself, and the
+ * account deletion screen it offers, because leaving ChatRoute must not need
+ * agreeing to it first.
+ */
+const TERMS_EXEMPT_PATHS: readonly string[] = ["/terms", "/account/delete"];
+
+/**
+ * Where to send a signed-in person who is somewhere they may not be yet, or
+ * null to leave them. Asked on every change to the person and every move, not
+ * only at launch and sign-in: a session read that turns an unknown answer (a
+ * person kept by an older build) into null, and a request the server refused
+ * with `terms_required`, both have to reach the gate from wherever they land.
+ *
+ * Only the terms, deliberately. Onboarding stays a destination the sign-in
+ * paths choose, because nothing the server enforces depends on it.
+ */
+export function termsRedirect(user: SessionUser | null, pathname: string): Href | null {
+  if (!user || !needsTerms(user)) return null;
+  return TERMS_EXEMPT_PATHS.includes(pathname) ? null : TERMS_HREF;
+}
+
+/**
  * The gate a signed-in person is owed before their Hub, or null for none:
  * the terms first, because nothing — not even choosing a name — happens on
  * ChatRoute before somebody has agreed to how it is used, then onboarding.

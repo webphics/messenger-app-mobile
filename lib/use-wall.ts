@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
+import { unblockedSince } from '@/lib/blocked-people'
 import { useBlockedIds } from '@/lib/blocks-context'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
 import {
@@ -310,6 +311,18 @@ function useWallPages(
       setRead(applyFirstPage(result.value, pageLimit))
     })
   }, [readPage, pageLimit, searching, searchTerm])
+
+  /**
+   * An unblock re-reads the first page: the API left that person's Posts out
+   * of every page it answered while the block stood, so they are not here to
+   * be shown again (`withoutAuthors` only hides what was read).
+   */
+  const lastBlocked = useRef(blockedIds)
+  useEffect(() => {
+    const unblocked = unblockedSince(lastBlocked.current, blockedIds)
+    lastBlocked.current = blockedIds
+    if (unblocked) loadFirst()
+  }, [blockedIds, loadFirst])
 
   useEffect(() => {
     // A fresh mount and a sort switch look the same from here: both need a

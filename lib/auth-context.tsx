@@ -24,6 +24,7 @@ import {
   confirmSession,
   hydrateAuth,
   onSessionExpired,
+  onTermsRequired,
   requestMagicLink as sendMagicLink,
   requestSignUp as sendSignUp,
   type SignUpRequest,
@@ -270,6 +271,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * what stops screens rendering empty states with nothing to explain them.
    */
   useEffect(() => onSessionExpired(() => dispatch({ type: "expired" })), []);
+
+  /**
+   * The server's half of the terms gate. A refused request marks the person as
+   * owing the terms; `TermsRedirect` sees that and moves them to the gate.
+   */
+  useEffect(() => onTermsRequired(() => dispatch({ type: "terms-required" })), []);
 
   /**
    * Run one attempt at establishing a session, whatever it is an attempt at.

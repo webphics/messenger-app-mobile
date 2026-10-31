@@ -21,9 +21,9 @@ import { colors, screenBottomPad } from "@/lib/tokens";
  * is made from a Post or a Message; this is where it is undone, which is why the
  * question asked before a block says so.
  *
- * The list is the shared one (`lib/blocks-context`), re-read on the way in, so
- * an unblock here brings the person's Posts back on the Wall without a request
- * of its own.
+ * The list is the shared one (`lib/blocks-context`), re-read on the way in. An
+ * unblock here is heard by the Wall and any open thread, which re-read their
+ * first page so what the API left out during the block comes back.
  */
 export function AccountBlockedScreen() {
   const insets = useSafeAreaInsets();
@@ -83,7 +83,7 @@ export function AccountBlockedScreen() {
       >
         <Text variant="label" className="mb-4 font-normal leading-5 text-muted">
           You don’t see posts or messages from people you block, and they can’t start a new
-          conversation with you. They aren’t told.
+          conversation with you. Support conversations aren’t affected. They aren’t told.
         </Text>
 
         {waiting ? (

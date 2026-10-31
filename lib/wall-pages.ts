@@ -201,11 +201,12 @@ export function withRestoredPost(read: WallPages, post: WallPost, index: number)
  *
  * Applied to what is *drawn* rather than written into what was read, so the
  * cursor stays the last Post the API answered with — paging on from a Post
- * this filtered out would otherwise ask for the page after the wrong one — and
- * so an unblock brings the Posts back without a request. The API leaves them
- * out of every page it answers from the block onwards; this is what takes down
- * the ones already on the screen, and the live ones the socket broadcasts to the
- * whole Organization room. Hands back the same object when nothing is hidden,
+ * this filtered out would otherwise ask for the page after the wrong one. The
+ * API leaves them out of every page it answers from the block onwards, and out
+ * of the live events it sends this reader; this is what takes down the ones
+ * already on the screen the moment the block lands. An unblock shows again
+ * only what was already read, so the Wall hooks re-read their first page then
+ * (`unblockedSince`). Hands back the same object when nothing is hidden,
  * so a memoised list does not re-render for a block of somebody absent.
  */
 export function withoutAuthors(read: WallPages, authorIds: ReadonlySet<string>): WallPages {

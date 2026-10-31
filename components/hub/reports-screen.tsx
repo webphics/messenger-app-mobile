@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 import type { AdminReport, ReportAction, ReportStatus } from "@/lib/report-parse";
 import {
   REPORT_ACTION_COPY,
-  REPORT_ACTION_DONE,
+  reportDecisions,
   REPORT_TABS,
   REPORT_TARGET_LABELS,
   isReportOverdue,
@@ -179,6 +179,7 @@ const ReportCard = memo(function ReportCard({
   const target = REPORT_TARGET_LABELS[report.targetKind];
   const snapshot = report.content.text;
   const files = report.content.attachmentCount;
+  const decisions = reportDecisions(report);
 
   return (
     <View
@@ -238,11 +239,21 @@ const ReportCard = memo(function ReportCard({
         <Text variant="meta" className="text-muted">
           Reported by {report.reporter ? report.reporter.name : "an account that has gone"}
         </Text>
-        {report.action ? (
-          <Text variant="meta" className="text-muted">
-            {REPORT_ACTION_DONE[report.action]}
-            {report.handledBy ? ` by ${report.handledBy.name}` : ""}
-          </Text>
+        {decisions.length > 0 ? (
+          <View className="mt-1 flex-row flex-wrap items-center gap-1.5">
+            {decisions.map((decision) => (
+              <View key={decision} className="rounded-full bg-line/40 px-2.5 py-1">
+                <Text variant="meta" className="font-semibold text-ink-soft">
+                  {decision}
+                </Text>
+              </View>
+            ))}
+            {report.handledBy ? (
+              <Text variant="meta" className="text-muted">
+                by {report.handledBy.name}
+              </Text>
+            ) : null}
+          </View>
         ) : null}
       </View>
 

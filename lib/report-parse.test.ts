@@ -17,6 +17,8 @@ const ROW = {
   action: null,
   resolutionNote: null,
   content: { text: 'You are worthless', attachmentCount: 1, removed: false },
+  contentRemovedAt: null,
+  userBannedAt: null,
   reporter: { id: 'u-1', name: 'Ada', email: 'ada@x.test', image: null, role: 'customer' },
   reportedUser: { id: 'u-2', name: 'Mallory', email: 'm@x.test', image: null, role: 'customer' },
   handledBy: null,
@@ -28,6 +30,26 @@ const ROW = {
 describe('reading a report', () => {
   it('reads every field a reviewer acts on', () => {
     expect(parseAdminReport(ROW)).toEqual(ROW)
+  })
+
+  it('keeps both decisions when content was removed and its author banned', () => {
+    const both = {
+      ...ROW,
+      status: 'actioned',
+      action: 'ban_user',
+      contentRemovedAt: '2026-10-31T11:00:00.000Z',
+      userBannedAt: '2026-10-31T11:05:00.000Z',
+    }
+    expect(parseAdminReport(both)).toMatchObject({
+      contentRemovedAt: '2026-10-31T11:00:00.000Z',
+      userBannedAt: '2026-10-31T11:05:00.000Z',
+      content: { removed: true },
+    })
+  })
+
+  it('reads a report from an API without the decision fields as neither taken', () => {
+    const { contentRemovedAt: _removed, userBannedAt: _banned, ...older } = ROW
+    expect(parseAdminReport(older)).toMatchObject({ contentRemovedAt: null, userBannedAt: null })
   })
 
   it.each([

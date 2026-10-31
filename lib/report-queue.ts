@@ -82,6 +82,19 @@ export const REPORT_ACTION_DONE: Record<ReportAction, string> = {
 }
 
 /**
+ * Every decision a report carries, for the badges on its card: a removal and a
+ * ban can both have happened, in either order, and neither erases the other.
+ * Dismissed only when nothing was done.
+ */
+export function reportDecisions(report: AdminReport): string[] {
+  const decisions: string[] = []
+  if (report.contentRemovedAt !== null || report.content.removed) decisions.push(REPORT_ACTION_DONE.remove_content)
+  if (report.userBannedAt !== null) decisions.push(REPORT_ACTION_DONE.ban_user)
+  if (decisions.length === 0 && report.status === 'dismissed') decisions.push(REPORT_ACTION_DONE.dismiss)
+  return decisions
+}
+
+/**
  * The Hub row's second line. Nothing waiting says so plainly; something
  * overdue leads with that, because it is the number somebody has to act on.
  */

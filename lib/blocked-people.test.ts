@@ -3,6 +3,7 @@ import {
   parseBlockedPeople,
   parseBlockedPerson,
   parseUnblocked,
+  unblockedSince,
   withBlockedPerson,
   withoutBlockedPerson,
   type BlockedPerson,
@@ -58,5 +59,18 @@ describe('the list', () => {
 
   it('answers the ids the screens filter by', () => {
     expect([...blockedIdSet([person('a'), person('b')])]).toEqual(['a', 'b'])
+  })
+})
+
+describe('unblockedSince', () => {
+  it.each([
+    ['somebody left the list', ['ada', 'bo'], ['bo'], true],
+    ['the last person left it', ['ada'], [], true],
+    ['somebody was added', ['ada'], ['ada', 'bo'], false],
+    ['nothing changed', ['ada'], ['ada'], false],
+    ['one swapped for another', ['ada'], ['bo'], true],
+    ['it was and is empty', [], [], false],
+  ])('%s → %s', (_label, before, after, expected) => {
+    expect(unblockedSince(new Set(before), new Set(after))).toBe(expected)
   })
 })

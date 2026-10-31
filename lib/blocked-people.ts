@@ -57,6 +57,16 @@ export function withoutBlockedPerson(list: readonly BlockedPerson[], userId: str
   return list.filter(existing => existing.id !== userId)
 }
 
+/**
+ * Whether somebody was unblocked between two readings of the list. What the
+ * API left out of its pages while the block stood is not on this phone, so a
+ * screen that sees this re-reads rather than waiting for a pull.
+ */
+export function unblockedSince(previous: ReadonlySet<string>, next: ReadonlySet<string>): boolean {
+  for (const id of previous) if (!next.has(id)) return true
+  return false
+}
+
 /** The ids the screens filter by. */
 export function blockedIdSet(list: readonly BlockedPerson[]): ReadonlySet<string> {
   return new Set(list.map(person => person.id))

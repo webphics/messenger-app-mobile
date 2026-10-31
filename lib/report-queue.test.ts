@@ -2,6 +2,7 @@ import { parseAdminReport, type AdminReport } from '@/lib/report-parse'
 import {
   isReportOverdue,
   reportAge,
+  reportDecisions,
   reportSummaryLine,
   withResolvedReport,
 } from '@/lib/report-queue'
@@ -66,5 +67,26 @@ describe('the queue after an action', () => {
     const rows = [report({ id: 'a', status: 'actioned' })]
     const resolved = report({ id: 'a', status: 'actioned', action: 'ban_user' })
     expect(withResolvedReport(rows, resolved, 'actioned')[0]?.action).toBe('ban_user')
+  })
+})
+
+describe('the decisions a card shows', () => {
+  it.each([
+    ['nothing yet', {}, []],
+    ['removed only', { status: 'actioned', contentRemovedAt: '2026-10-31T11:00:00.000Z' }, ['Content removed']],
+    ['banned only', { status: 'actioned', userBannedAt: '2026-10-31T11:00:00.000Z' }, ['User banned']],
+    [
+      'removed, then banned — the ban does not erase the removal',
+      {
+        status: 'actioned',
+        action: 'ban_user',
+        contentRemovedAt: '2026-10-31T11:00:00.000Z',
+        userBannedAt: '2026-10-31T11:05:00.000Z',
+      },
+      ['Content removed', 'User banned'],
+    ],
+    ['dismissed with nothing done', { status: 'dismissed', action: 'dismiss' }, ['Dismissed']],
+  ])('%s', (_label, overrides, expected) => {
+    expect(reportDecisions(report(overrides))).toEqual(expected)
   })
 })

@@ -47,6 +47,13 @@ export type AdminReport = {
   action: ReportAction | null
   resolutionNote: string | null
   content: { text: string | null; attachmentCount: number; removed: boolean }
+  /**
+   * When the content was taken down and when its author was banned, each from
+   * any report on the same target. Kept apart from `action`, which is only the
+   * latest decision, so a removal followed by a ban still shows both.
+   */
+  contentRemovedAt: string | null
+  userBannedAt: string | null
   reporter: ReportPerson | null
   reportedUser: ReportPerson | null
   handledBy: ReportPerson | null
@@ -146,8 +153,10 @@ export function parseAdminReport(data: unknown): AdminReport | null {
     content: {
       text: text(content?.text),
       attachmentCount: count(content?.attachmentCount),
-      removed: content?.removed === true,
+      removed: content?.removed === true || text(row.contentRemovedAt) !== null,
     },
+    contentRemovedAt: text(row.contentRemovedAt),
+    userBannedAt: text(row.userBannedAt),
     reporter: parsePerson(row.reporter),
     reportedUser: parsePerson(row.reportedUser),
     handledBy: parsePerson(row.handledBy),

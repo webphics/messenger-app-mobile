@@ -14,7 +14,7 @@ export function confirmBlock(name: string): Promise<boolean> {
   return new Promise(resolve => {
     Alert.alert(
       `Block ${name}?`,
-      'You won’t see their posts or messages, and they can’t start a new conversation with you. They aren’t told. You can unblock them in Settings.',
+      'You won’t see their posts or messages, and they can’t start a new conversation with you. Support conversations aren’t affected. They aren’t told. You can unblock them in Settings.',
       [
         { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
         { text: 'Block', style: 'destructive', onPress: () => resolve(true) },

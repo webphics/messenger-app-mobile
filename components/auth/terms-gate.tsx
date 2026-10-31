@@ -27,9 +27,10 @@ import { colors, screenTopPad } from "@/lib/tokens";
  * a first Google sign-in and a sign-up link opened from an unknown address
  * create one without it, and accounts from before this step existed have none.
  *
- * Two ways off it and no third: agree, which the API records with the date, or
- * sign out. There is no back, because the screen behind it is whatever the
- * person was not yet allowed to see.
+ * Three ways off it: agree, which the API records with the date; sign out; or
+ * delete the account, which must never need agreeing first (`termsRedirect`
+ * leaves the deletion screen alone). There is no back, because the screen
+ * behind it is whatever the person was not yet allowed to see.
  */
 
 const POINTS = [
@@ -135,6 +136,15 @@ export function TermsGate() {
           onPress={() => void leave()}
         >
           <Text className="text-danger">Sign out</Text>
+        </Button>
+
+        <Button
+          variant="ghost"
+          className="min-h-12 w-full"
+          disabled={saving}
+          onPress={() => router.push("/account/delete")}
+        >
+          <Text className="text-muted">Delete my account…</Text>
         </Button>
       </Animated.View>
     </ScrollView>

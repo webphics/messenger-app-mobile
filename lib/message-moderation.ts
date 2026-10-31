@@ -1,6 +1,6 @@
 import { isCompanyPersona } from '@/lib/display'
 import { isLocalId, isOutgoing, isSystemMessage } from '@/lib/thread-state'
-import { isStaffMessage, type Message } from '@/lib/types'
+import { isStaffMessage, type ConversationType, type Message } from '@/lib/types'
 
 /**
  * Whether a Message's long-press menu offers Report and Block.
@@ -24,8 +24,24 @@ export type MessageModeration = {
 
 const NOTHING: MessageModeration = { report: false, block: null }
 
-export function messageModeration(message: Message, viewerId: string): MessageModeration {
+/**
+ * Whether a block reaches this kind of conversation. Not a Support DM: that
+ * thread is the company and its customer, so the API leaves its history, live
+ * Messages and notifications alone whoever blocked whom — and this client hides
+ * nothing in one and offers no Block there either, so a block never looks like
+ * it did something it did not.
+ */
+export function blocksApplyTo(conversationType: ConversationType): boolean {
+  return conversationType !== 'support_dm'
+}
+
+export function messageModeration(
+  message: Message,
+  viewerId: string,
+  conversationType: ConversationType,
+): MessageModeration {
   if (isLocalId(message.id) || isSystemMessage(message) || isOutgoing(message, viewerId)) return NOTHING
+  if (!blocksApplyTo(conversationType)) return { report: true, block: null }
   const sender =
     isStaffMessage(message) && message.sender.id !== '' && !isCompanyPersona(message.sender.id)
       ? message.sender

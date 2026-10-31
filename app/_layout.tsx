@@ -32,6 +32,7 @@ import { Uniwind } from "uniwind";
 import { useRootStackAnimation } from "@/lib/use-stack-chrome";
 import { useViewer } from "@/lib/use-viewer";
 import { SessionEndRedirect } from "@/components/auth/session-end";
+import { TermsRedirect } from "@/components/auth/terms-redirect";
 import { PushRegistration } from "@/components/push/push-registration";
 import { AuthProvider } from "@/lib/auth-context";
 import { BlocksProvider } from "@/lib/blocks-context";
@@ -106,6 +107,9 @@ export default function RootLayout() {
       ) : null}
       <AuthProvider>
         <SessionEndRedirect />
+        {/* Beside it: the terms gate has moments without a screen too — a
+            session read or a `terms_required` refusal. */}
+        <TermsRedirect />
         {/* Outside the inbox, because the inbox is one of the things that
             listens to it, and inside the auth provider, because a connection
             needs a session to authenticate its handshake with. */}

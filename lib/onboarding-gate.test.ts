@@ -3,6 +3,7 @@ import { ROLE_HREF } from "@/lib/hub-routes";
 import {
   ONBOARDING_HREF,
   TERMS_HREF,
+  termsRedirect,
   needsOnboarding,
   needsTerms,
   signedInDestination,
@@ -56,6 +57,33 @@ describe("through the parser, which is where the substitution lives", () => {
   test("case and padding do not smuggle a blank name past the gate", () => {
     const user = parseSessionUser(payload("  ONBOARDING-PROBE@TALO.TEST  "));
     expect(needsOnboarding(user!)).toBe(true);
+  });
+});
+
+describe("termsRedirect: reaching the gate from wherever the person is", () => {
+  const person = (termsAcceptedAt?: string | null) => {
+    const user = parseSessionUser({
+      id: "e0d3c1a2-0000-4000-8000-000000000000",
+      name: "Ada Lovelace",
+      email: "ada@talo.test",
+      role: "agent",
+      termsAcceptedAt: termsAcceptedAt ?? null,
+    })!;
+    if (termsAcceptedAt !== undefined) return user;
+    const { termsAcceptedAt: _unknown, ...kept } = user;
+    return kept;
+  };
+
+  test.each([
+    ["owes the terms, on a Hub screen", person(null), "/", TERMS_HREF],
+    ["owes the terms, deep in a thread", person(null), "/chat/abc", TERMS_HREF],
+    ["owes the terms, already on the gate", person(null), "/terms", null],
+    ["owes the terms, deleting the account", person(null), "/account/delete", null],
+    ["has agreed", person("2026-10-31T10:00:00.000Z"), "/chat/abc", null],
+    ["kept by an older build, no answer yet", person(undefined), "/chat/abc", null],
+    ["nobody signed in", null, "/sign-in", null],
+  ])("%s → %s", (_label, user, pathname, expected) => {
+    expect(termsRedirect(user, pathname)).toBe(expected);
   });
 });
 
