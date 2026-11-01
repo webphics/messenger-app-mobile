@@ -8,10 +8,9 @@ import { AccountTwoFactorScreen } from "@/components/settings/account-two-factor
  * A sibling of the role groups rather than a screen inside one, per ADR-0012:
  * governing your own account belongs to the account and not to the role.
  *
- * This is the whole of two-factor management on this client. There is no route
- * for turning it on, because there is no screen for it: ticket 08 is blocked on
- * `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md`,
- * and ADR-0013 records why.
+ * This is the whole of two-factor management on this client, turning it on
+ * included (#08): the setup is a card on this screen rather than a route of its
+ * own, because its key and codes exist only in the answer that minted them.
  */
 export default function AccountTwoFactorRouteScreen() {
   return <AccountTwoFactorScreen />;

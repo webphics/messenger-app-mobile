@@ -419,7 +419,7 @@ describe("verifyTwoFactorCode", () => {
   test("presents the challenge and stores what comes back", async () => {
     request.mockResolvedValueOnce(created(USER));
 
-    await expect(verifyTwoFactorCode(CHALLENGE, "123456")).resolves.toEqual({
+    await expect(verifyTwoFactorCode(CHALLENGE, "123456", "totp")).resolves.toEqual({
       kind: "signed-in",
       cookie: ISSUED,
       user: PARSED_USER,
@@ -438,11 +438,30 @@ describe("verifyTwoFactorCode", () => {
     expect(getSessionUser()).toEqual(PARSED_USER);
   });
 
+  test("a backup code presents the same challenge to the backup route", async () => {
+    request.mockResolvedValueOnce(created(USER));
+
+    await expect(
+      verifyTwoFactorCode(CHALLENGE, "d4m39TKO73", "backup-code"),
+    ).resolves.toEqual({ kind: "signed-in", cookie: ISSUED, user: PARSED_USER });
+
+    expect(request).toHaveBeenCalledWith("/auth/two-factor/verify-backup-code", {
+      method: "POST",
+      // The hyphen a person dropped is put back; the API compares exactly.
+      body: { code: "d4m39-TKO73" },
+      // Still the whole credential. The route no longer carries `AuthGuard`, so
+      // the challenge cookie is enough, as it is for an authenticator code.
+      cookie: CHALLENGE,
+    });
+    expect(writeCookie).toHaveBeenCalledWith(ISSUED);
+    expect(getSessionUser()).toEqual(PARSED_USER);
+  });
+
   test("a refused code writes nothing and leaves nobody signed in", async () => {
     request.mockResolvedValueOnce(REFUSED);
 
     // In words about a code, because the API's own 401 names a password.
-    await expect(verifyTwoFactorCode(CHALLENGE, "000000")).resolves.toMatchObject({
+    await expect(verifyTwoFactorCode(CHALLENGE, "000000", "totp")).resolves.toMatchObject({
       kind: "unauthorised",
     });
     expect(writeCookie).not.toHaveBeenCalled();
@@ -453,7 +472,7 @@ describe("verifyTwoFactorCode", () => {
   test("a verified code with no cookie behind it establishes nothing", async () => {
     request.mockResolvedValueOnce(created(USER, null));
 
-    await expect(verifyTwoFactorCode(CHALLENGE, "123456")).resolves.toEqual({
+    await expect(verifyTwoFactorCode(CHALLENGE, "123456", "totp")).resolves.toEqual({
       kind: "malformed",
     });
     expect(writeCookie).not.toHaveBeenCalled();

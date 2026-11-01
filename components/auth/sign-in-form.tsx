@@ -68,7 +68,11 @@ import {
   signUpTermsError,
 } from "@/lib/sign-up-fields";
 import type { SeedAccount } from "@/lib/seed-accounts";
-import { CHALLENGE_COPY, codeError } from "@/lib/two-factor-challenge";
+import {
+  CHALLENGE_COPY,
+  codeError,
+  type ChallengeMethod,
+} from "@/lib/two-factor-challenge";
 import { colors, screenTopPad } from "@/lib/tokens";
 
 /** `brand-lockup.png` is 900x587; the mark sits above the wordmark. */
@@ -288,6 +292,12 @@ export function SignInForm() {
   /** The code being typed, and why it cannot be sent yet. */
   const [code, setCode] = useState("");
   const [codeFieldError, setCodeFieldError] = useState<string | null>(null);
+  /**
+   * Which kind of code the field is asking for. The authenticator first, since
+   * that is the everyday answer; a backup code is the way in for somebody
+   * without it, one tap away rather than behind a screen of its own.
+   */
+  const [codeMethod, setCodeMethod] = useState<ChallengeMethod>("totp");
   const sendingLink = linkRequest.sending;
   /**
    * Whether anything at all is out — the one guard every control on this screen
@@ -376,6 +386,7 @@ export function SignInForm() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCode("");
     setCodeFieldError(null);
+    setCodeMethod("totp");
     setPassword("");
     setShowPassword(false);
   }, [inChallenge]);
@@ -699,7 +710,7 @@ export function SignInForm() {
   async function onSubmitCode() {
     if (anyRequestOut || challenge === null) return;
 
-    const next = codeError(code);
+    const next = codeError(code, codeMethod);
     setCodeFieldError(next);
     if (next) {
       hapticWarning();
@@ -707,7 +718,23 @@ export function SignInForm() {
       return;
     }
 
-    await submitTwoFactorCode(code);
+    await submitTwoFactorCode(code, codeMethod);
+  }
+
+  /**
+   * Ask for the other kind of code.
+   *
+   * What was typed goes, because it was typed for the other field: six digits
+   * are never a backup code and a backup code is never six digits, so carrying
+   * either across is a refusal waiting to happen. The challenge is untouched,
+   * since both kinds answer the same one.
+   */
+  function onSwitchCodeMethod() {
+    if (anyRequestOut) return;
+    setCodeMethod((current) => (current === "totp" ? "backup-code" : "totp"));
+    setCode("");
+    setCodeFieldError(null);
+    focusAfterPaint(codeRef);
   }
 
   /**
@@ -723,8 +750,9 @@ export function SignInForm() {
     cancelTwoFactor();
   }
 
+  const challengeCopy = CHALLENGE_COPY[codeMethod];
   const heading = challenge
-    ? CHALLENGE_COPY
+    ? challengeCopy
     : step === "credentials"
       ? CREDENTIALS_COPY[credentials ?? "password"]
       : step === "link-sent" && linkPurpose === "sign-up"
@@ -791,41 +819,69 @@ export function SignInForm() {
           {challenge ? (
             <>
               {/*
-                One field, and nothing else on offer. A backup code cannot be
-                redeemed at this moment. `POST /auth/two-factor/verify-backup-code`
-                carries `@UseGuards(AuthGuard)` and there is no session here to
-                satisfy it, so a control for one would be a door that opens onto
-                a wall. See ADR-0013.
+                One field, for whichever kind of code the switch below it names.
+                Both are redeemed against the same challenge, so changing kind
+                is a change of field rather than of step.
               */}
               <View className="mt-5">
                 <Text variant="label" className="mb-1.5 text-ink">
-                  Authentication code
+                  {challengeCopy.fieldLabel}
                 </Text>
-                <Input
-                  ref={codeRef}
-                  className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base tracking-[6px] text-ink"
-                  placeholder="123456"
-                  accessibilityLabel="Authentication code from your authenticator app"
-                  // The one-time-code hint is what makes an authenticator's own
-                  // suggestion appear over the keyboard, on both platforms.
-                  autoComplete="one-time-code"
-                  textContentType="oneTimeCode"
-                  inputMode="numeric"
-                  keyboardType="number-pad"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  // Long enough to hold a pasted `123 456`, which is normalised
-                  // rather than refused. Nothing here blocks a paste.
-                  maxLength={16}
-                  returnKeyType="go"
-                  onSubmitEditing={() => void onSubmitCode()}
-                  value={code}
-                  onChangeText={(v) => {
-                    setCode(v);
-                    setCodeFieldError(null);
-                  }}
-                />
+                {codeMethod === "totp" ? (
+                  <Input
+                    key="totp"
+                    ref={codeRef}
+                    className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base tracking-[6px] text-ink"
+                    placeholder={challengeCopy.placeholder}
+                    accessibilityLabel={challengeCopy.fieldAccessibilityLabel}
+                    // The one-time-code hint is what makes an authenticator's own
+                    // suggestion appear over the keyboard, on both platforms.
+                    autoComplete="one-time-code"
+                    textContentType="oneTimeCode"
+                    inputMode="numeric"
+                    keyboardType="number-pad"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    // Long enough to hold a pasted `123 456`, which is normalised
+                    // rather than refused. Nothing here blocks a paste.
+                    maxLength={16}
+                    returnKeyType="go"
+                    onSubmitEditing={() => void onSubmitCode()}
+                    value={code}
+                    onChangeText={(v) => {
+                      setCode(v);
+                      setCodeFieldError(null);
+                    }}
+                  />
+                ) : (
+                  <Input
+                    // Keyed apart from the field above so the keyboard type
+                    // changes with it: a number pad cannot type a backup code.
+                    key="backup-code"
+                    ref={codeRef}
+                    className="h-12 rounded-2xl border-line/80 bg-line/35 font-sans text-base tracking-[2px] text-ink"
+                    placeholder={challengeCopy.placeholder}
+                    accessibilityLabel={challengeCopy.fieldAccessibilityLabel}
+                    // Not a one-time code to the platform: no app will ever
+                    // suggest one, and the hint would invite an SMS code instead.
+                    autoComplete="off"
+                    keyboardType="default"
+                    // Mixed case, compared exactly by the API, so the keyboard
+                    // must not change a letter somebody typed.
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    maxLength={24}
+                    returnKeyType="go"
+                    onSubmitEditing={() => void onSubmitCode()}
+                    value={code}
+                    onChangeText={(v) => {
+                      setCode(v);
+                      setCodeFieldError(null);
+                    }}
+                  />
+                )}
                 <FieldError message={codeFieldError} />
               </View>
 
@@ -843,6 +899,23 @@ export function SignInForm() {
                 {/* The label stays put while it spins, as on the password step. */}
                 <Text>Verify</Text>
               </Button>
+
+              {/* The way in for somebody without their authenticator, and back
+                  again. Drawn as text rather than as a third button, because it
+                  changes the field rather than doing anything. */}
+              <TactilePressable
+                accessibilityRole="button"
+                accessibilityLabel={challengeCopy.switchLabel}
+                accessibilityState={{ disabled: anyRequestOut }}
+                disabled={anyRequestOut}
+                onPress={onSwitchCodeMethod}
+                hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+                className="mt-4 min-h-11 items-center justify-center self-center px-2"
+              >
+                <Text variant="label" className="text-primary">
+                  {challengeCopy.switchLabel}
+                </Text>
+              </TactilePressable>
 
               {/* No dead end: there is always a way back to the sign-in screen,
                   and taking it keeps nothing of the attempt. */}

@@ -1,5 +1,8 @@
 import {
   checkTwoFactorPassword,
+  disableConfirmationMessage,
+  groupSetupKey,
+  TWO_FACTOR_COPY,
   twoFactorActions,
   type TwoFactorAccount,
 } from "@/lib/two-factor-management";
@@ -10,7 +13,6 @@ import {
  */
 const ON: TwoFactorAccount = { twoFactorEnabled: true, hasPassword: true };
 const OFF: TwoFactorAccount = { twoFactorEnabled: false, hasPassword: false };
-const ACCOUNTS = [ON, OFF];
 
 describe("what the screen offers", () => {
   test("two-factor on offers turning it off and replacing the codes, and nothing else", () => {
@@ -20,8 +22,8 @@ describe("what the screen offers", () => {
     ]);
   });
 
-  test("two-factor off offers nothing at all", () => {
-    expect(twoFactorActions(OFF)).toEqual([]);
+  test("two-factor off offers turning it on, and nothing else", () => {
+    expect(twoFactorActions(OFF).map((action) => action.kind)).toEqual(["enable"]);
   });
 
   test("turning it off is the destructive one, so it is confirmed first", () => {
@@ -34,29 +36,38 @@ describe("what the screen offers", () => {
   });
 });
 
-describe("nothing here can turn two-factor on", () => {
-  // The hard boundary of ticket 07, and the reason is a lockout rather than
-  // scope: `POST /auth/two-factor/verify-backup-code` is behind `AuthGuard`, so
-  // a backup code is suspected to be unredeemable at challenge time, which is
-  // the one moment it exists for. Offering enable would let somebody turn on a
-  // lock and throw away the only spare key. See ADR-0013 and issue 02.
-  test.each(ACCOUNTS)("no action list contains an enable action (%s)", (account) => {
-    for (const action of twoFactorActions(account)) {
-      // `String` rather than the value itself, because `TwoFactorActionKind`
-      // has no such member: the assertion has to survive the type that already
-      // makes it true, so that widening the union later is what trips it.
-      expect(String(action.kind)).not.toBe("enable");
-      expect(String(action.kind)).not.toBe("setup");
+describe("turning two-factor on", () => {
+  // Ticket 08. Withheld while `POST /auth/two-factor/verify-backup-code` was
+  // behind `AuthGuard`, which left a backup code unredeemable at sign-in, the
+  // one moment it exists for. The API dropped the guard and the sign-in
+  // challenge takes a backup code now, so the spare key works. See ADR-0013
+  // and issue 02.
+  test("is offered only where it is off", () => {
+    expect(twoFactorActions(OFF).some((action) => action.kind === "enable")).toBe(true);
+    expect(twoFactorActions(ON).some((action) => action.kind === "enable")).toBe(false);
+  });
+
+  test("is labelled as turning it on, to the eye and to a screen reader", () => {
+    const [enable] = twoFactorActions(OFF);
+
+    expect(enable?.label).toMatch(/turn on/i);
+    expect(enable?.accessibilityLabel).toMatch(/turn on/i);
+  });
+
+  test("is not confirmed as destructive, since it takes nothing away", () => {
+    expect(twoFactorActions(OFF)[0]?.destructive).toBe(false);
+  });
+
+  test("nothing on an account that has it on is labelled as turning it on", () => {
+    for (const action of twoFactorActions(ON)) {
+      expect(action.label).not.toMatch(/turn on|enable|set up|switch on/i);
+      expect(action.accessibilityLabel).not.toMatch(/turn on|enable|set up|switch on/i);
     }
   });
 
-  test.each(ACCOUNTS)("and nothing is labelled as turning it on (%s)", (account) => {
-    for (const action of twoFactorActions(account)) {
-      expect(action.label).not.toMatch(/turn on|enable|set up|switch on/i);
-      expect(action.accessibilityLabel).not.toMatch(
-        /turn on|enable|set up|switch on/i,
-      );
-    }
+  test("the setup key is drawn in fours, as authenticator apps show it", () => {
+    expect(groupSetupKey("JMYXUODFHBIF6X2R")).toBe("JMYX UODF HBIF 6X2R");
+    expect(groupSetupKey("JMYXUO")).toBe("JMYX UO");
   });
 });
 
@@ -73,5 +84,28 @@ describe("the body each account sends", () => {
     expect(
       checkTwoFactorPassword({ hasPassword: true }, "  hunter2  ").password,
     ).toBe("hunter2");
+  });
+});
+
+describe("what turning it off says", () => {
+  test("an account with a password is told the password goes too", () => {
+    expect(disableConfirmationMessage({ hasPassword: true })).toMatch(
+      /removes your password/,
+    );
+  });
+
+  test("an account with no password is not told about one", () => {
+    expect(disableConfirmationMessage({ hasPassword: false })).not.toMatch(
+      /password/,
+    );
+  });
+
+  test("neither promises that a password protects the account", () => {
+    for (const hasPassword of [true, false]) {
+      expect(disableConfirmationMessage({ hasPassword })).not.toMatch(
+        /password alone/,
+      );
+    }
+    expect(TWO_FACTOR_COPY.off.detail).not.toMatch(/password/);
   });
 });

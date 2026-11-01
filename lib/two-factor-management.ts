@@ -1,16 +1,15 @@
 /**
- * What the two-factor screen says, what it offers, and the one thing it refuses
- * to offer.
+ * What the two-factor screen says and what it offers.
  *
  * Pure and table-tested, beside `components/settings/account-two-factor-screen`,
- * which owns the drawing, and `lib/two-factor-api`, which owns the two paths.
+ * which owns the drawing, and `lib/two-factor-api`, which owns the paths.
  * The same split every rules module here has, `lib/password-rules`,
  * `lib/account-session-rows`, `lib/conversation-access`, and for the same reason:
- * nothing in this file imports anything native, so the rules ticket 07 turns on
- * are a table of cases rather than something only a running phone can
+ * nothing in this file imports anything native, so the rules tickets 07 and 08
+ * turn on are a table of cases rather than something only a running phone can
  * demonstrate.
  *
- * The rules, all from ticket 07 and
+ * The rules, from tickets 07 and 08 and
  * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`:
  *
  * 1. **The screen reports the state and never asks for it.** `twoFactorEnabled`
@@ -20,36 +19,37 @@
  *    than asking again even if a route existed.
  * 2. **Two-factor on offers exactly two things, turning it off and replacing the
  *    backup codes.** Nothing else, in either order, ever.
- * 3. **Two-factor off offers nothing at all.** The action list is empty, and
- *    that emptiness is this module's answer rather than a control a component
- *    happened not to draw. See the section below, which is the whole reason this
- *    screen is half a screen.
+ * 3. **Two-factor off offers exactly one thing, turning it on.** Ticket 08. It
+ *    was withheld while a backup code could not be redeemed at sign-in, and the
+ *    section below says what changed.
  * 4. **A password is required exactly when the account has one.** Read off
  *    `hasPassword`, so an account that signs in by link or with Google alone is
  *    drawn no password field and sends no password. The API is why, and the
- *    working is below.
+ *    working is below. Turning it on asks under the same rule, because
+ *    `POST /auth/two-factor/enable` takes the same body and better-auth checks
+ *    it with the same function.
  *
- * ## Why there is no control here that turns two-factor on
+ * ## Why turning it on was withheld, and why it no longer is
  *
- * `POST /auth/two-factor/enable` and `GET /auth/two-factor/get-totp-uri` both
- * exist, both work, and both stay unused by this client. That is ticket 08, and
- * ticket 08 is blocked on
- * `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md`.
+ * Turning on a factor hands somebody backup codes as the only way in without
+ * their authenticator. `POST /auth/two-factor/verify-backup-code` used to carry
+ * `@UseGuards(AuthGuard)`, which resolves a full session, and at challenge time
+ * there is no session, only the short-lived `better-auth.two_factor` cookie. So
+ * a backup code could not be redeemed at the one moment it exists for, and
+ * offering enable would have let somebody turn on a lock and throw away the only
+ * spare key, from the device they are most likely to lose.
  *
- * The reason is a lockout rather than a scope cut.
- * `POST /auth/two-factor/verify-backup-code` carries `@UseGuards(AuthGuard)`,
- * which resolves a full Better Auth session, and at challenge time there is no
- * session, only the short-lived `better-auth.two_factor` cookie. So a backup
- * code is suspected to be unredeemable at the one moment it exists for. Offering
- * enable while the only recovery path for the factor may be broken would let
- * somebody turn on a lock and throw away the only spare key, from the device
- * they are most likely to lose. Issue 02 confirms that suspicion before anything
- * concludes, because reading the code is not running it, and ADR-0013 makes it a
- * blocking edge rather than a note.
+ * The API dropped the guard, because better-auth's `verifyBackupCode`
+ * authenticates from the challenge cookie or a session by itself.
+ * `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md`
+ * ran the whole thing against the API: a backup code presented with only the
+ * challenge cookie answered 201 with a session. The sign-in challenge on this
+ * client takes one now, so the spare key works where it has to, and enable is
+ * offered.
  *
- * Anybody arriving here to add an enable control is in the wrong ticket. The
- * test beside this file asserts that no action list ever contains one, so
- * adding it is a failing test rather than a review comment somebody might miss.
+ * The test beside this file asserts the shape of both lists, so an enable
+ * control leaking into the on state, or going missing from the off one, is a
+ * failing test rather than a review comment somebody might miss.
  *
  * ## When the API wants a password, and how that was established
  *
@@ -86,12 +86,11 @@ export type TwoFactorStatus = "on" | "off";
 /**
  * Every action this screen may offer.
  *
- * There is deliberately no `enable`, and the omission is the type's job rather
- * than a component's: a screen cannot draw a control this union has no name for,
- * so the boundary in the header is enforced at compile time before any test
- * runs.
+ * `enable` starts a setup rather than finishing anything: the factor is on only
+ * once a code from the new authenticator comes back, which is a step of the
+ * screen and not an action of its own. See `lib/two-factor-api`.
  */
-export type TwoFactorActionKind = "disable" | "regenerate-backup-codes";
+export type TwoFactorActionKind = "enable" | "disable" | "regenerate-backup-codes";
 
 /** A control, named twice, once for the eye and once for a screen reader. */
 export type TwoFactorAction = {
@@ -101,11 +100,12 @@ export type TwoFactorAction = {
   /**
    * Whether this is confirmed before it happens, per `AGENTS.md`.
    *
-   * True for turning two-factor off and false for replacing the codes, which
-   * looks inconsistent and is not. Turning it off takes a protection away and
-   * gives nothing back. Replacing the codes hands the replacement over in the
-   * same breath, on the same screen, so what it takes away is visibly returned
-   * rather than gone.
+   * True for turning two-factor off and false for the other two, which looks
+   * inconsistent and is not. Turning it off takes a protection away and gives
+   * nothing back. Replacing the codes hands the replacement over in the same
+   * breath, on the same screen, so what it takes away is visibly returned rather
+   * than gone. Turning it on takes nothing away at all until its last step, and
+   * that step is the person typing a code they could only have if it worked.
    */
   destructive: boolean;
 };
@@ -120,10 +120,6 @@ export function twoFactorStatus(
 /**
  * Rules 2 and 3. What the screen offers, in the order it draws them.
  *
- * A list that is allowed to be empty, which is `lib/wall-actions`' shape and is
- * load-bearing here: an account with two-factor off gets nothing rather than a
- * greyed-out control that invites somebody to work out why it cannot be tapped.
- *
  * Turning off is first because it is what somebody who opened this screen with
  * two-factor on most often came for, and it is the destructive one, so it is
  * drawn as such rather than hidden under the safer control.
@@ -131,7 +127,16 @@ export function twoFactorStatus(
 export function twoFactorActions(
   account: Pick<TwoFactorAccount, "twoFactorEnabled">,
 ): TwoFactorAction[] {
-  if (twoFactorStatus(account) === "off") return [];
+  if (twoFactorStatus(account) === "off") {
+    return [
+      {
+        kind: "enable",
+        label: "Turn on two-factor",
+        accessibilityLabel: "Turn on two-factor authentication for this account",
+        destructive: false,
+      },
+    ];
+  }
 
   return [
     {
@@ -212,11 +217,8 @@ export function checkTwoFactorPassword(
  * "your account asks for a password alone" are different news and a sentence
  * covering both would be vague enough to be useless to either person.
  *
- * The off state names the absence rather than leaving somebody hunting for a
- * control that is not there. It says nothing about the web app: pointing at
- * another client that would enable it is offering the thing rule 3 withholds,
- * one indirection later, and the reason it is withheld applies to any device
- * that account ends up locked out of.
+ * The off state says what turning it on would change, because the control under
+ * it is the one thing on the screen and the sentence is what it is weighed by.
  */
 export const TWO_FACTOR_COPY: Record<
   TwoFactorStatus,
@@ -230,31 +232,44 @@ export const TWO_FACTOR_COPY: Record<
   off: {
     statusLine: "Two-factor authentication is off",
     detail:
-      "Signing in asks for your password alone. Turning two-factor on is not something this app does yet.",
+      "Signing in does not ask for a code. Turn it on to also ask for one from an authenticator app.",
   },
 };
 
 /** The password field, where there is one. */
 export const TWO_FACTOR_PASSWORD_COPY = {
   label: "Your password",
-  hint: "Confirms it is you before either of these goes ahead.",
+  hint: "Confirms it is you before this goes ahead.",
 } as const;
 
 /**
  * Turning it off, asked before it happens.
  *
- * `AGENTS.md` confirms a destructive action, and this one has no undo anywhere
- * in this app: nothing here turns two-factor back on, so somebody who taps this
- * by accident cannot repair it from the phone they are holding. The message says
- * that rather than leaving it to be discovered.
+ * `AGENTS.md` confirms a destructive action. Turning it back on is possible from
+ * this screen, but it is a new authenticator entry and a new set of codes rather
+ * than an undo, and the message says so rather than leaving it to be discovered.
  */
 export const TWO_FACTOR_DISABLE_CONFIRMATION = {
   title: "Turn off two-factor authentication?",
-  message:
-    "Your account will be protected by your password alone, and the backup codes you have now will stop working. This app cannot turn it back on.",
   confirmLabel: "Turn off",
   cancelLabel: "Cancel",
 } as const;
+
+/**
+ * The API deletes the password along with the factor
+ * (`removeCredentialAccountAfterTwoFactorDisable`), so an account that has one
+ * is told it goes, and one that has none is not told about a password at all.
+ */
+export function disableConfirmationMessage(
+  account: Pick<TwoFactorAccount, "hasPassword">,
+): string {
+  const rest =
+    "The backup codes you have now will stop working, and turning it on again means setting up your authenticator app again.";
+
+  return account.hasPassword
+    ? `This also removes your password, so next time you sign in with a link sent to your email. ${rest}`
+    : rest;
+}
 
 /**
  * The codes, and the warning that has to arrive with them.
@@ -276,3 +291,50 @@ export const BACKUP_CODES_COPY = {
   copiedLabel: "Copied",
   copyAccessibilityLabel: "Copy your backup codes to the clipboard",
 } as const;
+
+/**
+ * The setup, in the order a person does it.
+ *
+ * Three steps on one card rather than three screens, because each needs what the
+ * one before it put on screen: the key is what the app is given, the codes are
+ * what replace the app, and the code is what proves the app has the key.
+ *
+ * The backup codes come before the code rather than after it, which is the
+ * load-bearing choice. Once the code is accepted the factor is on, and a person
+ * who has not stored the codes by then is the lockout ticket 08 was blocked on.
+ * Shown first, they are stored while nothing depends on them yet.
+ *
+ * There is no QR code. Somebody setting up on this phone has the authenticator on
+ * this phone too, and a phone cannot scan its own screen, so the link that opens
+ * the app and the key to type by hand are the two ways that work.
+ */
+export const TWO_FACTOR_SETUP_COPY = {
+  title: "Set up your authenticator app",
+  keyStep: "1. Add this account to your authenticator app.",
+  openLabel: "Open in authenticator app",
+  openAccessibilityLabel: "Add this account to an authenticator app on this phone",
+  openFailed:
+    "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
+  keyLabel: "Setup key",
+  copyKeyLabel: "Copy key",
+  copyKeyAccessibilityLabel: "Copy the setup key to the clipboard",
+  codesStep: "2. Store your backup codes.",
+  codesWarning:
+    "Each code signs you in once if you lose your authenticator app. They are shown once, so store them somewhere safe now.",
+  codeStep: "3. Enter the code your authenticator app is showing.",
+  codeLabel: "Authentication code",
+  confirmLabel: "Turn on",
+  confirmAccessibilityLabel: "Check the code and turn on two-factor authentication",
+  cancelLabel: "Cancel setup",
+  cancelAccessibilityLabel: "Cancel setting up two-factor authentication",
+} as const;
+
+/**
+ * The setup key in groups of four, as authenticator apps show and accept it.
+ *
+ * For the eye only. The copy button copies the key as the API minted it,
+ * because some apps refuse the spaces.
+ */
+export function groupSetupKey(secret: string): string {
+  return secret.replace(/(.{4})(?=.)/g, "$1 ");
+}

@@ -1,5 +1,7 @@
+import { apiRequest } from "@/lib/api-client";
 import { asRecord } from "@/lib/api-envelope";
 import { readOutcome, type ApiResult } from "@/lib/api-result";
+import { CODE_REFUSED_NOTICE, parseSessionUser } from "@/lib/auth-response";
 import {
   adoptReplacedSessionCookie,
   authenticatedRequest,
@@ -7,38 +9,45 @@ import {
 } from "@/lib/auth-service";
 import { writeKeptPerson } from "@/lib/keychain";
 import { getSessionUser, setSessionUser } from "@/lib/session";
+import { normaliseCode } from "@/lib/two-factor-challenge";
 import type { SessionUser } from "@/lib/types";
 
 /**
- * Turning two-factor off, and replacing the backup codes, over the one transport
- * this app has.
+ * Turning two-factor on and off, and replacing the backup codes, over the one
+ * transport this app has.
  *
  * `authenticatedRequest` like every other family, so the Session cookie and the
  * CSRF pair are handled exactly as they are everywhere else, a cookie the server
  * has stopped accepting ends the session once rather than at this call site, and
  * a request that hangs ends as an ordinary transport failure on the same
- * deadline. This module adds two paths, not a second way of talking to the API.
+ * deadline. This module adds four paths, not a second way of talking to the API.
+ * The one exception is the code that confirms a setup, and it says why.
  *
- * ## Two routes, and the two that are deliberately absent
+ * ## Turning it on is two requests, and only the second turns it on
  *
- * `POST /auth/two-factor/enable` and `GET /auth/two-factor/get-totp-uri` exist,
- * work, and have no wrapper here. That is ticket 08, which is blocked on
- * `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md`:
- * `POST /auth/two-factor/verify-backup-code` carries `@UseGuards(AuthGuard)`, so
- * it resolves a full session, and at challenge time there is none, only the
- * short-lived `better-auth.two_factor` cookie. A backup code is therefore
- * suspected to be unredeemable at the one moment it exists for. Giving this
- * client a way to turn two-factor on while that is true would let somebody turn
- * on a lock and throw away the only spare key, from the device they are most
- * likely to lose. `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`
- * makes it a blocking edge rather than a note. Anybody adding an enable wrapper
- * here is in the wrong ticket.
+ * `POST /auth/two-factor/enable` mints a secret and a set of backup codes and
+ * answers with both, but it does not turn anything on: better-auth stores the
+ * factor unverified and flips `twoFactorEnabled` only when the first code from
+ * it comes back on `POST /auth/two-factor/verify-totp` under the same session.
+ * So setting up is `startTwoFactorSetup` then `confirmTwoFactorSetup`, and a
+ * person who walks away between them is left exactly as they were. Starting
+ * again overwrites the unverified secret and codes, which is why a fresh start
+ * is always safe to offer.
  *
- * ## Both bodies are strict, and the password is conditional
+ * This used to be withheld. `POST /auth/two-factor/verify-backup-code` carried
+ * `@UseGuards(AuthGuard)`, so a backup code could not be redeemed at challenge
+ * time, and turning on a factor whose only recovery was broken would have let
+ * somebody throw away the spare key. The API dropped the guard, the sign-in
+ * challenge now takes a backup code, and
+ * `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md`
+ * records it run against the API. `GET /auth/two-factor/get-totp-uri` still has
+ * no wrapper, because the enable answer already carries the URI.
+ *
+ * ## The password bodies are strict, and the password is conditional
  *
  * `TwoFactorEnableInputSchema` is a `z.strictObject({ password?: string })` and
- * both routes are validated against it, so an extra key is refused outright
- * rather than ignored. `twoFactorBody` below assembles exactly one of the two
+ * enable, disable and generate-backup-codes are all validated against it, so an
+ * extra key is refused outright rather than ignored. `twoFactorBody` below assembles exactly one of the two
  * shapes for that reason.
  *
  * When the password is needed is `lib/two-factor-management`'s rule, read off
@@ -133,7 +142,9 @@ export async function disableTwoFactor(
 
   const held = getSessionUser();
   const result = readOutcome(outcome, (data) =>
-    disabled(data) && held ? { ...held, twoFactorEnabled: false } : null,
+    // `removeCredentialAccountAfterTwoFactorDisable` in the API deletes the password with the
+    // factor, so a screen still drawing a password field would ask for one that is gone.
+    disabled(data) && held ? { ...held, twoFactorEnabled: false, hasPassword: false } : null,
   );
 
   if (result.ok) {
@@ -170,4 +181,119 @@ export async function generateBackupCodes(
   });
 
   return readOutcome(outcome, parseBackupCodes);
+}
+
+const ENABLE_PATH = "/auth/two-factor/enable";
+const SETUP_CONFIRM_PATH = "/auth/two-factor/verify-totp";
+
+/** What an authenticator app needs, and the codes that stand in for it. */
+export type TwoFactorSetup = {
+  /** The `otpauth://` link an authenticator app on this phone can open. */
+  totpURI: string;
+  /** The same secret, for somebody typing it into an app by hand. */
+  secret: string;
+  backupCodes: string[];
+};
+
+/**
+ * The secret, off the `otpauth://` link.
+ *
+ * A pattern rather than `URL`, because React Native's `URL` does not reliably
+ * read the query of a scheme it does not know, and `otpauth:` is one of those.
+ */
+function secretOf(totpURI: string): string | null {
+  const match = /[?&]secret=([^&]+)/.exec(totpURI);
+  return match ? decodeURIComponent(match[1]!) : null;
+}
+
+/**
+ * The setup, or null for anything this client cannot use whole.
+ *
+ * A link with no secret is a factor nobody can add, and a set of codes this
+ * could not read is `parseBackupCodes`' reason again: a recovery path with holes
+ * in it is worse than being told to try again.
+ */
+function parseSetup(data: unknown): TwoFactorSetup | null {
+  const record = asRecord(data);
+  const totpURI = record?.totpURI;
+  if (typeof totpURI !== "string" || !totpURI.startsWith("otpauth://")) return null;
+
+  const secret = secretOf(totpURI);
+  const backupCodes = parseBackupCodes(record?.backupCodes);
+  if (!secret || !backupCodes) return null;
+
+  return { totpURI, secret, backupCodes };
+}
+
+/**
+ * Mint the secret and backup codes for this account, without turning anything on.
+ *
+ * The body is the disable route's, so the password rule is the same one:
+ * better-auth's `enableTwoFactor` calls the same `shouldRequirePassword` before
+ * it does anything. A wrong password is a 400 rather than a 401, so it is an
+ * ordinary refusal and never ends the session.
+ */
+export async function startTwoFactorSetup(
+  password: string | null,
+): Promise<ApiResult<TwoFactorSetup>> {
+  const outcome = await authenticatedRequest(ENABLE_PATH, {
+    method: "POST",
+    body: twoFactorBody(password),
+  });
+
+  return readOutcome(outcome, parseSetup);
+}
+
+/**
+ * Prove the authenticator was set up, which is the request that turns two-factor on.
+ *
+ * ## Why this is `apiRequest` rather than `authenticatedRequest`
+ *
+ * A wrong code here is a 401: better-auth raises `INVALID_CODE` as UNAUTHORIZED
+ * and the API folds it into `invalid_credentials`. `authenticatedRequest` reads
+ * every 401 as the session ending, so a mistyped digit would sign somebody out
+ * halfway through turning on a protection. The route carries no guard, so its
+ * 401 is about the code rather than the session. The held Session cookie still
+ * goes out, because `apiRequest` attaches it, and that is what tells better-auth
+ * this is a setup rather than a sign-in.
+ *
+ * The cost is one case this cannot tell apart. A session that had already ended
+ * also answers 401 here and reads as a refused code; the next authenticated
+ * request is what notices the session instead.
+ *
+ * ## What it writes
+ *
+ * better-auth ends the session this request carried and answers with its
+ * successor, as it does for disable, so the cookie is adopted first. The person
+ * is derived from the held one with the single flag this route changed, and
+ * only when the answer itself says the factor is on: a 2xx alone is not enough
+ * to tell somebody they are protected.
+ */
+export async function confirmTwoFactorSetup(
+  code: string,
+): Promise<ApiResult<SessionUser>> {
+  const startedAt = currentCredentialEpoch();
+  const outcome = await apiRequest(SETUP_CONFIRM_PATH, {
+    method: "POST",
+    body: { code: normaliseCode(code, "totp") },
+  });
+
+  if (outcome.reached && outcome.status === 401) {
+    return { ok: false, failure: { kind: "refused", message: CODE_REFUSED_NOTICE } };
+  }
+
+  const held = getSessionUser();
+  const result = readOutcome(outcome, (data) =>
+    parseSessionUser(data)?.twoFactorEnabled === true && held
+      ? { ...held, twoFactorEnabled: true }
+      : null,
+  );
+
+  if (result.ok) {
+    await adoptReplacedSessionCookie(outcome, startedAt);
+    setSessionUser(result.value);
+    await writeKeptPerson(result.value);
+  }
+
+  return result;
 }
