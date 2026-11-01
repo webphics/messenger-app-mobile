@@ -23,22 +23,37 @@ Until now all three sign-in paths refused a challenge with one sentence telling 
 web app. An account with two-factor on could not sign in on a phone at all. That is the access bug
 this closes, and it is why the challenge lands before management rather than after it.
 
-## TOTP only at the challenge, and enable stays off the phone
+## Both kinds of code at the challenge, and enable on the phone
 
-`POST /auth/two-factor/verify-backup-code` carries `@UseGuards(AuthGuard)`, and that guard comes
-from `@thallesp/nestjs-better-auth`, so it resolves a full session. At challenge time there is no
-session, only the challenge cookie. A backup code therefore cannot be redeemed at the one moment it
-exists to be used. The challenge screen offers TOTP and nothing else.
+*Amended 2026-11-01. As first written this section said TOTP only, and enable off the phone. The
+reasoning is kept below because it is why the order of work went the way it did.*
 
-This is suspected to be broken on web as well, since `two-factor-verify-client.tsx` calls the
-backup-code mutation from its own challenge screen against the same guarded route. It is filed
-separately as `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md` and is not
-fixed here. Reading the code is not running it, so that issue confirms before it concludes.
+`POST /auth/two-factor/verify-backup-code` used to carry `@UseGuards(AuthGuard)`, and that guard
+comes from `@thallesp/nestjs-better-auth`, so it resolved a full session. At challenge time there is
+no session, only the challenge cookie. A backup code therefore could not be redeemed at the one
+moment it exists to be used, and the challenge screen offered TOTP and nothing else. It was broken
+on web as well: `two-factor-verify-client.tsx` called the backup-code route from its own challenge
+screen and got the same 401.
 
-Management consequently ships in two halves. Disable, regenerate backup codes and view current state
-ship with it. **Enable does not ship until backup-code recovery is confirmed working.** Offering
-enable while the only recovery path for the factor is broken would let a person turn on a lock and
+Management consequently shipped in two halves. Disable, regenerate backup codes and view current
+state shipped first. Enable was held back until backup-code recovery worked, because offering it
+while the only recovery path for the factor was broken would have let a person turn on a lock and
 throw away the only spare key, from the device most likely to be the one they lose.
+
+The API has since dropped the guard (`messenger-api` commit `3e57c34`). better-auth's
+`verifyBackupCode` authenticates from the challenge cookie or from a session by itself, so the route
+now matches `verify-totp`. `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md`
+ran it against the API before anything here changed: a backup code presented with only the
+challenge cookie answered 201 with session cookies, a reused one and one with no challenge answered
+401. So:
+
+- The challenge takes either kind of code. Which one is a field on the sign-in screen and a route in
+  `verifyTwoFactorCode`, not a second machine state: both answer the same challenge with the same
+  cookie and come back with the same session.
+- Enable ships, as a setup card on the account two-factor screen. `POST /auth/two-factor/enable`
+  mints the secret and the codes without turning anything on, and the first code from the new
+  authenticator, sent to `verify-totp` under the session, is what turns it on. The codes are shown
+  before that code is asked for, so they are stored while nothing depends on them yet.
 
 ## Consequences
 
@@ -47,9 +62,9 @@ throw away the only spare key, from the device most likely to be the one they lo
   bookkeeping ADR-0004 was protecting, so it is scoped to the machine state and discarded with it.
 - A `two-factor` `AuthState` and a matching `AuthOutcome` exist, so the three sign-in paths stop
   sharing one refusal string.
-- Management splits in two. The half without enable ships on its own and is done when its screens
-  render. Enable is a separate ticket, blocked both on the backup-code issue and on the challenge,
-  because enabling a factor from a phone that cannot answer its challenge is the lockout this
-  decision exists to prevent.
-- A person who has two-factor on and has lost their authenticator still cannot get in from a phone.
-  That is not made worse by this decision, and it is not fixed by it either.
+- Management shipped in two. The half without enable came first. Enable followed once the challenge
+  existed and a backup code could answer it, because enabling a factor from a phone that cannot
+  answer its challenge, or whose spare key does not open it, is the lockout this decision exists to
+  prevent.
+- A person who has two-factor on and has lost their authenticator gets in from a phone with a backup
+  code. One who has lost both still cannot, and no client fixes that.

@@ -1,5 +1,6 @@
 import { asRecord, CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import { parseCapabilities } from "@/lib/capabilities";
+import type { ChallengeMethod } from "@/lib/two-factor-challenge";
 import type { SessionUser, UserRole } from "@/lib/types";
 
 /**
@@ -142,6 +143,18 @@ export const APPLE_REFUSED_NOTICE =
  */
 export const CODE_REFUSED_NOTICE =
   "That code was not accepted. Check your authenticator app and enter the code it is showing now.";
+
+/**
+ * `CODE_REFUSED_NOTICE`, for a backup code.
+ *
+ * Its own sentence because the likely reasons are different ones: a backup code
+ * works once, so the commonest refusal is a code already spent, and telling
+ * somebody to look at an authenticator they may not have is the opposite of
+ * help. The same 401 covers a lapsed challenge here too, so this says no more
+ * about the cause than the other one does.
+ */
+export const BACKUP_CODE_REFUSED_NOTICE =
+  "That backup code was not accepted. Check it, and use one you have not used before.";
 
 const DEFAULT_SERVER_ERROR = "The server could not handle that right now. Try again.";
 
@@ -357,7 +370,8 @@ export function interpretAppleSignIn(outcome: HttpOutcome): AuthOutcome {
 }
 
 /**
- * Read a `POST /auth/two-factor/verify-totp` response.
+ * Read a `POST /auth/two-factor/verify-totp` or
+ * `POST /auth/two-factor/verify-backup-code` response.
  *
  * The same interpreter as the three ways in, because the API answers this route
  * with the same shape: the user in an envelope, the Session cookie in a header.
@@ -367,16 +381,20 @@ export function interpretAppleSignIn(outcome: HttpOutcome): AuthOutcome {
  *
  * The refusal is the one part that cannot be shared, and it is replaced rather
  * than defaulted: see `CODE_REFUSED_NOTICE` for why the server's own words are
- * the wrong ones on this route alone. A `server-error` still speaks for itself,
+ * the wrong ones on these routes alone. Which sentence replaces them is the
+ * method's, since the two codes are refused for different reasons. A
+ * `server-error` still speaks for itself,
  * because a 429 or a 500 is about the server rather than about the code, and a
  * CSRF refusal keeps the sentence that tells somebody retyping cannot fix it.
  */
-export function interpretTwoFactorVerify(outcome: HttpOutcome): AuthOutcome {
-  const result = interpretIssuedSession(outcome, CODE_REFUSED_NOTICE);
+export function interpretTwoFactorVerify(
+  outcome: HttpOutcome,
+  method: ChallengeMethod,
+): AuthOutcome {
+  const refused = method === "backup-code" ? BACKUP_CODE_REFUSED_NOTICE : CODE_REFUSED_NOTICE;
+  const result = interpretIssuedSession(outcome, refused);
 
-  return result.kind === "unauthorised"
-    ? { kind: "unauthorised", message: CODE_REFUSED_NOTICE }
-    : result;
+  return result.kind === "unauthorised" ? { kind: "unauthorised", message: refused } : result;
 }
 
 /**

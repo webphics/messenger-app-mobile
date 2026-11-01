@@ -3,8 +3,15 @@ import {
   authenticatedRequest,
 } from "@/lib/auth-service";
 import { writeKeptPerson } from "@/lib/keychain";
+import { apiRequest } from "@/lib/api-client";
+import { CODE_REFUSED_NOTICE } from "@/lib/auth-response";
 import { getSessionUser, setSessionUser } from "@/lib/session";
-import { disableTwoFactor, generateBackupCodes } from "@/lib/two-factor-api";
+import {
+  confirmTwoFactorSetup,
+  disableTwoFactor,
+  generateBackupCodes,
+  startTwoFactorSetup,
+} from "@/lib/two-factor-api";
 
 /**
  * Another write that changes who the signed-in person *is*, so the assertion
@@ -18,10 +25,12 @@ jest.mock("@/lib/auth-service", () => ({
   currentCredentialEpoch: jest.fn(() => 0),
 }));
 jest.mock("@/lib/keychain", () => ({ writeKeptPerson: jest.fn() }));
+jest.mock("@/lib/api-client", () => ({ apiRequest: jest.fn() }));
 
 const request = authenticatedRequest as jest.MockedFunction<
   typeof authenticatedRequest
 >;
+const plainRequest = apiRequest as jest.MockedFunction<typeof apiRequest>;
 const kept = writeKeptPerson as jest.MockedFunction<typeof writeKeptPerson>;
 const adopt = adoptReplacedSessionCookie as jest.MockedFunction<
   typeof adoptReplacedSessionCookie
@@ -166,5 +175,108 @@ describe("codes that were generated", () => {
       ok: false,
       failure: { kind: "malformed" },
     });
+  });
+});
+
+const TOTP_URI =
+  "otpauth://totp/ChatRoute:ada%40chatroute.test?secret=JMYXUODFHBIF6X2R&issuer=ChatRoute&digits=6&period=30";
+const SETUP_CODES = ["d4m39-TKO73", "1vfhC-17O0S"];
+
+describe("starting a setup", () => {
+  test("asks the enable route, with the same body rule as disable", async () => {
+    request.mockResolvedValueOnce(
+      answered({ totpURI: TOTP_URI, backupCodes: SETUP_CODES }, 201),
+    );
+
+    const result = await startTwoFactorSetup("hunter2");
+
+    expect(request).toHaveBeenCalledWith("/auth/two-factor/enable", {
+      method: "POST",
+      body: { password: "hunter2" },
+    });
+    expect(result).toEqual({
+      ok: true,
+      value: { totpURI: TOTP_URI, secret: "JMYXUODFHBIF6X2R", backupCodes: SETUP_CODES },
+    });
+  });
+
+  test("turns nothing on, so nobody is told they are protected yet", async () => {
+    // better-auth flips `twoFactorEnabled` only when the first code is verified.
+    request.mockResolvedValueOnce(
+      answered({ totpURI: TOTP_URI, backupCodes: SETUP_CODES }, 201),
+    );
+    setSessionUser({ ...PROTECTED_PERSON, twoFactorEnabled: false });
+
+    await startTwoFactorSetup("hunter2");
+
+    expect(getSessionUser()?.twoFactorEnabled).toBe(false);
+    expect(kept).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["a link with no secret", { totpURI: "otpauth://totp/ChatRoute:ada", backupCodes: SETUP_CODES }],
+    ["no backup codes", { totpURI: TOTP_URI, backupCodes: [] }],
+  ])("%s is malformed rather than half a setup", async (_name, data) => {
+    request.mockResolvedValueOnce(answered(data, 201));
+
+    expect(await startTwoFactorSetup("hunter2")).toEqual({
+      ok: false,
+      failure: { kind: "malformed" },
+    });
+  });
+});
+
+describe("confirming a setup", () => {
+  const OFF = { ...PROTECTED_PERSON, twoFactorEnabled: false };
+  const apiUser = { id: "7", email: "ada@chatroute.test", role: "customer", twoFactorEnabled: true };
+
+  beforeEach(() => {
+    setSessionUser(OFF);
+  });
+
+  test("a wrong code is a refusal about the code, and never reaches the session-ending path", async () => {
+    // Through `authenticatedRequest` this 401 would sign the person out.
+    plainRequest.mockResolvedValueOnce({
+      reached: true as const,
+      status: 401,
+      body: { code: "invalid_credentials", message: "Invalid username, email, or password." },
+      sessionCookie: null,
+    });
+
+    const result = await confirmTwoFactorSetup("000 000");
+
+    expect(plainRequest).toHaveBeenCalledWith("/auth/two-factor/verify-totp", {
+      method: "POST",
+      body: { code: "000000" },
+    });
+    expect(request).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: false, failure: { kind: "refused", message: CODE_REFUSED_NOTICE } });
+    expect(getSessionUser()).toEqual(OFF);
+  });
+
+  test("an accepted code turns it on everywhere, under the session the API replaced", async () => {
+    const outcome = {
+      ...answered(apiUser, 201),
+      sessionCookie: "better-auth.session_token=successor",
+    };
+    plainRequest.mockResolvedValueOnce(outcome);
+
+    const result = await confirmTwoFactorSetup("123456");
+
+    expect(result).toEqual({ ok: true, value: { ...OFF, twoFactorEnabled: true } });
+    expect(adopt).toHaveBeenCalledWith(outcome, 0);
+    expect(getSessionUser()?.twoFactorEnabled).toBe(true);
+    expect(kept).toHaveBeenCalledWith(expect.objectContaining({ twoFactorEnabled: true }));
+  });
+
+  test("an answer that does not say the factor is on is not believed", async () => {
+    plainRequest.mockResolvedValueOnce(answered({ ...apiUser, twoFactorEnabled: false }, 201));
+
+    expect(await confirmTwoFactorSetup("123456")).toEqual({
+      ok: false,
+      failure: { kind: "malformed" },
+    });
+    expect(getSessionUser()).toEqual(OFF);
+    expect(adopt).not.toHaveBeenCalled();
   });
 });

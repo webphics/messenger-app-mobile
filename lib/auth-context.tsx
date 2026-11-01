@@ -36,7 +36,7 @@ import {
   verifyMagicLink as spendMagicLink,
   verifyTwoFactorCode,
 } from "@/lib/auth-service";
-import { CHALLENGE_LIFETIME_MS } from "@/lib/two-factor-challenge";
+import { CHALLENGE_LIFETIME_MS, type ChallengeMethod } from "@/lib/two-factor-challenge";
 import { appleAuthEvent } from "@/lib/apple-auth";
 import { googleAuthEvent } from "@/lib/google-auth";
 import type { ApiResult } from "@/lib/api-result";
@@ -93,14 +93,14 @@ type AuthContextValue = {
   requestSignUp: (input: SignUpRequest) => Promise<SignUpOutcome>;
   /**
    * Finish a sign-in an account's second factor interrupted, with the code from
-   * their authenticator.
+   * their authenticator or one of their backup codes, as `method` says.
    *
    * Takes no challenge: the challenge is in the machine state, which is the only
    * place it exists, and a caller that had to pass one back could pass the wrong
    * one. Ignored when the machine is not in the challenge, and while a code is
    * already out.
    */
-  submitTwoFactorCode: (code: string) => Promise<void>;
+  submitTwoFactorCode: (code: string, method: ChallengeMethod) => Promise<void>;
   /**
    * Back out of code entry. Lands signed-out, retaining nothing of the attempt.
    * The challenge goes with the state it lived in.
@@ -419,7 +419,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * would let the second through and fire a second request.
    */
   const submitTwoFactorCode = useCallback(
-    async (code: string) => {
+    async (code: string, method: ChallengeMethod) => {
       if (challenge === null || submitting.current) return;
       submitting.current = true;
       dispatch({ type: "submit-code" });
@@ -427,7 +427,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         dispatch({
           type: "code-settled",
-          outcome: await verifyTwoFactorCode(challenge, code),
+          outcome: await verifyTwoFactorCode(challenge, code, method),
         });
       } finally {
         submitting.current = false;

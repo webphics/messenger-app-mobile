@@ -1,5 +1,6 @@
 import { CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import {
+  BACKUP_CODE_REFUSED_NOTICE,
   CODE_REFUSED_NOTICE,
   interpretGoogleSignIn,
   interpretMagicLinkRequest,
@@ -535,7 +536,7 @@ describe("interpretTwoFactorVerify", () => {
   }
 
   test("a 201 with a user and a cookie is a sign-in like any other", () => {
-    expect(interpretTwoFactorVerify(created(envelope(apiUser())))).toEqual({
+    expect(interpretTwoFactorVerify(created(envelope(apiUser())), "totp")).toEqual({
       kind: "signed-in",
       cookie: ISSUED,
       user: {
@@ -553,7 +554,7 @@ describe("interpretTwoFactorVerify", () => {
   });
 
   test("a verified code that issued no cookie establishes nothing", () => {
-    expect(interpretTwoFactorVerify(created(envelope(apiUser()), null))).toEqual({
+    expect(interpretTwoFactorVerify(created(envelope(apiUser()), null), "totp")).toEqual({
       kind: "malformed",
     });
   });
@@ -574,10 +575,27 @@ describe("interpretTwoFactorVerify", () => {
         message: "Invalid username, email, or password.",
       },
       sessionCookie: null,
-    });
+    }, "totp");
 
     expect(outcome).toEqual({ kind: "unauthorised", message: CODE_REFUSED_NOTICE });
     expect(CODE_REFUSED_NOTICE).not.toMatch(/password/i);
+  });
+
+  test("a refused backup code is told about backup codes, not about an authenticator", () => {
+    // Most often a code already spent, and the person may have no authenticator
+    // to check, which is why they reached for a backup code at all.
+    const outcome = interpretTwoFactorVerify(
+      {
+        reached: true,
+        status: 401,
+        body: { statusCode: 401, code: "invalid_credentials", message: "Invalid username, email, or password." },
+        sessionCookie: null,
+      },
+      "backup-code",
+    );
+
+    expect(outcome).toEqual({ kind: "unauthorised", message: BACKUP_CODE_REFUSED_NOTICE });
+    expect(BACKUP_CODE_REFUSED_NOTICE).not.toMatch(/password|authenticator/i);
   });
 
   /**
@@ -592,7 +610,7 @@ describe("interpretTwoFactorVerify", () => {
       status: 401,
       body: { statusCode: 401, code: "invalid_credentials", message: "Invalid username, email, or password." },
       sessionCookie: null,
-    });
+    }, "totp");
     expect(lapsed).toEqual({ kind: "unauthorised", message: CODE_REFUSED_NOTICE });
   });
 });

@@ -55,7 +55,7 @@ import {
 import { setSessionUser } from "@/lib/session";
 import { pushDeregistrationSettled } from "@/lib/push-registry";
 import { endSessionOnDevice } from "@/lib/session-wipe";
-import { normaliseCode } from "@/lib/two-factor-challenge";
+import { normaliseCode, type ChallengeMethod } from "@/lib/two-factor-challenge";
 import type { SessionUser } from "@/lib/types";
 
 /**
@@ -75,7 +75,10 @@ const SIGN_UP_PATH = "/auth/sign-up";
 const GOOGLE_PATH = "/auth/google";
 const APPLE_PATH = "/auth/apple";
 const APPLE_NONCE_PATH = "/auth/apple/nonce";
-const TWO_FACTOR_VERIFY_PATH = "/auth/two-factor/verify-totp";
+const TWO_FACTOR_VERIFY_PATHS: Record<ChallengeMethod, string> = {
+  totp: "/auth/two-factor/verify-totp",
+  "backup-code": "/auth/two-factor/verify-backup-code",
+};
 
 /**
  * Bumped every time the credential is deliberately discarded.
@@ -313,31 +316,38 @@ export async function signInWithPassword(
  *
  * `challenge` is presented through `apiRequest`'s existing `cookie` option
  * rather than through a mechanism of its own, and it is the whole credential on
- * this request: `POST /auth/two-factor/verify-totp` carries no auth guard,
- * because at challenge time there is no session to guard it with. It comes from
- * the machine state and goes nowhere else. Nothing here holds it, and
- * `applyOutcome` never writes it.
+ * this request: neither `POST /auth/two-factor/verify-totp` nor
+ * `POST /auth/two-factor/verify-backup-code` carries an auth guard, because at
+ * challenge time there is no session to guard them with. better-auth reads the
+ * challenge cookie itself on both. It comes from the machine state and goes
+ * nowhere else. Nothing here holds it, and `applyOutcome` never writes it.
+ *
+ * `method` picks the route and nothing else. A backup code finishes the
+ * handshake exactly as an authenticator code does, with the same body, the same
+ * cookie, and the same user and Session cookie back, so everything after the
+ * request is shared. The backup route used to carry `@UseGuards(AuthGuard)`,
+ * which made a backup code unredeemable at the one moment it exists for; the API
+ * dropped it, and `.scratch/mobile-parity/issues/02-backup-code-verify-is-session-guarded.md`
+ * records it being run against that API rather than read.
  *
  * The code is normalised on the way out for the reason the identifier is trimmed
  * on the way into `signInWithPassword`: the API's body is a `z.strictObject`
- * over a TOTP code, and a code pasted with the space its authenticator draws is
+ * over the code, and a code pasted with the space its authenticator draws is
  * the same code.
- *
- * Backup codes are deliberately not offered here and must not be added:
- * `POST /auth/two-factor/verify-backup-code` carries `@UseGuards(AuthGuard)`,
- * which resolves a full session, and at this moment there is none. See ADR-0013.
  */
 export async function verifyTwoFactorCode(
   challenge: string,
   code: string,
+  method: ChallengeMethod,
 ): Promise<AuthOutcome> {
   const startedAt = credentialEpoch;
   const outcome = interpretTwoFactorVerify(
-    await apiRequest(TWO_FACTOR_VERIFY_PATH, {
+    await apiRequest(TWO_FACTOR_VERIFY_PATHS[method], {
       method: "POST",
-      body: { code: normaliseCode(code) },
+      body: { code: normaliseCode(code, method) },
       cookie: challenge,
     }),
+    method,
   );
 
   await applyOutcome(outcome, startedAt);

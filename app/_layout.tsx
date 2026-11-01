@@ -287,10 +287,8 @@ function RootStack({
           contentStyle: { backgroundColor: colors.bg },
         }}
       />
-      {/* Two-factor, as far as ADR-0013 lets it go (#07): the state,
-        turning it off, and fresh backup codes. Turning it on is
-        ticket 08 and is blocked on backup-code recovery being
-        confirmed to work. */}
+      {/* Two-factor (#07, #08): the state, turning it on and off, and
+        fresh backup codes. */}
       <Stack.Screen
         name="account/two-factor"
         options={{
