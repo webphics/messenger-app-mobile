@@ -120,6 +120,10 @@ export const LINK_REFUSED_NOTICE =
 export const GOOGLE_REFUSED_NOTICE =
   "That Google account was not accepted. Try another account, or sign in with your email.";
 
+/** `GOOGLE_REFUSED_NOTICE`, for an Apple ID: nobody typed anything to check. */
+export const APPLE_REFUSED_NOTICE =
+  "That Apple ID was not accepted. Try again, or sign in with your email.";
+
 /**
  * What to say when a two-factor code is refused.
  *
@@ -223,6 +227,9 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     // queue, which offers nobody an action the API would refuse.
     supportAssignmentEnabled: record.supportAssignmentEnabled === true,
     capabilities: parseCapabilities(record.capabilities),
+    // Absent reads as not accepted: the terms screen asks once more, which is
+    // a smaller failure than letting somebody past a step App Review requires.
+    termsAcceptedAt: nonEmptyString(record.termsAcceptedAt) ?? null,
   };
 }
 
@@ -338,6 +345,15 @@ export function interpretMagicLinkVerify(outcome: HttpOutcome): AuthOutcome {
  */
 export function interpretGoogleSignIn(outcome: HttpOutcome): AuthOutcome {
   return interpretIssuedSession(outcome, GOOGLE_REFUSED_NOTICE);
+}
+
+/**
+ * Read a `POST /auth/apple` response. The same route shape as Google's, through
+ * the same interpreter and with the same two-factor stance; only the backstop
+ * sentence names Apple.
+ */
+export function interpretAppleSignIn(outcome: HttpOutcome): AuthOutcome {
+  return interpretIssuedSession(outcome, APPLE_REFUSED_NOTICE);
 }
 
 /**
@@ -486,4 +502,16 @@ export function interpretSession(outcome: HttpOutcome, cookie: string): AuthOutc
  */
 export function saysSessionExpired(outcome: HttpOutcome): boolean {
   return outcome.reached && outcome.status === 401;
+}
+
+/**
+ * Whether the API refused a request because this person has not agreed to the
+ * Terms of Use (App Store guideline 1.2). A 403 with that code and nothing
+ * else: every other 403 is a verdict on the request, and the session is fine
+ * either way, so this never ends it — it sends the person to agree.
+ */
+export function saysTermsRequired(outcome: HttpOutcome): boolean {
+  if (!outcome.reached || outcome.status !== 403) return false;
+  const body = outcome.body;
+  return typeof body === "object" && body !== null && (body as { code?: unknown }).code === "terms_required";
 }

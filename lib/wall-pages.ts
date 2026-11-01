@@ -195,3 +195,21 @@ export function withRestoredPost(read: WallPages, post: WallPost, index: number)
   posts.splice(Math.min(Math.max(index, 0), posts.length), 0, post)
   return { ...read, posts }
 }
+
+/**
+ * The Wall without the Posts of people the reader blocked.
+ *
+ * Applied to what is *drawn* rather than written into what was read, so the
+ * cursor stays the last Post the API answered with — paging on from a Post
+ * this filtered out would otherwise ask for the page after the wrong one. The
+ * API leaves them out of every page it answers from the block onwards, and out
+ * of the live events it sends this reader; this is what takes down the ones
+ * already on the screen the moment the block lands. An unblock shows again
+ * only what was already read, so the Wall hooks re-read their first page then
+ * (`unblockedSince`). Hands back the same object when nothing is hidden,
+ * so a memoised list does not re-render for a block of somebody absent.
+ */
+export function withoutAuthors(read: WallPages, authorIds: ReadonlySet<string>): WallPages {
+  if (authorIds.size === 0 || !read.posts.some(post => authorIds.has(post.author.id))) return read
+  return { ...read, posts: read.posts.filter(post => !authorIds.has(post.author.id)) }
+}

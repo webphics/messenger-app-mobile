@@ -1,4 +1,4 @@
-import { dynamicRouteId } from '@/lib/hub-routes'
+import { dynamicRouteId, pushRouteHref } from '@/lib/hub-routes'
 
 describe('hub-routes', () => {
   test('dynamicRouteId prefers params then path', () => {
@@ -9,5 +9,10 @@ describe('hub-routes', () => {
     expect(dynamicRouteId('[id]', '/(admin)/(home)/chart/open-threads', 'chart')).toBe(
       'open-threads',
     )
+  })
+
+  test('a report opens the Admin’s review queue, and anybody else’s own inbox', () => {
+    expect(pushRouteHref({ screen: 'reports' }, 'admin')).toBe('/(admin)/(home)/reports')
+    expect(pushRouteHref({ screen: 'reports' }, 'agent')).toBe('/(agent)/conversations')
   })
 })

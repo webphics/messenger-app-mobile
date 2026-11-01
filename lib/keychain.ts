@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
+import { type AppleName, parseAppleName, serialiseAppleName } from "@/lib/apple-auth";
 import { parseKeptPerson, serialiseKeptPerson } from "@/lib/kept-person";
 import type { SessionUser } from "@/lib/types";
 
@@ -142,5 +143,46 @@ export async function clearKeptPerson(): Promise<void> {
     await SecureStore.deleteItemAsync(KEPT_PERSON_KEY);
   } catch {
     // See above.
+  }
+}
+
+/**
+ * The name Apple shared on a first authorisation, kept until an account holds
+ * it. Apple shares it once per Apple ID, so a first attempt that never reached
+ * a signed-in account would otherwise lose it for good. Keyed by Apple's user
+ * id, which is stable per person and app; the keystore only allows letters,
+ * digits, `.`, `-` and `_` in a key, which Apple's ids already are, and anything
+ * else is replaced rather than trusted.
+ *
+ * Not part of the credential and not touched by a Session end: it belongs to a
+ * sign-in that has not happened yet.
+ */
+function appleNameKey(appleUserId: string): string {
+  return `chatroute.apple_name.${appleUserId.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+}
+
+export async function readAppleName(appleUserId: string): Promise<AppleName | null> {
+  try {
+    const stored = await SecureStore.getItemAsync(appleNameKey(appleUserId));
+    return parseAppleName(typeof stored === "string" ? stored : null);
+  } catch {
+    return null;
+  }
+}
+
+/** A write that will not land costs only the name on a later retry. */
+export async function writeAppleName(appleUserId: string, name: AppleName): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(appleNameKey(appleUserId), serialiseAppleName(name));
+  } catch {
+    // Nothing downstream can act on this failing.
+  }
+}
+
+export async function clearAppleName(appleUserId: string): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(appleNameKey(appleUserId));
+  } catch {
+    // A name left behind is read only by a sign-in with the same Apple ID.
   }
 }

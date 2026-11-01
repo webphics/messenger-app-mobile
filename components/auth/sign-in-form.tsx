@@ -1,3 +1,4 @@
+import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import {
   AlertCircle,
@@ -19,10 +20,12 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SeedAccountPicker } from "@/components/auth/seed-account-picker";
+import { TermsCheckbox } from "@/components/auth/terms-checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { isAppleSignInAvailable } from "@/lib/apple-session";
 import { useAuth } from "@/lib/auth-context";
 import { GOOGLE_CONFIG } from "@/lib/google-config";
 import { GOOGLE_NATIVE_NOTICE } from "@/lib/google-session";
@@ -62,6 +65,7 @@ import {
   signUpDefaults,
   signUpFieldErrors,
   signUpNeedsEmail,
+  signUpTermsError,
 } from "@/lib/sign-up-fields";
 import type { SeedAccount } from "@/lib/seed-accounts";
 import { CHALLENGE_COPY, codeError } from "@/lib/two-factor-challenge";
@@ -166,6 +170,7 @@ export function SignInForm() {
     state,
     signIn,
     signInWithGoogle,
+    signInWithApple,
     requestMagicLink,
     requestSignUp,
     submitTwoFactorCode,
@@ -195,7 +200,7 @@ export function SignInForm() {
    * pressed, or the button someone did not touch is the one that reads as busy,
    * to the eye and to a screen reader alike.
    */
-  const [pending, setPending] = useState<"password" | "google" | null>(null);
+  const [pending, setPending] = useState<"password" | "google" | "apple" | null>(null);
   /**
    * The sentence explaining why Google is not on offer, or null when it is. A
    * build with no OAuth client cannot sign anyone in with Google, and naming the
@@ -207,6 +212,23 @@ export function SignInForm() {
     GOOGLE_CONFIG.kind === "unconfigured" ? GOOGLE_CONFIG.notice : GOOGLE_NATIVE_NOTICE;
   const passwordBusy = pending === "password";
   const googleBusy = pending === "google";
+  const appleBusy = pending === "apple";
+  /**
+   * Whether to offer Sign in with Apple: iOS with a binary that has the native
+   * module. Unlike Google there is no sentence for the build that cannot — the
+   * button is simply not drawn, since Android never offers it and App Review
+   * only asks it of iOS. Asked once; the answer cannot change while the app runs.
+   */
+  const [appleAvailable, setAppleAvailable] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void isAppleSignInAvailable().then((available) => {
+      if (live) setAppleAvailable(available);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   /**
    * Read from `pending` as well as from the machine, because the two are not the
    * same interval. The Google account sheet is up before anything has been
@@ -233,6 +255,12 @@ export function SignInForm() {
     fields: signUpDefaults(""),
   });
   const [signUpErrors, setSignUpErrors] = useState<SignUpFieldErrors>({});
+  /**
+   * The Terms of Use box. Required: the link is not sent until it is ticked,
+   * and the API records the date when the account is created from the link.
+   */
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState<string | null>(null);
   /**
    * Whether the machine's standing notice still describes what is on screen.
    *
@@ -476,6 +504,8 @@ export function SignInForm() {
       : { ...signUp.fields, email: normaliseIdentifier(identifier) };
     const errors = signUpFieldErrors(fields);
     setSignUpErrors(errors);
+    const termsProblem = signUpTermsError(termsAccepted);
+    setTermsError(termsProblem);
 
     const firstError = SIGN_UP_FIELD_ORDER.find((field) => errors[field]);
     if (firstError) {
@@ -483,11 +513,15 @@ export function SignInForm() {
       signUpRefs[firstError].current?.focus();
       return;
     }
+    if (termsProblem) {
+      hapticWarning();
+      return;
+    }
 
     setNoticeStale(false);
     setLinkRequest((prev) => ({ ...prev, sending: true, failure: null }));
 
-    const outcome = await requestSignUp(fields);
+    const outcome = await requestSignUp({ ...fields, acceptTerms: true });
     if (outcome.kind === "sent") {
       hapticSuccess();
       setLinkPurpose("sign-up");
@@ -610,6 +644,21 @@ export function SignInForm() {
       // not an attempt, and clearing it then would make closing a sheet erase
       // something.
       if (await signInWithGoogle()) {
+        setLinkRequest((prev) => ({ ...prev, failure: null }));
+      }
+    } finally {
+      setPending(null);
+    }
+  }
+
+  /** `onGoogleSignIn` with Apple's sheet, on exactly the same terms. */
+  async function onAppleSignIn() {
+    if (anyRequestOut) return;
+
+    setNoticeStale(false);
+    setPending("apple");
+    try {
+      if (await signInWithApple()) {
         setLinkRequest((prev) => ({ ...prev, failure: null }));
       }
     } finally {
@@ -1099,6 +1148,18 @@ export function SignInForm() {
           ) : null}
 
           {step === "sign-up" ? (
+            <TermsCheckbox
+              checked={termsAccepted}
+              onChange={(next) => {
+                setTermsAccepted(next);
+                setTermsError(null);
+              }}
+              error={termsError}
+              disabled={anyRequestOut}
+            />
+          ) : null}
+
+          {step === "sign-up" ? (
             <Button
               className="mt-6 min-h-12 w-full"
               onPress={() => void onRequestSignUp()}
@@ -1190,6 +1251,40 @@ export function SignInForm() {
                 <Text variant="meta" className="mt-2 text-center text-muted">
                   {googleUnavailable}
                 </Text>
+              ) : null}
+
+              {/*
+                Apple's own control, because the guidelines App Review holds a
+                Sign in with Apple button to — its logo, title, colours and
+                proportions — are met by the system button and by nothing drawn
+                here. The white outline sits beside the outline Google button at
+                the same height and radius, so neither reads as the lesser
+                option. It has no disabled state, so the wrapper takes the
+                presses while another attempt is out, and the spinner is laid
+                over it rather than inside.
+              */}
+              {appleAvailable ? (
+                <View
+                  className="mt-3 w-full justify-center"
+                  pointerEvents={anyRequestOut ? "none" : "auto"}
+                  style={{ opacity: anyRequestOut && !appleBusy ? 0.5 : 1 }}
+                  accessibilityState={{ disabled: anyRequestOut, busy: appleBusy }}
+                >
+                  <AppleAuthentication.AppleAuthenticationButton
+                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                    buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+                    cornerRadius={12}
+                    style={{ width: "100%", height: 48 }}
+                    onPress={() => void onAppleSignIn()}
+                  />
+                  {appleBusy ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={colors.primary}
+                      className="absolute right-4"
+                    />
+                  ) : null}
+                </View>
               ) : null}
 
               {/* An identifier nobody holds goes to the sign-up step, so there is

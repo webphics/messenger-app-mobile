@@ -43,6 +43,9 @@ export default function AdminHomeLayout() {
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.broadcasts)}>
         <Stack.Screen name="broadcasts" options={{ title: "Broadcasts" }} />
       </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.reports)}>
+        <Stack.Screen name="reports" options={{ title: "Reports" }} />
+      </Stack.Protected>
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.communities)}>
         <Stack.Screen name="communities" options={{ title: "Communities" }} />
       </Stack.Protected>

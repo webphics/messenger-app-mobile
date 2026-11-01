@@ -14,6 +14,7 @@
 			"icon": "./assets/images/icon.png",
 			"bundleIdentifier": "com.thechatroute.app",
 			"supportsTablet": false,
+			"usesAppleSignIn": true,
 			"infoPlist": {
 				"ITSAppUsesNonExemptEncryption": false
 			}
@@ -80,6 +81,7 @@
 			"./plugins/with-store-excluded-from-backup",
 			"expo-secure-store",
 			"expo-sqlite",
+			"expo-apple-authentication",
 			[
 				"expo-notifications",
 				{

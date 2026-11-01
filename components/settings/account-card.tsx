@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { View } from "react-native";
 
 import {
+  Ban,
   ChevronRight,
   KeyRound,
   Shield,
@@ -106,6 +107,13 @@ function accountRows(account: SessionUser | null): AccountRow[] {
         ? "On. Turn it off, or generate fresh backup codes."
         : "Off. Codes from an authenticator app are not required to sign in.",
       open: () => router.push("/account/two-factor"),
+    },
+    {
+      key: "blocked",
+      icon: Ban,
+      title: "Blocked people",
+      hint: "See who you’ve blocked, and unblock them.",
+      open: () => router.push("/account/blocked"),
     },
     {
       key: "delete",

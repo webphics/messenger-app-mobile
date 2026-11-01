@@ -5,6 +5,7 @@ import {
   Activity,
   // BookOpen, // hidden with Knowledge
   Building2,
+  Flag,
   Megaphone,
   MessageCircle,
   MessageSquare,
@@ -27,7 +28,9 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
 // import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
 import { ANALYTICS_ACCESS, mayEnter, SCREEN_ACCESS } from "@/lib/route-access";
+import { reportSummaryLine } from "@/lib/report-queue";
 import { useAnalytics } from "@/lib/use-analytics";
+import { useReportSummary } from "@/lib/use-report-queue";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useViewer } from "@/lib/use-viewer";
 import { colors } from "@/lib/tokens";
@@ -73,6 +76,12 @@ export function AdminHub() {
   const showsAnalytics = mayEnter(me, ANALYTICS_ACCESS);
   const analytics = useAnalytics();
   const { awaitingReply } = analytics;
+  /*
+   * Open reports, and how many have waited past the day App Review allows —
+   * the one number on the Hub somebody is held to. Re-read on every focus.
+   */
+  const showsReports = mayEnter(me, SCREEN_ACCESS.reports);
+  const reports = useReportSummary(showsReports);
 
   return (
     <HubScroll>
@@ -193,6 +202,26 @@ export function AdminHub() {
         </Text>
         {/* Each row is drawn from `SCREEN_ACCESS`, the table the screen's own
             guard reads, so a row is here exactly when its screen opens. */}
+        {/* Reports first: it is the one row with a deadline behind it. */}
+        {showsReports ? (
+          <ActionRow
+            icon={Flag}
+            tone={reports && reports.open > 0 ? "amber" : "neutral"}
+            title="Reports"
+            hint={reportSummaryLine(reports)}
+            accessibilityLabel={`Reports, ${reportSummaryLine(reports)}`}
+            trailing={
+              reports && reports.open > 0 ? (
+                <Pill
+                  label={reports.overdue > 0 ? `${reports.overdue} overdue` : String(reports.open)}
+                  tone="amber"
+                  dot={reports.overdue > 0}
+                />
+              ) : undefined
+            }
+            onPress={() => router.push("/(admin)/reports" as Href)}
+          />
+        ) : null}
         {mayEnter(me, SCREEN_ACCESS.organizations) ? (
           <ActionRow
             icon={Building2}

@@ -32,11 +32,14 @@ import {
   emptyThread,
   failSend,
   findUnsent,
+  isFinalSendRefusal,
   isLocalId,
   mergeMessages,
   refuseSend,
   LOCAL_ID_PREFIX,
   threadMessages,
+  withdrawSend,
+  withoutSenders,
   type DeliveryState,
   type MessageAuthor,
   type SendDraft,
@@ -45,6 +48,8 @@ import {
 } from '@/lib/thread-state'
 import { toggleReaction } from '@/lib/message-react'
 import { useRealtimeEvents, type RealtimeEvent } from '@/lib/realtime-context'
+import { useBlockedIds } from '@/lib/blocks-context'
+import { blocksApplyTo } from '@/lib/message-moderation'
 import { useSupportAssignment } from '@/lib/use-support-assignment'
 import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 import type { Conversation, Message, MessageAttachment, UserRole } from '@/lib/types'
@@ -184,6 +189,9 @@ function restoredThread(
   if (!ownerId || !conversationId || !viewer) return emptyThread()
   return restoreThread(ownerId, conversationId, viewer, MESSAGE_PAGE_LIMIT)
 }
+
+/** Nobody's Messages hidden: a Support DM, which blocks do not reach. */
+const NO_BLOCKED_SENDERS: ReadonlySet<string> = new Set()
 
 export function useThreadMessages(
   conversation: Conversation | null,
@@ -588,7 +596,12 @@ export function useThreadMessages(
       setState((thread) => applySentMessage(thread, message.id, sent.value))
       return
     }
-    setState((thread) => failSend(thread, message.id))
+    // Refused for its words, or because the other person blocked this one: a
+    // retry would be refused again, so it leaves the thread rather than waiting
+    // under *Retry*, and the notice says why.
+    setState((thread) =>
+      isFinalSendRefusal(sent.failure) ? withdrawSend(thread, message.id) : failSend(thread, message.id),
+    )
     setSendError(sendNotice ?? sendFailureMessage(sent.failure))
   }, [refusedWrite])
 
@@ -809,7 +822,27 @@ export function useThreadMessages(
     void saveThread(ownerId, conversationId, state)
   }, [conversationId, ownerId, state])
 
-  const messages = useMemo(() => threadMessages(state), [state])
+  /**
+   * Who this reader blocked. Their Messages are hidden from what is drawn
+   * (`withoutSenders`), except in a Support DM, which blocks do not reach
+   * (`blocksApplyTo`). A block or an unblock landing while the thread is open
+   * re-reads its newest page: the API filters its pages, so after an unblock
+   * the Messages it left out while the block stood come back only by asking.
+   */
+  const allBlockedIds = useBlockedIds()
+  const blockedIds =
+    conversation && !blocksApplyTo(conversation.type) ? NO_BLOCKED_SENDERS : allBlockedIds
+  const blockedCount = useRef(blockedIds.size)
+  useEffect(() => {
+    const changed = blockedIds.size !== blockedCount.current
+    blockedCount.current = blockedIds.size
+    if (changed) reload('resync')
+  }, [blockedIds, reload])
+
+  const messages = useMemo(
+    () => withoutSenders(threadMessages(state), blockedIds),
+    [state, blockedIds],
+  )
   const delivery = useMemo(() => deliveryStates(state.unsent), [state.unsent])
 
   const dismissFailure = useCallback(() => setFailure(null), [])

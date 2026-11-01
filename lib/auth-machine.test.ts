@@ -137,6 +137,38 @@ describe("an account screen writing to the signed-in person", () => {
   });
 });
 
+describe("the server refusing a request with terms_required", () => {
+  const AGREED: SessionUser = { ...AGENT, termsAcceptedAt: "2026-10-31T10:00:00.000Z" };
+  const { termsAcceptedAt: _unknown, ...KEPT_BY_OLDER_BUILD } = AGREED;
+
+  test.each([
+    ["a person this device thought had agreed", AGREED],
+    ["a person kept by an older build, with no answer either way", KEPT_BY_OLDER_BUILD],
+  ])("marks %s as owing the terms, in place", (_label, user) => {
+    const before: AuthState = { status: "signed-in", user, stale: false };
+    expect(authTransition(before, { type: "terms-required" })).toEqual({
+      status: "signed-in",
+      user: { ...user, termsAcceptedAt: null },
+      stale: false,
+    });
+  });
+
+  test("a person already owing them is the same state, so a burst re-renders nothing", () => {
+    const before: AuthState = {
+      status: "signed-in",
+      user: { ...AGENT, termsAcceptedAt: null },
+      stale: true,
+    };
+    expect(authTransition(before, { type: "terms-required" })).toBe(before);
+  });
+
+  test("does nothing anywhere but signed-in", () => {
+    for (const state of EVERY_STATE.filter((s) => s.status !== "signed-in")) {
+      expect(authTransition(state, { type: "terms-required" })).toBe(state);
+    }
+  });
+});
+
 describe("confirming a Stale session", () => {
   test("replaces the kept person with the one the API named, in place", () => {
     expect(authTransition(STALE, { type: "confirmed", user: CUSTOMER })).toEqual({

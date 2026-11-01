@@ -13,6 +13,19 @@ describe('readOutcome refusals', () => {
     })
   })
 
+  test('words the content filter’s refusal itself, keeping the code', () => {
+    expect(
+      refusedWith(422, { code: 'objectionable_content', message: "This contains language that isn't allowed." }),
+    ).toEqual({
+      ok: false,
+      failure: {
+        kind: 'refused',
+        message: 'This contains language that isn’t allowed on ChatRoute. Edit it and try again.',
+        code: 'objectionable_content',
+      },
+    })
+  })
+
   test('reads a code named like an object property as any other code', () => {
     expect(refusedWith(400, { code: 'toString', message: 'Bad request.' })).toMatchObject({
       failure: { message: 'Bad request.' },

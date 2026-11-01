@@ -1,5 +1,6 @@
 import type { ApiFailure } from '@/lib/api-result'
 import { can, type Capability } from '@/lib/capabilities'
+import { isCompanyPersona } from '@/lib/display'
 import type { UserRole, WallPost, WallPostReaction, WallVoteDirection } from '@/lib/types'
 
 /**
@@ -26,7 +27,14 @@ export type WallPostViewer = {
 /** The API's own ceiling on a Post's body (`WALL_POST_BODY_MAX`), mirrored so an edit can say so before the API does. */
 export const WALL_POST_BODY_MAX = 500
 
-export type WallPostAction = 'copy-body' | 'copy-link' | 'edit' | 'delete' | 'takedown'
+export type WallPostAction =
+  | 'copy-body'
+  | 'copy-link'
+  | 'edit'
+  | 'delete'
+  | 'takedown'
+  | 'report'
+  | 'block'
 
 /**
  * What the overflow control offers.
@@ -36,6 +44,13 @@ export type WallPostAction = 'copy-body' | 'copy-link' | 'edit' | 'delete' | 'ta
  * `remove_wall_posts` (`assertCanRemove`), whatever the role: a holder acting
  * on somebody *else's* Post. A holder's own Post still reads as `delete`. A
  * takedown is what happens to somebody else's writing, never to your own.
+ *
+ * `report` and `block` are every reader's on every Post but their own, whatever
+ * the role: App Review asks that anybody can report what they see and block
+ * whoever posted it, and the API's `POST /reports` and `POST /blocks` refuse
+ * only yourself. They come last because they are the ones that leave the card.
+ * A Customer reading a Staff member's Post sees the company (`company:…`), an
+ * organization rather than a person, so there is nobody to block — only report.
  */
 export function wallPostActions(post: WallPost, viewer: WallPostViewer): WallPostAction[] {
   const isAuthor = post.author.id === viewer.id
@@ -47,6 +62,8 @@ export function wallPostActions(post: WallPost, viewer: WallPostViewer): WallPos
     isAuthor ? ('edit' as const) : null,
     isAuthor ? ('delete' as const) : null,
     mayTakeDown && !isAuthor ? ('takedown' as const) : null,
+    isAuthor ? null : ('report' as const),
+    isAuthor || isCompanyPersona(post.author.id) ? null : ('block' as const),
   ].filter((action): action is WallPostAction => action !== null)
 }
 

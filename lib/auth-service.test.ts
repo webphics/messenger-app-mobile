@@ -10,19 +10,25 @@ import {
   hydrateAuth,
   onSessionExpired,
   requestMagicLink,
+  requestSignUp,
+  signInWithApple,
   signInWithGoogle,
   signInWithPassword,
   signOut,
   verifyMagicLink,
   verifyTwoFactorCode,
 } from "@/lib/auth-service";
+import { requestAppleCredential } from "@/lib/apple-session";
 import { releaseGoogleSession, requestGoogleIdToken } from "@/lib/google-session";
 import {
+  clearAppleName,
   clearKeptPerson,
   clearRetiredCredential,
   clearSessionCookie,
+  readAppleName,
   readKeptPerson,
   readSessionCookie,
+  writeAppleName,
   writeKeptPerson,
   writeSessionCookie,
 } from "@/lib/keychain";
@@ -66,6 +72,11 @@ jest.mock("@/lib/google-session", () => ({
   releaseGoogleSession: jest.fn(async () => undefined),
 }));
 
+// Apple's sheet, the same way. What it decides is `lib/apple-auth.test.ts`'s.
+jest.mock("@/lib/apple-session", () => ({
+  requestAppleCredential: jest.fn(async () => ({ kind: "failed" })),
+}));
+
 // The Store and the downloaded documents both sit behind native modules, and
 // what they do with a wipe is tested where each of them owns one. What matters
 // here is only which moments reach this at all.
@@ -88,6 +99,9 @@ jest.mock("@/lib/keychain", () => ({
   readKeptPerson: jest.fn(async () => null),
   writeKeptPerson: jest.fn(async () => undefined),
   clearKeptPerson: jest.fn(async () => undefined),
+  readAppleName: jest.fn(async () => null),
+  writeAppleName: jest.fn(async () => undefined),
+  clearAppleName: jest.fn(async () => undefined),
 }));
 
 const request = apiRequest as jest.MockedFunction<typeof apiRequest>;
@@ -97,6 +111,12 @@ const googleToken = requestGoogleIdToken as jest.MockedFunction<
 const releaseGoogle = releaseGoogleSession as jest.MockedFunction<
   typeof releaseGoogleSession
 >;
+const appleCredential = requestAppleCredential as jest.MockedFunction<
+  typeof requestAppleCredential
+>;
+const readAppleNameMock = readAppleName as jest.MockedFunction<typeof readAppleName>;
+const writeAppleNameMock = writeAppleName as jest.MockedFunction<typeof writeAppleName>;
+const clearAppleNameMock = clearAppleName as jest.MockedFunction<typeof clearAppleName>;
 const readCookie = readSessionCookie as jest.MockedFunction<typeof readSessionCookie>;
 const writeCookie = writeSessionCookie as jest.MockedFunction<typeof writeSessionCookie>;
 const clearCookie = clearSessionCookie as jest.MockedFunction<typeof clearSessionCookie>;
@@ -121,6 +141,7 @@ const USER = {
   role: "agent",
   hasPassword: true,
   twoFactorEnabled: false,
+  termsAcceptedAt: "2026-10-31T10:00:00.000Z",
 };
 
 const PARSED_USER = {
@@ -132,6 +153,7 @@ const PARSED_USER = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  termsAcceptedAt: "2026-10-31T10:00:00.000Z",
 };
 
 function ok(data: unknown, sessionCookie: string | null = null) {
@@ -512,6 +534,143 @@ describe("signInWithGoogle", () => {
 
     expect(writeCookie).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
+  });
+});
+
+describe("signInWithApple", () => {
+  const NONCE = "q3Jx0b2Tn7yWc1d4FvKpL8sE6aRz9uMhGiN5oYtQwXe";
+  const HASHED = "6b1d3f0c2a9e94f";
+  const APPLE_USER = "000123.0a1b2c3d4e5f.0456";
+  const CREDENTIAL = {
+    kind: "credential" as const,
+    appleUserId: APPLE_USER,
+    idToken: "eyJraWQiOiJXNldjT0tCIn0.apple-minted.signature",
+    authorizationCode: "c1a9f0e2b7d34.0.abcd",
+  };
+
+  function nonceIssued() {
+    request.mockResolvedValueOnce(ok({ nonce: NONCE, hashedNonce: HASHED }));
+  }
+
+  test("asks for a nonce, opens the sheet with its hash, and sends the raw nonce back", async () => {
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce({ ...CREDENTIAL, givenName: "Ada" });
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await expect(signInWithApple()).resolves.toEqual({
+      kind: "settled",
+      outcome: { kind: "signed-in", cookie: ISSUED, user: PARSED_USER },
+    });
+
+    expect(request).toHaveBeenNthCalledWith(1, "/auth/apple/nonce", { method: "POST", body: {} });
+    expect(appleCredential).toHaveBeenCalledWith(HASHED);
+    // The code goes up too: it is what the API revokes the grant with when the
+    // account is deleted.
+    expect(request).toHaveBeenNthCalledWith(2, "/auth/apple", {
+      method: "POST",
+      body: {
+        idToken: CREDENTIAL.idToken,
+        authorizationCode: CREDENTIAL.authorizationCode,
+        nonce: NONCE,
+        givenName: "Ada",
+      },
+    });
+    expect(writeCookie).toHaveBeenCalledWith(ISSUED);
+    expect(getSessionCookie()).toBe(ISSUED);
+  });
+
+  test("a server without Apple says so before the sheet opens", async () => {
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 503,
+      body: { code: "apple_sign_in_unavailable" },
+      sessionCookie: null,
+    });
+
+    await expect(signInWithApple()).resolves.toEqual({ kind: "unavailable" });
+    expect(appleCredential).not.toHaveBeenCalled();
+  });
+
+  test("no network for the nonce is the offline outcome, and the sheet stays shut", async () => {
+    request.mockResolvedValueOnce({ reached: false });
+
+    await expect(signInWithApple()).resolves.toEqual({
+      kind: "settled",
+      outcome: { kind: "transport-failure" },
+    });
+    expect(appleCredential).not.toHaveBeenCalled();
+  });
+
+  test("a dismissed sheet asks the API nothing more and changes nothing", async () => {
+    setSessionCookie(STORED);
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce({ kind: "cancelled" });
+
+    await expect(signInWithApple()).resolves.toEqual({ kind: "cancelled" });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(getSessionCookie()).toBe(STORED);
+  });
+
+  // Apple shares the name once. A first attempt the API never answers must not
+  // lose it: it is kept, sent again on the retry, and let go once signed in.
+  test("the name from a failed first attempt is kept and sent on the retry", async () => {
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce({ ...CREDENTIAL, givenName: "Ada", familyName: "Lovelace" });
+    request.mockResolvedValueOnce({ reached: false });
+
+    await signInWithApple();
+
+    expect(writeAppleNameMock).toHaveBeenCalledWith(APPLE_USER, {
+      givenName: "Ada",
+      familyName: "Lovelace",
+    });
+    expect(clearAppleNameMock).not.toHaveBeenCalled();
+
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce(CREDENTIAL);
+    readAppleNameMock.mockResolvedValueOnce({ givenName: "Ada", familyName: "Lovelace" });
+    request.mockResolvedValueOnce(ok(USER, ISSUED));
+
+    await signInWithApple();
+
+    expect(readAppleNameMock).toHaveBeenCalledWith(APPLE_USER);
+    expect(request).toHaveBeenLastCalledWith("/auth/apple", {
+      method: "POST",
+      body: {
+        idToken: CREDENTIAL.idToken,
+        authorizationCode: CREDENTIAL.authorizationCode,
+        nonce: NONCE,
+        givenName: "Ada",
+        familyName: "Lovelace",
+      },
+    });
+    expect(clearAppleNameMock).toHaveBeenCalledWith(APPLE_USER);
+  });
+
+  test("a credential the API refuses leaves nothing here", async () => {
+    setSessionCookie(STORED);
+    setSessionUser(PARSED_USER);
+    nonceIssued();
+    appleCredential.mockResolvedValueOnce(CREDENTIAL);
+    request.mockResolvedValueOnce({
+      reached: true,
+      status: 401,
+      body: {},
+      sessionCookie: null,
+    });
+
+    await expect(signInWithApple()).resolves.toEqual({
+      kind: "settled",
+      outcome: {
+        kind: "unauthorised",
+        message: "That Apple ID was not accepted. Try again, or sign in with your email.",
+      },
+    });
+
+    expect(getSessionCookie()).toBeNull();
+    expect(getSessionUser()).toBeNull();
+    expect(clearCookie).toHaveBeenCalled();
   });
 });
 
@@ -974,5 +1133,30 @@ describe("verifying a magic link", () => {
     // with is stale — writing it would leave a live cookie for the next launch.
     expect(writeCookie).not.toHaveBeenCalled();
     expect(getSessionCookie()).toBeNull();
+  });
+});
+
+describe("asking for a sign-up link", () => {
+  test("says the Terms of Use were agreed to, so the account is created with the date", async () => {
+    request.mockResolvedValueOnce({ reached: true, status: 200, body: { data: null }, sessionCookie: null });
+
+    await requestSignUp({
+      email: "Ada@Talo.test",
+      name: "Ada",
+      username: "ada",
+      phone: "",
+      acceptTerms: true,
+    });
+
+    expect(request).toHaveBeenCalledWith("/auth/sign-up", {
+      method: "POST",
+      body: {
+        email: "ada@talo.test",
+        name: "Ada",
+        username: "ada",
+        acceptTerms: true,
+        url: "https://app.example.com",
+      },
+    });
   });
 });

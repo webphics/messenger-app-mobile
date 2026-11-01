@@ -170,6 +170,20 @@ it is the second account-creation path beside the Magic link. Dismissing the she
 not a failure.
 _Avoid_: Google OAuth, social login, SSO, Sign in with Google (as the name in code)
 
+**Apple sign-in**:
+The fourth way in, iOS only: the system Sign in with Apple sheet, an ID token and an authorization code,
+and the same Session cookie as the other three. There because App Store guideline 4.8 asks an app
+offering Google sign-in for an option that collects only a name and an email and can hide the email;
+the person may share neither name nor real address, so a relay address is an ordinary account email.
+The sheet is opened with the hash of a single-use nonce the API issues first, so a token can be
+presented once; an API without Apple configured says so at that step, before the sheet opens. The code
+goes to the API with the token so deleting the account can revoke the grant
+(`api/docs/planning/apple-sign-in.md`). Apple shares the name once, so it is kept in the keychain
+under the Apple user id until an account holds it. Like Google, a first sign-in creates a Customer
+account, it needs a Development client built after it was added, and dismissing the sheet is a
+Cancellation. The button is Apple's own and is drawn only on iOS, where the device can offer it.
+_Avoid_: Apple ID login, SIWA, Sign in with Apple (as the name in code)
+
 **Audience arrangement**:
 The reason mobile Google sign-in needs no API change: the app is configured with the *web* OAuth
 client alongside the platform one, so Google mints the ID token with the web client as its audience —
@@ -184,7 +198,7 @@ app needs it. Built from the `development` profile in `eas.json`.
 _Avoid_: Dev build (as the name for the profile), custom client, standalone build (that is a release)
 
 **Cancellation**:
-Dismissing the Google account sheet. A distinct outcome from a failure: it surfaces no message, clears
+Dismissing the Google account sheet or the Apple sheet. A distinct outcome from a failure: it surfaces no message, clears
 nothing that was typed, and returns to sign-in unchanged.
 _Avoid_: Abort, dismissal error, cancelled sign-in error
 
@@ -407,6 +421,28 @@ _Avoid_: Like/dislike (those are the icons, not the concept), rating, karma, Rea
 A Post somebody saved for themselves. Private: nobody sees another person's, and a Post never says
 how many people saved it.
 _Avoid_: Save, favourite, star, pin, collection
+
+**Report**:
+Somebody telling ChatRoute that a Post, a Message or a group breaks the terms, with a reason and an
+optional note. Anybody may report anything they can read but their own. It lands in the Admin's
+**Report queue**, where an open Report past a day is *Overdue* in words, and an Admin removes the
+content, bans whoever posted it, or dismisses it. The person reported is never told who reported
+them.
+_Avoid_: Flag, complaint (a Complaint is a Customer's message in General Support), abuse ticket
+
+**Block**:
+One person hiding another: the API leaves the blocked person's Posts and Messages out of everything
+it answers the blocker with and refuses them a new direct message, and this app takes what is
+already on screen down the moment it lands. Private and silent — the blocked person is not told —
+and undone from Settings.
+_Avoid_: Mute (that is a conversation's), ban (that is an Admin's, and takes the account)
+
+**Terms gate**:
+The screen a signed-in person meets before anything else while the API says they have never
+agreed to the Terms of Use. Ahead of onboarding, and reached the way onboarding is, because a first
+Google sign-in and a sign-up link opened from an unknown address create an account without the
+sign-up form's checkbox.
+_Avoid_: EULA screen, consent screen
 
 **Viewer count**:
 How many distinct people have seen a Post, its author excluded, counted once per person ever. Not a

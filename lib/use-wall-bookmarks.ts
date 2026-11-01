@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ApiFailure, ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
+import { unblockedSince } from '@/lib/blocked-people'
+import { useBlockedIds } from '@/lib/blocks-context'
 import {
   nextWallPostVote,
   toggleWallPostReaction,
@@ -25,6 +27,7 @@ import {
   applyOlderPage,
   canPageBack,
   emptyWall,
+  withoutAuthors,
   withoutLivePost,
   withRestoredPost,
   withUpdatedPost,
@@ -77,6 +80,7 @@ export function useWallBookmarks(): WallBodyView {
   )
 
   const [read, setRead] = useState<WallPages>(emptyWall)
+  const blockedIds = useBlockedIds()
   const [loading, setLoading] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -101,6 +105,18 @@ export function useWallBookmarks(): WallBodyView {
       setRead(applyFirstPage(result.value, WALL_BOOKMARKS_PAGE_LIMIT))
     })
   }, [])
+
+  /**
+   * An unblock re-reads the first page: the API left that person's Posts out
+   * of every page it answered while the block stood, so they are not here to
+   * be shown again (`withoutAuthors` only hides what was read).
+   */
+  const lastBlocked = useRef(blockedIds)
+  useEffect(() => {
+    const unblocked = unblockedSince(lastBlocked.current, blockedIds)
+    lastBlocked.current = blockedIds
+    if (unblocked) loadFirst()
+  }, [blockedIds, loadFirst])
 
   useEffect(() => {
     loadFirst()
@@ -308,9 +324,12 @@ export function useWallBookmarks(): WallBodyView {
     [read],
   )
 
+  // Same rule as the Wall: a blocked author's saved Post is hidden, not unsaved.
+  const shown = useMemo(() => withoutAuthors(read, blockedIds), [read, blockedIds])
+
   return {
-    posts: read.posts,
-    notice: wallBookmarksNotice({ drawn: read.posts.length, loading, failure }),
+    posts: shown.posts,
+    notice: wallBookmarksNotice({ drawn: shown.posts.length, loading, failure }),
     loadingOlder,
     refreshing,
     canLoadOlder: canPageBack(read),

@@ -54,14 +54,64 @@ export function needsOnboarding(user: SessionUser): boolean {
   return name.toLowerCase() === user.email.trim().toLowerCase();
 }
 
+export const TERMS_HREF = "/(auth)/terms" as Href;
+
 /**
- * The destination for a signed-in person: onboarding while the name is blank,
- * their role's Hub once it is not.
+ * Whether this person still has to agree to the Terms of Use (App Store
+ * guideline 1.2): the API says they never have. Only an explicit null — an
+ * absent field is a person kept from an older build, whose answer arrives with
+ * the next reachable session read.
+ *
+ * Every way in reaches it the way onboarding is reached, because a Google
+ * account's first sign-in and a sign-up link opened from an unknown address
+ * both create the account without the sign-up form's checkbox.
+ */
+export function needsTerms(user: SessionUser): boolean {
+  return user.termsAcceptedAt === null;
+}
+
+/**
+ * Where somebody who owes the terms may still be: the gate itself, and the
+ * account deletion screen it offers, because leaving ChatRoute must not need
+ * agreeing to it first.
+ */
+const TERMS_EXEMPT_PATHS: readonly string[] = ["/terms", "/account/delete"];
+
+/**
+ * Where to send a signed-in person who is somewhere they may not be yet, or
+ * null to leave them. Asked on every change to the person and every move, not
+ * only at launch and sign-in: a session read that turns an unknown answer (a
+ * person kept by an older build) into null, and a request the server refused
+ * with `terms_required`, both have to reach the gate from wherever they land.
+ *
+ * Only the terms, deliberately. Onboarding stays a destination the sign-in
+ * paths choose, because nothing the server enforces depends on it.
+ */
+export function termsRedirect(user: SessionUser | null, pathname: string): Href | null {
+  if (!user || !needsTerms(user)) return null;
+  return TERMS_EXEMPT_PATHS.includes(pathname) ? null : TERMS_HREF;
+}
+
+/**
+ * The gate a signed-in person is owed before their Hub, or null for none:
+ * the terms first, because nothing — not even choosing a name — happens on
+ * ChatRoute before somebody has agreed to how it is used, then onboarding.
+ */
+export function gateDestination(user: SessionUser): Href | null {
+  if (needsTerms(user)) return TERMS_HREF;
+  if (needsOnboarding(user)) return ONBOARDING_HREF;
+  return null;
+}
+
+/**
+ * The destination for a signed-in person: the terms while they have not agreed
+ * to them, onboarding while the name is blank, their role's Hub once neither
+ * holds.
  *
  * Every place that navigates on a resolved session goes through this rather
  * than reading `ROLE_HREF` directly, so the gate cannot be true on one route in
  * and false on another.
  */
 export function signedInDestination(user: SessionUser): Href {
-  return needsOnboarding(user) ? ONBOARDING_HREF : ROLE_HREF[user.role];
+  return gateDestination(user) ?? ROLE_HREF[user.role];
 }

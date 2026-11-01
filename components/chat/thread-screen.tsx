@@ -17,6 +17,7 @@ import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
 import { InvitationCard } from '@/components/chat/invitation-card'
 import { MessageActions } from '@/components/chat/message-actions'
 import { MessageEditSheet } from '@/components/chat/message-edit-sheet'
+import { ReportSheet, type ReportTarget } from '@/components/moderation/report-sheet'
 import { MessageHistorySheet } from '@/components/chat/message-history-sheet'
 import { ThreadDayPill } from '@/components/chat/thread-day-pill'
 import { MessageBubble, type QuotedMessage } from '@/components/chat/message-bubble'
@@ -56,6 +57,8 @@ import {
   type BubbleContent,
 } from '@/lib/message-attachment'
 import { offersEditHistory } from '@/lib/message-history'
+import { messageModeration } from '@/lib/message-moderation'
+import { useBlockPerson } from '@/lib/use-block-person'
 import { adminOnlyLabel } from '@/lib/message-invitation'
 import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
@@ -823,6 +826,47 @@ export function ThreadScreen({
     [],
   )
 
+  /**
+   * Report and Block on somebody else's message (`messageModeration`). Report
+   * opens one sheet for the thread, like the edit sheet; Block asks, and the
+   * thread drops the sender's Messages itself once it lands
+   * (`useThreadMessages` reads who is blocked).
+   */
+  const [reportTarget, setReportTarget] = useState<ReportTarget | null>(null)
+  const blockPerson = useBlockPerson()
+
+  const moderationFor = useCallback(
+    (messageId: string) => {
+      const message = messages.find((item) => item.id === messageId)
+      return message
+        ? messageModeration(message, viewer.id, conversation.type)
+        : { report: false, block: null }
+    },
+    [messages, viewer.id, conversation.type],
+  )
+
+  const menuModeration = useMemo(
+    () => (menu ? moderationFor(menu.messageId) : null),
+    [menu, moderationFor],
+  )
+  const menuSender = menuModeration?.block ?? null
+
+  const reportMessage = useCallback(
+    (messageId: string) => {
+      setMenu(null)
+      setReportTarget({ targetKind: 'message', targetId: messageId, conversationId: conversation.id })
+    },
+    [conversation.id],
+  )
+
+  const blockSender = useCallback(
+    (person: { id: string; name: string }) => {
+      setMenu(null)
+      void blockPerson(person)
+    },
+    [blockPerson],
+  )
+
   const showMessageInfo = useCallback(
     (messageId: string) => {
       setMenu(null)
@@ -1240,8 +1284,17 @@ export function ThreadScreen({
             canShowHistory(menu.messageId) ? () => openEditHistory(menu.messageId) : undefined
           }
           onInfo={canShowInfo(menu) ? () => showMessageInfo(menu.messageId) : undefined}
+          onReport={menuModeration?.report ? () => reportMessage(menu.messageId) : undefined}
+          onBlock={menuSender ? () => blockSender(menuSender) : undefined}
+          blockLabel={menuSender ? `Block ${menuSender.name}` : undefined}
         />
       ) : null}
+
+      <ReportSheet
+        visible={reportTarget !== null}
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+      />
 
       {/*
         Mounted beside the overlay rather than per bubble: one sheet serves the

@@ -6,6 +6,15 @@ import {
   type ApiRequestOptions,
 } from "@/lib/api-client";
 import {
+  appleNameSettled,
+  appleNameToSend,
+  hasAppleName,
+  interpretAppleNonce,
+  type AppleResult,
+} from "@/lib/apple-auth";
+import { requestAppleCredential } from "@/lib/apple-session";
+import {
+  interpretAppleSignIn,
   interpretGoogleSignIn,
   interpretMagicLinkRequest,
   interpretMagicLinkVerify,
@@ -14,6 +23,7 @@ import {
   interpretSignUp,
   interpretTwoFactorVerify,
   saysSessionExpired,
+  saysTermsRequired,
   type AuthOutcome,
   type HttpOutcome,
   type MagicLinkRequestOutcome,
@@ -25,11 +35,14 @@ import {
   requestGoogleIdToken,
 } from "@/lib/google-session";
 import {
+  clearAppleName,
   clearKeptPerson,
   clearRetiredCredential,
   clearSessionCookie,
+  readAppleName,
   readKeptPerson,
   readSessionCookie,
+  writeAppleName,
   writeKeptPerson,
   writeSessionCookie,
 } from "@/lib/keychain";
@@ -60,6 +73,8 @@ const MAGIC_LINK_REQUEST_PATH = "/auth/magic-link";
 const MAGIC_LINK_VERIFY_PATH = "/auth/magic-link/verify";
 const SIGN_UP_PATH = "/auth/sign-up";
 const GOOGLE_PATH = "/auth/google";
+const APPLE_PATH = "/auth/apple";
+const APPLE_NONCE_PATH = "/auth/apple/nonce";
 const TWO_FACTOR_VERIFY_PATH = "/auth/two-factor/verify-totp";
 
 /**
@@ -369,6 +384,55 @@ export async function signInWithGoogle(): Promise<GoogleResult> {
 }
 
 /**
+ * Sign in with Apple, and trade the credential for a session here.
+ *
+ * Three steps where Google has two. A nonce first, from the API, because the
+ * sheet has to be opened with it: the token Apple mints carries its hash, and
+ * the API spends the nonce, so a token can be presented once. Asking first also
+ * means a server with no Apple configuration says so before the sheet opens,
+ * not after the person has authorised the app.
+ *
+ * The code goes up with the token so the API can exchange it for the grant it
+ * revokes when the account is deleted (`api/docs/planning/apple-sign-in.md`).
+ * The name Apple shares once is kept on the device until an account holds it.
+ * There is no native session to release afterwards: Apple keeps none on the
+ * device for this app to hold.
+ */
+export async function signInWithApple(): Promise<AppleResult> {
+  const issued = interpretAppleNonce(
+    await apiRequest(APPLE_NONCE_PATH, { method: "POST", body: {} }),
+  );
+  if (issued.kind === "unreached") {
+    return { kind: "settled", outcome: { kind: "transport-failure" } };
+  }
+  if (issued.kind !== "nonce") return issued;
+
+  const attempt = await requestAppleCredential(issued.hashedNonce);
+  if (attempt.kind !== "credential") return attempt;
+
+  const { kind: _kind, appleUserId, givenName, familyName, ...credential } = attempt;
+  const shared = { givenName, familyName };
+  if (hasAppleName(shared)) await writeAppleName(appleUserId, shared);
+  const name = appleNameToSend(
+    shared,
+    hasAppleName(shared) ? null : await readAppleName(appleUserId),
+  );
+
+  const startedAt = credentialEpoch;
+  const outcome = interpretAppleSignIn(
+    await apiRequest(APPLE_PATH, {
+      method: "POST",
+      body: { ...credential, nonce: issued.nonce, ...name },
+    }),
+  );
+
+  await applyOutcome(outcome, startedAt);
+  if (appleNameSettled(outcome)) await clearAppleName(appleUserId);
+
+  return { kind: "settled", outcome };
+}
+
+/**
  * Ask the API to email a sign-in link.
  *
  * The origin travels with the request rather than being configured on the
@@ -425,6 +489,12 @@ export type SignUpRequest = {
   username: string;
   /** Omitted from the body when blank. */
   phone: string;
+  /**
+   * The Terms of Use box on the sign-up step. Sent only when true: the API
+   * stamps the date onto the account when the link creates it, and an account
+   * that arrives without one meets the terms gate on its first sign-in.
+   */
+  acceptTerms: boolean;
 };
 
 /**
@@ -450,6 +520,7 @@ export async function requestSignUp(input: SignUpRequest): Promise<SignUpOutcome
         name: input.name.trim(),
         username: input.username.trim().toLowerCase(),
         ...(phone ? { phone } : {}),
+        ...(input.acceptTerms ? { acceptTerms: true } : {}),
         url: MAGIC_LINK_ORIGIN,
       },
     }),
@@ -536,6 +607,22 @@ export function onSessionExpired(listener: () => void): () => void {
   };
 }
 
+/** Whoever needs to know the API refused a request for want of agreed terms. */
+const termsListeners = new Set<() => void>();
+
+/**
+ * Listen for `terms_required`: the server enforces the terms gate on every
+ * request, so a person this device thought had agreed (an older build's kept
+ * copy, or an account whose date was cleared) is sent to agree from wherever
+ * they are. Returns the way to stop.
+ */
+export function onTermsRequired(listener: () => void): () => void {
+  termsListeners.add(listener);
+  return () => {
+    termsListeners.delete(listener);
+  };
+}
+
 /**
  * Make a request as the signed-in person, and end the session if the server says
  * the credential is dead.
@@ -595,6 +682,12 @@ export async function authenticatedRequest(
   if (saysSessionExpired(outcome) && startedAt === credentialEpoch) {
     await forgetCredential();
     for (const listener of expiryListeners) listener();
+  }
+
+  // A refusal like any other for the caller — never retried — and the gate for
+  // everyone else: the session stands, the person just has to agree first.
+  if (saysTermsRequired(outcome) && startedAt === credentialEpoch) {
+    for (const listener of termsListeners) listener();
   }
 
   return outcome;

@@ -18,6 +18,9 @@ import {
   threadContinues,
   threadMessages,
   visibleMessages,
+  withdrawSend,
+  withoutSenders,
+  isFinalSendRefusal,
 } from '@/lib/thread-state'
 import { parseMessageCreated } from '@/lib/realtime-events'
 import type { ThreadState, UnsentMessage } from '@/lib/thread-state'
@@ -971,5 +974,48 @@ describe('applyNewestPage', () => {
       hasMore: false,
       cursor: undefined,
     })
+  })
+})
+
+describe('hiding the Messages of people the reader blocked', () => {
+  const at = '2026-10-31T10:00:00.000Z'
+  const fromAda = staffMessage('a', at, { sender: { id: 'ada', name: 'Ada', role: 'customer' } })
+  const fromMallory = staffMessage('m', at, { sender: { id: 'mallory', name: 'Mallory', role: 'customer' } })
+  const support = customerMessage('s', at)
+
+  it.each([
+    ['nobody blocked', [], ['a', 'm', 's']],
+    ['one sender blocked', ['mallory'], ['a', 's']],
+    ['a sender with nothing here', ['eve'], ['a', 'm', 's']],
+  ])('%s', (_, blocked, expected) => {
+    expect(withoutSenders([fromAda, fromMallory, support], new Set(blocked)).map(m => m.id)).toEqual(expected)
+  })
+
+  it('hands back the same array when nothing is hidden', () => {
+    const messages = [fromAda, support]
+    expect(withoutSenders(messages, new Set(['mallory']))).toBe(messages)
+  })
+})
+
+describe('a send refused for good', () => {
+  it.each([
+    ['the content filter', { kind: 'refused', message: 'x', code: 'objectionable_content' }, true],
+    ['a block', { kind: 'refused', message: 'x', code: 'blocked' }, true],
+    ['a write policy', { kind: 'refused', message: 'x', code: 'forbidden' }, false],
+    ['a refusal with no code', { kind: 'refused', message: 'x' }, false],
+    ['no connection', { kind: 'unreachable' }, false],
+  ])('%s is final: %s', (_, failure, expected) => {
+    expect(isFinalSendRefusal(failure)).toBe(expected)
+  })
+
+  it('leaves the thread rather than waiting under Retry', () => {
+    const message = draftMessage({
+      id: 'local:1',
+      body: 'bad words',
+      author: { id: 'me', name: 'Me', role: 'customer' },
+    })
+    const sending = beginSend(emptyThread(), message)
+    expect(withdrawSend(sending, 'local:1').unsent).toEqual([])
+    expect(withdrawSend(sending, 'local:2')).toBe(sending)
   })
 })

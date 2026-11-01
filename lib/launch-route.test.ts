@@ -3,7 +3,7 @@ import { chatHref } from "@/lib/chat-route-id";
 import { ROLE_HREF, SIGN_IN_HREF } from "@/lib/hub-routes";
 import { launchDestination } from "@/lib/launch-route";
 import { wallPostHref } from "@/lib/wall-route";
-import { ONBOARDING_HREF } from "@/lib/onboarding-gate";
+import { ONBOARDING_HREF, TERMS_HREF } from "@/lib/onboarding-gate";
 import type { ConversationFetch, SessionUser, UserRole } from "@/lib/types";
 
 const AGENT: SessionUser = {
@@ -141,6 +141,20 @@ describe("an account with no name", () => {
 
   test("still waits for the fetch", () => {
     expect(launchDestination(nameless(), "outstanding")).toEqual({ kind: "wait" });
+  });
+});
+
+describe("an account that has not agreed to the terms", () => {
+  const unagreed: AuthState = {
+    status: "signed-in",
+    user: { ...AGENT, name: "", termsAcceptedAt: null },
+    stale: false,
+  };
+
+  test("is sent to the terms first, ahead of onboarding and a tapped notification", () => {
+    const terms = { kind: "navigate", href: TERMS_HREF };
+    expect(launchDestination(unagreed, "answered")).toEqual(terms);
+    expect(launchDestination(unagreed, "answered", "c-1")).toEqual(terms);
   });
 });
 
