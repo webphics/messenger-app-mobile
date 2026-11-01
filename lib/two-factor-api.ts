@@ -142,7 +142,9 @@ export async function disableTwoFactor(
 
   const held = getSessionUser();
   const result = readOutcome(outcome, (data) =>
-    disabled(data) && held ? { ...held, twoFactorEnabled: false } : null,
+    // `removeCredentialAccountAfterTwoFactorDisable` in the API deletes the password with the
+    // factor, so a screen still drawing a password field would ask for one that is gone.
+    disabled(data) && held ? { ...held, twoFactorEnabled: false, hasPassword: false } : null,
   );
 
   if (result.ok) {

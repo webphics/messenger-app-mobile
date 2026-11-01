@@ -232,7 +232,7 @@ export const TWO_FACTOR_COPY: Record<
   off: {
     statusLine: "Two-factor authentication is off",
     detail:
-      "Signing in asks for your password alone. Turn it on to also ask for a code from an authenticator app.",
+      "Signing in does not ask for a code. Turn it on to also ask for one from an authenticator app.",
   },
 };
 
@@ -251,11 +251,25 @@ export const TWO_FACTOR_PASSWORD_COPY = {
  */
 export const TWO_FACTOR_DISABLE_CONFIRMATION = {
   title: "Turn off two-factor authentication?",
-  message:
-    "Your account will be protected by your password alone, and the backup codes you have now will stop working. Turning it on again means setting up your authenticator app again.",
   confirmLabel: "Turn off",
   cancelLabel: "Cancel",
 } as const;
+
+/**
+ * The API deletes the password along with the factor
+ * (`removeCredentialAccountAfterTwoFactorDisable`), so an account that has one
+ * is told it goes, and one that has none is not told about a password at all.
+ */
+export function disableConfirmationMessage(
+  account: Pick<TwoFactorAccount, "hasPassword">,
+): string {
+  const rest =
+    "The backup codes you have now will stop working, and turning it on again means setting up your authenticator app again.";
+
+  return account.hasPassword
+    ? `This also removes your password, so next time you sign in with a link sent to your email. ${rest}`
+    : rest;
+}
 
 /**
  * The codes, and the warning that has to arrive with them.

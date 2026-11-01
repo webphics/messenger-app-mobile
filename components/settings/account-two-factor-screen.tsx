@@ -46,6 +46,7 @@ import {
   TWO_FACTOR_SETUP_COPY,
   asksForPassword,
   checkTwoFactorPassword,
+  disableConfirmationMessage,
   groupSetupKey,
   twoFactorActions,
   twoFactorStatus,
@@ -176,11 +177,11 @@ function setupRefusal(failure: ApiFailure): string {
  * such on iOS, and so a dismissal resolves rather than leaving the caller's
  * promise hanging, which Android's back gesture would otherwise do.
  */
-function confirmDisable(): Promise<boolean> {
+function confirmDisable(hasPassword: boolean): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(
       TWO_FACTOR_DISABLE_CONFIRMATION.title,
-      TWO_FACTOR_DISABLE_CONFIRMATION.message,
+      disableConfirmationMessage({ hasPassword }),
       [
         {
           text: TWO_FACTOR_DISABLE_CONFIRMATION.cancelLabel,
@@ -322,7 +323,7 @@ export function AccountTwoFactorScreen() {
       };
 
       if (kind === "disable") {
-        void confirmDisable().then((goAhead) => {
+        void confirmDisable(account?.hasPassword === true).then((goAhead) => {
           if (goAhead && live.current) send();
         });
         return;

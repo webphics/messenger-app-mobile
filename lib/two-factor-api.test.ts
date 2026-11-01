@@ -93,9 +93,20 @@ describe("two-factor that was turned off", () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { ...PROTECTED_PERSON, twoFactorEnabled: false },
+      value: { ...PROTECTED_PERSON, twoFactorEnabled: false, hasPassword: false },
     });
     expect(getSessionUser()?.twoFactorEnabled).toBe(false);
+  });
+
+  test("the password goes with it, because the API removes it", async () => {
+    request.mockResolvedValueOnce(answered({ status: true }));
+
+    await disableTwoFactor("hunter2");
+
+    expect(getSessionUser()?.hasPassword).toBe(false);
+    expect(kept).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "7", hasPassword: false }),
+    );
   });
 
   test("the Kept person moves with it, so a cold start agrees", async () => {

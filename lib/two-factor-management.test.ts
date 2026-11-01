@@ -1,6 +1,8 @@
 import {
   checkTwoFactorPassword,
+  disableConfirmationMessage,
   groupSetupKey,
+  TWO_FACTOR_COPY,
   twoFactorActions,
   type TwoFactorAccount,
 } from "@/lib/two-factor-management";
@@ -82,5 +84,28 @@ describe("the body each account sends", () => {
     expect(
       checkTwoFactorPassword({ hasPassword: true }, "  hunter2  ").password,
     ).toBe("hunter2");
+  });
+});
+
+describe("what turning it off says", () => {
+  test("an account with a password is told the password goes too", () => {
+    expect(disableConfirmationMessage({ hasPassword: true })).toMatch(
+      /removes your password/,
+    );
+  });
+
+  test("an account with no password is not told about one", () => {
+    expect(disableConfirmationMessage({ hasPassword: false })).not.toMatch(
+      /password/,
+    );
+  });
+
+  test("neither promises that a password protects the account", () => {
+    for (const hasPassword of [true, false]) {
+      expect(disableConfirmationMessage({ hasPassword })).not.toMatch(
+        /password alone/,
+      );
+    }
+    expect(TWO_FACTOR_COPY.off.detail).not.toMatch(/password/);
   });
 });
