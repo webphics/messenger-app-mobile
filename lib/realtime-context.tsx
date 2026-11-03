@@ -20,6 +20,7 @@ import {
   parseConversationUpdated,
   parseGroupJoinRequestAnswered,
   parseMessageCreated,
+  parseMessageDeleted,
   parseNotificationCreated,
   parseNotificationRead,
   parsePostCreated,
@@ -57,6 +58,8 @@ import type { AppNotification, Conversation, Message } from '@/lib/types'
 
 export type RealtimeEvent =
   | { kind: 'message'; conversationId: string; message: Message }
+  /** A Message hard-deleted by staff, which every copy on this device has to lose. */
+  | { kind: 'message-deleted'; conversationId: string; messageId: string }
   | { kind: 'conversation'; conversation: Conversation }
   | { kind: 'deleted'; conversationId: string }
   /**
@@ -289,6 +292,11 @@ function useRealtimeConnection(): RealtimeValue {
       const event = parseMessageCreated(payload)
       if (!event) return
       emit({ kind: 'message', conversationId: event.conversationId, message: event.message })
+    })
+
+    socket.on(REALTIME_EVENTS.messageDeleted, (payload: unknown) => {
+      const event = parseMessageDeleted(payload)
+      if (event) emit({ kind: 'message-deleted', ...event })
     })
 
     socket.on(REALTIME_EVENTS.conversationUpdated, (payload: unknown) => {

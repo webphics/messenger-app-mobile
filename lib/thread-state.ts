@@ -370,6 +370,62 @@ export function applyIncomingMessage(
 }
 
 /**
+ * Messages the API has deleted, taken out of the thread.
+ *
+ * The only reducer that removes a confirmed Message; everything else merges by
+ * id. A reply keeps its place but loses its quote of a deleted Message, because
+ * `replyTo.preview` is a copy of the deleted text and the API unsets it on the
+ * stored replies too. Unsent Messages are never touched: the API has never seen
+ * them, so it cannot have deleted them.
+ */
+export function withoutMessages(state: ThreadState, ids: readonly string[]): ThreadState {
+  if (ids.length === 0) return state
+  const gone = new Set(ids)
+  if (!state.messages.some((message) => gone.has(message.id) || gone.has(message.replyTo?.id ?? ''))) {
+    return state
+  }
+
+  return {
+    ...state,
+    messages: state.messages
+      .filter((message) => !gone.has(message.id))
+      .map((message) =>
+        message.replyTo && gone.has(message.replyTo.id) ? { ...message, replyTo: null } : message,
+      ),
+  }
+}
+
+/**
+ * The held Messages a newest page shows the API no longer has.
+ *
+ * A deletion this device missed (closed, offline, the thread not open) leaves
+ * the Message in the Store, and the newest page alone would never remove it,
+ * since a page only merges. So a held Message the page should contain and does
+ * not is gone. The page covers everything after its oldest Message, so the
+ * check is "newer than that, and not in it".
+ *
+ * Strictly newer: a Message sharing the boundary timestamp may sit just past the
+ * page's cut. `held` must be what the thread held when the request went out, not
+ * when it answered: a Message the socket delivered in between is newer than the
+ * page and would otherwise be read as deleted.
+ *
+ * The raw page is compared, as in `threadContinues`, since a Message this viewer
+ * is not shown is still evidence that it exists.
+ */
+export function vanishedFromNewestPage(
+  held: readonly Message[],
+  page: readonly Message[],
+): string[] {
+  if (page.length === 0) return []
+  const oldest = Math.min(...page.map((message) => Date.parse(message.createdAt)))
+  const kept = new Set(page.map((message) => message.id))
+
+  return held
+    .filter((message) => Date.parse(message.createdAt) > oldest && !kept.has(message.id))
+    .map((message) => message.id)
+}
+
+/**
  * The echo an arriving message is the confirmation of, dropped.
  *
  * A message this device sent comes back twice: once as the API's answer to the

@@ -5,6 +5,7 @@ import {
   parseConversationUpdated,
   parseGroupJoinRequestAnswered,
   parseMessageCreated,
+  parseMessageDeleted,
   parsePostCreated,
   parsePostRemoved,
   parsePostUpdated,
@@ -368,5 +369,24 @@ describe('parseConversationUpdated, reading access', () => {
     const payload = { conversation: { ...STAFF_CONVERSATION_UPDATED.conversation, access } }
 
     expect(parseConversationUpdated(payload)?.access).toEqual(access)
+  })
+})
+
+describe('parseMessageDeleted', () => {
+  it('reads both ids', () => {
+    expect(parseMessageDeleted({ conversationId: 'c1', messageId: 'm1' })).toEqual({
+      conversationId: 'c1',
+      messageId: 'm1',
+    })
+  })
+
+  const refused: [string, unknown][] = [
+    ['no message id', { conversationId: 'c1' }],
+    ['an empty conversation id', { conversationId: '', messageId: 'm1' }],
+    ['not an object', 'm1'],
+  ]
+
+  it.each(refused)('answers null for %s', (_case, payload) => {
+    expect(parseMessageDeleted(payload)).toBeNull()
   })
 })
