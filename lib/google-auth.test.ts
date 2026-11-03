@@ -20,6 +20,9 @@ const CUSTOMER: SessionUser = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
 };
 
 const SUBMITTING: AuthState = { status: "submitting" };

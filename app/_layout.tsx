@@ -281,6 +281,16 @@ function RootStack({
           contentStyle: { backgroundColor: colors.bg },
         }}
       />
+      {/* Name, username, phone and photo, pushed from the header card
+        on Settings. A sibling of the account screens around it for the
+        same reason they are. */}
+      <Stack.Screen
+        name="account/profile"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
       {/* Setting a first password or changing one (#06). It carries
         no mode in its address: which of the two it is doing is read
         off the signed-in person, so there is no way to arrive at the

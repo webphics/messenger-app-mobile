@@ -231,6 +231,11 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     name: nonEmptyString(record.name) ?? email,
     email,
     role: role as UserRole,
+    // Each nullable on the API's side already, so absent and blank both read as
+    // none rather than refusing the person.
+    username: nonEmptyString(record.username) ?? null,
+    phone: nonEmptyString(record.phone) ?? null,
+    image: nonEmptyString(record.image) ?? null,
     // `=== true` rather than truthiness: a string, a 1 or an object would all
     // pass a loose check and every one of them is a payload this client did not
     // understand, which is the case the false default exists for.

@@ -82,7 +82,28 @@ describe("parseSessionUser", () => {
       supportAssignmentEnabled: false,
       termsAcceptedAt: "2026-10-31T10:00:00.000Z",
       capabilities: [],
+      username: null,
+      phone: null,
+      image: null,
     });
+  });
+
+  test("reads the profile the Settings header and the profile screen draw", () => {
+    expect(
+      parseSessionUser(
+        apiUser({ username: "ada", phone: "+447700900123", image: "/uploads/avatars/a.png" }),
+      ),
+    ).toMatchObject({ username: "ada", phone: "+447700900123", image: "/uploads/avatars/a.png" });
+  });
+
+  test.each([
+    ["absent", undefined],
+    ["null", null],
+    ["blank", "  "],
+    ["not a string", 42],
+  ])("a profile field that is %s reads as none", (_label, value) => {
+    const user = parseSessionUser(apiUser({ username: value, phone: value, image: value }));
+    expect(user).toMatchObject({ username: null, phone: null, image: null });
   });
 
   /**
@@ -174,6 +195,9 @@ describe("interpretSignIn", () => {
         supportAssignmentEnabled: false,
         termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
+        username: null,
+        phone: null,
+        image: null,
       },
     });
   });
@@ -303,6 +327,9 @@ describe("interpretSession", () => {
         supportAssignmentEnabled: false,
         termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
+        username: null,
+        phone: null,
+        image: null,
       },
     });
   });
@@ -549,6 +576,9 @@ describe("interpretTwoFactorVerify", () => {
         supportAssignmentEnabled: false,
         termsAcceptedAt: "2026-10-31T10:00:00.000Z",
         capabilities: [],
+        username: null,
+        phone: null,
+        image: null,
       },
     });
   });

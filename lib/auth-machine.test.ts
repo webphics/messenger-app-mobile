@@ -18,6 +18,9 @@ const AGENT: SessionUser = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
 };
 
 const CUSTOMER: SessionUser = { ...AGENT, role: "customer" };
