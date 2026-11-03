@@ -139,4 +139,15 @@ describe("resetRequestNotice", () => {
   ])("%s", (_name, outcome, expected) => {
     expect(resetRequestNotice(outcome, email)).toBe(expected);
   });
+
+  test("an address typed on sign-in is answered with an if, so it says nothing about the account", () => {
+    expect(resetRequestNotice({ kind: "sent" }, email, "typed")).toBe(
+      "If ada@chatroute.test has an account, a link to set a new password is on its way. Open it on this phone or a computer, and set the new password in your browser. The link works once and expires after an hour.",
+    );
+  });
+
+  test("everything but a sent link reads the same on sign-in", () => {
+    const limited: ResetRequestOutcome = { kind: "rate-limited", retryAfterSeconds: 125 };
+    expect(resetRequestNotice(limited, email, "typed")).toBe(resetRequestNotice(limited, email));
+  });
 });
