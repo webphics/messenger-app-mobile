@@ -389,6 +389,16 @@ type PendingOutbox = {
 const queuedOutbox = new Map<string, PendingOutbox>()
 
 /**
+ * Messages the API has deleted, waiting to leave the disk, by thread.
+ *
+ * Its own queue because `saveThread` cannot express a removal: Messages are an
+ * upsert, and a thread state holding fewer of them is just as often one that
+ * Restored less than the disk has. Drained after the thread writes, so a state
+ * queued before the deletion cannot write the row back.
+ */
+const queuedForgets = new Map<string, { ownerId: string; conversationId: string; ids: Set<string> }>()
+
+/**
  * The Unsent Messages last known to be on disk for a thread, by identity.
  *
  * The same trick `writtenMessages` uses, and for the same reason: a state change
@@ -950,12 +960,67 @@ function queueOutbox(
   })
 }
 
+/**
+ * Take Messages the API has deleted off the disk.
+ *
+ * Called for every copy this device may hold, whether or not the thread is
+ * open, so a thread opened later does not Restore a Message that is gone.
+ * Deleting a row that is not there is a no-op, so the open thread and the list
+ * may both ask for the same one.
+ */
+export function forgetMessages(
+  ownerId: string,
+  conversationId: string,
+  ids: readonly string[],
+): Promise<void> {
+  if (ids.length === 0 || !mayWrite(ownerId)) return draining ?? Promise.resolve()
+
+  const key = threadKey(ownerId, conversationId)
+  const pending = queuedForgets.get(key) ?? { ownerId, conversationId, ids: new Set<string>() }
+  for (const id of ids) pending.ids.add(id)
+  queuedForgets.set(key, pending)
+
+  draining ??= drain()
+  return draining
+}
+
+/**
+ * One thread's deletions, one transaction. Quotes of a deleted Message in the
+ * rows left behind are rewritten by the thread's own next write, if it is open,
+ * and by the newest page the next time it is.
+ */
+async function deleteMessages(pending: {
+  ownerId: string
+  conversationId: string
+  ids: Set<string>
+}): Promise<void> {
+  const database = connect()
+  if (!database) return
+
+  try {
+    await database.withTransactionAsync(async () => {
+      for (const id of pending.ids) {
+        await database.runAsync(
+          'DELETE FROM messages WHERE owner_id = ? AND conversation_id = ? AND id = ?',
+          pending.ownerId,
+          pending.conversationId,
+          id,
+        )
+      }
+    })
+  } catch {
+    // Swallowed, like every other write here. The newest page removes it again
+    // the next time this thread is opened.
+  }
+}
+
 async function drain(): Promise<void> {
   try {
     while (
       queued.size > 0 ||
       queuedThreads.size > 0 ||
       queuedOutbox.size > 0 ||
+      queuedForgets.size > 0 ||
       queuedCommunities.size > 0 ||
       queuedFeeds.size > 0
     ) {
@@ -966,6 +1031,10 @@ async function drain(): Promise<void> {
       const threads = [...queuedThreads.values()]
       queuedThreads.clear()
       for (const pending of threads) await writeThread(pending)
+
+      const forgets = [...queuedForgets.values()]
+      queuedForgets.clear()
+      for (const pending of forgets) await deleteMessages(pending)
 
       const outboxes = [...queuedOutbox.values()]
       queuedOutbox.clear()
@@ -1571,6 +1640,7 @@ export async function wipeStore(): Promise<void> {
   queued.clear()
   queuedThreads.clear()
   queuedOutbox.clear()
+  queuedForgets.clear()
   queuedCommunities.clear()
   queuedFeeds.clear()
   // Nothing is left waiting, but a write already past the queue is still on its

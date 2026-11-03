@@ -28,6 +28,12 @@ export const REALTIME_NAMESPACE = '/realtime'
 
 export const REALTIME_EVENTS = {
   messageCreated: 'message.created',
+  /**
+   * A Message hard-deleted by staff. Ids only: the text is gone from the API and
+   * must go from every device holding a copy. The `conversation.updated` sent
+   * after it carries the row's new preview.
+   */
+  messageDeleted: 'message.deleted',
   conversationUpdated: 'conversation.updated',
   conversationDeleted: 'conversation.deleted',
   conversationReassigned: 'conversation.reassigned',
@@ -164,6 +170,22 @@ export function parseConversationReassigned(payload: unknown): Reassignment | nu
     reason,
     assignee: assignee && { id: assignee.id, name: assignee.name },
   }
+}
+
+export type MessageDeleted = {
+  conversationId: string
+  messageId: string
+}
+
+/** A Message that no longer exists. Nothing is left to fetch for it. */
+export function parseMessageDeleted(payload: unknown): MessageDeleted | null {
+  const record = asRecord(payload)
+  if (!record) return null
+
+  const { conversationId, messageId } = record
+  if (typeof conversationId !== 'string' || conversationId === '') return null
+  if (typeof messageId !== 'string' || messageId === '') return null
+  return { conversationId, messageId }
 }
 
 /** A conversation that no longer exists. Nothing is left to fetch for it. */
