@@ -34,6 +34,7 @@ import { useViewer } from "@/lib/use-viewer";
 import { SessionEndRedirect } from "@/components/auth/session-end";
 import { TermsRedirect } from "@/components/auth/terms-redirect";
 import { PushRegistration } from "@/components/push/push-registration";
+import { UpdateGate } from "@/components/update/update-gate";
 import { AuthProvider } from "@/lib/auth-context";
 import { BlocksProvider } from "@/lib/blocks-context";
 import { ConversationInboxProvider } from "@/lib/conversation-inbox";
@@ -151,6 +152,10 @@ export default function RootLayout() {
           </ConversationInboxProvider>
         </RealtimeProvider>
       </AuthProvider>
+      {/* Last, so it draws over every screen and every banner. Outside the
+          providers because it needs none of them: a build the API refuses is
+          refused whoever is signed in. */}
+      <UpdateGate />
     </GestureHandlerRootView>
   );
 }
