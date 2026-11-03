@@ -227,7 +227,23 @@ EAS downloads with `EXPO_TOKEN` before the build.
 rejects an AAB whose versionCode it has seen before, so a re-pushed tag builds an AAB Play will
 refuse if that version was already uploaded.
 
-There is no iOS build in CI.
+### CI: the iOS Release workflow
+
+`.github/workflows/ios-release.yml` starts from the same tags, maps them to the same environments,
+and runs the same version and `main` checks. It builds an IPA with `eas build --platform ios
+--profile store --local` on a `macos-26` runner and sends it to App Store Connect with `eas submit`,
+where it appears under TestFlight. Submitting for review is still done by hand in App Store Connect.
+The IPA is not attached to the GitHub Release; it stays a run artifact for 7 days.
+
+A macOS minute is billed as ten on a private repository, and a cold build takes 25 to 40 minutes.
+The build fails in its first minute if the runner's default Xcode is older than 26.
+
+Signing uses the distribution certificate and provisioning profile stored on EAS. They are created
+by one interactive `eas build --platform ios` (or `eas credentials --platform ios`) from a terminal,
+because that needs the Apple ID and its 2FA code. CI never logs in to Apple.
+
+`ios.buildNumber` is derived from `expo.version` the same way as `versionCode`, so App Store Connect
+refuses a re-pushed tag that already uploaded.
 
 ### CI setup
 
@@ -252,6 +268,24 @@ not reach CI. The workflow writes the environment's variables into the `producti
 
 The two `EXPO_PUBLIC_*` values are variables rather than secrets because Metro inlines them into
 the shipped bundle, so anyone holding the APK can read them anyway.
+
+The iOS workflow also reads these. Without `ASC_APP_ID` it builds and skips the upload with a
+warning; with it, the three key secrets are required.
+
+| Name                               | Kind     | Notes                                                                                     |
+| ---------------------------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | variable | Optional. Without it the build uses the value in `eas.json`.                              |
+| `ASC_APP_ID`                       | variable | The app's Apple ID, a number under _App Store Connect → App Information_.                 |
+| `ASC_API_KEY_ID`                   | secret   | From _Users and Access → Integrations → App Store Connect API_, role App Manager or Admin. |
+| `ASC_API_KEY_ISSUER_ID`            | secret   | The issuer ID shown on the same page.                                                     |
+| `ASC_API_KEY_P8`                   | secret   | The contents of the downloaded `AuthKey_<id>.p8`. Apple lets you download it once.        |
+
+```bash
+gh variable set ASC_APP_ID --env Production
+gh secret set ASC_API_KEY_ID --env Production
+gh secret set ASC_API_KEY_ISSUER_ID --env Production
+gh secret set ASC_API_KEY_P8 --env Production < AuthKey_XXXXXXXXXX.p8
+```
 
 ### Local builds
 
