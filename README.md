@@ -194,7 +194,9 @@ tag must also point at a commit that is on `main`.
 
 #### Cutting a release
 
-From a clean, up-to-date `main`:
+From a clean, up-to-date `main`, first write the notes for the version you are about to cut in
+`release-notes/X.Y.Z.md`. Plain text, written for the people using the app, and under 500
+characters, which is Play Console's "What's new" limit. Leave the file uncommitted:
 
 ```bash
 pnpm release patch   # or minor / major / an explicit 1.4.0
@@ -204,8 +206,10 @@ pnpm release patch   # or minor / major / an explicit 1.4.0
 git push --follow-tags
 ```
 
-`pnpm release` bumps `package.json`, syncs `app.json`, commits `chore(release): X.Y.Z` and creates
-the `chatroute-vX.Y.Z` tag. Pushing the tag starts the build. For a Development or Release build, run
+`pnpm release` bumps `package.json`, syncs `app.json`, commits `chore(release): X.Y.Z` with the
+notes in it and creates the `chatroute-vX.Y.Z` tag. Pushing the tag starts the build, and the
+Release it publishes opens with the notes under "What's new", ready to copy into Play Console. A
+tag without a notes file still publishes, with a warning on the run. For a Development or Release build, run
 `npm version <bump> --tag-version-prefix=chatroute-development-v` (or `chatroute-release-v`) instead.
 
 To retry a failed run, use _Re-run failed jobs_ on it, or run the workflow from the tag in the

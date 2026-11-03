@@ -539,8 +539,15 @@ jobs:
       contents: write
 
     steps:
-      # No checkout: `gh release` is given --repo explicitly, so nothing here
-      # needs a working tree.
+      # Only `release-notes/`, at the tag: `gh release` is given --repo
+      # explicitly, so the notes are the one thing here that needs a tree.
+      - name: Check out the release notes
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.meta.outputs.tag }}
+          sparse-checkout: release-notes
+          sparse-checkout-cone-mode: false
+
       # Both artifacts into one directory: merge-multiple drops the per-artifact
       # subdirectory download-artifact would otherwise make.
       - name: Download the APK and AAB
@@ -562,6 +569,16 @@ jobs:
         run: |
           set -euo pipefail
           NOTES="ChatRoute Android ${VERSION} (${ANDROID_ABIS}). Built from ${GITHUB_SHA}. Install ${APK} directly on a phone; upload ${AAB} to Google Play Console."
+
+          # The person-facing notes, committed with the release by `pnpm release`,
+          # go first so they can be copied into Play Console's "What's new" as
+          # they stand. A tag without them still publishes, with a warning.
+          RELEASE_NOTES="release-notes/${VERSION}.md"
+          if [ -f "$RELEASE_NOTES" ]; then
+            NOTES="$(printf "## What's new\n\n%s\n\n---\n\n%s" "$(cat "$RELEASE_NOTES")" "$NOTES")"
+          else
+            echo "::warning::${RELEASE_NOTES} is missing, so this Release has no What's new section."
+          fi
 
           FLAGS=()
           if [ "$PRERELEASE" = true ]; then
