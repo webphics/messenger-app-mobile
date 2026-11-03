@@ -1,0 +1,472 @@
+# Builds the iOS app (IPA) on a macOS runner when a version tag is pushed and
+# sends it to App Store Connect, where it lands in TestFlight. The Android half
+# of the same release is android-release.yml; both start from the same tags.
+#
+# The build runs through `eas build --platform ios --profile store --local`, so
+# it compiles on this runner rather than on EAS's builders: no build credits and
+# no queue. Xcode only runs on macOS, which is why this is not on ubuntu-latest,
+# and that has a price. On a private repository GitHub bills a macOS minute as
+# ten, and a cold release build is 25 to 40 minutes.
+#
+# The project stays managed, as on Android: `ios/` is gitignored and EAS runs
+# `expo prebuild` inside the build. The `eas-build-post-install` hook in
+# package.json still runs, and `scripts/eas-local-properties.mjs` exits as a
+# no-op because no `android/` is generated.
+#
+# Signing: the distribution certificate and the App Store provisioning profile
+# for `com.thechatroute.app` live on EAS, created by the first interactive
+# `eas build --platform ios`. EAS downloads them with EXPO_TOKEN before the
+# build, so nothing secret lives in the repo, and the runner never needs the
+# Apple ID or its 2FA code. If the credentials are missing on EAS the build
+# fails in its first minute with "Credentials are not set up"; run
+# `eas credentials --platform ios` once from a terminal to create them.
+#
+# The upload goes through `eas submit` with an App Store Connect API key rather
+# than an Apple ID, again because a runner cannot answer 2FA. See
+# `testflight-upload` for the three secrets and the one variable it reads.
+#
+# App Store Connect refuses a build number it has already seen for a version,
+# and app.config.js derives `ios.buildNumber` from expo.version, so re-pushing a
+# tag that already uploaded fails in `testflight-upload` and nowhere else. The
+# fix is a new version, not a re-run.
+
+name: iOS Release
+
+on:
+  push:
+    tags:
+      - 'chatroute-v[0-9]+.[0-9]+.[0-9]+'
+      - 'chatroute-development-v[0-9]+.[0-9]+.[0-9]+'
+      - 'chatroute-release-v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build only, upload the IPA as a run artifact and send nothing to App Store Connect
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Same prefix and the same environment mapping as android-release.yml. The
+  # `on.push.tags` patterns above have to agree with it.
+  RELEASE_TAG_PREFIX: chatroute-v
+
+  # Expo SDK 58 needs Xcode 26, and App Store Connect has refused builds made
+  # with an older SDK since April 2026. `build` fails early below this.
+  MIN_XCODE_MAJOR: 26
+
+# `EXPO_PUBLIC_*` values come from the tag's environment, as on Android, and are
+# written into eas.json's `production` profile before the build because EAS lays
+# a profile's `env` over the runner's. `store` extends `production`, so it picks
+# them up. EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID matters at prebuild as well as in the
+# bundle: app.config.js derives the Google sign-in URL scheme from it, and
+# without it Google sign-in on iOS opens and never returns to the app.
+
+jobs:
+  # The tag decides the environment, the same way it does in android-release.yml:
+  #
+  #   chatroute-v<X.Y.Z>              -> Production
+  #   chatroute-development-v<X.Y.Z>  -> Development
+  #   chatroute-release-v<X.Y.Z>      -> Release
+  #
+  # A dispatch from a branch builds with Development's values and uploads
+  # nothing, so a change to this file can be tried without reaching TestFlight.
+  target:
+    name: Resolve environment
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      environment: ${{ steps.pick.outputs.environment }}
+      publish: ${{ steps.pick.outputs.publish }}
+      tag_prefix: ${{ steps.pick.outputs.tag_prefix }}
+      label: ${{ steps.pick.outputs.label }}
+    steps:
+      - id: pick
+        run: |
+          set -euo pipefail
+          PUBLISH=true
+          case "${GITHUB_REF_TYPE}:${GITHUB_REF_NAME}" in
+            tag:chatroute-development-v*) ENVIRONMENT=Development ;;
+            tag:chatroute-release-v*)     ENVIRONMENT=Release ;;
+            tag:chatroute-v*)             ENVIRONMENT=Production ;;
+            *)
+              ENVIRONMENT=Development
+              PUBLISH=false
+              echo "::notice::${GITHUB_REF_NAME} is not a version tag. Building with Development's values and uploading nothing."
+              ;;
+          esac
+
+          if [ "$ENVIRONMENT" = Production ]; then
+            TAG_PREFIX="$RELEASE_TAG_PREFIX"
+            LABEL=""
+          else
+            LOWER="$(printf '%s' "$ENVIRONMENT" | tr '[:upper:]' '[:lower:]')"
+            TAG_PREFIX="${RELEASE_TAG_PREFIX%v}${LOWER}-v"
+            LABEL=" (${ENVIRONMENT})"
+          fi
+
+          {
+            echo "environment=${ENVIRONMENT}"
+            echo "publish=${PUBLISH}"
+            echo "tag_prefix=${TAG_PREFIX}"
+            echo "label=${LABEL}"
+          } >> "$GITHUB_OUTPUT"
+          echo "${GITHUB_REF_NAME} builds for ${ENVIRONMENT}, tag prefix ${TAG_PREFIX}, publish ${PUBLISH}"
+
+  # The checks that are cheap on Linux and expensive to discover after 40 macOS
+  # minutes: a missing variable, a tag that disagrees with app.json, a
+  # Production tag cut off main.
+  meta:
+    name: Check config, resolve version
+    needs: [target]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: ${{ needs.target.outputs.environment }}
+      deployment: false
+
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+      EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
+
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      ipa: ${{ steps.meta.outputs.ipa }}
+      title: ${{ steps.meta.outputs.title }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a Production tag to be on main
+        if: ${{ needs.target.outputs.environment == 'Production' && needs.target.outputs.publish == 'true' }}
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::${GITHUB_REF_NAME} points at ${GITHUB_SHA}, which is not on main. Merge it to main and tag from there."
+            exit 1
+          fi
+
+      # The Google client IDs only warn. Unset, the build still succeeds and
+      # keeps whatever eas.json's production profile says.
+      - name: Require the bundle-time configuration
+        env:
+          ENVIRONMENT: ${{ needs.target.outputs.environment }}
+        run: |
+          if [ -z "$EXPO_PUBLIC_API_URL" ]; then
+            echo "::error::EXPO_PUBLIC_API_URL is not set on the ${ENVIRONMENT} environment. Run: gh variable set EXPO_PUBLIC_API_URL --env ${ENVIRONMENT}"
+            exit 1
+          fi
+          for NAME in EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID; do
+            if [ -z "${!NAME}" ]; then
+              echo "::warning::${NAME} is not set on the ${ENVIRONMENT} environment, so the build uses the value in eas.json's production profile."
+            fi
+          done
+
+      - name: Resolve version and names
+        id: meta
+        env:
+          PUBLISH: ${{ needs.target.outputs.publish }}
+          TAG_PREFIX: ${{ needs.target.outputs.tag_prefix }}
+          LABEL: ${{ needs.target.outputs.label }}
+        run: |
+          set -euo pipefail
+
+          APP_VERSION="$(node -p "require('./app.json').expo.version")"
+          if [ "$PUBLISH" = true ]; then
+            TAG="$GITHUB_REF_NAME"
+            VERSION="${TAG#"$TAG_PREFIX"}"
+          else
+            TAG=""
+            VERSION="$APP_VERSION"
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must be X.Y.Z, got \"$VERSION\". Tags look like ${TAG_PREFIX}1.2.3."
+            exit 1
+          fi
+          if [ "$VERSION" != "$APP_VERSION" ]; then
+            echo "::error::${TAG} says ${VERSION} but expo.version in app.json is ${APP_VERSION}. Delete the tag, commit the bump, and tag again (pnpm release does all three in the right order)."
+            exit 1
+          fi
+
+          APP_NAME="$(node -p "require('./app.json').expo.name")"
+          IPA_BASE="$(printf '%s' "$APP_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]')"
+          if [ -z "$IPA_BASE" ]; then
+            echo "::error::expo.name \"$APP_NAME\" has no alphanumeric characters to build a filename from."
+            exit 1
+          fi
+
+          {
+            echo "version=$VERSION"
+            echo "tag=${TAG}"
+            echo "ipa=${IPA_BASE}-release.ipa"
+            echo "title=${APP_NAME} iOS ${VERSION}${LABEL}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Version $VERSION → tag ${TAG:-none}, asset ${IPA_BASE}-release.ipa"
+
+  # The long one, and the one that costs macOS minutes. It publishes nothing, so
+  # it can be re-run without touching App Store Connect.
+  build:
+    name: Build the IPA
+    needs: [target, meta]
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment:
+      name: ${{ needs.target.outputs.environment }}
+      deployment: false
+
+    env:
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+      EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
+      ARCHIVE: ${{ needs.meta.outputs.ipa }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # The runner image decides which Xcode is the default, and an image update
+      # can change it. Failing here costs a minute; an archive built with the
+      # wrong SDK costs the whole build and is refused at upload.
+      - name: Check Xcode, CocoaPods and fastlane
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          MAJOR="$(xcodebuild -version | awk 'NR==1 { split($2, v, "."); print v[1] }')"
+          if [ "$MAJOR" -lt "$MIN_XCODE_MAJOR" ]; then
+            echo "::error::The default Xcode is ${MAJOR}, and this build needs ${MIN_XCODE_MAJOR} or newer. Pick a newer one with xcode-select in this step, or move runs-on to a newer macOS image."
+            exit 1
+          fi
+          # EAS's local iOS build archives with fastlane and installs pods with
+          # CocoaPods. The runner image ships both; install whichever is missing.
+          command -v pod >/dev/null || brew install cocoapods
+          command -v fastlane >/dev/null || brew install fastlane
+          pod --version
+          fastlane --version | tail -1
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'app.json', 'app.config.js', 'plugins/*.js') }}
+          restore-keys: |
+            pods-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Rewrites the runner's copy of eas.json only; nothing is committed. A
+      # value the environment does not set is left as eas.json has it, which is
+      # what `meta` warned about.
+      - name: Point the production profile at this environment
+        run: |
+          set -euo pipefail
+          jq --arg api "$EXPO_PUBLIC_API_URL" \
+             --arg web "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" \
+             --arg ios "$EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID" \
+            '.build.production.env.EXPO_PUBLIC_API_URL = $api
+             | if $web == "" then . else .build.production.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = $web end
+             | if $ios == "" then . else .build.production.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID = $ios end' \
+            eas.json > "$RUNNER_TEMP/eas.json"
+          mv "$RUNNER_TEMP/eas.json" eas.json
+          jq '.build.production.env' eas.json
+
+      # `store` is the profile with `distribution: store`, which is what makes
+      # EAS sign with the App Store profile rather than an ad hoc one.
+      - name: Build the IPA with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ENVIRONMENT: ${{ needs.target.outputs.environment }}
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "::error::EXPO_TOKEN is not set on the ${ENVIRONMENT} environment. Create one at https://expo.dev/settings/access-tokens and add it with: gh secret set EXPO_TOKEN --env ${ENVIRONMENT}"
+            exit 1
+          fi
+          mkdir -p dist
+          pnpm exec eas build \
+            --platform ios \
+            --profile store \
+            --local \
+            --non-interactive \
+            --output "dist/${ARCHIVE}"
+
+      - name: Check the artifact
+        run: |
+          set -euo pipefail
+          if [ ! -f "dist/${ARCHIVE}" ]; then
+            echo "::error::EAS reported success but dist/${ARCHIVE} is not there."
+            ls -la dist || true
+            exit 1
+          fi
+          ls -lh "dist/${ARCHIVE}"
+
+      # Same check as Android: an unset API URL compiles to `undefined` and the
+      # app dies on launch. An IPA is a zip, and Metro's output sits at
+      # Payload/<name>.app/main.jsbundle.
+      - name: Verify the API URL was inlined into the bundle
+        run: |
+          set -euo pipefail
+          if unzip -p "dist/${ARCHIVE}" 'Payload/*.app/main.jsbundle' | grep -qF "$EXPO_PUBLIC_API_URL"; then
+            echo "EXPO_PUBLIC_API_URL is present in the JS bundle."
+          else
+            echo "::error::EXPO_PUBLIC_API_URL is not in main.jsbundle inside ${ARCHIVE}, so this build would crash on launch or talk to the wrong API."
+            exit 1
+          fi
+
+      # Kept for a week rather than a day, unlike the Android artifacts: the IPA
+      # is not attached to the GitHub Release (an IPA signed for the App Store
+      # installs on no phone directly), so this is the only copy outside App
+      # Store Connect.
+      - name: Upload the IPA for the upload job
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: dist/${{ env.ARCHIVE }}
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  # Sends the IPA to App Store Connect. After Apple processes it (10 to 30
+  # minutes) it appears under TestFlight, and from there it is submitted for
+  # review by hand in App Store Connect.
+  #
+  # Runs on Linux: `eas submit` hands the file to EAS's submission service,
+  # which does the upload, so no Mac is needed here.
+  #
+  # Reads, from the tag's environment:
+  #
+  #   ASC_APP_ID             variable  the app's Apple ID, a number shown under
+  #                                    App Information in App Store Connect
+  #   ASC_API_KEY_ID         secret    the key ID from Users and Access >
+  #                                    Integrations > App Store Connect API
+  #   ASC_API_KEY_ISSUER_ID  secret    the issuer ID on the same page
+  #   ASC_API_KEY_P8         secret    the contents of the downloaded .p8 file
+  #
+  # An environment without ASC_APP_ID skips this job with a warning, so a tag
+  # can build before App Store Connect is set up for it.
+  testflight-upload:
+    name: Upload the IPA to App Store Connect
+    needs: [target, meta, build]
+    if: ${{ needs.target.outputs.publish == 'true' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: ${{ needs.target.outputs.environment }}
+      deployment: false
+
+    steps:
+      - name: Check the App Store Connect settings
+        id: asc
+        env:
+          ENVIRONMENT: ${{ needs.target.outputs.environment }}
+          ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ASC_APP_ID:-}" ]; then
+            echo "::warning::ASC_APP_ID is not set on the ${ENVIRONMENT} environment, so nothing goes to App Store Connect. Run: gh variable set ASC_APP_ID --env ${ENVIRONMENT}"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for NAME in ASC_API_KEY_ID ASC_API_KEY_ISSUER_ID ASC_API_KEY_P8 EXPO_TOKEN; do
+            if [ -z "${!NAME:-}" ]; then
+              echo "::error::${NAME} is not set on the ${ENVIRONMENT} environment. Run: gh secret set ${NAME} --env ${ENVIRONMENT}"
+              exit 1
+            fi
+          done
+          echo "upload=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+
+      - uses: actions/setup-node@v4
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Download the IPA
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa
+          path: dist
+
+      # eas.json has no `submit` section, so this writes one into the runner's
+      # copy. The key file goes to RUNNER_TEMP, outside the checkout, and the
+      # runner is thrown away at the end of the job.
+      - name: Write the submit profile
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+        env:
+          ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          KEY_PATH="$RUNNER_TEMP/AuthKey_${ASC_API_KEY_ID}.p8"
+          printf '%s\n' "$ASC_API_KEY_P8" > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          jq --arg app "$ASC_APP_ID" \
+             --arg path "$KEY_PATH" \
+             --arg id "$ASC_API_KEY_ID" \
+             --arg issuer "$ASC_API_KEY_ISSUER_ID" \
+            '.submit.store.ios = {
+               ascAppId: $app,
+               ascApiKeyPath: $path,
+               ascApiKeyId: $id,
+               ascApiKeyIssuerId: $issuer
+             }' \
+            eas.json > "$RUNNER_TEMP/eas.json"
+          mv "$RUNNER_TEMP/eas.json" eas.json
+
+      - name: Submit to App Store Connect
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          IPA: ${{ needs.meta.outputs.ipa }}
+        run: |
+          pnpm exec eas submit \
+            --platform ios \
+            --profile store \
+            --path "dist/${IPA}" \
+            --non-interactive \
+            --wait
+
+      - name: Summarise
+        if: ${{ steps.asc.outputs.upload == 'true' }}
+        env:
+          TITLE: ${{ needs.meta.outputs.title }}
+        run: |
+          {
+            echo "### ${TITLE} sent to App Store Connect"
+            echo
+            echo "It appears under TestFlight once Apple finishes processing, usually 10 to 30 minutes. Submit it for review from App Store Connect."
+          } >> "$GITHUB_STEP_SUMMARY"
