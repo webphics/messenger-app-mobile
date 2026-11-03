@@ -11,13 +11,16 @@ const AGENT: SessionUser = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: true,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
 };
 
 test("a kept person comes back exactly as they went in", () => {
   expect(parseKeptPerson(serialiseKeptPerson(AGENT))).toEqual(AGENT);
 });
 
-test("only the four identity fields and the assignment switch are written down", () => {
+test("only the identity fields, the profile and the assignment switch are written down", () => {
   const written = serialiseKeptPerson({
     ...AGENT,
     hasPassword: true,
@@ -30,7 +33,29 @@ test("only the four identity fields and the assignment switch are written down",
     name: AGENT.name,
     email: AGENT.email,
     role: AGENT.role,
+    username: null,
+    phone: null,
+    image: null,
     supportAssignmentEnabled: true,
+  });
+});
+
+test("the profile survives the keystore, so an offline launch still draws the photo", () => {
+  const profiled = {
+    ...AGENT,
+    username: "qa_agent",
+    phone: "+447700900123",
+    image: "/uploads/avatars/qa.png",
+  };
+  expect(parseKeptPerson(serialiseKeptPerson(profiled))).toEqual(profiled);
+});
+
+test("a person kept by a build from before the profile was written down has none", () => {
+  const { username: _u, phone: _p, image: _i, ...older } = AGENT;
+  expect(parseKeptPerson(JSON.stringify(older))).toMatchObject({
+    username: null,
+    phone: null,
+    image: null,
   });
 });
 

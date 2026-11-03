@@ -153,6 +153,9 @@ const PARSED_USER = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
   termsAcceptedAt: "2026-10-31T10:00:00.000Z",
 };
 

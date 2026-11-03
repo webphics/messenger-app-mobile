@@ -15,6 +15,9 @@ const AGENT: SessionUser = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
 };
 
 const signedIn = (role: UserRole): AuthState => ({

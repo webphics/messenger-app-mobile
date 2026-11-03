@@ -13,6 +13,21 @@ export type SessionUser = {
   email: string
   role: UserRole
   /**
+   * The login identifier, lower-case, editable on the profile screen. Not a
+   * display name: `name` is what a person reads. Null only on an account that
+   * predates the API's backfill.
+   */
+  username: string | null
+  /** In international form, e.g. `+447700900123`, or null when there is none. */
+  phone: string | null
+  /**
+   * The profile photo as the API stores it: a path under `/uploads/avatars` for
+   * one uploaded here or on the web, or an absolute URL for one a Google sign-in
+   * brought. Never drawn as it stands; `profilePhotoUri` in `lib/profile-rules`
+   * joins a path to the API origin.
+   */
+  image: string | null
+  /**
    * Whether this account has a password at all, which is what the password
    * screen reads to decide whether it is setting a first one or changing an
    * existing one.
