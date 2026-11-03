@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
+  expo-router@58.0.28: f04df5ef5062df7d13e6775d7845e7ba03cae8bfc70887bc10f354d3febea258
   rn-emoji-keyboard@1.7.0: 060f03338b0ec5d50d2f6e3e73d2d2413d9fc02772e27fb6911f3a1806f62e92
 
 importers:
@@ -94,7 +95,7 @@ importers:
         version: 58.1.7(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
       expo-router:
         specifier: ~58.0.28
-        version: 58.0.28(98fb05baf913bdee09243c29cdf8e758)
+        version: 58.0.28(patch_hash=f04df5ef5062df7d13e6775d7845e7ba03cae8bfc70887bc10f354d3febea258)(98fb05baf913bdee09243c29cdf8e758)
       expo-secure-store:
         specifier: ~58.0.2
         version: 58.0.2(expo@58.0.21)
@@ -7382,7 +7383,7 @@ snapshots:
       ws: 8.22.0
       zod: 3.25.76
     optionalDependencies:
-      expo-router: 58.0.28(98fb05baf913bdee09243c29cdf8e758)
+      expo-router: 58.0.28(patch_hash=f04df5ef5062df7d13e6775d7845e7ba03cae8bfc70887bc10f354d3febea258)(98fb05baf913bdee09243c29cdf8e758)
       react-native: 0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0)
     transitivePeerDependencies:
       - '@expo/dom-webview'
@@ -7980,7 +7981,7 @@ snapshots:
       react: 19.3.0
     optionalDependencies:
       '@expo/metro-runtime': 58.0.15(@expo/log-box@58.0.13)(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
-      expo-router: 58.0.28(98fb05baf913bdee09243c29cdf8e758)
+      expo-router: 58.0.28(patch_hash=f04df5ef5062df7d13e6775d7845e7ba03cae8bfc70887bc10f354d3febea258)(98fb05baf913bdee09243c29cdf8e758)
       react-dom: 19.3.0(react@19.3.0)
     transitivePeerDependencies:
       - supports-color
@@ -10877,7 +10878,7 @@ snapshots:
       - supports-color
       - typescript
 
-  expo-router@58.0.28(98fb05baf913bdee09243c29cdf8e758):
+  expo-router@58.0.28(patch_hash=f04df5ef5062df7d13e6775d7845e7ba03cae8bfc70887bc10f354d3febea258)(98fb05baf913bdee09243c29cdf8e758):
     dependencies:
       '@expo/log-box': 58.0.13(@expo/dom-webview@58.0.2)(expo@58.0.21)(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       '@expo/metro-runtime': 58.0.15(@expo/log-box@58.0.13)(expo@58.0.21)(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
