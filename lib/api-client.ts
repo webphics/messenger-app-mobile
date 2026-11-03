@@ -3,6 +3,7 @@ import { File, UploadType } from "expo-file-system";
 import { API_BASE_URL } from "@/lib/api-config";
 import { asRecord, CSRF_REFUSED_CODE } from "@/lib/api-envelope";
 import { appVersionHeaders, readUpdateRefusal, setUpdateState } from "@/lib/app-update";
+import { userAgentHeaders } from "@/lib/app-user-agent";
 import type { HttpOutcome } from "@/lib/auth-response";
 
 /**
@@ -221,7 +222,7 @@ async function fetchCsrfPair(): Promise<CsrfPair | null> {
   return underDeadline(async ({ signal }) => {
     const response = await fetch(`${API_BASE_URL}${CSRF_PATH}`, {
       method: "GET",
-      headers: { Accept: "application/json", ...appVersionHeaders() },
+      headers: { Accept: "application/json", ...appVersionHeaders(), ...userAgentHeaders() },
       credentials: "omit",
       signal,
     });
@@ -312,10 +313,12 @@ function requestBody(attempt: Attempt): { body?: string } {
 /** The Session cookie and the CSRF pair, however the request is about to travel. */
 function credentialHeaders(attempt: Attempt, csrf: CsrfPair | null): Record<string, string> {
   // The version pair rides on every request so the API can refuse a build it no
-  // longer serves; see `lib/app-update`.
+  // longer serves; see `lib/app-update`. The User-Agent is what the API's
+  // sessions list names this device by; see `lib/user-agent`.
   const headers: Record<string, string> = {
     Accept: "application/json",
     ...appVersionHeaders(),
+    ...userAgentHeaders(),
   };
   if (csrf) headers[CSRF_HEADER] = csrf.token;
 
