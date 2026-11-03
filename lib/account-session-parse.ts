@@ -48,6 +48,7 @@ export function parseAccountSession(value: unknown): AccountSession | null {
     // `lib/account-session-rows` rather than here.
     deviceName: text(record.deviceName) ?? '',
     deviceType: text(record.deviceType) ?? '',
+    userAgent: text(record.userAgent),
     ipAddress: text(record.ipAddress),
     loginMethod: text(record.loginMethod),
     isCurrent: record.isCurrent === true,
