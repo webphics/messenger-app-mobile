@@ -2,6 +2,7 @@ import { File, UploadType } from "expo-file-system";
 
 import { API_BASE_URL } from "@/lib/api-config";
 import { asRecord, CSRF_REFUSED_CODE } from "@/lib/api-envelope";
+import { appVersionHeaders, readUpdateRefusal, setUpdateState } from "@/lib/app-update";
 import type { HttpOutcome } from "@/lib/auth-response";
 
 /**
@@ -220,7 +221,7 @@ async function fetchCsrfPair(): Promise<CsrfPair | null> {
   return underDeadline(async ({ signal }) => {
     const response = await fetch(`${API_BASE_URL}${CSRF_PATH}`, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...appVersionHeaders() },
       credentials: "omit",
       signal,
     });
@@ -310,7 +311,12 @@ function requestBody(attempt: Attempt): { body?: string } {
 
 /** The Session cookie and the CSRF pair, however the request is about to travel. */
 function credentialHeaders(attempt: Attempt, csrf: CsrfPair | null): Record<string, string> {
-  const headers: Record<string, string> = { Accept: "application/json" };
+  // The version pair rides on every request so the API can refuse a build it no
+  // longer serves; see `lib/app-update`.
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    ...appVersionHeaders(),
+  };
   if (csrf) headers[CSRF_HEADER] = csrf.token;
 
   // Both halves of the double submit travel in one header, beside the Session
@@ -520,6 +526,12 @@ export async function apiRequest(
   }
 
   if (!answer) return { reached: false };
+
+  // Reported here rather than by each caller, because any request can be the
+  // one that learns this build is no longer served. The caller still gets the
+  // answer and reads it as the failure it is; the update screen covers it.
+  const refusal = readUpdateRefusal(answer.status, answer.body);
+  if (refusal) setUpdateState(refusal);
 
   return {
     reached: true,
