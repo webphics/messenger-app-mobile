@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, View, type TextInputInstance } from "rea
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AlertCircle, Check, Eye, EyeOff } from "@/components/icons";
+import { ForgotPasswordLink } from "@/components/auth/forgot-password-link";
 import { InScreenHeader } from "@/components/in-screen-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +14,6 @@ import { useAuth } from "@/lib/auth-context";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { changePassword, setPassword } from "@/lib/password-api";
-import {
-  requestPasswordReset,
-  resetRequestNotice,
-  type ResetRequestOutcome,
-} from "@/lib/password-reset-api";
 import {
   checkPassword,
   EMPTY_PASSWORD_DRAFT,
@@ -193,93 +189,6 @@ function PasswordInput({
         <Text variant="label" className="mt-1.5 font-normal leading-5 text-muted">
           {PASSWORD_LENGTH_RULE}
         </Text>
-      ) : null}
-    </View>
-  );
-}
-
-/**
- * The way out for somebody who cannot prove the current password: email a
- * reset link to the address they are signed in with, which they are not asked
- * to type, since the app already has it.
- *
- * The link opens the web page that sets the password, so nothing on this
- * screen changes when it succeeds. What it owes the person is the sentence
- * saying where the link went and where it leads, which `lib/password-reset-api`
- * words, and which stays until they leave. The control stays too, because
- * asking again is a fair answer to an email that never arrived and the rate
- * limit is the API's to apply.
- */
-function ForgotPassword({ email }: { email: string }) {
-  const [sending, setSending] = useState(false);
-  const [outcome, setOutcome] = useState<ResetRequestOutcome | null>(null);
-
-  const live = useRef(true);
-  useEffect(() => {
-    live.current = true;
-    return () => {
-      live.current = false;
-    };
-  }, []);
-
-  const onPress = useCallback(() => {
-    if (sending) return;
-    setSending(true);
-    setOutcome(null);
-
-    void requestPasswordReset(email).then((next) => {
-      if (!live.current) return;
-      setSending(false);
-      setOutcome(next);
-      if (next.kind === "sent") hapticSuccess();
-      else hapticWarning();
-    });
-  }, [email, sending]);
-
-  const notice = outcome ? resetRequestNotice(outcome, email) : null;
-  const sent = outcome?.kind === "sent";
-
-  return (
-    <View className="mt-1.5">
-      <TactilePressable
-        accessibilityRole="button"
-        accessibilityLabel="Forgot password?"
-        accessibilityHint={`Emails a link for setting a new password to ${email}`}
-        accessibilityState={{ disabled: sending, busy: sending }}
-        // Disabled only while the request is out, like the submit button.
-        disabled={sending}
-        onPress={onPress}
-        className="min-h-11 flex-row items-center gap-2 self-start"
-      >
-        <Text variant="label" className="text-primary">
-          Forgot password?
-        </Text>
-        {sending ? <ActivityIndicator color={colors.primary} size="small" /> : null}
-      </TactilePressable>
-
-      {notice ? (
-        <View
-          className={
-            sent
-              ? "mt-1 flex-row items-start gap-2.5 rounded-2xl border border-line/70 bg-primary-soft/40 p-3.5"
-              : "mt-1 flex-row items-start gap-2.5 rounded-2xl border border-danger/30 bg-surface p-3.5"
-          }
-        >
-          <View className="mt-0.5">
-            {sent ? (
-              <Check color={colors.primary} size={16} />
-            ) : (
-              <AlertCircle color={colors.danger} size={16} />
-            )}
-          </View>
-          <Text
-            accessibilityLiveRegion="polite"
-            variant="label"
-            className={`min-w-0 flex-1 font-normal leading-5 ${sent ? "text-ink" : "text-danger"}`}
-          >
-            {notice}
-          </Text>
-        </View>
       ) : null}
     </View>
   );
@@ -480,7 +389,7 @@ export function AccountPasswordScreen() {
               {/* Under the field it rescues. An account with no address has
                   nowhere to send a link, so it draws nothing rather than a
                   control that can only fail. */}
-              {email ? <ForgotPassword email={email} /> : null}
+              {email ? <ForgotPasswordLink email={email} audience="own" /> : null}
             </>
           ) : null}
 

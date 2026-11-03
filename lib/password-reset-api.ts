@@ -4,8 +4,9 @@ import type { HttpOutcome } from "@/lib/auth-response";
 import { authenticatedRequest } from "@/lib/auth-service";
 
 /**
- * Asking the API to email a password-reset link, for somebody on the Change
- * password screen who does not remember the password it asks them to prove.
+ * Asking the API to email a password-reset link: for somebody on the Change
+ * password screen who does not remember the password it asks them to prove, and
+ * for somebody on the sign-in password step who does not remember theirs.
  *
  * The link is the whole of the recovery, and none of it happens in this app:
  * it points at `https://thechatroute.com/reset-password?token=…`, the new
@@ -15,7 +16,7 @@ import { authenticatedRequest } from "@/lib/auth-service";
  *
  * `authenticatedRequest` like `lib/password-api`, although the route itself
  * asks for no session: it is the transport that holds the CSRF pair and the
- * deadline, and the person asking is signed in anyway.
+ * deadline, and with no session it sends the request all the same.
  *
  * ## Four outcomes rather than `ApiResult`'s two
  *
@@ -26,7 +27,8 @@ import { authenticatedRequest } from "@/lib/auth-service";
  *
  * `data: { sent: true }` is the API's answer whether or not the address has an
  * account, so `sent` means "nothing went wrong" and never "an account exists".
- * Here the address is the signed-in person's own, so the difference is moot.
+ * On Change password the address is the signed-in person's own, so the
+ * difference is moot; on sign-in it is not, which is `ResetAudience`.
  */
 
 const FORGOT_PASSWORD_PATH = "/auth/password/forgot";
@@ -68,6 +70,18 @@ export async function requestPasswordReset(email: string): Promise<ResetRequestO
 }
 
 /**
+ * Whose address the link was asked for. `own` is the signed-in person's, on
+ * Change password. `typed` is whatever was entered on sign-in, which may belong
+ * to nobody, so the sentence says "if" rather than telling a stranger whether
+ * the address has an account.
+ */
+export type ResetAudience = "own" | "typed";
+
+/** Sign-in accepts a username, but reset links only go to an address. */
+export const USERNAME_RESET_NOTICE =
+  "Reset links go to an email address. Change it to the email you sign in with, then tap Forgot password? again.";
+
+/**
  * What the screen says once a request has settled. Null for an expired
  * session, the convention every write here follows: the auth layer is already
  * on its way to sign-in.
@@ -79,10 +93,13 @@ export async function requestPasswordReset(email: string): Promise<ResetRequestO
 export function resetRequestNotice(
   outcome: ResetRequestOutcome,
   email: string,
+  audience: ResetAudience = "own",
 ): string | null {
   switch (outcome.kind) {
     case "sent":
-      return `A link to set a new password is on its way to ${email.trim()}. Open it on this phone or a computer, and set the new password in your browser. The link works once and expires after an hour.`;
+      return audience === "own"
+        ? `A link to set a new password is on its way to ${email.trim()}. Open it on this phone or a computer, and set the new password in your browser. The link works once and expires after an hour.`
+        : `If ${email.trim()} has an account, a link to set a new password is on its way. Open it on this phone or a computer, and set the new password in your browser. The link works once and expires after an hour.`;
     case "rate-limited": {
       if (outcome.retryAfterSeconds === null) {
         return "Too many reset emails have been asked for. Wait a few minutes, then try again.";
