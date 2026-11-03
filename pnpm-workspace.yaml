@@ -43,5 +43,12 @@ allowedDeprecatedVersions:
 # React Native 0.88 removed: a release build reads it as undefined and crashes the
 # moment the emoji panel opens. The patch defers with setTimeout instead. Drop it
 # once a release stops importing InteractionManager.
+#
+# expo-router 58.0.28 unbinds its global router whenever any navigation root
+# unmounts. Android recreates the activity on a font or display size change, the
+# new root binds before the old one goes, and the old one's cleanup then left the
+# router throwing for the rest of the session. The patch unbinds only when the
+# last root goes. Drop it once expo-router counts its bridges itself.
 patchedDependencies:
+  expo-router@58.0.28: patches/expo-router@58.0.28.patch
   rn-emoji-keyboard@1.7.0: patches/rn-emoji-keyboard@1.7.0.patch
