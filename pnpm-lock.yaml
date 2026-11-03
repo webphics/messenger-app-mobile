@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  rn-emoji-keyboard@1.7.0: 060f03338b0ec5d50d2f6e3e73d2d2413d9fc02772e27fb6911f3a1806f62e92
+
 importers:
 
   .:
@@ -148,7 +151,7 @@ importers:
         version: 0.13.0(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       rn-emoji-keyboard:
         specifier: 1.7.0
-        version: 1.7.0(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
+        version: 1.7.0(patch_hash=060f03338b0ec5d50d2f6e3e73d2d2413d9fc02772e27fb6911f3a1806f62e92)(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)
       socket.io-client:
         specifier: ^4.8.4
         version: 4.8.4
@@ -13570,7 +13573,7 @@ snapshots:
       glob: 6.0.4
     optional: true
 
-  rn-emoji-keyboard@1.7.0(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0):
+  rn-emoji-keyboard@1.7.0(patch_hash=060f03338b0ec5d50d2f6e3e73d2d2413d9fc02772e27fb6911f3a1806f62e92)(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0):
     dependencies:
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0)
