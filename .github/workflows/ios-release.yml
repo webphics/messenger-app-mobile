@@ -229,6 +229,7 @@ jobs:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
       EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID }}
+      EXPO_PUBLIC_MAGIC_LINK_ORIGIN: ${{ vars.EXPO_PUBLIC_MAGIC_LINK_ORIGIN }}
       ARCHIVE: ${{ needs.meta.outputs.ipa }}
 
     steps:
@@ -273,16 +274,21 @@ jobs:
 
       # Rewrites the runner's copy of eas.json only; nothing is committed. A
       # value the environment does not set is left as eas.json has it, which is
-      # what `meta` warned about.
+      # what `meta` warned about. An unset magic-link origin falls back to the
+      # app's own scheme (`lib/magic-link-config.ts`); an HTTPS one needs the
+      # Associated Domains entitlement and the apple-app-site-association file
+      # before the link opens the app (docs/store/ios/publishing.md, step 4).
       - name: Point the production profile at this environment
         run: |
           set -euo pipefail
           jq --arg api "$EXPO_PUBLIC_API_URL" \
              --arg web "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" \
              --arg ios "$EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID" \
+             --arg magic "$EXPO_PUBLIC_MAGIC_LINK_ORIGIN" \
             '.build.production.env.EXPO_PUBLIC_API_URL = $api
              | if $web == "" then . else .build.production.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = $web end
-             | if $ios == "" then . else .build.production.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID = $ios end' \
+             | if $ios == "" then . else .build.production.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID = $ios end
+             | if $magic == "" then . else .build.production.env.EXPO_PUBLIC_MAGIC_LINK_ORIGIN = $magic end' \
             eas.json > "$RUNNER_TEMP/eas.json"
           mv "$RUNNER_TEMP/eas.json" eas.json
           jq '.build.production.env' eas.json

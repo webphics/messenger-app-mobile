@@ -360,6 +360,7 @@ jobs:
     env:
       EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
       EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ vars.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
+      EXPO_PUBLIC_MAGIC_LINK_ORIGIN: ${{ vars.EXPO_PUBLIC_MAGIC_LINK_ORIGIN }}
       # The file this leg produces, named once for every step below.
       ARCHIVE: ${{ matrix.format == 'aab' && needs.meta.outputs.aab || needs.meta.outputs.apk }}
 
@@ -420,16 +421,24 @@ jobs:
       # A Google client ID that is not set is removed rather than written as an
       # empty string, which is the "Google sign-in is disabled" case `meta`
       # warns about.
+      #
+      # The magic-link origin is written only when the environment sets one.
+      # Unset, the app falls back to its own scheme from app.json
+      # (`lib/magic-link-config.ts`), which is the same `chatroute://` the
+      # Production environment sets today. Setting the variable to an HTTPS
+      # origin is how the switch to app links happens, with no edit here.
       - name: Point the production profile at this environment
         run: |
           set -euo pipefail
           jq --arg api "$EXPO_PUBLIC_API_URL" \
              --arg google "$EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID" \
+             --arg magic "$EXPO_PUBLIC_MAGIC_LINK_ORIGIN" \
             '.build.production.env.EXPO_PUBLIC_API_URL = $api
              | if $google == ""
                then del(.build.production.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID)
                else .build.production.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = $google
-               end' \
+               end
+             | if $magic == "" then . else .build.production.env.EXPO_PUBLIC_MAGIC_LINK_ORIGIN = $magic end' \
             eas.json > "$RUNNER_TEMP/eas.json"
           mv "$RUNNER_TEMP/eas.json" eas.json
           jq '.build.production.env' eas.json
