@@ -38,6 +38,9 @@ const WITHOUT_PASSWORD = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
 };
 
 const WITH_PASSWORD = { ...WITHOUT_PASSWORD, hasPassword: true };

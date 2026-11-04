@@ -26,6 +26,12 @@ describe('parseAccountSession', () => {
     expect(parseAccountSession({ ...ROW, id: 42 })).toBeNull()
   })
 
+  test('keeps the raw user agent, which is how this app is told apart from a browser', () => {
+    expect(parseAccountSession(ROW)?.userAgent).toBe('Mozilla/5.0 (Windows NT 11.0) Chrome/140')
+    expect(parseAccountSession({ ...ROW, userAgent: null })?.userAgent).toBeNull()
+    expect(parseAccountSession({ ...ROW, userAgent: 42 })?.userAgent).toBeNull()
+  })
+
   test('takes only a true as this device, never a truthy value', () => {
     expect(parseAccountSession({ ...ROW, isCurrent: true })?.isCurrent).toBe(true)
     expect(parseAccountSession({ ...ROW, isCurrent: 'yes' })?.isCurrent).toBe(false)

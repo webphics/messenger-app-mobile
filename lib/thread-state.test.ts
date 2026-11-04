@@ -19,7 +19,9 @@ import {
   threadMessages,
   visibleMessages,
   withdrawSend,
+  withoutMessages,
   withoutSenders,
+  vanishedFromNewestPage,
   isFinalSendRefusal,
 } from '@/lib/thread-state'
 import { parseMessageCreated } from '@/lib/realtime-events'
@@ -1017,5 +1019,59 @@ describe('a send refused for good', () => {
     const sending = beginSend(emptyThread(), message)
     expect(withdrawSend(sending, 'local:1').unsent).toEqual([])
     expect(withdrawSend(sending, 'local:2')).toBe(sending)
+  })
+})
+
+describe('withoutMessages', () => {
+  test('drops a deleted Message and the quote of it a reply carried', () => {
+    const state = {
+      ...emptyThread(),
+      messages: [
+        customerMessage('m1', '2026-08-13T08:00:00.000Z'),
+        customerMessage('m2', '2026-08-13T08:00:01.000Z', {
+          replyTo: { id: 'm1', preview: 'the deleted words' },
+        }),
+      ],
+    }
+
+    const next = withoutMessages(state, ['m1'])
+
+    expect(next.messages.map((message) => message.id)).toEqual(['m2'])
+    expect(next.messages[0].replyTo).toBeNull()
+  })
+
+  test('leaves a thread that never held the Message as it was', () => {
+    const state = { ...emptyThread(), messages: [customerMessage('m1', '2026-08-13T08:00:00.000Z')] }
+
+    expect(withoutMessages(state, ['elsewhere'])).toBe(state)
+  })
+})
+
+describe('vanishedFromNewestPage', () => {
+  const held = [
+    customerMessage('old', '2026-08-13T07:00:00.000Z'),
+    customerMessage('edge', '2026-08-13T08:00:00.000Z'),
+    customerMessage('m1', '2026-08-13T08:00:00.000Z'),
+    customerMessage('deleted', '2026-08-13T08:00:01.000Z'),
+    customerMessage('m2', '2026-08-13T08:00:02.000Z'),
+    customerMessage('deleted-newest', '2026-08-13T08:00:03.000Z'),
+  ]
+  const page = [
+    customerMessage('m1', '2026-08-13T08:00:00.000Z'),
+    customerMessage('m2', '2026-08-13T08:00:02.000Z'),
+  ]
+
+  test('names what the page covers and no longer has, the newest Message included', () => {
+    expect(vanishedFromNewestPage(held, page)).toEqual(['deleted', 'deleted-newest'])
+  })
+
+  test('says nothing about history older than the page, or tied with its oldest', () => {
+    const vanished = vanishedFromNewestPage(held, page)
+    expect(vanished).not.toContain('old')
+    expect(vanished).not.toContain('edge')
+  })
+
+  test('says nothing for an empty page, which rebuilds the thread anyway', () => {
+    expect(vanishedFromNewestPage(held, [])).toEqual([])
   })
 })

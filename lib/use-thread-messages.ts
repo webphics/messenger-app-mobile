@@ -12,7 +12,12 @@ import {
 } from '@/lib/conversation-api'
 import { assignmentSwitchedOnNotice } from '@/lib/conversation-failure'
 import { messageEditRefusal, withRefreshedQuotes } from '@/lib/message-edit'
-import { restoreOlderMessages, restoreThread, saveThread } from '@/lib/conversation-store'
+import {
+  forgetMessages,
+  restoreOlderMessages,
+  restoreThread,
+  saveThread,
+} from '@/lib/conversation-store'
 import { missingStagedFiles } from '@/lib/staged-file'
 import { isDeviceUri, missingFilesMessage, sendMessageType } from '@/lib/attachment-upload'
 import {
@@ -38,7 +43,9 @@ import {
   refuseSend,
   LOCAL_ID_PREFIX,
   threadMessages,
+  vanishedFromNewestPage,
   withdrawSend,
+  withoutMessages,
   withoutSenders,
   type DeliveryState,
   type MessageAuthor,
@@ -349,6 +356,9 @@ export function useThreadMessages(
       if (!conversationId || !viewer) return
       if (inFlight.current) return
       inFlight.current = true
+      // What was held before asking, so a Message the socket delivers while the
+      // request is out is not read as deleted. See `vanishedFromNewestPage`.
+      const heldBefore = held.current.messages
 
       const page = await listMessages(conversationId, cursor ? { cursor } : {})
       inFlight.current = false
@@ -363,16 +373,18 @@ export function useThreadMessages(
       }
 
       setFailure(null)
+      const vanished = cursor ? [] : vanishedFromNewestPage(heldBefore, page.value)
       setState((thread) =>
         cursor
           ? applyMessagePage(thread, page.value, viewer)
-          : applyNewestPage(thread, page.value, viewer),
+          : applyNewestPage(withoutMessages(thread, vanished), page.value, viewer),
       )
+      if (ownerId) void forgetMessages(ownerId, conversationId, vanished)
       setLoading(false)
       setLoadingOlder(false)
       setRefreshing(false)
     },
-    [conversationId, viewer],
+    [conversationId, ownerId, viewer],
   )
 
   useEffect(() => {
@@ -497,6 +509,14 @@ export function useThreadMessages(
     // thread needs: the message itself is already here, and re-reading the
     // whole thread for a row's preview would put the largest request in the app
     // on the path of every message anyone sends.
+    if (event.kind === 'message-deleted') {
+      // The disk is the Conversation list's to clear, since it hears this
+      // whether or not the thread is open. See `lib/conversation-inbox`.
+      if (event.conversationId === conversationId) {
+        setState((thread) => withoutMessages(thread, [event.messageId]))
+      }
+      return
+    }
     if (event.kind !== 'message') return
     if (event.conversationId !== conversationId || !viewer) return
 

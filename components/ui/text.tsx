@@ -1,3 +1,4 @@
+import { capsText } from '@/lib/caps-text';
 import { cn } from '@/lib/cn';
 import { Slot } from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
@@ -61,12 +62,20 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot : RNText;
+  const merged = cn(textVariants({ variant }), textClass, className);
+  // `uppercase` is applied to the string rather than left to `textTransform`,
+  // which Android measures before it applies — see `lib/caps-text`.
+  const caps = asChild ? null : capsText(merged, props.children);
   return (
     <Component
-      className={cn(textVariants({ variant }), textClass, className)}
+      className={caps?.className ?? merged}
       role={variant ? ROLE[variant] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant] : undefined}
+      aria-label={
+        props['aria-label'] ?? props.accessibilityLabel ?? (caps?.label || undefined)
+      }
       {...props}
+      {...(caps ? { children: caps.children } : null)}
     />
   );
 }

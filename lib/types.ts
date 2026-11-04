@@ -13,6 +13,21 @@ export type SessionUser = {
   email: string
   role: UserRole
   /**
+   * The login identifier, lower-case, editable on the profile screen. Not a
+   * display name: `name` is what a person reads. Null only on an account that
+   * predates the API's backfill.
+   */
+  username: string | null
+  /** In international form, e.g. `+447700900123`, or null when there is none. */
+  phone: string | null
+  /**
+   * The profile photo as the API stores it: a path under `/uploads/avatars` for
+   * one uploaded here or on the web, or an absolute URL for one a Google sign-in
+   * brought. Never drawn as it stands; `profilePhotoUri` in `lib/profile-rules`
+   * joins a path to the API origin.
+   */
+  image: string | null
+  /**
    * Whether this account has a password at all, which is what the password
    * screen reads to decide whether it is setting a first one or changing an
    * existing one.
@@ -1094,9 +1109,7 @@ export type AppNotification = {
  * One session on this account, as `GET /sessions` answers it.
  *
  * The sessions screen's shape rather than the API's whole row. What is dropped
- * is what nothing on a phone reads: the raw `userAgent`, which is the string
- * `deviceName` and `deviceType` were derived from and is 200 characters of
- * nothing a person recognises themselves by; `expiresAt`, which is the API's
+ * is what nothing on a phone reads: `expiresAt`, which is the API's
  * own bookkeeping and not a fact about a device; and `status` with `isRevoked`,
  * because this screen asks for active sessions only, so every row it holds is
  * active by construction. See
@@ -1112,6 +1125,11 @@ export type AccountSession = {
   deviceName: string
   /** `desktop`, `mobile`, `tablet` or `unknown`. */
   deviceType: string
+  /**
+   * The raw string the two above were derived from, which the API's sniffing
+   * cannot read when it is this app's. `lib/user-agent` reads it first.
+   */
+  userAgent: string | null
   ipAddress: string | null
   /** `email`, `magic-link`, `google`, or null for a session that predates the column. */
   loginMethod: string | null

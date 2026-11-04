@@ -1,6 +1,7 @@
 import { io, type Socket } from 'socket.io-client'
 
 import { API_BASE_URL } from '@/lib/api-config'
+import { userAgentHeaders } from '@/lib/app-user-agent'
 import { REALTIME_NAMESPACE } from '@/lib/realtime-events'
 
 /**
@@ -56,7 +57,10 @@ export function connectRealtime(
     // and empty is what a client with no web origin honestly has: the server
     // reads it as absent, which is the case it already allows. See
     // `docs/adr/ADR-0006-the-socket-carries-the-session-cookie.md`.
-    extraHeaders: { Cookie: sessionCookie, origin: '' },
+    //
+    // The User-Agent is the one every REST request carries, so the handshake
+    // names the same device; see `lib/user-agent`.
+    extraHeaders: { Cookie: sessionCookie, origin: '', ...userAgentHeaders() },
     forceNew: options.forceNew ?? false,
   })
 }

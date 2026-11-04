@@ -18,8 +18,13 @@ import type { SessionUser } from "@/lib/types";
  */
 
 /**
- * The four identity fields and the assignment switch, and nothing incidental
- * that happens to be on the object.
+ * The four identity fields, the profile, and the assignment switch, and nothing
+ * incidental that happens to be on the object.
+ *
+ * The profile — username, phone, photo — is kept because the Settings header
+ * and the profile screen draw it, and an offline cold start that dropped it
+ * would show initials over a photo this device has already cached, and open
+ * the profile form with a blank phone that a save would then write back.
  *
  * The switch is the one field here that is not about who somebody is. It is
  * kept because it decides the shape of every staff screen — whether there is
@@ -28,8 +33,19 @@ import type { SessionUser } from "@/lib/types";
  * until the API confirms which it is.
  */
 export function serialiseKeptPerson(user: SessionUser): string {
-  const { id, name, email, role, supportAssignmentEnabled, termsAcceptedAt } = user;
-  return JSON.stringify({ id, name, email, role, supportAssignmentEnabled, termsAcceptedAt });
+  const { id, name, email, role, username, phone, image, supportAssignmentEnabled, termsAcceptedAt } =
+    user;
+  return JSON.stringify({
+    id,
+    name,
+    email,
+    role,
+    username,
+    phone,
+    image,
+    supportAssignmentEnabled,
+    termsAcceptedAt,
+  });
 }
 
 /** The kept person, or null when there is none and when what is there is not one. */

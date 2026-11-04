@@ -1,5 +1,6 @@
-import { LogOut } from "@/components/icons";
+import { ChevronRight, LogOut } from "@/components/icons";
 import Constants from "expo-constants";
+import { router } from "expo-router";
 import { ScrollView, View } from "react-native";
 
 import { AccountCard } from "@/components/settings/account-card";
@@ -7,13 +8,13 @@ import { InvitationsCard } from "@/components/settings/invitations-card";
 import { LegalCard } from "@/components/settings/legal-card";
 import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
 import { PostNotificationsCard } from "@/components/settings/post-notifications-card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ProfilePhoto } from "@/components/settings/profile-photo";
 import { Button } from "@/components/ui/button";
+import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { confirmSignOut } from "@/lib/confirm-sign-out";
 import { getDevUser } from "@/lib/dev-user";
-import { initials } from "@/lib/display";
 import { hubEyebrow } from "@/lib/hub-chrome";
 import {
   makeRefreshControl,
@@ -43,16 +44,17 @@ export function SettingsScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={makeRefreshControl(refreshing, onRefresh)}
     >
-      <View
+      {/* The way into the profile screen, and the card that shows the
+          photo it changes. `accountUpdated` redraws it the moment a save
+          there lands, which is why it reads the provider. */}
+      <TactilePressable
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}, edit profile`}
+        accessibilityHint="Change your name, username, phone and photo."
+        onPress={() => router.push("/account/profile")}
         className="flex-row items-center gap-3.5 rounded-3xl border border-line bg-surface p-4 shadow-md shadow-black/5"
       >
-        <Avatar alt={displayName} className="size-14">
-          <AvatarFallback className="bg-primary-soft">
-            <Text variant="headline" className="text-primary">
-              {initials(displayName)}
-            </Text>
-          </AvatarFallback>
-        </Avatar>
+        <ProfilePhoto name={displayName} image={account?.image} className="size-14" />
 
         <View className="min-w-0 flex-1">
           <Text variant="headline" className="text-ink" numberOfLines={1}>
@@ -73,7 +75,9 @@ export function SettingsScreen() {
             </Text>
           </View>
         </View>
-      </View>
+
+        <ChevronRight color={colors.muted} size={18} />
+      </TactilePressable>
 
       {/* Above Application because it is the one thing here that is waiting
           on an answer, and it draws nothing at all when there is none. */}

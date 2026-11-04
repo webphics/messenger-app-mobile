@@ -18,7 +18,7 @@ import {
   type ApiFailure,
   type ApiResult,
 } from '@/lib/conversation-api'
-import { restoreStore, saveStore } from '@/lib/conversation-store'
+import { forgetMessages, restoreStore, saveStore } from '@/lib/conversation-store'
 import {
   mergeConversation,
   sortConversations,
@@ -150,6 +150,8 @@ function applyToList(
   if (event.kind === 'deleted') return withoutConversation(conversations, event.conversationId)
   if (event.kind === 'conversation') return mergeConversation(conversations, event.conversation)
   if (event.kind === 'reassigned') return withReassignment(conversations, event.reassignment)
+  // The row's new preview arrives on the `conversation.updated` sent after it.
+  if (event.kind === 'message-deleted') return conversations
   // A Post is not a Message and never reaches the Conversation list — the Wall
   // is the only thing that reads a `post-*` event. See `lib/use-wall`.
   if (event.kind === 'post-created' || event.kind === 'post-updated' || event.kind === 'post-removed') {
@@ -477,6 +479,12 @@ function useConversationInboxState(): ConversationInboxView {
     // The busiest event on the socket and never about the list, so it does not
     // even queue an update that would answer the same rows.
     if (event.kind === 'typing') return
+    // Off the disk here rather than in the thread, which is only listening while
+    // it is open: a thread opened later must not Restore a Message that is gone.
+    if (event.kind === 'message-deleted') {
+      if (viewerId) void forgetMessages(viewerId, event.conversationId, [event.messageId])
+      return
+    }
 
     setInbox((current) => {
       if (current.status !== 'ready') return current

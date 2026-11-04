@@ -1,6 +1,6 @@
-import { authenticatedRequest } from "@/lib/auth-service";
+import { adoptReplacedSessionCookie, authenticatedRequest } from "@/lib/auth-service";
 import { writeKeptPerson } from "@/lib/keychain";
-import { updateProfile } from "@/lib/profile-api";
+import { removeProfilePhoto, updateProfile, uploadProfilePhoto } from "@/lib/profile-api";
 import { getSessionUser, setSessionUser } from "@/lib/session";
 
 /**
@@ -19,13 +19,20 @@ import { getSessionUser, setSessionUser } from "@/lib/session";
  * actually moved — not that a function was called.
  */
 
-jest.mock("@/lib/auth-service", () => ({ authenticatedRequest: jest.fn() }));
+jest.mock("@/lib/auth-service", () => ({
+  authenticatedRequest: jest.fn(),
+  adoptReplacedSessionCookie: jest.fn(),
+  currentCredentialEpoch: jest.fn(() => 0),
+}));
 jest.mock("@/lib/keychain", () => ({ writeKeptPerson: jest.fn() }));
 
 const request = authenticatedRequest as jest.MockedFunction<
   typeof authenticatedRequest
 >;
 const kept = writeKeptPerson as jest.MockedFunction<typeof writeKeptPerson>;
+const adopt = adoptReplacedSessionCookie as jest.MockedFunction<
+  typeof adoptReplacedSessionCookie
+>;
 
 const NAMED = {
   id: "4",
@@ -36,6 +43,9 @@ const NAMED = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
 };
 
 /** Who the device thought was signed in before the write: the nameless account. */
@@ -50,6 +60,9 @@ const BEFORE = {
   twoFactorEnabled: false,
   supportAssignmentEnabled: false,
   capabilities: [],
+  username: null,
+  phone: null,
+  image: null,
 };
 
 const answered = (data: unknown) => ({
@@ -76,6 +89,33 @@ describe("what the API is asked", () => {
     });
   });
 
+  test("a username rides along only when one is given, since absent keeps the current one", async () => {
+    request.mockResolvedValueOnce(answered(NAMED));
+
+    await updateProfile({ name: "Grace Hopper", username: "grace", phone: "+14155552671" });
+
+    expect(request).toHaveBeenCalledWith("/auth/profile", {
+      method: "PUT",
+      body: { name: "Grace Hopper", username: "grace", phone: "+14155552671" },
+    });
+  });
+
+  test("a new photo is the picked file, posted to the avatar route", async () => {
+    request.mockResolvedValueOnce(answered(NAMED));
+    const file = { uri: "file:///me.jpg", field: "file", type: "image/jpeg" };
+
+    await uploadProfilePhoto(file);
+
+    expect(request).toHaveBeenCalledWith("/auth/profile/avatar", { method: "POST", file });
+  });
+
+  test("removing the photo is a DELETE on the same route, with no body", async () => {
+    request.mockResolvedValueOnce(answered(NAMED));
+
+    await removeProfilePhoto();
+
+    expect(request).toHaveBeenCalledWith("/auth/profile/avatar", { method: "DELETE" });
+  });
 });
 
 describe("the three copies of the signed-in person", () => {
@@ -91,6 +131,29 @@ describe("the three copies of the signed-in person", () => {
     expect(kept).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Grace H." }),
     );
+  });
+
+  test.each([
+    ["a new photo", () => uploadProfilePhoto({ uri: "file:///me.jpg", field: "file", type: "image/jpeg" })],
+    ["a removed photo", () => removeProfilePhoto()],
+  ])("%s lands in every copy, so the Settings header redraws at once", async (_label, write) => {
+    request.mockResolvedValueOnce(answered({ ...NAMED, image: "/uploads/avatars/new.jpg" }));
+
+    await write();
+
+    expect(getSessionUser()?.image).toBe("/uploads/avatars/new.jpg");
+    expect(kept).toHaveBeenCalledWith(
+      expect.objectContaining({ image: "/uploads/avatars/new.jpg" }),
+    );
+  });
+
+  test("the re-issued Session cookie is kept, as the API asks of a native client", async () => {
+    const outcome = { ...answered(NAMED), sessionCookie: "better-auth.session_token=next" };
+    request.mockResolvedValueOnce(outcome);
+
+    await updateProfile({ name: "Grace Hopper", phone: null });
+
+    expect(adopt).toHaveBeenCalledWith(outcome, 0);
   });
 });
 
@@ -108,6 +171,7 @@ describe("a write that did not happen changes nothing", () => {
     expect(result.ok).toBe(false);
     expect(getSessionUser()).toEqual(BEFORE);
     expect(kept).not.toHaveBeenCalled();
+    expect(adopt).not.toHaveBeenCalled();
   });
 
   test("an expired session is reported rather than written through", async () => {

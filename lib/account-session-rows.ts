@@ -1,4 +1,5 @@
 import type { AccountSession } from '@/lib/types'
+import { readAppUserAgent, type AppAgent } from '@/lib/user-agent'
 
 /**
  * The sessions on this account, as the screen draws them.
@@ -107,7 +108,8 @@ function text(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function deviceTitle(session: AccountSession): string {
+function deviceTitle(session: AccountSession, app: AppAgent | null): string {
+  if (app) return app.name
   const name = text(session.deviceName)
   // The API answers `Unknown` for a session with no user agent at all, which is
   // a word rather than a device. It reads as a name until somebody notices it
@@ -116,11 +118,23 @@ function deviceTitle(session: AccountSession): string {
   return name === '' || name.toLowerCase() === 'unknown' ? UNKNOWN_DEVICE : name
 }
 
-function deviceDetail(session: AccountSession): string {
-  const kind = DEVICE_TYPES[text(session.deviceType).toLowerCase()] ?? ''
+/** What this app calls the kinds of device it runs on. */
+const APP_KINDS: Record<NonNullable<AppAgent['kind']>, string> = {
+  phone: 'Phone',
+  tablet: 'Tablet',
+}
+
+function deviceDetail(session: AccountSession, app: AppAgent | null): string {
+  // The API's `deviceType` is set aside entirely for this app's own sessions
+  // rather than used as a fallback: what it made of `okhttp/4.12.0` is
+  // `desktop`, and a session the app cannot place is better left unsaid than
+  // called a computer.
+  const kind = app
+    ? (app.kind ? APP_KINDS[app.kind] : '')
+    : (DEVICE_TYPES[text(session.deviceType).toLowerCase()] ?? '')
   const method = text(session.loginMethod)
   const how = method === '' ? '' : (LOGIN_METHODS[method] ?? `Signed in with ${method}`)
-  return [kind, how].filter((part) => part !== '').join(' · ')
+  return [kind, app?.model ?? '', how].filter((part) => part !== '').join(' · ')
 }
 
 /**
@@ -149,13 +163,18 @@ export function accountSessionRows(
   currentId: string | null,
 ): AccountSessionRow[] {
   return sessions.map((session) => {
-    const title = deviceTitle(session)
+    // This app's own sessions are read off the raw user agent, because the
+    // API's sniffing looks for an operating system and a browser and this app
+    // is not a browser; see `lib/user-agent`. Every other session is named as
+    // the API named it.
+    const app = readAppUserAgent(session.userAgent)
+    const title = deviceTitle(session, app)
     const thisDevice = currentId !== null && session.id === currentId
 
     return {
       id: session.id,
       title,
-      detail: deviceDetail(session),
+      detail: deviceDetail(session, app),
       // `updatedAt` is when the session was last touched and is the closer
       // answer to "when was this used"; `createdAt` is the fallback, because a
       // session nothing has refreshed yet has the two the same anyway.

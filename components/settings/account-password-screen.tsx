@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, View, type TextInputInstance } from "rea
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AlertCircle, Check, Eye, EyeOff } from "@/components/icons";
+import { ForgotPasswordLink } from "@/components/auth/forgot-password-link";
 import { InScreenHeader } from "@/components/in-screen-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -245,6 +246,7 @@ export function AccountPasswordScreen() {
   }, []);
 
   const copy = PASSWORD_COPY[mode];
+  const email = state.status === "signed-in" ? state.user.email.trim() : "";
 
   const edit = useCallback((field: PasswordField, value: string) => {
     setDraft((held) => ({ ...held, [field]: value }));
@@ -374,15 +376,21 @@ export function AccountPasswordScreen() {
           ) : null}
 
           {asksForCurrentPassword(mode) ? (
-            <PasswordInput
-              field="current"
-              value={draft.current}
-              error={errors.current}
-              inputRef={currentRef}
-              returnKeyType="next"
-              onChangeText={(value) => edit("current", value)}
-              onSubmitEditing={() => nextRef.current?.focus()}
-            />
+            <>
+              <PasswordInput
+                field="current"
+                value={draft.current}
+                error={errors.current}
+                inputRef={currentRef}
+                returnKeyType="next"
+                onChangeText={(value) => edit("current", value)}
+                onSubmitEditing={() => nextRef.current?.focus()}
+              />
+              {/* Under the field it rescues. An account with no address has
+                  nowhere to send a link, so it draws nothing rather than a
+                  control that can only fail. */}
+              {email ? <ForgotPasswordLink email={email} audience="own" /> : null}
+            </>
           ) : null}
 
           <PasswordInput

@@ -19,6 +19,7 @@ import {
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ForgotPasswordLink } from "@/components/auth/forgot-password-link";
 import { SeedAccountPicker } from "@/components/auth/seed-account-picker";
 import { TermsCheckbox } from "@/components/auth/terms-checkbox";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import { OFFLINE_NOTICE } from "@/lib/auth-machine";
 import { signedInDestination } from "@/lib/onboarding-gate";
 import {
   identifierError,
+  identifierKind,
   normaliseIdentifier,
 } from "@/lib/sign-in-identifier";
 import {
@@ -1037,6 +1039,13 @@ export function SignInForm() {
                 </TactilePressable>
               </View>
               <FieldError message={passwordError} />
+              {/* Under the field it rescues. Reset links go to an address, so a
+                  username is told that rather than sent a request. */}
+              <ForgotPasswordLink
+                email={identifierKind(identifier) === "email" ? normaliseIdentifier(identifier) : null}
+                audience="typed"
+                disabled={anyRequestOut}
+              />
             </View>
           ) : null}
 
