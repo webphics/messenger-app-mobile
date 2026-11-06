@@ -63,7 +63,7 @@ export async function listCommunities(): Promise<ApiResult<Community[]>> {
 export async function listCommunityGroups(
   communityId: string,
 ): Promise<ApiResult<CommunityFeedRow[]>> {
-  const outcome = await authenticatedRequest(`/communities/${communityId}/groups`)
+  const outcome = await authenticatedRequest(`/communities/${encodeURIComponent(communityId)}/groups`)
   return readOutcome(outcome, parseCommunityFeed)
 }
 
@@ -81,7 +81,7 @@ export async function joinLinkedGroup(
   groupId: string,
 ): Promise<ApiResult<GroupJoinOutcome>> {
   const outcome = await authenticatedRequest(
-    `/communities/${communityId}/groups/${groupId}/join`,
+    `/communities/${encodeURIComponent(communityId)}/groups/${encodeURIComponent(groupId)}/join`,
     { method: 'POST' },
   )
   return readOutcome(outcome, parseGroupJoinOutcome)
@@ -93,7 +93,7 @@ export async function joinLinkedGroup(
  * one, which stays on web.
  */
 export async function leaveCommunity(communityId: string): Promise<ApiResult<{ id: string }>> {
-  const outcome = await authenticatedRequest(`/communities/${communityId}/members/me`, {
+  const outcome = await authenticatedRequest(`/communities/${encodeURIComponent(communityId)}/members/me`, {
     method: 'DELETE',
   })
   return readOutcome(outcome, parseLeftCommunity)
@@ -108,7 +108,7 @@ export async function withdrawJoinRequest(
   groupId: string,
 ): Promise<ApiResult<void>> {
   const outcome = await authenticatedRequest(
-    `/communities/${communityId}/groups/${groupId}/join-requests/me`,
+    `/communities/${encodeURIComponent(communityId)}/groups/${encodeURIComponent(groupId)}/join-requests/me`,
     { method: 'DELETE' },
   )
   return readOutcome(outcome, acknowledged)

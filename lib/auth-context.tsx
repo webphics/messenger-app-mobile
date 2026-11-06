@@ -40,6 +40,7 @@ import { CHALLENGE_LIFETIME_MS, type ChallengeMethod } from "@/lib/two-factor-ch
 import { appleAuthEvent } from "@/lib/apple-auth";
 import { googleAuthEvent } from "@/lib/google-auth";
 import type { ApiResult } from "@/lib/api-result";
+import { rememberMagicLinkRequest } from "@/lib/magic-link-request";
 import { updateProfile } from "@/lib/profile-api";
 import type { SessionUser } from "@/lib/types";
 
@@ -365,15 +366,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [runSheetAttempt],
   );
 
-  const requestMagicLink = useCallback(
-    (email: string, name?: string) => sendMagicLink(email, name),
-    [],
-  );
+  /**
+   * Both requests mail a link, so both leave a record that this device asked
+   * for one: the link screen spends a link without asking only inside that
+   * record's window. Written as the request leaves rather than on its answer,
+   * because an answer lost to the network may still have sent the mail.
+   */
+  const requestMagicLink = useCallback((email: string, name?: string) => {
+    rememberMagicLinkRequest();
+    return sendMagicLink(email, name);
+  }, []);
 
-  const requestSignUp = useCallback(
-    (input: SignUpRequest) => sendSignUp(input),
-    [],
-  );
+  const requestSignUp = useCallback((input: SignUpRequest) => {
+    rememberMagicLinkRequest();
+    return sendSignUp(input);
+  }, []);
 
   /**
    * The challenge this provider is holding, or null when it is holding none.

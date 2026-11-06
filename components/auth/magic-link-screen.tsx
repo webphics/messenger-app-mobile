@@ -10,7 +10,13 @@ import { Text } from "@/components/ui/text";
 import { useAuth } from "@/lib/auth-context";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { SIGN_IN_HREF } from "@/lib/hub-routes";
-import { magicLinkStage, readLinkToken, readyToVerify } from "@/lib/magic-link-route";
+import { forgetMagicLinkRequest, readMagicLinkRequest } from "@/lib/magic-link-request";
+import {
+  linkNeedsConfirmation,
+  magicLinkStage,
+  readLinkToken,
+  readyToVerify,
+} from "@/lib/magic-link-route";
 import { settleDownEnter } from "@/lib/motion-enter";
 import { colors } from "@/lib/tokens";
 
@@ -46,20 +52,31 @@ export function MagicLinkScreen() {
    */
   const started = useRef(false);
   const [settled, setSettled] = useState(false);
-  const stage = magicLinkStage(token, state, settled);
+  /**
+   * Whether the token may be spent. Read once, as the screen opens: a link this
+   * device asked for moments ago is the answer to that request and goes
+   * straight through; anything else waits for the person to say yes, because
+   * the link may be for somebody else's account. See `linkNeedsConfirmation`.
+   */
+  const [confirmed, setConfirmed] = useState(
+    () => !linkNeedsConfirmation(readMagicLinkRequest(), Date.now()),
+  );
+  const stage = magicLinkStage(token, state, settled, confirmed);
   const navigated = useRef(false);
 
   useEffect(() => {
     // `token === null` is restated only so TypeScript narrows it for the call
     // below; the rule itself lives in `readyToVerify` and is not repeated here.
-    if (token === null || !readyToVerify(token, state, started.current)) return;
+    if (token === null || !readyToVerify(token, state, started.current, confirmed)) return;
 
     started.current = true;
+    // One request vouches for one link.
+    forgetMagicLinkRequest();
     // Recorded when the answer arrives rather than when the request leaves, so
     // there is no frame in which the screen has given up on a link still in the
     // post.
     void verifyMagicLink(token).finally(() => setSettled(true));
-  }, [token, state, verifyMagicLink]);
+  }, [token, state, confirmed, verifyMagicLink]);
 
   // Guarded by a ref rather than by the dependency list: `stage` is rebuilt every
   // render, so an effect keyed on it would navigate again on each one.
@@ -92,7 +109,34 @@ export function MagicLinkScreen() {
           )}
         </View>
 
-        {stage.kind === "refused" ? (
+        {stage.kind === "confirm" ? (
+          <>
+            <Text variant="headline" className="mt-5 text-center text-ink">
+              Sign in on this phone?
+            </Text>
+            <Text variant="meta" className="mt-2 text-center text-muted">
+              This link signs this phone in to the account it was sent for.
+              Continue only if you asked for it. If you didn&rsquo;t, someone
+              may be trying to put this phone in their account.
+            </Text>
+
+            <Button className="mt-7 min-h-12 w-full" onPress={() => setConfirmed(true)}>
+              <Text>Sign in</Text>
+            </Button>
+            {/* The way out spends nothing: the token is left unused and the
+                person lands where they could ask for a link of their own. */}
+            <Button
+              variant="ghost"
+              className="mt-2 min-h-12 w-full"
+              onPress={() => {
+                forgetMagicLinkRequest();
+                router.replace(SIGN_IN_HREF);
+              }}
+            >
+              <Text>Cancel</Text>
+            </Button>
+          </>
+        ) : stage.kind === "refused" ? (
           <>
             <Text variant="headline" className="mt-5 text-center text-ink">
               This link didn&rsquo;t work

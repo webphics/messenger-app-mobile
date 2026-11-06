@@ -1,6 +1,7 @@
 import { asRecord } from '@/lib/api-envelope'
 import { isServerFileUrl } from '@/lib/attachment-upload'
 import { wallPostKinds } from '@/lib/types'
+import { isWebLink } from '@/lib/web-link'
 import type {
   NamedWall,
   WallAttachmentKind,
@@ -71,14 +72,21 @@ export function parseWallAttachment(data: unknown): WallPostAttachment | null {
   return { kind, url, fileName: text(row.fileName), size: optionalNumber(row.size) }
 }
 
-/** A link only counts when it has both halves: a label to press and somewhere to go. */
+/**
+ * A link only counts when it has both halves: a label to press and somewhere to go.
+ *
+ * Somewhere on the web, specifically. An author writes the URL and the button
+ * hands it to `Linking.openURL`, so a `chatroute:`, `intent:` or `market:` one
+ * would act on the reader's phone; it is dropped here, which means it is never
+ * drawn, rather than drawn as a button that does nothing.
+ */
 export function parseWallLink(data: unknown): WallPostLink | null {
   const row = asRecord(data)
   if (!row) return null
 
   const label = text(row.label)
   const url = text(row.url)
-  return label && url ? { label, url } : null
+  return label && url && isWebLink(url) ? { label, url: url.trim() } : null
 }
 
 function parseAuthor(data: unknown): WallPostAuthor | null {

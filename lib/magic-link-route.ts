@@ -24,6 +24,11 @@ import { signedInDestination } from "@/lib/onboarding-gate";
 export type MagicLinkStage =
   /** The token is being checked, or hydration has not finished making room to check it. */
   | { kind: "verifying" }
+  /**
+   * A link this device did not just ask for. Nothing is spent until the person
+   * holding the phone says so, because a link can be somebody else's account.
+   */
+  | { kind: "confirm" }
   | { kind: "navigate"; href: Href }
   /** The link cannot sign anyone in. The screen owes an explanation and a way back. */
   | { kind: "refused"; message: string };
@@ -49,19 +54,59 @@ export function readLinkToken(raw: string | string[] | undefined): string | null
 }
 
 /**
+ * How long after a request on this device a link is taken to be that request's
+ * answer, and opened without asking.
+ *
+ * The link's own lifetime (`expiresIn: 60 * 15` on the API's `magicLink`
+ * plugin): any link this device asked for is dead after it, so a longer window
+ * would only widen the case it exists to close.
+ */
+export const MAGIC_LINK_REQUEST_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Whether a link must be confirmed before its token is spent.
+ *
+ * Spending a token signs this phone in to whichever account the link was made
+ * for, and the link does not say which. Somebody can mail a person a link for
+ * their own account, and a phone that opened it unasked would land in it (a
+ * login CSRF). So a link is confirmed unless this device asked for one within
+ * the window: `requestedAt` is that record, null when there is none.
+ *
+ * A record from the future is a clock that moved, not a recent request, and
+ * reads as no record. The cost of being wrong in that direction is one tap.
+ */
+export function linkNeedsConfirmation(requestedAt: number | null, now: number): boolean {
+  if (requestedAt === null || !Number.isFinite(requestedAt)) return true;
+  const age = now - requestedAt;
+  return age < 0 || age > MAGIC_LINK_REQUEST_WINDOW_MS;
+}
+
+/**
+ * The stored request record, read back. Anything but a plain non-negative
+ * integer is no record, which `linkNeedsConfirmation` turns into a question.
+ */
+export function readRequestRecord(text: string | null): number | null {
+  const trimmed = text?.trim() ?? "";
+  if (!/^\d{1,15}$/.test(trimmed)) return null;
+  return Number(trimmed);
+}
+
+/**
  * Whether the verification call should be started now.
  *
  * Only from `signed-out`, because that is the only state the auth machine will
  * accept a `submit` from — asking earlier would drop the attempt on the floor and
  * leave the screen verifying forever. `started` is what stops a settled refusal,
- * which lands back in `signed-out`, from spending a second link.
+ * which lands back in `signed-out`, from spending a second link. `confirmed` is
+ * the person's yes, or this device's own recent request standing in for it.
  */
 export function readyToVerify(
   token: string | null,
   state: AuthState,
   started: boolean,
+  confirmed: boolean,
 ): boolean {
-  return token !== null && !started && state.status === "signed-out";
+  return token !== null && !started && confirmed && state.status === "signed-out";
 }
 
 /**
@@ -73,6 +118,7 @@ export function magicLinkStage(
   token: string | null,
   state: AuthState,
   settled: boolean,
+  confirmed: boolean,
 ): MagicLinkStage {
   if (token === null) return { kind: "refused", message: MISSING_TOKEN_NOTICE };
 
@@ -110,10 +156,12 @@ export function magicLinkStage(
     case "two-factor":
       return { kind: "navigate", href: SIGN_IN_HREF };
 
+    // Only signed-out asks, because it is the only state a token would be spent
+    // from: someone already signed in is sent on without spending it, and a
+    // wait or an unreachable API has nothing to confirm yet.
     case "signed-out":
-      return settled
-        ? { kind: "refused", message: state.notice ?? LINK_REFUSED_NOTICE }
-        : { kind: "verifying" };
+      if (settled) return { kind: "refused", message: state.notice ?? LINK_REFUSED_NOTICE };
+      return confirmed ? { kind: "verifying" } : { kind: "confirm" };
   }
 }
 

@@ -1,6 +1,7 @@
 import {
   parseWallAttachment,
   parseWallContributorGrant,
+  parseWallLink,
   parseWallPost,
   parseWallPosts,
 } from '@/lib/wall-parse'
@@ -91,5 +92,28 @@ describe('parseWallContributorGrant', () => {
       ...grant,
       isContributor: false,
     })
+  })
+})
+
+describe('parseWallLink', () => {
+  it.each(['https://example.com/notice', 'http://example.com/plain'])('keeps a web link, %s', url => {
+    expect(parseWallLink({ label: 'Read', url })).toEqual({ label: 'Read', url })
+  })
+
+  it.each([
+    'chatroute://account/delete',
+    'intent://scan/#Intent;scheme=zxing;end',
+    'market://details?id=com.example',
+    'tel:+15555550100',
+    'javascript:alert(1)',
+    'example.com/notice',
+  ])('drops %s, so the button is never drawn', url => {
+    expect(parseWallLink({ label: 'Read', url })).toBeNull()
+  })
+
+  it('drops the link and keeps the Post', () => {
+    const parsed = parseWallPost({ ...post, link: { label: 'Read', url: 'chatroute://account/delete' } })
+    expect(parsed).not.toBeNull()
+    expect(parsed?.link).toBeNull()
   })
 })

@@ -32,6 +32,7 @@ import {
 } from '@/lib/wall-actions'
 import type { WallPostEditInput } from '@/lib/wall-api'
 import { groupWallAttachments, linkHost } from '@/lib/wall-card'
+import { isWebLink } from '@/lib/web-link'
 import type { WallPost, WallVoteDirection } from '@/lib/types'
 
 /**
@@ -323,7 +324,11 @@ export const WallPostCard = memo(function WallPostCard({
           <TactilePressable
             accessibilityRole="link"
             accessibilityLabel={`${link.label}, opens ${linkHost(link.url)}`}
-            onPress={() => void Linking.openURL(link.url)}
+            onPress={() => {
+              // Checked again at the moment of opening: `parseWallLink` already
+              // drops anything else, but this is the line that acts on it.
+              if (isWebLink(link.url)) void Linking.openURL(link.url).catch(() => undefined)
+            }}
             className="min-h-12 flex-row items-center gap-3 rounded-2xl border border-line/80 bg-surface px-3.5 py-2.5 shadow-xs shadow-black/8"
           >
             <View className="min-w-0 flex-1">
