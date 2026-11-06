@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   BackHandler,
   Dimensions,
   FlatList,
@@ -57,6 +58,7 @@ import {
   type BubbleContent,
 } from '@/lib/message-attachment'
 import { offersEditHistory } from '@/lib/message-history'
+import { confirmDeleteMessage } from '@/lib/confirm-delete-message'
 import { messageModeration } from '@/lib/message-moderation'
 import { useBlockPerson } from '@/lib/use-block-person'
 import { adminOnlyLabel } from '@/lib/message-invitation'
@@ -162,6 +164,15 @@ type ThreadScreenProps = {
    * judged where the menu opens. This only carries the words.
    */
   onEditMessage: (messageId: string, body: string) => Promise<string | null>
+  /**
+   * Delete a message for everyone, and answer the refusal to show or null.
+   *
+   * Offered only where `messageActions` in `lib/conversation-access` says so,
+   * which is the API's `deletable` and `deleteMessages`. This screen asks first
+   * and says why when it is refused; the removal and the rollback are the
+   * thread's. Absent where nothing can delete, which offers no Delete at all.
+   */
+  onDeleteMessage?: (messageId: string) => Promise<string | null>
   /**
    * Take the way out of a read-only thread the API offered: engage it, take it
    * over, or reopen it.
@@ -411,6 +422,7 @@ export function ThreadScreen({
   onDismissSendError,
   onToggleReaction,
   onEditMessage,
+  onDeleteMessage,
   onAssign,
   assigning = false,
   assignError = null,
@@ -919,6 +931,37 @@ export function ThreadScreen({
     [conversation.access, messages],
   )
 
+  /**
+   * Whether this message can be deleted, judged when the menu renders, like
+   * `canEdit`. The whole rule is `messageActions`'s and is table-tested.
+   */
+  const canDelete = useCallback(
+    (messageId: string) => {
+      if (!onDeleteMessage) return false
+      const message = messages.find((item) => item.id === messageId)
+      if (!message) return false
+      return messageActions(conversation.access, message, Date.now()).delete
+    },
+    [conversation.access, messages, onDeleteMessage],
+  )
+
+  /**
+   * Ask, then delete. The thread drops the message on the confirm and puts it
+   * back on a refusal, so all this adds is the question before and the reason
+   * after.
+   */
+  const deleteMessage = useCallback(
+    async (messageId: string) => {
+      const message = messages.find((item) => item.id === messageId)
+      setMenu(null)
+      if (!message || !onDeleteMessage) return
+      if (!(await confirmDeleteMessage(message))) return
+      const refusal = await onDeleteMessage(messageId)
+      if (refusal) Alert.alert('Could not delete message', refusal)
+    },
+    [messages, onDeleteMessage],
+  )
+
   const openEditSheet = useCallback(
     (messageId: string) => {
       const message = messages.find((item) => item.id === messageId)
@@ -1287,6 +1330,7 @@ export function ThreadScreen({
           onReport={menuModeration?.report ? () => reportMessage(menu.messageId) : undefined}
           onBlock={menuSender ? () => blockSender(menuSender) : undefined}
           blockLabel={menuSender ? `Block ${menuSender.name}` : undefined}
+          onDelete={canDelete(menu.messageId) ? () => void deleteMessage(menu.messageId) : undefined}
         />
       ) : null}
 

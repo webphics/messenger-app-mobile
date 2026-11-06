@@ -225,11 +225,46 @@ describe('messageActions', () => {
   })
 
   test('does not offer Edit while the access is unknown', () => {
-    expect(messageActions(undefined, message(), NOW)).toEqual({ edit: false })
+    expect(messageActions(undefined, message(), NOW)).toEqual({ edit: false, delete: false })
   })
 
   test('does not offer Edit on a window end it cannot read', () => {
     expect(offersEdit(openPayload(), { editableUntil: 'soon' })).toBe(false)
+  })
+
+  /** Delete, read the way the thread screen reads it. */
+  function offersDelete(deleteMessages: boolean, overrides: Partial<Message> = {}) {
+    const payload = { write: { state: 'open' }, actions: actions({ deleteMessages }) }
+    return messageActions(parseAccess(payload), message(overrides), NOW).delete
+  }
+
+  /*
+   * The role and Capability cases arrive already folded into `deletable` by the
+   * API: an Admin with `delete_messages` gets it on anybody's message, an Agent
+   * with only `delete_own_messages` on their own, a Customer on nothing.
+   */
+  test.each([
+    ['a deletable message where the conversation offers delete', true, { deletable: true }, true],
+    ["somebody else's message after its edit window, still deletable", true, { deletable: true, editableUntil: null }, true],
+    ["a message the API did not mark deletable (an Agent on somebody else's)", true, {}, false],
+    ['a message marked not deletable', true, { deletable: false }, false],
+    ['a deletable message where the conversation turns delete off', false, { deletable: true }, false],
+    ['a System notice, even one marked deletable', true, { deletable: true, messageType: 'system' as const }, false],
+    ['a message this device is still carrying', true, { deletable: true, id: 'local-1' }, false],
+  ])('%s', (_, deleteMessages, overrides, offered) => {
+    expect(offersDelete(deleteMessages, overrides as Partial<Message>)).toBe(offered)
+  })
+
+  test('offers Delete and Edit independently', () => {
+    const payload = { write: { state: 'open' }, actions: actions({ editMessages: true, deleteMessages: true }) }
+    expect(messageActions(parseAccess(payload), message({ deletable: true }), NOW)).toEqual({
+      edit: true,
+      delete: true,
+    })
+  })
+
+  test('does not offer Delete while the access is unknown', () => {
+    expect(messageActions(UNKNOWN_ACCESS, message({ deletable: true }), NOW).delete).toBe(false)
   })
 })
 
@@ -340,6 +375,17 @@ describe('refusalMeansStale', () => {
       expect(refusalMeansStale(refusedWith(code))).toBe(true)
     },
   )
+
+  /* What a refused delete leads to: a refetch of the conversation, or nothing. */
+  test.each([
+    ['message_not_deletable', true],
+    ['missing_capability', true],
+    ['forbidden', true],
+    ['conversation_not_found', true],
+    ['message_not_found', false],
+  ])('a delete refused with %s refetches: %s', (code, stale) => {
+    expect(refusalMeansStale(refusedWith(code))).toBe(stale)
+  })
 
   test('a refusal about the request, a lost thread or a code named like an object property is not stale', () => {
     expect(refusalMeansStale(refusedWith('validation_failed'))).toBe(false)

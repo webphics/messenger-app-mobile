@@ -254,6 +254,18 @@ describe('parseMessage', () => {
     expect(parseMessage(messageRow({ fromCompany: false, editableUntil }))?.editableUntil).toBeNull()
   })
 
+  test.each([
+    ['true', true, true],
+    ['false', false, undefined],
+    ['missing, an API from before the field or a Customer payload', undefined, undefined],
+    ['not a boolean', 'yes', undefined],
+  ])('reads deletable that is %s', (_case, deletable, parsed) => {
+    const message = parseMessage(messageRow({ fromCompany: false, deletable }))
+    expect(message?.deletable).toBe(parsed)
+    // Read back through the same parser, the way the Store does.
+    expect(parseMessage(message)?.deletable).toBe(parsed)
+  })
+
   test('reads a message with a sender as the staff shape', () => {
     const message = parseMessage(
       messageRow({ sender: { id: 'agent-1', name: 'Jonah Reed', role: 'agent' } }),

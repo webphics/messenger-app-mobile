@@ -352,6 +352,23 @@ export async function editMessage(
 }
 
 /**
+ * Deletes a message for everyone in the conversation.
+ *
+ * Staff only on the API, ruled by `ConversationsPolicy.canDeleteMessage`. The
+ * API sends that ruling as the message's `deletable` and the conversation's
+ * `deleteMessages`, and `messageActions` in `lib/conversation-access` reads
+ * both so Delete is absent rather than offered and refused. The answer carries
+ * nothing worth reading; the other viewers hear `message.deleted`.
+ */
+export async function deleteMessage(id: string, messageId: string): Promise<ApiResult<void>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`,
+    { method: 'DELETE' },
+  )
+  return readOutcome(outcome, acknowledged)
+}
+
+/**
  * Who has read one message, and when.
  *
  * Sender-only on the API: asking about somebody else's message answers 403

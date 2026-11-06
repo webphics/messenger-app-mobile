@@ -49,7 +49,7 @@ function refusalMessage(body: unknown): string {
  * shows before anything is sent are worded in `lib/conversation-access`.
  *
  * `message_not_deletable` answers a delete of a system notice, or of an
- * attachment on one. This client has no Delete, so nothing sends one today.
+ * attachment on one. Message delete (`deleteMessage`) shows it.
  */
 const CLIENT_WORDING: ReadonlyMap<string, string> = new Map([
   ['message_not_deletable', 'System notices cannot be deleted, and neither can their attachments.'],

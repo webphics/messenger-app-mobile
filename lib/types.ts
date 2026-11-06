@@ -446,6 +446,14 @@ type MessageBase = {
    * admin-only message. An Agent is never sent one. Set only when true, like `addressedToCustomer`.
    */
   adminOnly?: boolean
+  /**
+   * The API's ruling that this viewer may delete this message
+   * (`ConversationsPolicy.canDeleteMessage`), sent on every Staff payload. Set
+   * only when true, like `adminOnly`: absent is what an older API and a
+   * Customer's payload send, and both mean no Delete. See `messageActions` in
+   * `lib/conversation-access`.
+   */
+  deletable?: boolean
   reactions: MessageReaction[]
   attachments: MessageAttachment[]
   receiptStatus: ReceiptStatus

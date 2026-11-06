@@ -371,6 +371,7 @@ function ConversationScreen({
       onDismissSendError={thread.dismissSendError}
       onToggleReaction={thread.react}
       onEditMessage={thread.edit}
+      onDeleteMessage={thread.remove}
       onAssign={assignment.assign}
       assigning={assignment.assigning}
       assignError={assignment.error}

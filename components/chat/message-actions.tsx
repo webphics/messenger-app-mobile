@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Clock, Flag, Info, Pencil, Reply, UserX } from "@/components/icons";
+import { Clock, Flag, Info, Pencil, Reply, Trash2, UserX } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -63,6 +63,12 @@ type MessageActionsProps = {
    */
   onBlock?: () => void;
   blockLabel?: string;
+  /**
+   * Delete the message for everyone. Absent unless the API marked it
+   * `deletable` and the conversation's `access` offers `deleteMessages`;
+   * `messageActions` in `lib/conversation-access` decides.
+   */
+  onDelete?: () => void;
 };
 
 export function MessageActions({
@@ -76,6 +82,7 @@ export function MessageActions({
   onReport,
   onBlock,
   blockLabel = "Block",
+  onDelete,
 }: MessageActionsProps) {
   const reduceMotion = useReducedMotion();
   // The tray appears where a finger just was, so Reduce Motion keeps the fade
@@ -103,7 +110,8 @@ export function MessageActions({
   /*
     Reply, then Edit, then History, then Info: most often wanted first, and the one that
     leaves the thread for a screen of its own last. Report and Block follow,
-    apart from the rest because they are about the sender rather than the words. Each is absent rather than
+    apart from the rest because they are about the sender rather than the words, and Delete
+    last, with them in the danger colour because it cannot be undone. Each is absent rather than
     disabled where it does not apply, which is `wall-post-actions`' rule too —
     a control that opens onto a refusal is worse than no control.
   */
@@ -140,8 +148,8 @@ export function MessageActions({
         onInfo();
       },
     },
-    // Last, and drawn in the danger colour: both leave the thread for a
-    // question of their own (a reason, a confirmation).
+    // Last, and drawn in the danger colour: each leaves the thread for a
+    // question of its own (a reason, a confirmation).
     onReport && {
       label: "Report…",
       accessibilityLabel: "Report message",
@@ -158,6 +166,15 @@ export function MessageActions({
       danger: true,
       onPress: () => {
         onBlock();
+      },
+    },
+    onDelete && {
+      label: "Delete…",
+      accessibilityLabel: "Delete message",
+      Icon: Trash2,
+      danger: true,
+      onPress: () => {
+        onDelete();
       },
     },
   ].filter((pill): pill is Exclude<typeof pill, false | undefined> => Boolean(pill));

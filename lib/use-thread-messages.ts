@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
   addReaction,
+  deleteMessage,
   editMessage,
   listMessages,
   removeReaction,
@@ -12,6 +13,12 @@ import {
 } from '@/lib/conversation-api'
 import { assignmentSwitchedOnNotice } from '@/lib/conversation-failure'
 import { messageEditRefusal, withRefreshedQuotes } from '@/lib/message-edit'
+import {
+  deleteRefusalMeansGone,
+  deletionSnapshot,
+  messageDeleteRefusal,
+  withRestoredMessage,
+} from '@/lib/message-delete'
 import {
   forgetMessages,
   restoreOlderMessages,
@@ -155,6 +162,13 @@ export type ThreadMessages = {
    * is still holding, and closing the sheet to show a banner would throw it away.
    */
   edit: (messageId: string, body: string) => Promise<string | null>
+  /**
+   * Delete a message for everyone, after the person confirmed it.
+   *
+   * Answers the refusal to show, or null when it landed, like `edit`: the
+   * message is back in the thread by then, and the caller says why.
+   */
+  remove: (messageId: string) => Promise<string | null>
 }
 
 /**
@@ -819,6 +833,51 @@ export function useThreadMessages(
   )
 
   /**
+   * Delete a message for everyone: out of the thread on the tap, the request
+   * after it, and back where it was if the API refuses.
+   *
+   * The removal is `withoutMessages`, which `message.deleted` already uses, so
+   * the quote of it leaves every reply too and the echo the API sends this
+   * device afterwards finds nothing to do. The disk is cleared only once the API
+   * has said yes (`forgetMessages`): the Store only upserts, so until then the
+   * row is still there, which is what a process that dies with the request out
+   * should find. The newest page settles it the next time either way.
+   *
+   * Applied again on success, because a page fetched while the request was out
+   * still had the message and put it back. A `message_not_found` refusal is a
+   * delete somebody else got to first and settles the same way.
+   */
+  const remove = useCallback(
+    async (messageId: string): Promise<string | null> => {
+      if (!conversationId || !author) return 'This conversation is not ready yet.'
+      if (isLocalId(messageId)) return 'That message has not been sent yet.'
+
+      const snapshot = deletionSnapshot(held.current, messageId)
+      if (!snapshot) return null
+
+      setState((thread) => withoutMessages(thread, [messageId]))
+
+      const answer = await deleteMessage(conversationId, messageId)
+      if (answer.ok || deleteRefusalMeansGone(answer.failure)) {
+        if (ownerId) void forgetMessages(ownerId, conversationId, [messageId])
+        if (onScreen.current === conversationId) {
+          setState((thread) => withoutMessages(thread, [messageId]))
+        }
+        return null
+      }
+
+      // Refetches the conversation for a stale-copy refusal, so `access` and
+      // the flags are current wherever the person has gone since.
+      const notice = refusedWrite(conversationId, answer.failure)
+      if (onScreen.current === conversationId) {
+        setState((thread) => withRestoredMessage(thread, snapshot))
+      }
+      return notice ?? messageDeleteRefusal(answer.failure)
+    },
+    [author, conversationId, ownerId, refusedWrite],
+  )
+
+  /**
    * Every state this thread reaches, written through to the Store.
    *
    * Observed here rather than written at each transition, the way the shared
@@ -888,6 +947,7 @@ export function useThreadMessages(
     retrySend,
     react,
     edit,
+    remove,
   }
 }
 

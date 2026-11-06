@@ -87,9 +87,10 @@ export type WriteAccess =
  * Support DM, for staff who can see its notes. Every staff action is off for a
  * Customer.
  *
- * `setWritePolicy`, `setJoinPolicy`, `deleteMessages` and `deleteConversation`
- * are parsed and offered nowhere: this client has no Group policy control and
- * no delete control. They are still required, like every action here, so an
+ * `deleteMessages` is read by `messageActions`, beside each message's own
+ * `deletable`. `setWritePolicy`, `setJoinPolicy` and `deleteConversation` are
+ * parsed and offered nowhere: this client has no Group policy control and no
+ * conversation delete. They are still required, like every action here, so an
  * answer this build reads is always a whole one.
  */
 export const ACCESS_ACTIONS = [
@@ -374,11 +375,10 @@ export function detailsView(access: ConversationAccess | undefined): DetailsView
   return { labels: manageLabels, readNotes, writeNotes }
 }
 
-/**
- * What one message offers in the long-press menu. This client has no Delete,
- * so `deleteMessages` is not read here.
- */
-export type MessageActionsView = { edit: boolean }
+/** What one message offers in the long-press menu. */
+export type MessageActionsView = { edit: boolean; delete: boolean }
+
+const NO_MESSAGE_ACTIONS: MessageActionsView = { edit: false, delete: false }
 
 /**
  * What this message offers this viewer at `now`.
@@ -389,8 +389,15 @@ export type MessageActionsView = { edit: boolean }
  * broadcasts and the fifteen-minute window. At exactly `editableUntil` the API
  * refuses, so the menu does too.
  *
+ * Delete needs the conversation's `deleteMessages` and the message's own
+ * `deletable`, which is `ConversationsPolicy.canDeleteMessage` for this viewer:
+ * any author's message with `delete_messages`, only their own with
+ * `delete_own_messages`, never for a Customer. A System notice is refused to
+ * everyone with `message_not_deletable`, so it is not offered even on a payload
+ * that says otherwise, which is the web client's rule too.
+ *
  * The one fact only this client knows: a message with a local id has not
- * reached the API yet and has nothing there to edit. Retry or delete is the
+ * reached the API yet and has nothing there to edit or delete. Retry is the
  * remedy for one of those.
  *
  * `now` is a parameter so one pass judges every row against one instant, and
@@ -401,11 +408,16 @@ export function messageActions(
   message: Message,
   now: number,
 ): MessageActionsView {
-  if (!access || !isKnownAccess(access) || !access.actions.editMessages) return { edit: false }
-  if (isLocalId(message.id) || message.editableUntil === null) return { edit: false }
+  if (!access || !isKnownAccess(access) || isLocalId(message.id)) return NO_MESSAGE_ACTIONS
 
+  const remove =
+    access.actions.deleteMessages && message.deletable === true && message.messageType !== 'system'
+
+  if (!access.actions.editMessages || message.editableUntil === null) {
+    return { edit: false, delete: remove }
+  }
   const until = Date.parse(message.editableUntil)
-  return { edit: !Number.isNaN(until) && now < until }
+  return { edit: !Number.isNaN(until) && now < until, delete: remove }
 }
 
 /**
@@ -421,9 +433,8 @@ export function messageActions(
  *   `lib/conversation-failure`.
  * - `missing_capability`: a Capability was revoked, which sends no
  *   conversation event, so `actions` on the copy is out of date.
- * - `message_not_deletable`: `deleteMessages` was offered on a copy that
- *   should not have offered it. This client sends no delete today; the code is
- *   listed so the rule is whole when one arrives.
+ * - `message_not_deletable`: Delete was offered on a copy that should not
+ *   have offered it (`messageActions`).
  * - `conversation_not_found` and `forbidden`: how the API's rulings answer the
  *   common races. A Close or Transfer after somebody else took or closed the
  *   thread is a 404, and a Take over on a thread the viewer already holds is

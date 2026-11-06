@@ -374,6 +374,8 @@ export function parseMessage(value: unknown): Message | null {
     ...(invitation ? { invitation } : {}),
     ...(complaint ? { complaint } : {}),
     ...(record.adminOnly === true ? { adminOnly: true } : {}),
+    // This viewer may delete it, as the API ruled. Anything but `true` is no Delete.
+    ...(record.deletable === true ? { deletable: true } : {}),
     reactions: records(record.reactions).flatMap((item) => {
       const parsed = reaction(item)
       return parsed ? [parsed] : []
