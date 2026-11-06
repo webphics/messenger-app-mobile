@@ -531,22 +531,37 @@ export function parseLabel(value: unknown): Label | null {
 export function parseNote(value: unknown): ConversationNote | null {
   const record = asRecord(value)
   if (!record) return null
-  if (record.deletedAt != null) return null
 
   const id = text(record.id)
-  const body = text(record.text)
   const author = asRecord(record.author)
   const authorId = author ? text(author.id) : null
   const authorName = author ? text(author.name) : null
   const createdAt = timestamp(record.createdAt)
-  if (!id || !body || !authorId || !authorName || !createdAt) return null
+  const deletedAt = timestamp(record.deletedAt)
+  // A tombstone's wording is never drawn, so it may be missing; a live note's may not.
+  const body = deletedAt ? (nullableText(record.text) ?? '') : text(record.text)
+  if (!id || body === null || !authorId || !authorName || !createdAt) return null
+
+  const deletedByRecord = asRecord(record.deletedBy)
+  const deletedById = deletedByRecord ? text(deletedByRecord.id) : null
+  const deletedByName = deletedByRecord ? text(deletedByRecord.name) : null
+  const access = asRecord(record.access)
 
   return {
     id,
     text: body,
     author: { id: authorId, name: authorName },
-    messageId: nullableText(record.messageId),
+    messageId: text(record.messageId),
     createdAt,
+    editedAt: timestamp(record.editedAt),
+    deletedAt,
+    deletedBy:
+      deletedAt && deletedById && deletedByName ? { id: deletedById, name: deletedByName } : null,
+    // Only a literal `true` grants: an older API that sends no `access` offers nothing.
+    access: {
+      edit: access?.edit === true,
+      delete: access?.delete === true,
+    },
   }
 }
 

@@ -421,6 +421,23 @@ export function messageActions(
 }
 
 /**
+ * Whether the long-press menu offers "Add note" on this message.
+ *
+ * Exactly the conversation's `writeNotes`, which the API sends only on a
+ * Support DM and only to staff who may write its notes, so an org DM, a Group
+ * and every Customer get none. The one fact only this client knows is the
+ * same as `messageActions`': a message with a local id has not reached the API,
+ * so there is nothing there for a note to point at.
+ */
+export function messageNoteOffered(
+  access: ConversationAccess | undefined,
+  message: Message,
+): boolean {
+  if (!access || !isKnownAccess(access) || isLocalId(message.id)) return false
+  return access.actions.writeNotes
+}
+
+/**
  * The API's refusal codes that say the conversation changed after this device
  * read it, so the copy on screen offered something the API no longer allows.
  *

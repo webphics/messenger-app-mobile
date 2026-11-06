@@ -1,5 +1,5 @@
 import { useLayoutEffect } from "react";
-import { Clock, Flag, Info, Pencil, Reply, Trash2, UserX } from "@/components/icons";
+import { Clock, FileText, Flag, Info, Pencil, Reply, Trash2, UserX } from "@/components/icons";
 import { Pressable, View } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -69,6 +69,12 @@ type MessageActionsProps = {
    * `messageActions` in `lib/conversation-access` decides.
    */
   onDelete?: () => void;
+  /**
+   * Write an internal note about this message. Absent unless the
+   * conversation's `access` offers `writeNotes`; `messageNoteOffered` in
+   * `lib/conversation-access` decides.
+   */
+  onAddNote?: () => void;
 };
 
 export function MessageActions({
@@ -83,6 +89,7 @@ export function MessageActions({
   onBlock,
   blockLabel = "Block",
   onDelete,
+  onAddNote,
 }: MessageActionsProps) {
   const reduceMotion = useReducedMotion();
   // The tray appears where a finger just was, so Reduce Motion keeps the fade
@@ -108,7 +115,7 @@ export function MessageActions({
   }));
 
   /*
-    Reply, then Edit, then History, then Info: most often wanted first, and the one that
+    Reply, then Edit, then History, then Add note, then Info: most often wanted first, and the one that
     leaves the thread for a screen of its own last. Report and Block follow,
     apart from the rest because they are about the sender rather than the words, and Delete
     last, with them in the danger colour because it cannot be undone. Each is absent rather than
@@ -138,6 +145,15 @@ export function MessageActions({
       Icon: Clock,
       onPress: () => {
         onHistory();
+      },
+    },
+    // Beside Info: both are staff looking at the message rather than changing it.
+    onAddNote && {
+      label: "Add note",
+      accessibilityLabel: "Add an internal note about this message",
+      Icon: FileText,
+      onPress: () => {
+        onAddNote();
       },
     },
     onInfo && {

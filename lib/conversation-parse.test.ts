@@ -455,19 +455,25 @@ describe('parseNotes', () => {
     ...overrides,
   })
 
-  it('reads a live note, ignoring the fields this app does not use yet', () => {
-    expect(parseNotes([note({ editedAt: '2026-09-26T11:02:10.000Z' })])).toEqual([
+  it('reads a live, edited note with its access and the message it is about', () => {
+    expect(
+      parseNotes([note({ editedAt: '2026-09-26T11:02:10.000Z', messageId: 'msg-9' })]),
+    ).toEqual([
       {
         id: 'note-1',
         text: 'This is a scammer',
         author: { id: 'agent-1', name: 'Rizwan Manzoor' },
-        messageId: null,
-        createdAt: expect.anything(),
+        messageId: 'msg-9',
+        createdAt: '2026-09-25T07:41:00.000Z',
+        editedAt: '2026-09-26T11:02:10.000Z',
+        deletedAt: null,
+        deletedBy: null,
+        access: { edit: true, delete: true },
       },
     ])
   })
 
-  it('drops a deleted note rather than showing its last wording as live', () => {
+  it('keeps a deleted note as a tombstone naming who deleted it', () => {
     const tombstone = note({
       id: 'note-2',
       deletedAt: '2026-09-26T11:05:43.000Z',
@@ -475,7 +481,42 @@ describe('parseNotes', () => {
       access: { edit: false, delete: false },
     })
 
-    expect(parseNotes([note(), tombstone]).map((parsed) => parsed.id)).toEqual(['note-1'])
+    expect(parseNotes([note(), tombstone])[1]).toMatchObject({
+      id: 'note-2',
+      deletedAt: '2026-09-26T11:05:43.000Z',
+      deletedBy: { id: 'admin-1', name: 'Tajbin Khan' },
+      access: { edit: false, delete: false },
+    })
+  })
+
+  it.each([
+    ['no access block', { access: undefined }],
+    ['a null access block', { access: null }],
+    ['truthy non-booleans', { access: { edit: 'yes', delete: 1 } }],
+  ])('offers no actions for %s', (_label, overrides) => {
+    expect(parseNotes([note(overrides)])[0]?.access).toEqual({ edit: false, delete: false })
+  })
+
+  it('reads a note from an API that sends none of the newer fields', () => {
+    const { editedAt, deletedAt, deletedBy, access, ...older } = note()
+    void editedAt
+    void deletedAt
+    void deletedBy
+    void access
+    expect(parseNotes([older])[0]).toMatchObject({
+      editedAt: null,
+      deletedAt: null,
+      deletedBy: null,
+      access: { edit: false, delete: false },
+    })
+  })
+
+  it('drops a live note with no text, and keeps a tombstone without one', () => {
+    const parsed = parseNotes([
+      note({ id: 'live', text: '' }),
+      note({ id: 'gone', text: undefined, deletedAt: '2026-09-26T11:05:43.000Z' }),
+    ])
+    expect(parsed.map((n) => [n.id, n.text])).toEqual([['gone', '']])
   })
 })
 

@@ -4,10 +4,19 @@ import { refusalSentence } from '@/lib/api-result'
 import {
   attachLabel,
   createNote,
+  deleteNote as deleteNoteRequest,
   detachLabel,
   listLabels,
   listNotes,
+  updateNote,
 } from '@/lib/conversation-api'
+import {
+  refusalStalesNotes,
+  replaceNote,
+  withNoteDeleted,
+  withNoteEdited,
+} from '@/lib/note-view'
+import { getSessionUser } from '@/lib/session'
 import type { Conversation, ConversationNote, Label } from '@/lib/types'
 import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 
@@ -15,7 +24,8 @@ import { useConversationWriteRefused } from '@/lib/use-conversation-write-refuse
  * What a thread carries besides its messages: the labels on it, and the notes
  * staff have written about it.
  *
- * Two fetches and three mutations, held together because they are one screen and
+ * Two fetches and five mutations (attach, detach, and add, edit or delete a
+ * note), held together because they are one screen and
  * share its lifetime. Which of them are *allowed* is not decided here. The API
  * says so on the conversation's `access.actions`, `detailsView` in
  * `lib/conversation-access` reads it, and the caller passes the answer in as
@@ -79,6 +89,16 @@ export type ConversationDetails = {
   addNote: (text: string) => void
   addingNote: boolean
   noteError: string | null
+  /**
+   * Rewrite a note, shown at once and put back if the API refuses. Answers the
+   * refusal to show, or null when it landed.
+   */
+  editNote: (noteId: string, text: string) => Promise<string | null>
+  /**
+   * Delete a note, leaving its tombstone at once and restoring the note if the
+   * API refuses. Answers the refusal to show, or null when it landed.
+   */
+  deleteNote: (noteId: string) => Promise<string | null>
 }
 
 export function useConversationDetails({
@@ -248,6 +268,95 @@ export function useConversationDetails({
     [addingNote, conversationId, writeRefused],
   )
 
+  /** The ready list as it stands, read by the two writes below for their rollback copy. */
+  const heldNotes = useRef<NotesState>(notes)
+  useEffect(() => {
+    heldNotes.current = notes
+  }, [notes])
+
+  /**
+   * One edit or delete: the change on screen first, then the request, then the
+   * API's own copy of the note, or the held copy back with the reason.
+   * A refusal that says the list is out of date (`note_deleted`,
+   * `note_not_found`) reads the notes again; one that says the conversation
+   * copy is stale goes to `useConversationWriteRefused`, as every write does.
+   */
+  const changeNote = useCallback(
+    async (
+      noteId: string,
+      optimistic: (note: ConversationNote) => ConversationNote,
+      request: (id: string) => ReturnType<typeof updateNote>,
+      fallback: string,
+    ): Promise<string | null> => {
+      const id = conversationId
+      const held = heldNotes.current
+      if (!id || held.status !== 'ready') return fallback
+      const before = held.notes.find((note) => note.id === noteId)
+      if (!before) return fallback
+
+      setNotes((current) =>
+        current.status === 'ready'
+          ? { status: 'ready', notes: replaceNote(current.notes, optimistic(before)) }
+          : current,
+      )
+
+      const result = await request(id)
+      if (!result.ok) void writeRefused(id, result.failure)
+      if (onScreen.current !== id) return null
+
+      if (result.ok) {
+        setNotes((current) =>
+          current.status === 'ready'
+            ? { status: 'ready', notes: replaceNote(current.notes, result.value) }
+            : current,
+        )
+        return null
+      }
+
+      setNotes((current) =>
+        current.status === 'ready'
+          ? { status: 'ready', notes: replaceNote(current.notes, before) }
+          : current,
+      )
+      if (result.failure.kind === 'refused' && refusalStalesNotes(result.failure.code)) {
+        loadNotes(id)
+      }
+      return refusalSentence(result.failure, fallback) ?? fallback
+    },
+    [conversationId, loadNotes, writeRefused],
+  )
+
+  const editNote = useCallback(
+    (noteId: string, text: string) => {
+      const trimmed = text.trim()
+      return changeNote(
+        noteId,
+        (note) => withNoteEdited(note, trimmed, new Date().toISOString()),
+        (id) => updateNote(id, noteId, trimmed),
+        'The note could not be changed.',
+      )
+    },
+    [changeNote],
+  )
+
+  const deleteNote = useCallback(
+    (noteId: string) => {
+      const viewer = getSessionUser()
+      return changeNote(
+        noteId,
+        (note) =>
+          withNoteDeleted(
+            note,
+            viewer ? { id: viewer.id, name: viewer.name } : null,
+            new Date().toISOString(),
+          ),
+        (id) => deleteNoteRequest(id, noteId),
+        'The note could not be deleted.',
+      )
+    },
+    [changeNote],
+  )
+
   return {
     labels,
     reloadLabels,
@@ -260,5 +369,7 @@ export function useConversationDetails({
     addNote,
     addingNote,
     noteError,
+    editNote,
+    deleteNote,
   }
 }

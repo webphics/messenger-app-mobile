@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import {
   Redirect,
@@ -14,7 +14,8 @@ import { AppLoadingScreen } from "@/components/ui/app-loading-screen";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { chatIdFromRoute, chatIdFromSegments } from "@/lib/chat-route-id";
-import { getConversation } from "@/lib/conversation-api";
+import { refusalSentence } from "@/lib/api-result";
+import { createNote, getConversation } from "@/lib/conversation-api";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
 import { useThreadOnScreen } from "@/lib/in-app-banner";
@@ -31,6 +32,7 @@ import type { Typist } from "@/lib/realtime-events";
 import { sameTypists } from "@/lib/typing";
 import { getSession, getSessionUser } from "@/lib/session";
 import { useConversationAssignment } from "@/lib/use-conversation-assignment";
+import { useConversationWriteRefused } from "@/lib/use-conversation-write-refused";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useThreadMessages } from "@/lib/use-thread-messages";
 import type { Conversation, UserRole } from "@/lib/types";
@@ -175,6 +177,26 @@ function ConversationScreen({
   const openedId = allowed ? conversation.id : null;
 
   const thread = useThreadMessages(allowed ? conversation : null, role, author);
+
+  /**
+   * A note about one message, from the long-press menu. Nothing on this screen
+   * draws notes, so the answer is not held here: Conversation details reads the
+   * list when it opens. A refusal goes through `useConversationWriteRefused`
+   * like every other conversation write, so a stale `writeNotes` is refetched
+   * and Add note leaves the menu.
+   */
+  const writeRefused = useConversationWriteRefused();
+  const addNote = useCallback(
+    async (messageId: string, text: string): Promise<string | null> => {
+      if (!openedId) return "This conversation is no longer open.";
+      const result = await createNote(openedId, text, messageId);
+      if (result.ok) return null;
+      void writeRefused(openedId, result.failure);
+      return refusalSentence(result.failure, "The note could not be saved.") ??
+        "The note could not be saved.";
+    },
+    [openedId, writeRefused],
+  );
 
   /**
    * Engaging a thread, and taking one over.
@@ -372,6 +394,7 @@ function ConversationScreen({
       onToggleReaction={thread.react}
       onEditMessage={thread.edit}
       onDeleteMessage={thread.remove}
+      onAddNote={addNote}
       onAssign={assignment.assign}
       assigning={assignment.assigning}
       assignError={assignment.error}

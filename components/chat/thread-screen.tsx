@@ -17,6 +17,7 @@ import { AlertCircle, X } from '@/components/icons'
 import { Composer, type ComposerSendPayload } from '@/components/chat/composer'
 import { InvitationCard } from '@/components/chat/invitation-card'
 import { MessageActions } from '@/components/chat/message-actions'
+import { NoteSheet } from '@/components/chat/note-sheet'
 import { MessageEditSheet } from '@/components/chat/message-edit-sheet'
 import { ReportSheet, type ReportTarget } from '@/components/moderation/report-sheet'
 import { MessageHistorySheet } from '@/components/chat/message-history-sheet'
@@ -36,6 +37,7 @@ import { rejectUploadReason } from '@/lib/attachment-upload'
 import {
   composerView,
   messageActions,
+  messageNoteOffered,
   type WayOut,
   type WayOutButton,
 } from '@/lib/conversation-access'
@@ -66,6 +68,7 @@ import { groupReactions } from '@/lib/message-react'
 import { colors } from '@/lib/tokens'
 import { makeRefreshControl } from '@/lib/simulated-refresh'
 import { threadNotice, type ThreadNotice } from '@/lib/thread-notice'
+import { onNoteJump, takeNoteJump } from '@/lib/note-jump'
 import { jumpStep } from '@/lib/thread-jump'
 import { buildThreadRows, threadDayMarks, type ThreadRow } from '@/lib/thread-rows'
 import {
@@ -173,6 +176,12 @@ type ThreadScreenProps = {
    * thread's. Absent where nothing can delete, which offers no Delete at all.
    */
   onDeleteMessage?: (messageId: string) => Promise<string | null>
+  /**
+   * Write an internal note about a message, and answer the refusal to show or
+   * null. Offered only where `messageNoteOffered` says the conversation's
+   * `access` has `writeNotes`; absent where nothing writes notes.
+   */
+  onAddNote?: (messageId: string, text: string) => Promise<string | null>
   /**
    * Take the way out of a read-only thread the API offered: engage it, take it
    * over, or reopen it.
@@ -423,6 +432,7 @@ export function ThreadScreen({
   onToggleReaction,
   onEditMessage,
   onDeleteMessage,
+  onAddNote,
   onAssign,
   assigning = false,
   assignError = null,
@@ -653,7 +663,12 @@ export function ThreadScreen({
    * have been asked for while looking for it. Null when nothing is being looked
    * for. See `jumpStep`.
    */
-  const [jump, setJump] = useState<{ targetId: string; pagesLoaded: number } | null>(null)
+  const [jump, setJump] = useState<{
+    targetId: string
+    pagesLoaded: number
+    /** Said when the walk gives up: a quote and a note name different things. */
+    missing: string
+  } | null>(null)
   /** The original a jump landed on, flashed so the eye finds it. */
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
 
@@ -682,7 +697,7 @@ export function ThreadScreen({
     }
     if (step.kind === 'give-up') {
       setJump(null)
-      setRefusal('The original message is no longer available.')
+      setRefusal(jump.missing)
       return
     }
 
@@ -706,10 +721,30 @@ export function ThreadScreen({
       const targetId = reply?.replyTo?.id
       if (!targetId) return
       setHighlightedId(null)
-      setJump({ targetId, pagesLoaded: 0 })
+      setJump({ targetId, pagesLoaded: 0, missing: 'The original message is no longer available.' })
     },
     [messages],
   )
+
+  /**
+   * "Jump to message" from a note on Conversation details, through the same
+   * walk a quote takes. Taken on mount (details opened with no thread behind
+   * it) and whenever one is asked for while this thread sits underneath.
+   */
+  useEffect(() => {
+    const take = () => {
+      const targetId = takeNoteJump(conversation.id)
+      if (!targetId) return
+      setHighlightedId(null)
+      setJump({
+        targetId,
+        pagesLoaded: 0,
+        missing: 'The message this note is about is no longer in the conversation.',
+      })
+    }
+    take()
+    return onNoteJump(take)
+  }, [conversation.id])
 
   const jumpToDayStart = useCallback(() => {
     const mark = dayMarks[topRowIndex]
@@ -961,6 +996,41 @@ export function ThreadScreen({
     },
     [messages, onDeleteMessage],
   )
+
+  /** The message the note sheet is open on, held whole like `messageToEdit`. */
+  const [noteTarget, setNoteTarget] = useState<Message | null>(null)
+
+  /** Whether Add note is offered on this message. `messageNoteOffered` holds the rule. */
+  const canAddNote = useCallback(
+    (messageId: string) => {
+      if (!onAddNote) return false
+      const message = messages.find((item) => item.id === messageId)
+      if (!message) return false
+      return messageNoteOffered(conversation.access, message)
+    },
+    [conversation.access, messages, onAddNote],
+  )
+
+  const openNoteSheet = useCallback(
+    (messageId: string) => {
+      const message = messages.find((item) => item.id === messageId)
+      setMenu(null)
+      if (message) setNoteTarget(message)
+    },
+    [messages],
+  )
+
+  const noteAbout = useMemo(() => {
+    if (!noteTarget) return null
+    return {
+      name:
+        messageSenderName(noteTarget) ??
+        (isOutgoing(noteTarget, viewer.id)
+          ? 'You'
+          : conversationTitle(conversation, organizationNames)),
+      body: quoteAttachmentText(contentOf(noteTarget)),
+    }
+  }, [noteTarget, viewer.id, conversation, organizationNames])
 
   const openEditSheet = useCallback(
     (messageId: string) => {
@@ -1331,6 +1401,7 @@ export function ThreadScreen({
           onBlock={menuSender ? () => blockSender(menuSender) : undefined}
           blockLabel={menuSender ? `Block ${menuSender.name}` : undefined}
           onDelete={canDelete(menu.messageId) ? () => void deleteMessage(menu.messageId) : undefined}
+          onAddNote={canAddNote(menu.messageId) ? () => openNoteSheet(menu.messageId) : undefined}
         />
       ) : null}
 
@@ -1352,6 +1423,16 @@ export function ThreadScreen({
           onSave={(body) => onEditMessage(messageToEdit.id, body)}
         />
       ) : null}
+
+      <NoteSheet
+        visible={noteTarget !== null && Boolean(onAddNote)}
+        title="Add note"
+        about={noteAbout}
+        onClose={() => setNoteTarget(null)}
+        onSave={(text) =>
+          noteTarget && onAddNote ? onAddNote(noteTarget.id, text) : Promise.resolve(null)
+        }
+      />
 
       <MessageHistorySheet
         conversationId={conversation.id}

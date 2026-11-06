@@ -690,19 +690,51 @@ export async function listNotes(id: string): Promise<ApiResult<ConversationNote[
 }
 
 /**
- * Write one.
- *
- * Text only. The API also takes a `messageId`, which is what the web client's
- * note-on-a-message affordance sends and what its "Jump to message" reads back —
- * neither of which this client has, so nothing here would have one to pass.
+ * Write one, about the conversation or, with `messageId`, about one message in
+ * it. Web shows a note with a `messageId` against that message, and "Jump to
+ * message" on Conversation details reads it back.
  */
 export async function createNote(
   id: string,
   text: string,
+  messageId?: string,
 ): Promise<ApiResult<ConversationNote>> {
   const outcome = await authenticatedRequest(
     `/conversations/${encodeURIComponent(id)}/notes`,
-    { method: 'POST', body: { text } },
+    { method: 'POST', body: messageId ? { text, messageId } : { text } },
+  )
+  return readOutcome(outcome, parseNote)
+}
+
+/**
+ * Rewrite a note. Author only on the API (`ConversationsPolicy.canEditNote`),
+ * sent to this viewer as the note's `access.edit`. Answers with the note as
+ * stored, `editedAt` set; the replaced wording goes to its history.
+ */
+export async function updateNote(
+  id: string,
+  noteId: string,
+  text: string,
+): Promise<ApiResult<ConversationNote>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/notes/${encodeURIComponent(noteId)}`,
+    { method: 'PATCH', body: { text } },
+  )
+  return readOutcome(outcome, parseNote)
+}
+
+/**
+ * Delete a note: the author, or staff holding `delete_any_note`
+ * (`ConversationsPolicy.canDeleteNote`, sent as `access.delete`). A soft
+ * delete, so the API answers with the tombstone, which stays in the list.
+ */
+export async function deleteNote(
+  id: string,
+  noteId: string,
+): Promise<ApiResult<ConversationNote>> {
+  const outcome = await authenticatedRequest(
+    `/conversations/${encodeURIComponent(id)}/notes/${encodeURIComponent(noteId)}`,
+    { method: 'DELETE' },
   )
   return readOutcome(outcome, parseNote)
 }

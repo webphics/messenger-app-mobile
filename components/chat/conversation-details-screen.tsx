@@ -17,14 +17,17 @@ import {
   FileText,
   Flag,
   Image as ImageIcon,
+  Pencil,
   Plus,
   Shield,
   Tag,
+  Trash2,
   Users,
   X,
 } from '@/components/icons'
 import { InScreenHeader } from '@/components/in-screen-header'
 import { DetailsCard } from '@/components/chat/details-card'
+import { NoteSheet } from '@/components/chat/note-sheet'
 import { OnboardingPlacementSection } from '@/components/chat/onboarding-placement-section'
 import { ThreadManagementSection } from '@/components/chat/thread-management-section'
 import { ReportSheet } from '@/components/moderation/report-sheet'
@@ -32,7 +35,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { LinkedText, linkTint } from '@/components/ui/linked-text'
 import { Text } from '@/components/ui/text'
-import { chatMediaHref } from '@/lib/chat-route-id'
+import { chatHref, chatMediaHref } from '@/lib/chat-route-id'
 import {
   detailsView,
   threadActionsView,
@@ -55,6 +58,8 @@ import { conversationPeer, conversationTitle } from '@/lib/conversation-title'
 import { avatarInitials, initials, isCompanyPersona } from '@/lib/display'
 import { useKeyboardInset } from '@/lib/keyboard-inset'
 import { formatDayLabel } from '@/lib/message-day'
+import { requestNoteJump } from '@/lib/note-jump'
+import { noteActions, noteStatus, noteSubject } from '@/lib/note-view'
 import { colors, screenBottomPad } from '@/lib/tokens'
 import type {
   ConversationDetails,
@@ -201,6 +206,44 @@ export function ConversationDetailsScreen({
     ])
   })
 
+  /** The note the edit sheet is open on. */
+  const [editing, setEditing] = useState<ConversationNote | null>(null)
+
+  /**
+   * Back to the thread, which takes the jump through its quote-jump walk
+   * (`lib/note-jump`). A draft in the note field still asks first, through the
+   * same removal prevention as any other way out.
+   */
+  const jumpToMessage = useCallback(
+    (note: ConversationNote) => {
+      if (!note.messageId) return
+      requestNoteJump({ conversationId: conversation.id, messageId: note.messageId })
+      if (router.canGoBack()) router.back()
+      else router.replace(chatHref(conversation.id))
+    },
+    [conversation.id],
+  )
+
+  const { deleteNote } = details
+  const confirmDeleteNote = useCallback(
+    (note: ConversationNote) => {
+      Alert.alert('Delete this note?', 'Staff will see that it was deleted, and by whom.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              const refusal = await deleteNote(note.id)
+              if (refusal) Alert.alert('Could not delete note', refusal)
+            })()
+          },
+        },
+      ])
+    },
+    [deleteNote],
+  )
+
   return (
     <View className="flex-1 bg-bg">
       {/*
@@ -285,6 +328,9 @@ export function ConversationDetailsScreen({
               error={details.noteError}
               draft={draft}
               onChangeDraft={setDraft}
+              onJump={jumpToMessage}
+              onEdit={setEditing}
+              onDelete={confirmDeleteNote}
             />
           ) : null}
 
@@ -296,6 +342,14 @@ export function ConversationDetailsScreen({
           {isGroup ? <ReportGroupRow conversationId={conversation.id} /> : null}
         </ScrollView>
       </View>
+
+      <NoteSheet
+        visible={editing !== null}
+        title="Edit note"
+        initialText={editing?.text ?? ''}
+        onClose={() => setEditing(null)}
+        onSave={(text) => (editing ? details.editNote(editing.id, text) : Promise.resolve(null))}
+      />
     </View>
   )
 }
@@ -761,6 +815,9 @@ function NotesSection({
   error,
   draft,
   onChangeDraft,
+  onJump,
+  onEdit,
+  onDelete,
 }: {
   notes: ConversationDetails['notes']
   onReload: () => void
@@ -775,6 +832,9 @@ function NotesSection({
    */
   draft: string
   onChangeDraft: (text: string) => void
+  onJump: (note: ConversationNote) => void
+  onEdit: (note: ConversationNote) => void
+  onDelete: (note: ConversationNote) => void
 }) {
   const setDraft = onChangeDraft
 
@@ -833,7 +893,13 @@ function NotesSection({
       ) : notes.status === 'ready' ? (
         <View className="gap-2.5">
           {notes.notes.map((note) => (
-            <NoteCard key={note.id} note={note} />
+            <NoteCard
+              key={note.id}
+              note={note}
+              onJump={onJump}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
           ))}
         </View>
       ) : null}
@@ -881,8 +947,43 @@ function NotesSection({
   )
 }
 
-/** One note: who wrote it and when on the first line, what they wrote under it. */
-function NoteCard({ note }: { note: ConversationNote }) {
+/**
+ * One note: who wrote it and when on the first line, what they wrote under it,
+ * and what the API lets this viewer do with it. A deleted note keeps its place
+ * as one muted line naming who deleted it, the way web draws `deletedAt`.
+ */
+function NoteCard({
+  note,
+  onJump,
+  onEdit,
+  onDelete,
+}: {
+  note: ConversationNote
+  onJump: (note: ConversationNote) => void
+  onEdit: (note: ConversationNote) => void
+  onDelete: (note: ConversationNote) => void
+}) {
+  const status = noteStatus(note)
+  if (status.kind === 'deleted') {
+    const when = formatDayLabel(note.deletedAt ?? note.createdAt)
+    return (
+      <View
+        accessible
+        accessibilityLabel={`${status.summary}, ${when}`}
+        className="gap-0.5 rounded-2xl border border-dashed border-line bg-bg/60 p-3"
+      >
+        <Text variant="meta" className="italic text-muted">
+          {status.summary}
+        </Text>
+        <Text variant="label" className="font-normal text-muted">
+          {when}
+        </Text>
+      </View>
+    )
+  }
+
+  const offered = noteActions(note)
+  const subject = noteSubject(note)
   return (
     <View className="flex-row gap-3 rounded-2xl bg-bg p-3">
       <Avatar alt={note.author.name} className="size-8">
@@ -893,18 +994,86 @@ function NoteCard({ note }: { note: ConversationNote }) {
         </AvatarFallback>
       </Avatar>
       <View className="min-w-0 flex-1 gap-1">
-        <View className="flex-row items-baseline gap-2">
+        <View className="flex-row flex-wrap items-baseline gap-x-2">
           <Text variant="meta" numberOfLines={1} className="min-w-0 shrink font-semibold text-ink">
             {note.author.name}
           </Text>
           <Text variant="label" className="font-normal text-muted">
             {formatDayLabel(note.createdAt)}
           </Text>
+          {status.edited ? (
+            <Text variant="label" className="font-normal text-muted">
+              · Edited
+            </Text>
+          ) : null}
         </View>
         <Text variant="meta" className="text-ink">
           <LinkedText text={note.text} linkClassName={linkTint(false)} />
         </Text>
+        {offered.jump || offered.edit || offered.delete ? (
+          <View className="-ml-2 flex-row flex-wrap items-center">
+            {offered.jump ? (
+              <NoteAction
+                label="Jump to message"
+                accessibilityLabel={`Jump to the message this ${subject} is about`}
+                Icon={ChevronRight}
+                onPress={() => onJump(note)}
+              />
+            ) : null}
+            {offered.edit ? (
+              <NoteAction
+                label="Edit"
+                accessibilityLabel={`Edit ${subject}`}
+                Icon={Pencil}
+                onPress={() => onEdit(note)}
+              />
+            ) : null}
+            {offered.delete ? (
+              <NoteAction
+                label="Delete…"
+                accessibilityLabel={`Delete ${subject}`}
+                Icon={Trash2}
+                danger
+                onPress={() => onDelete(note)}
+              />
+            ) : null}
+          </View>
+        ) : null}
       </View>
     </View>
+  )
+}
+
+/** A text button under a note, padded towards a 44pt target though it draws smaller. */
+function NoteAction({
+  label,
+  accessibilityLabel,
+  Icon,
+  danger = false,
+  onPress,
+}: {
+  label: string
+  accessibilityLabel: string
+  Icon: typeof Pencil
+  danger?: boolean
+  onPress: () => void
+}) {
+  const tint = danger ? colors.danger : colors.primary
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      hitSlop={{ top: 6, bottom: 6 }}
+      className="min-h-9 flex-row items-center gap-1 rounded-full px-2 active:opacity-60"
+    >
+      <Icon color={tint} size={13} />
+      <Text
+        variant="label"
+        className={danger ? 'font-semibold text-danger' : 'font-semibold text-primary'}
+      >
+        {label}
+      </Text>
+    </Pressable>
   )
 }

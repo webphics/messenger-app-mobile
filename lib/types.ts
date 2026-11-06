@@ -160,6 +160,11 @@ export type Label = {
  * Staff-only, and never shown to the Customer — the API refuses one a Customer
  * asks for, and nothing on a Customer's screens asks. `messageId` names the
  * message it was written about, where it was written about one.
+ *
+ * A deleted note stays in the list as a tombstone (`deletedAt`, `deletedBy`),
+ * the way the API keeps it and web draws it. `access` is the API's ruling for
+ * this viewer (`ConversationsPolicy.canEditNote` / `canDeleteNote`); a payload
+ * without one offers nothing. `noteActions` in `lib/note-view` reads it.
  */
 export type ConversationNote = {
   id: string
@@ -167,6 +172,10 @@ export type ConversationNote = {
   author: { id: string; name: string }
   messageId: string | null
   createdAt: string
+  editedAt: string | null
+  deletedAt: string | null
+  deletedBy: { id: string; name: string } | null
+  access: { edit: boolean; delete: boolean }
 }
 
 /** A person named on a conversation. Presence is staff-facing and absent from a Customer's payload. */

@@ -3,7 +3,9 @@ import { clearCsrfPair, setSessionCookie } from '@/lib/api-client'
 import {
   addReaction,
   closeConversation,
+  createNote,
   createStaffDm,
+  deleteNote,
   engageConversation,
   getConversation,
   listConversations,
@@ -11,6 +13,7 @@ import {
   listMyOrganizations,
   sendMessage,
   takeOverConversation,
+  updateNote,
   uploadAttachment,
 } from '@/lib/conversation-api'
 import type { AttachmentView } from '@/lib/types'
@@ -291,6 +294,76 @@ describe('createStaffDm', () => {
     expect(JSON.parse(String(calls[calls.length - 1]?.init.body))).toEqual({
       userId: 'agent-2',
       organizationId: 'org-1',
+    })
+  })
+})
+
+describe('notes', () => {
+  const NOTE_ROW = {
+    id: 'note-1',
+    text: 'Refund approved',
+    author: { id: 'agent-1', name: 'Rizwan Manzoor' },
+    messageId: 'msg-1',
+    editedAt: null,
+    deletedAt: null,
+    deletedBy: null,
+    access: { edit: true, delete: true },
+    createdAt: '2026-11-06T04:00:00.000Z',
+  }
+
+  /** The request that carried the write, not the CSRF pre-flight before it. */
+  const write = () => calls.filter((call) => call.init?.method && call.init.method !== 'GET').at(-1)
+
+  test.each<[string, string | undefined, Record<string, unknown>]>([
+    ['about the conversation, with no messageId key', undefined, { text: 'Refund approved' }],
+    ['about one message', 'msg-1', { text: 'Refund approved', messageId: 'msg-1' }],
+  ])('createNote posts %s', async (_label, messageId, body) => {
+    enqueue(csrfResponse(), envelope(NOTE_ROW, 201))
+
+    const result = await createNote('conv-1', 'Refund approved', messageId)
+
+    expect(write()?.url).toBe(`${API_BASE_URL}/conversations/conv-1/notes`)
+    expect(JSON.parse(String(write()?.init.body))).toEqual(body)
+    expect(result.ok && result.value.messageId).toBe('msg-1')
+  })
+
+  test('updateNote patches the text on the note path, escaping both ids', async () => {
+    enqueue(csrfResponse(), envelope({ ...NOTE_ROW, text: 'Refund sent', editedAt: '2026-11-06T05:00:00.000Z' }))
+
+    const result = await updateNote('conv 1', 'note/1', 'Refund sent')
+
+    expect(write()?.init.method).toBe('PATCH')
+    expect(write()?.url).toBe(`${API_BASE_URL}/conversations/conv%201/notes/note%2F1`)
+    expect(JSON.parse(String(write()?.init.body))).toEqual({ text: 'Refund sent' })
+    expect(result.ok && result.value.editedAt).toBe('2026-11-06T05:00:00.000Z')
+  })
+
+  test('deleteNote answers with the tombstone', async () => {
+    enqueue(
+      csrfResponse(),
+      envelope({
+        ...NOTE_ROW,
+        deletedAt: '2026-11-06T05:00:00.000Z',
+        deletedBy: { id: 'admin-1', name: 'Tajbin Khan' },
+        access: { edit: false, delete: false },
+      }),
+    )
+
+    const result = await deleteNote('conv-1', 'note-1')
+
+    expect(write()?.init.method).toBe('DELETE')
+    expect(write()?.url).toBe(`${API_BASE_URL}/conversations/conv-1/notes/note-1`)
+    expect(result.ok && result.value.deletedBy).toEqual({ id: 'admin-1', name: 'Tajbin Khan' })
+  })
+
+  test('a refusal comes back as one, with its code', async () => {
+    enqueue(csrfResponse(), response(409, { statusCode: 409, message: 'This note was deleted.', code: 'note_deleted' }))
+
+    const result = await updateNote('conv-1', 'note-1', 'x')
+
+    expect(result).toEqual({
+      ok: false,
+      failure: expect.objectContaining({ kind: 'refused', message: 'This note was deleted.' }),
     })
   })
 })

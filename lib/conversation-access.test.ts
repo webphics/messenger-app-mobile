@@ -2,6 +2,7 @@ import {
   composerView,
   detailsView,
   messageActions,
+  messageNoteOffered,
   parseAccess,
   refusalMeansStale,
   threadActionsView,
@@ -265,6 +266,32 @@ describe('messageActions', () => {
 
   test('does not offer Delete while the access is unknown', () => {
     expect(messageActions(UNKNOWN_ACCESS, message({ deletable: true }), NOW).delete).toBe(false)
+  })
+})
+
+describe('messageNoteOffered', () => {
+  const message = (id = 'msg-1') =>
+    ({ id, body: 'hello', messageType: 'text', createdAt: '2026-09-26T11:55:00.000Z', editedAt: null,
+       editableUntil: null, replyTo: null, reactions: [], attachments: [], receiptStatus: 'sent',
+       fromCompany: false }) as unknown as Message
+
+  test.each<[string, unknown, boolean]>([
+    ['a Support DM offering writeNotes', { write: { state: 'open' }, actions: actions({ readNotes: true, writeNotes: true }) }, true],
+    ['notes readable and not writable', { write: { state: 'open' }, actions: actions({ readNotes: true }) }, false],
+    ['an org DM, a Group or a Customer (no writeNotes)', openPayload(), false],
+    ['writeNotes on a read-only thread', { ...readOnlyPayload({ reason: 'must_engage', wayOut: 'engage' }), actions: actions({ writeNotes: true }) }, true],
+  ])('%s → %s', (_label, payload, offered) => {
+    expect(messageNoteOffered(parseAccess(payload), message())).toBe(offered)
+  })
+
+  test('not on a message that has not reached the API', () => {
+    const payload = { write: { state: 'open' }, actions: actions({ writeNotes: true }) }
+    expect(messageNoteOffered(parseAccess(payload), message('local-123'))).toBe(false)
+  })
+
+  test('not while the access is unknown or absent', () => {
+    expect(messageNoteOffered(UNKNOWN_ACCESS, message())).toBe(false)
+    expect(messageNoteOffered(undefined, message())).toBe(false)
   })
 })
 
