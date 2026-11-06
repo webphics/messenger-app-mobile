@@ -161,6 +161,25 @@ export function isDeviceUri(url: string): boolean {
 }
 
 /**
+ * Whether a URL the API sent can name a file the API stores: an origin-free
+ * path (`/uploads/…`) or an absolute `http(s)` URL.
+ *
+ * The inverse of `isDeviceUri` for data that came off the network. A sender
+ * writes an attachment's URL, so a `file:` or `content:` one arriving in a
+ * message is somebody naming a file on *this* phone (the message database,
+ * another app's content), and opening it would hand that file to the share
+ * sheet. Those are dropped at the parse rather than trusted as already local.
+ */
+export function isServerFileUrl(url: string): boolean {
+  const value = url.trim()
+  if (value === '' || value.startsWith('//')) return false
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(value)?.[1]?.toLowerCase()
+  // No scheme is a path `resolveAttachmentUrl` joins onto the API's own origin.
+  if (!scheme) return true
+  return scheme === 'http' || scheme === 'https'
+}
+
+/**
  * The `messageType` a send carries, from what it carries.
  *
  * The API's enum is `text | media | voice`, and `voice` is not a synonym for

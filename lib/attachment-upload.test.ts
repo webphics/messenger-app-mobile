@@ -1,5 +1,6 @@
 import {
   isDeviceUri,
+  isServerFileUrl,
   MAX_UPLOAD_BYTES,
   missingFilesMessage,
   rejectUploadReason,
@@ -73,6 +74,26 @@ describe('isDeviceUri', () => {
     expect(isDeviceUri('http://10.0.2.2:4000/uploads/chat/a.jpg')).toBe(false)
   })
 
+})
+
+describe('isServerFileUrl', () => {
+  it('is true for an origin-free path or an http(s) URL', () => {
+    expect(isServerFileUrl('/uploads/chat/a.jpg')).toBe(true)
+    expect(isServerFileUrl('https://cdn.example/uploads/chat/a.jpg')).toBe(true)
+    expect(isServerFileUrl('http://10.0.2.2:4000/uploads/chat/a.jpg')).toBe(true)
+  })
+
+  it('is false for a device URI, a protocol-relative URL, or any other scheme', () => {
+    expect(isServerFileUrl('file:///data/user/0/com.thechatroute.app/files/SQLite/x.db')).toBe(false)
+    expect(isServerFileUrl('content://media/external/images/media/42')).toBe(false)
+    expect(isServerFileUrl('//evil.example/a.jpg')).toBe(false)
+    expect(isServerFileUrl('intent://scan#Intent;end')).toBe(false)
+    expect(isServerFileUrl('')).toBe(false)
+  })
+
+  it('is true for a path with no leading slash, which resolves against the API', () => {
+    expect(isServerFileUrl('uploads/chat/a.jpg')).toBe(true)
+  })
 })
 
 describe('sendMessageType', () => {

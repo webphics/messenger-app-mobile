@@ -247,6 +247,32 @@ describe('parseMessage', () => {
     expect(isStaffMessage(message!)).toBe(false)
   })
 
+  /**
+   * A sender writes an attachment's URL. One naming a file on this phone would
+   * be handed to the share sheet when tapped, so a network payload never
+   * carries one through; only the Outbox (`fromDevice`) keeps a device URI.
+   */
+  test('drops an attachment whose URL names a file on this device', () => {
+    const attachments = [
+      { type: 'application/pdf', url: '/uploads/chat/a.pdf', fileName: 'a.pdf', size: 10 },
+      {
+        type: 'application/pdf',
+        url: 'file:///data/user/0/com.thechatroute.app/files/SQLite/chatroute-store.db',
+        fileName: 'invoice.pdf',
+        size: 10,
+      },
+      { type: 'image/jpeg', url: 'content://media/external/images/media/42', fileName: null },
+      { type: 'image/jpeg', url: 'https://files.example/a.jpg', fileName: null },
+    ]
+    const row = messageRow({ fromCompany: true, attachments })
+
+    expect(parseMessage(row)?.attachments.map((attachment) => attachment.url)).toEqual([
+      '/uploads/chat/a.pdf',
+      'https://files.example/a.jpg',
+    ])
+    expect(parseMessage(row, { fromDevice: true })?.attachments).toHaveLength(4)
+  })
+
   test.each([
     ['missing, an API from before the field', undefined],
     ['not a date', 'in a while'],

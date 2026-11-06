@@ -1,4 +1,5 @@
 import { asRecord } from '@/lib/api-envelope'
+import { isServerFileUrl } from '@/lib/attachment-upload'
 import { wallPostKinds } from '@/lib/types'
 import type {
   NamedWall,
@@ -63,6 +64,9 @@ export function parseWallAttachment(data: unknown): WallPostAttachment | null {
   const kind = oneOf(row.type, ATTACHMENT_KINDS)
   const url = text(row.url)
   if (!kind || !url) return null
+  // An author writes this URL. A `file:` or `content:` one names a file on the
+  // reader's phone, which opening the attachment would hand to the share sheet.
+  if (!isServerFileUrl(url)) return null
 
   return { kind, url, fileName: text(row.fileName), size: optionalNumber(row.size) }
 }

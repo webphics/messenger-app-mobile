@@ -74,6 +74,14 @@ describe('parseWallAttachment', () => {
   it('drops a kind this build does not know rather than drawing it as an image', () => {
     expect(parseWallAttachment({ type: 'hologram', url: '/uploads/a' })).toBeNull()
   })
+
+  it('drops a URL that names a file on this device rather than one the API stores', () => {
+    expect(parseWallAttachment({ type: 'document', url: 'file:///data/a.db' })).toBeNull()
+    expect(parseWallAttachment({ type: 'image', url: 'content://media/42' })).toBeNull()
+    expect(parseWallAttachment({ type: 'image', url: '/uploads/wall/a.png' })?.url).toBe(
+      '/uploads/wall/a.png',
+    )
+  })
 })
 
 describe('parseWallContributorGrant', () => {

@@ -374,7 +374,9 @@ export function fromOutboxRows(rows: readonly unknown[]): UnsentMessage[] {
     if (typeof payload !== 'string') continue
 
     try {
-      const message = parseMessage(JSON.parse(payload))
+      // This device wrote the row, so a staged attachment's device URI is its
+      // own and stays: it is what a retry uploads.
+      const message = parseMessage(JSON.parse(payload), { fromDevice: true })
       if (message) messages.push(message)
     } catch {
       // Not JSON at all: a truncated write, or a row from a schema this build

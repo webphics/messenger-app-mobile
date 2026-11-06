@@ -1,4 +1,5 @@
 import { asRecord } from '@/lib/api-envelope'
+import { isServerFileUrl } from '@/lib/attachment-upload'
 import { parseAccess } from '@/lib/conversation-access'
 import { parseMessageComplaint, parseMessageInvitation } from '@/lib/message-invitation'
 import { parseMessageWallPost } from '@/lib/message-wall-post'
@@ -55,6 +56,13 @@ const CONVERSATION_TYPES: readonly ConversationType[] = [
 const SUPPORT_STATUSES: readonly SupportStatus[] = ['unassigned', 'engaged', 'closed']
 const WRITE_POLICIES: readonly GroupWritePolicy[] = ['everyone', 'admins', 'named']
 const MESSAGE_TYPES: readonly MessageType[] = ['text', 'media', 'voice', 'system']
+
+/**
+ * Where a payload came from. Everything is the network unless said otherwise;
+ * `fromDevice` is for a payload this device serialised itself (an Outbox row),
+ * whose attachments may still be the picker's `file:` or `content:` URIs.
+ */
+export type ParseOptions = { fromDevice?: boolean }
 const RECEIPT_STATUSES: readonly ReceiptStatus[] = ['sent', 'delivered', 'read']
 const ROLES: readonly UserRole[] = ['admin', 'agent', 'customer']
 const CONTACT_KINDS: readonly ContactKind[] = ['company', 'customer', 'staff']
@@ -295,12 +303,20 @@ export function parseConversations(value: unknown): Conversation[] {
  * duration or waveform, because it received a file rather than a voice note.
  * Both read as null here, and `storedAttachment` is what fills them back in
  * from what the recorder measured.
+ *
+ * A URL that cannot name a stored file (`file:`, `content:` and the rest) is
+ * dropped unless `fromDevice` says this payload is one this device wrote, which
+ * is the Outbox and nothing else. See `isServerFileUrl`.
  */
-export function parseAttachment(value: unknown): MessageAttachment | null {
+export function parseAttachment(
+  value: unknown,
+  options: ParseOptions = {},
+): MessageAttachment | null {
   const record = asRecord(value)
   if (!record) return null
   const url = text(record.url)
   if (!url) return null
+  if (options.fromDevice !== true && !isServerFileUrl(url)) return null
 
   const waveform = Array.isArray(record.waveform)
     ? record.waveform.filter((point): point is number => typeof point === 'number')
@@ -339,7 +355,7 @@ function replyTo(value: unknown): MessageReplyTo | null {
  * enforced: the API withholds those before they are sent, and
  * `lib/thread-state` filters on the type it did recognise.
  */
-export function parseMessage(value: unknown): Message | null {
+export function parseMessage(value: unknown, options: ParseOptions = {}): Message | null {
   const record = asRecord(value)
   if (!record) return null
 
@@ -381,7 +397,7 @@ export function parseMessage(value: unknown): Message | null {
       return parsed ? [parsed] : []
     }),
     attachments: records(record.attachments).flatMap((item) => {
-      const parsed = parseAttachment(item)
+      const parsed = parseAttachment(item, options)
       return parsed ? [parsed] : []
     }),
     receiptStatus: oneOf(record.receiptStatus, RECEIPT_STATUSES) ?? ('sent' as const),
