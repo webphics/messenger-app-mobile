@@ -20,6 +20,7 @@ import {
   Shield,
   ShieldCheck,
 } from "@/components/icons";
+import { ForgotPasswordLink } from "@/components/auth/forgot-password-link";
 import { InScreenHeader } from "@/components/in-screen-header";
 import { SetupQrCode } from "@/components/settings/setup-qr-code";
 import { Button } from "@/components/ui/button";
@@ -806,6 +807,18 @@ export function AccountTwoFactorScreen() {
                   {TWO_FACTOR_PASSWORD_COPY.hint}
                 </Text>
               )}
+
+              {/* The way out for somebody signed in who no longer knows the
+                  password this asks for. Inside the branch above, so an account
+                  with no password never sees it. An account with no address
+                  has nowhere to send a link, so it draws nothing. */}
+              {account?.email.trim() ? (
+                <ForgotPasswordLink
+                  email={account.email.trim()}
+                  audience="own"
+                  disabled={busy !== null}
+                />
+              ) : null}
             </View>
           ) : null}
 

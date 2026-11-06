@@ -17,9 +17,10 @@ import { colors } from "@/lib/tokens";
 /**
  * The way out for somebody who cannot prove a password: email a reset link.
  *
- * Drawn under the field it rescues, on the Change password screen and on the
- * sign-in password step. `audience` says whose address it is: the signed-in
- * person's own on Change password, or whatever was typed on sign-in, where the
+ * Drawn under the field it rescues: on the Change password screen, on the
+ * two-factor screen's password prompt, and on the sign-in password step.
+ * `audience` says whose address it is: the signed-in person's own on the two
+ * settings screens, or whatever was typed on sign-in, where the
  * sentence must not say whether the address has an account.
  *
  * `email` is null when the sign-in identifier is a username. The API sends
