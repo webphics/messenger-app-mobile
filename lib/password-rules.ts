@@ -204,14 +204,10 @@ export function checkPassword(
  * password yet" and "you are replacing the one you have" are different news, and
  * a sentence covering both would be vague enough to be useless to either person.
  *
- * The success line says the session survived, which is ticket 06's own
- * acceptance criterion and a fact about the API rather than a reassurance this
- * client invented. `auth.service.ts` calls Better Auth's `setPassword` and
- * `changePassword` with the body alone. Neither passes `revokeOtherSessions`,
- * and neither controller appends a `Set-Cookie` the way `updateProfile` does,
- * so no session is revoked and the session cookie this app holds is not rotated.
- * Read from `api/src/modules/auth/auth.controller.ts` and its service rather
- * than taken on trust.
+ * The success line says what the API did, rather than a reassurance this client
+ * invented. Since 2026-11-06 both routes sign out every other session and keep
+ * this device signed in (change-password by replacing its cookie, which
+ * `lib/password-api` adopts). See `api/docs/api/auth.md`.
  */
 export const PASSWORD_COPY: Record<
   PasswordMode,
@@ -227,13 +223,13 @@ export const PASSWORD_COPY: Record<
     description:
       "This account signs in by link or with Google. A password gives you another way in when email is not to hand.",
     submitLabel: "Set password",
-    success: "Password set. You are still signed in on this device.",
+    success: "Password set. You are still signed in here, and your other devices are signed out.",
   },
   change: {
     title: "Change your password",
     description:
       "Enter the password you use now, then the one you want instead.",
     submitLabel: "Change password",
-    success: "Password changed. You are still signed in on this device.",
+    success: "Password changed. You are still signed in here, and your other devices are signed out.",
   },
 };

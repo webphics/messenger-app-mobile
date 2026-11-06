@@ -1,4 +1,4 @@
-import { authenticatedRequest } from "@/lib/auth-service";
+import { adoptReplacedSessionCookie, authenticatedRequest } from "@/lib/auth-service";
 import { writeKeptPerson } from "@/lib/keychain";
 import { changePassword, setPassword } from "@/lib/password-api";
 import { getSessionUser, setSessionUser } from "@/lib/session";
@@ -20,13 +20,20 @@ import { getSessionUser, setSessionUser } from "@/lib/session";
  * point is that the snapshot a screen would read has actually moved.
  */
 
-jest.mock("@/lib/auth-service", () => ({ authenticatedRequest: jest.fn() }));
+jest.mock("@/lib/auth-service", () => ({
+  authenticatedRequest: jest.fn(),
+  adoptReplacedSessionCookie: jest.fn(),
+  currentCredentialEpoch: jest.fn(() => 0),
+}));
 jest.mock("@/lib/keychain", () => ({ writeKeptPerson: jest.fn() }));
 
 const request = authenticatedRequest as jest.MockedFunction<
   typeof authenticatedRequest
 >;
 const kept = writeKeptPerson as jest.MockedFunction<typeof writeKeptPerson>;
+const adopt = adoptReplacedSessionCookie as jest.MockedFunction<
+  typeof adoptReplacedSessionCookie
+>;
 
 /** Who the device thought was signed in: an account with no password. */
 const WITHOUT_PASSWORD = {
@@ -138,6 +145,20 @@ describe("a password that was changed", () => {
     expect(kept).toHaveBeenCalledWith(
       expect.objectContaining({ name: "Ada L.", hasPassword: true }),
     );
+  });
+
+  /**
+   * Since 2026-11-06 the API signs out every other session on a change and
+   * replaces this one, so the new cookie has to be kept or the next request is
+   * a 401.
+   */
+  test("adopts the replaced Session cookie", async () => {
+    const outcome = answered(WITH_PASSWORD);
+    request.mockResolvedValueOnce(outcome);
+
+    await changePassword({ currentPassword: "the-old-one", newPassword: "the-new-one" });
+
+    expect(adopt).toHaveBeenCalledWith(outcome, 0);
   });
 });
 

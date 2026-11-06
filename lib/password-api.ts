@@ -1,6 +1,10 @@
 import { readOutcome, type ApiResult } from "@/lib/api-result";
 import { parseSessionUser } from "@/lib/auth-response";
-import { authenticatedRequest } from "@/lib/auth-service";
+import {
+  adoptReplacedSessionCookie,
+  authenticatedRequest,
+  currentCredentialEpoch,
+} from "@/lib/auth-service";
 import { writeKeptPerson } from "@/lib/keychain";
 import { getSessionUser, setSessionUser } from "@/lib/session";
 import type { SessionUser } from "@/lib/types";
@@ -37,14 +41,14 @@ import type { SessionUser } from "@/lib/types";
  * state is the caller's, through `accountUpdated` on `useAuth()`, for the same
  * reason `saveProfile` dispatches its own.
  *
- * ## A successful write leaves the person signed in
+ * ## A successful write leaves this device signed in, and only this one
  *
- * Ticket 06 asks for it and the API already does it. `AuthService.setUserPassword`
- * and `changeUserPassword` call Better Auth with the body alone: neither passes
- * `revokeOtherSessions`, and neither controller appends a `Set-Cookie` the way
- * `updateProfile` does, so no session is revoked and the cookie this client holds
- * is not rotated. Read from `api/src/modules/auth/auth.controller.ts` and
- * `auth.service.ts` rather than assumed.
+ * Since 2026-11-06 both routes sign out every other session. Set-password keeps
+ * this one as it is. Change-password goes through Better Auth's
+ * `revokeOtherSessions`, which deletes every session including this one and
+ * issues a new one in a `Set-Cookie`, so `changePassword` adopts that cookie
+ * (`adoptReplacedSessionCookie`, as `lib/profile-api` does) or the next request
+ * would be a 401 that signs the person out. See `docs/api/auth.md`.
  */
 
 const SET_PASSWORD_PATH = "/auth/set-password";
@@ -116,6 +120,7 @@ export async function changePassword(input: {
   currentPassword: string;
   newPassword: string;
 }): Promise<ApiResult<SessionUser>> {
+  const startedAt = currentCredentialEpoch();
   const outcome = await authenticatedRequest(CHANGE_PASSWORD_PATH, {
     method: "POST",
     body: {
@@ -125,6 +130,9 @@ export async function changePassword(input: {
   });
 
   const result = readOutcome(outcome, parseSessionUser);
+  if (!result.ok) return result;
 
-  return result.ok ? { ok: true, value: await holdUpdatedPerson(result.value) } : result;
+  // The cookie first: the session it replaces no longer exists on the server.
+  await adoptReplacedSessionCookie(outcome, startedAt);
+  return { ok: true, value: await holdUpdatedPerson(result.value) };
 }

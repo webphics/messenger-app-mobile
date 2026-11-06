@@ -1,8 +1,10 @@
 import { io, type Socket } from 'socket.io-client'
 
+import { getSessionCookie } from '@/lib/api-client'
 import { API_BASE_URL } from '@/lib/api-config'
 import { userAgentHeaders } from '@/lib/app-user-agent'
 import { REALTIME_NAMESPACE } from '@/lib/realtime-events'
+import { shouldRetryAfterServerHangUp } from '@/lib/realtime-reconnect'
 
 /**
  * The one place this app opens a socket to the API.
@@ -14,8 +16,8 @@ import { REALTIME_NAMESPACE } from '@/lib/realtime-events'
  * for why that works over the websocket transport on React Native, and why this
  * asks for that transport and no other.
  *
- * Nothing here interprets a payload — `lib/realtime-events` does that — and
- * nothing here holds state. It builds a connection and hands it back.
+ * Nothing here interprets a payload — `lib/realtime-events` does that. It builds
+ * a connection, arms the one reconnect after a server close, and hands it back.
  */
 
 /**
@@ -39,7 +41,7 @@ export function connectRealtime(
   sessionCookie: string,
   options: { forceNew?: boolean } = {},
 ): Socket {
-  return io(REALTIME_URL, {
+  const socket = io(REALTIME_URL, {
     // Websocket only. The polling transport this would otherwise start on sends
     // its handshake through React Native's own networking stack, which keeps a
     // cookie store of its own — the same store ADR-0004 takes out of the path
@@ -63,4 +65,21 @@ export function connectRealtime(
     extraHeaders: { Cookie: sessionCookie, origin: '', ...userAgentHeaders() },
     forceNew: options.forceNew ?? false,
   })
+
+  // The server closes a socket when its session ends or the person's role,
+  // password or two-factor changes. Reconnect once with the cookie this app
+  // holds now, which a password change has just replaced. No cookie means the
+  // session has gone here too, so nothing is retried. See `lib/realtime-reconnect`.
+  let lastRetryAt: number | null = null
+  socket.on('disconnect', (reason) => {
+    const now = Date.now()
+    if (!shouldRetryAfterServerHangUp(reason, lastRetryAt, now)) return
+    const cookie = getSessionCookie()
+    if (!cookie) return
+    lastRetryAt = now
+    socket.io.opts.extraHeaders = { ...socket.io.opts.extraHeaders, Cookie: cookie }
+    socket.connect()
+  })
+
+  return socket
 }
