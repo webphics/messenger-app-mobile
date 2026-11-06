@@ -315,6 +315,8 @@ export const TWO_FACTOR_SETUP_COPY = {
   openAccessibilityLabel: "Add this account to an authenticator app on this phone",
   openFailed:
     "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
+  scanHint: "Or scan this from another device.",
+  qrAccessibilityLabel: "QR code for your authenticator app",
   keyLabel: "Setup key",
   copyKeyLabel: "Copy key",
   copyKeyAccessibilityLabel: "Copy the setup key to the clipboard",

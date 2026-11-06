@@ -21,6 +21,7 @@ import {
   ShieldCheck,
 } from "@/components/icons";
 import { InScreenHeader } from "@/components/in-screen-header";
+import { SetupQrCode } from "@/components/settings/setup-qr-code";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
@@ -65,7 +66,8 @@ import {
  *
  * With two-factor off the one control is turning it on (ticket 08), and it
  * opens a setup card in place rather than a screen: the key for the
- * authenticator app, the backup codes, and the code that proves the app has the
+ * authenticator app (a link that opens one on this phone, a QR code for one on
+ * another, and the key as text), the backup codes, and the code that proves the app has the
  * key. Only that last step turns anything on, which is better-auth's rule and
  * not this screen's, so a person who cancels or walks away is left with
  * two-factor off and nothing to undo. The codes are shown before the code field
@@ -552,6 +554,15 @@ export function AccountTwoFactorScreen() {
                   {TWO_FACTOR_SETUP_COPY.openFailed}
                 </Text>
               ) : null}
+              {/* The way in from a second phone. Inside the setup branch, so
+                  cancelling or finishing unmounts it with the key. */}
+              <Text variant="label" className="mt-1 font-normal text-muted">
+                {TWO_FACTOR_SETUP_COPY.scanHint}
+              </Text>
+              <SetupQrCode
+                text={setup.totpURI}
+                accessibilityLabel={TWO_FACTOR_SETUP_COPY.qrAccessibilityLabel}
+              />
               <View className="gap-1 rounded-2xl bg-line/35 p-3">
                 <Text variant="label" className="font-normal text-muted">
                   {TWO_FACTOR_SETUP_COPY.keyLabel}
