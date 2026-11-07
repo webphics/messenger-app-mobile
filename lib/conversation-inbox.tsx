@@ -10,6 +10,7 @@ import {
 } from 'react'
 
 import { useAuth } from '@/lib/auth-context'
+import { needsTerms } from '@/lib/onboarding-gate'
 import {
   ensureSupportConversation,
   listConversations,
@@ -401,6 +402,39 @@ function useConversationInboxState(): ConversationInboxView {
       deadline.current?.reset()
     }
   }, [viewerId, load])
+
+  /**
+   * The load again, once the person agrees to the Terms of Use.
+   *
+   * The first load starts at sign-in, while the terms gate is still on screen,
+   * and the API refuses it with `terms_required`. Agreeing changes nothing the
+   * effect above is keyed on, so without this the Messages tab went on showing
+   * that refusal ("Agree to the Terms of Use to continue") after the person had
+   * agreed, until they tapped Try again. The first load still runs while the
+   * terms are owed, because the Launch gate waits for it to settle.
+   *
+   * A `first` load, so failing again keeps any Restored rows; the Launch
+   * deadline has already settled, so its `arm` does nothing here.
+   */
+  const owesTerms = state.status === 'signed-in' && needsTerms(state.user)
+  const owedTerms = useRef(false)
+  useEffect(() => {
+    if (!viewerId) {
+      owedTerms.current = false
+      return
+    }
+    if (owesTerms) {
+      owedTerms.current = true
+      return
+    }
+    if (!owedTerms.current) return
+    owedTerms.current = false
+    // The refusal on screen is about terms that are now agreed, so it gives
+    // way to the spinner while the list is read again.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reacting to the person agreeing, which arrives as auth state; the read it starts is guarded by the load's generation.
+    setInbox((current) => (current.status === 'failed' ? { status: 'loading' } : current))
+    void load('first')
+  }, [viewerId, owesTerms, load])
 
   const reload = useCallback(() => {
     void load('refresh')

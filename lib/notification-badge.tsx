@@ -12,6 +12,7 @@ import { AppState } from 'react-native'
 
 import { useAuth } from '@/lib/auth-context'
 import { readUnreadNotificationCount } from '@/lib/notification-api'
+import { needsTerms } from '@/lib/onboarding-gate'
 import { useRealtimeEvents } from '@/lib/realtime-context'
 
 /**
@@ -80,16 +81,22 @@ export function NotificationBadgeProvider({ children }: { children: ReactNode })
     })
   }, [setCount])
 
+  /**
+   * Read once the person may use the API. Before they agree to the Terms of
+   * Use the API refuses the read with `terms_required`, so the badge would sit
+   * at zero until the app next came to the foreground.
+   */
+  const owesTerms = state.status === 'signed-in' && needsTerms(state.user)
   useEffect(() => {
     generation.current += 1
-    if (!userId) return
+    if (!userId || owesTerms) return
 
     refetch()
     const subscription = AppState.addEventListener('change', (next) => {
       if (next === 'active') refetch()
     })
     return () => subscription.remove()
-  }, [refetch, userId])
+  }, [refetch, userId, owesTerms])
 
   useRealtimeEvents((event) => {
     if (!userId) return

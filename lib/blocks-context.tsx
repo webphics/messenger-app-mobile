@@ -12,6 +12,7 @@ import {
 import type { ApiResult } from '@/lib/api-result'
 import { useAuth } from '@/lib/auth-context'
 import { blockPerson, listBlockedPeople, unblockPerson } from '@/lib/block-api'
+import { needsTerms } from '@/lib/onboarding-gate'
 import {
   blockedIdSet,
   withBlockedPerson,
@@ -80,10 +81,16 @@ export function BlocksProvider({ children }: { children: ReactNode }) {
     return result
   }, [])
 
+  /**
+   * Read once the person may use the API. Before they agree to the Terms of
+   * Use the API refuses the read with `terms_required`, and agreeing changes
+   * nothing else this is keyed on, so the list would never be read.
+   */
+  const owesTerms = state.status === 'signed-in' && needsTerms(state.user)
   useEffect(() => {
     generation.current += 1
-    if (userId) void reload()
-  }, [reload, userId])
+    if (userId && !owesTerms) void reload()
+  }, [reload, userId, owesTerms])
 
   const block = useCallback(async (target: string) => {
     const result = await blockPerson(target)
