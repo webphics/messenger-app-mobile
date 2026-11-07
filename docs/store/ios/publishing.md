@@ -41,9 +41,9 @@ things:
   The API verifies the token with the bundle ID as audience and revokes the Apple token when an
   account is deleted (`api/src/modules/auth/apple-sign-in.ts`), which Apple requires. It needs
   `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` set on the production
-  API (Coolify). **They were not set on 2026-11-04**: `POST /auth/apple/nonce` answered
-  `503 apple_sign_in_unavailable`, so the Apple button fails in a build pointed at production, and
-  App Review rejects an app whose Sign in with Apple does not work.
+  API (Coolify). They were set on 2026-11-04: `POST /auth/apple/nonce` answered `503
+  apple_sign_in_unavailable` that morning and `200` from 13:27 UTC. A real sign-in on an iPhone,
+  then deleting that account, is what proves the key ID, team and key match.
 - Apple team: `6X9889N2PN`, an individual team. That is the `APPLE_TEAM_ID` and the prefix in
   `apple-app-site-association`.
 - Google sign-in: the iOS OAuth client is in every `env` block; the URL scheme is derived in

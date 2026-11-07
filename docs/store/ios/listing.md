@@ -38,17 +38,21 @@ Work the Unassigned pool and claim a thread with one tap. Reply with text, photo
 FOR ADMINS
 Oversight that fits in a pocket: the account directory, organisations and invitations, labels, saved responses, the audit log and analytics charts. Take over a thread when it needs you.
 
+BUILT TO BE REACHABLE
+Push notifications bring a reply to your lock screen when the app is closed, and tapping one opens the thread. In the app, a quiet banner tells you about a message landing in another conversation.
+
 WORKS WITHOUT A SIGNAL
 ChatRoute keeps your conversations and recent messages on the device. A cold start opens on what your phone last knew, and a message that could not be sent waits for you rather than disappearing.
 
 ALSO IN THE APP
 Communities and group conversations. The Wall for announcements. Reactions and replies. Active sessions, password and two-factor sign-in managed from Settings. Signing out removes everything ChatRoute kept on the device.
 
-ChatRoute is for organisations that run it. Sign in with the email your organisation knows, a magic link or your Google account.
+ChatRoute is for organisations that run it. Sign in with the email your organisation knows, a magic link, your Google account or Sign in with Apple.
 ```
 
-The _Built to be reachable_ paragraph from the Android description is left out on purpose: push is
-not wired on iOS yet (`publishing.md`). Add it back when APNs ships.
+_Built to be reachable_ matches the Android description. The APNs key is on EAS (`publishing.md`),
+but push has not been seen arriving on a real iPhone yet. Confirm it in TestFlight before
+submitting; if it does not arrive, take the paragraph out rather than ship a claim that is false.
 
 ## ASO notes (App Store)
 
@@ -77,8 +81,13 @@ with _organization_ swapped in.
 
 ## Screenshot captions
 
-Drawn on the images (see `images.md`), Manrope ExtraBold headline, Manrope Regular sub-line. Seven
-for iOS, since the push screenshot is Android-only for now.
+Drawn on the images (see `images.md`), Manrope ExtraBold headline, Manrope Regular sub-line. The
+first release uploads 1 to 6 from `screenshots/iphone-6.3/`, scaled from the 1320 × 2868 masters
+to 1206 × 2622, because App Store Connect's iPhone tab (iPhone with Dynamic Island, medium
+display) accepts only the 6.1"/6.3" sizes: 1179 × 2556 or 1206 × 2622. Number 7 is left
+out: its capture comes from Android, so it shows Google without the Continue with Apple button the
+iOS sign-in screen has, and older footer text. Bring it back from an iPhone capture of the TestFlight
+build, with the sub-line changed to _Password, magic link, Google, Apple_.
 
 | #   | Caption                            | Sub-line                                                   |
 | --- | ---------------------------------- | ---------------------------------------------------------- |
@@ -93,7 +102,7 @@ for iOS, since the push screenshot is Android-only for now.
 ## What's New (first release, 4000)
 
 ```
-First release of ChatRoute for iPhone and iPad.
+First release of ChatRoute for iPhone.
 - Support conversations for Customers, Agents and Admins
 - Photos, documents and voice notes
 - Works offline on what the phone last knew
@@ -106,7 +115,7 @@ First release of ChatRoute for iPhone and iPad.
 | ------------------------------------------------------------ | --------- | ------------------ | ----------------- | ------------------------------------- |
 | Contact info: name, email, phone                             | yes       | yes                | no                | App functionality, account management |
 | User content: messages, photos or videos, audio, other files | yes       | yes                | no                | App functionality                     |
-| Identifiers: device ID (push token, Android only today)      | yes       | yes                | no                | App functionality                     |
+| Identifiers: device ID (push token)                          | yes       | yes                | no                | App functionality                     |
 | Diagnostics                                                  | no        | —                  | —                 | —                                     |
 | Location, contacts, financial, health, browsing, purchases   | no        | —                  | —                 | —                                     |
 
