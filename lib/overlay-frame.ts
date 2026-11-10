@@ -145,6 +145,39 @@ export function trayStyle(
   return { top: rect.y + rect.height / 2 - TRAY_Y_NUDGE, ...sideInset(rect, outgoing, hostWidth) }
 }
 
+/** Gap between the reaction bar and the bubble it belongs to. */
+export const REACTION_BAR_GAP = 8
+/** Keeps the bar off the screen's top edge. */
+export const REACTION_BAR_EDGE = 8
+
+/**
+ * Where the reaction bar sits: above the bubble, hugging its side, like the
+ * long-press bar in the common messengers. A bubble too near the top puts it
+ * below instead, and it never drops into `bottomReserve`, the strip the action
+ * bar covers.
+ */
+export function reactionBarStyle(
+  rect: Rect,
+  outgoing: boolean,
+  host: { width: number; height: number },
+  barHeight: number,
+  bottomReserve: number,
+  barWidth = 0,
+): { top: number; left?: number; right?: number } {
+  const above = rect.y - barHeight - REACTION_BAR_GAP
+  const below = rect.y + rect.height + REACTION_BAR_GAP
+  const lowest = host.height - bottomReserve - barHeight - REACTION_BAR_GAP
+  const preferred = above >= REACTION_BAR_EDGE ? above : below
+  const top = Math.max(REACTION_BAR_EDGE, Math.min(preferred, lowest))
+  // Hug the bubble's side, but slide inwards rather than run off the far edge.
+  const furthest = Math.max(REACTION_BAR_EDGE, host.width - barWidth - REACTION_BAR_EDGE)
+  const clamp = (inset: number) => Math.min(Math.max(REACTION_BAR_EDGE, inset), furthest)
+  const side = outgoing
+    ? { right: clamp(host.width - rect.x - rect.width) }
+    : { left: clamp(rect.x) }
+  return { top, ...side }
+}
+
 export function replyStyle(
   rect: Rect,
   outgoing: boolean,

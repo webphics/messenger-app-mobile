@@ -99,7 +99,7 @@ function Sheet({ target, onClose }: { target: ReportTarget; onClose: () => void 
           className="absolute inset-0"
         />
         <View
-          className="max-h-[90%] gap-3 rounded-t-3xl border-t border-line/80 bg-surface px-4 pt-3"
+          className="max-h-[80%] gap-3 rounded-t-3xl border-t border-line/80 bg-surface px-4 pt-3"
           style={{ paddingBottom: screenBottomPad(insets.bottom, 16) }}
         >
           <View className="h-1 w-10 self-center rounded-full bg-line" />
@@ -176,20 +176,21 @@ function Sheet({ target, onClose }: { target: ReportTarget; onClose: () => void 
                     )
                   })}
                 </View>
-
-                <TextInput
-                  value={details}
-                  onChangeText={setDetails}
-                  multiline
-                  maxLength={REPORT_DETAILS_MAX}
-                  placeholder={reason === 'other' ? 'What is wrong with it…' : 'Anything else we should know (optional)…'}
-                  placeholderTextColor={colors.muted}
-                  accessibilityLabel="Note for the reviewer"
-                  editable={!sending}
-                  className="mt-1 min-h-24 rounded-xl border border-line/70 bg-bg px-3 py-2.5 font-normal text-base text-ink"
-                  style={{ textAlignVertical: 'top' }}
-                />
               </ScrollView>
+
+              {/* Outside the list, so only the reasons scroll and the note stays in view. */}
+              <TextInput
+                value={details}
+                onChangeText={setDetails}
+                multiline
+                maxLength={REPORT_DETAILS_MAX}
+                placeholder={reason === 'other' ? 'What is wrong with it…' : 'Anything else we should know (optional)…'}
+                placeholderTextColor={colors.muted}
+                accessibilityLabel="Note for the reviewer"
+                editable={!sending}
+                className="max-h-32 min-h-20 rounded-xl border border-line/70 bg-bg px-3 py-2.5 font-normal text-base text-ink"
+                style={{ textAlignVertical: 'top' }}
+              />
 
               {error ? (
                 <Text variant="meta" accessibilityLiveRegion="polite" className="text-danger">

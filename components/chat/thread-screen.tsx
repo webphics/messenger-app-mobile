@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
+import * as Clipboard from 'expo-clipboard'
 import { useReducedMotion } from 'react-native-reanimated'
 
 import { AlertCircle, X } from '@/components/icons'
@@ -898,6 +899,18 @@ export function ThreadScreen({
   )
   const menuSender = menuModeration?.block ?? null
 
+  /** The words Copy puts on the clipboard, or null where there are none. */
+  const menuCopyText = useMemo(() => {
+    if (!menu) return null
+    const body = messages.find((item) => item.id === menu.messageId)?.body.trim()
+    return body ? body : null
+  }, [menu, messages])
+
+  const copyMessage = useCallback((text: string) => {
+    setMenu(null)
+    void Clipboard.setStringAsync(text)
+  }, [])
+
   const reportMessage = useCallback(
     (messageId: string) => {
       setMenu(null)
@@ -1392,6 +1405,7 @@ export function ThreadScreen({
               : undefined
           }
           onReply={readOnly ? undefined : () => handleReply(menu.messageId)}
+          onCopy={menuCopyText ? () => copyMessage(menuCopyText) : undefined}
           onEdit={canEdit(menu.messageId) ? () => openEditSheet(menu.messageId) : undefined}
           onHistory={
             canShowHistory(menu.messageId) ? () => openEditHistory(menu.messageId) : undefined

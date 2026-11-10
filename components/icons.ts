@@ -65,6 +65,7 @@ export { default as Mail } from "lucide-react-native/icons/mail";
 export { default as MailCheck } from "lucide-react-native/icons/mail-check";
 export { default as MailPlus } from "lucide-react-native/icons/mail-plus";
 export { default as Megaphone } from "lucide-react-native/icons/megaphone";
+export { default as Menu } from "lucide-react-native/icons/menu";
 export { default as MessageCircle } from "lucide-react-native/icons/message-circle";
 export { default as MessageSquare } from "lucide-react-native/icons/message-square";
 export { default as Mic } from "lucide-react-native/icons/mic";
