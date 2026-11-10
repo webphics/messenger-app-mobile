@@ -1,4 +1,4 @@
-import { attachmentFromAsset } from '@/lib/attachments'
+import { attachmentFromAsset, attachmentFromPastedImage } from '@/lib/attachments'
 
 /**
  * The seam between the picker's asset and this app's attachment. What is
@@ -31,5 +31,22 @@ describe('attachmentFromAsset', () => {
 
   test('a photo has no duration, whatever the picker put there', () => {
     expect(attachmentFromAsset(asset({ duration: 5023 })).durationMs).toBeUndefined()
+  })
+})
+
+describe('attachmentFromPastedImage', () => {
+  test('is an image named after the file the paste wrote', () => {
+    expect(
+      attachmentFromPastedImage('file:///data/user/0/com.thechatroute.app/cache/1731200000000_0.png'),
+    ).toEqual({
+      uri: 'file:///data/user/0/com.thechatroute.app/cache/1731200000000_0.png',
+      name: '1731200000000_0.png',
+      size: null,
+      kind: 'image',
+    })
+  })
+
+  test('falls back to a name when the URI ends in a slash', () => {
+    expect(attachmentFromPastedImage('file:///cache/').name).toBe('pasted-image.jpg')
   })
 })

@@ -47,7 +47,9 @@ import { Waveform } from "@/components/chat/waveform";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { TextInputWrapper, type PasteEventPayload } from "expo-paste-input";
 import {
+	attachmentFromPastedImage,
 	classifyPermissionOutcome,
 	fileNameFromUri,
 	formatBytes,
@@ -518,6 +520,21 @@ export function Composer({
 		setStaged(attachment);
 	}
 
+	/**
+	 * An image pasted into the field becomes the staged attachment, as if it had
+	 * come from the picker. React Native's own field drops anything that is not
+	 * text, so `TextInputWrapper` catches it natively first. Text pastes pass
+	 * through untouched and are not handled here. The composer holds one
+	 * attachment, so of several pasted images the first is kept.
+	 */
+	function handlePaste(payload: PasteEventPayload) {
+		if (payload.type !== "images" || recording) return;
+		const uri = payload.uris[0];
+		if (!uri) return;
+		setEmojiOpen(false);
+		setStaged(attachmentFromPastedImage(uri));
+	}
+
 	function handleCloseAttach() {
 		setAttachOpen(false);
 		if (!pickerAfterSheetRef.current) return;
@@ -715,26 +732,31 @@ export function Composer({
 							/>
 						) : null}
 						<View className="flex-row items-end">
-							<Input
-								ref={inputRef}
-								value={value}
-								onChangeText={onChangeText}
-								onSelectionChange={(event) => {
-									selectionRef.current = event.nativeEvent.selection;
-								}}
-								// A tap on the field while the panel is up asks for the keyboard.
-								onFocus={() => setEmojiOpen(false)}
-								placeholder={
-									wallPost
-										? "Add a message about this post…"
-										: replyTo
-											? "Write a reply…"
-											: "Type a message…"
-								}
-								accessibilityLabel="Message"
-								multiline
-								className="max-h-28 min-h-7 h-auto min-w-0 flex-1 border-0 bg-transparent px-1 py-1 font-sans text-base text-ink"
-							/>
+							<TextInputWrapper
+								onPaste={handlePaste}
+								style={{ flex: 1, minWidth: 0 }}
+							>
+								<Input
+									ref={inputRef}
+									value={value}
+									onChangeText={onChangeText}
+									onSelectionChange={(event) => {
+										selectionRef.current = event.nativeEvent.selection;
+									}}
+									// A tap on the field while the panel is up asks for the keyboard.
+									onFocus={() => setEmojiOpen(false)}
+									placeholder={
+										wallPost
+											? "Add a message about this post…"
+											: replyTo
+												? "Write a reply…"
+												: "Type a message…"
+									}
+									accessibilityLabel="Message"
+									multiline
+									className="max-h-28 min-h-7 h-auto min-w-0 flex-1 border-0 bg-transparent px-1 py-1 font-sans text-base text-ink"
+								/>
+							</TextInputWrapper>
 							{/* Inside the field, trailing, where Messenger keeps it. */}
 							<Pressable
 								accessibilityRole="button"

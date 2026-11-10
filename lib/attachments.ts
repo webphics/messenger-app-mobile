@@ -98,6 +98,24 @@ export function attachmentFromAsset(
 }
 
 /**
+ * An image pasted into the composer, in the shape a picked one takes.
+ *
+ * `expo-paste-input` decodes what was on the clipboard and writes it under the
+ * app's cache directory, which no backup reaches (ADR-0011), and hands back a
+ * `file://` URI with nothing else: no size, no pixel dimensions. The bubble
+ * reads those off the image itself, the way it does for any picked photo whose
+ * picker did not report them.
+ */
+export function attachmentFromPastedImage(uri: string): PickedAttachment {
+  return {
+    uri,
+    name: fileNameFromUri(uri, 'pasted-image.jpg'),
+    size: null,
+    kind: 'image',
+  }
+}
+
+/**
  * Photo or video from the device library.
  *
  * Asks for no permission. Android opens the system Photo Picker and iOS opens PHPicker, and
