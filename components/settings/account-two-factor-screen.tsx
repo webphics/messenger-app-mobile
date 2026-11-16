@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Platform,
   ScrollView,
   View,
   type TextInputInstance,
@@ -546,6 +547,11 @@ export function AccountTwoFactorScreen() {
                 <ExternalLink color={colors.primaryForeground} size={16} />
                 <Text>{TWO_FACTOR_SETUP_COPY.openLabel}</Text>
               </Button>
+              {Platform.OS === "ios" ? (
+                <Text variant="label" className="font-normal leading-5 text-muted">
+                  {TWO_FACTOR_SETUP_COPY.openHintIos}
+                </Text>
+              ) : null}
               {openFailed ? (
                 <Text
                   accessibilityLiveRegion="polite"

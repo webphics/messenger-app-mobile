@@ -313,6 +313,14 @@ export const TWO_FACTOR_SETUP_COPY = {
   keyStep: "1. Add this account to your authenticator app.",
   openLabel: "Open in authenticator app",
   openAccessibilityLabel: "Add this account to an authenticator app on this phone",
+  /**
+   * iPhone only (BUG-26). iOS offers no app picker for an `otpauth://` link: it
+   * goes to the one app chosen in Settings, which is Apple Passwords until the
+   * person changes it. Said before the tap, so the way to another app is on
+   * screen before Passwords opens.
+   */
+  openHintIos:
+    "iPhone opens the app chosen in Settings > General > AutoFill & Passwords > Set Up Codes In, which is Passwords unless you changed it. To use another authenticator app, copy the setup key below into it.",
   openFailed:
     "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
   scanHint: "Or scan this from another device.",
