@@ -8,6 +8,8 @@ import {
   readCookieValue,
   REQUEST_DEADLINE_MS,
   setSessionCookie,
+  UPLOAD_DRAIN_FLOOR_BYTES_PER_SECOND,
+  uploadDrainDeadlineMs,
 } from "@/lib/api-client";
 import { saysSessionExpired } from "@/lib/auth-response";
 
@@ -654,5 +656,58 @@ describe("a request that hangs", () => {
     // Then the connection dies mid-file: no more progress, and it gives up.
     await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
     expect(settled()).toBe(true);
+  });
+
+  /**
+   * BUG-28. The last progress report is the body handed to the operating
+   * system, not the body received: on a slow uplink a 2 MB video can still be
+   * draining from the socket for a minute after it, and abandoning it there
+   * stores the file on the server with no message to name it.
+   */
+  test("an upload whose body is handed off waits for it to drain, not fifteen seconds", async () => {
+    const totalBytes = 2_211_000;
+    enqueue(csrfResponse());
+    enqueueUpload(HANGS);
+
+    const settled = watch(
+      apiRequest("/conversations/c1/files", {
+        method: "POST",
+        file: { uri: "file:///cache/clip.mp4", field: "file", type: "video/mp4" },
+      }),
+    );
+
+    await jest.advanceTimersByTimeAsync(0);
+    uploads[0].options.onProgress?.({ bytesSent: totalBytes, totalBytes });
+
+    // Well past the ordinary deadline, still inside what 2 MB needs at the floor.
+    await jest.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS * 4);
+    expect(settled()).toBe(false);
+  });
+
+  test("and still gives up once even the floor rate would have drained it", async () => {
+    const totalBytes = 2_211_000;
+    enqueue(csrfResponse());
+    enqueueUpload(HANGS);
+
+    const pending = apiRequest("/conversations/c1/files", {
+      method: "POST",
+      file: { uri: "file:///cache/clip.mp4", field: "file", type: "video/mp4" },
+    });
+
+    await jest.advanceTimersByTimeAsync(0);
+    uploads[0].options.onProgress?.({ bytesSent: totalBytes, totalBytes });
+
+    await jest.advanceTimersByTimeAsync(uploadDrainDeadlineMs(totalBytes));
+    await expect(pending).resolves.toEqual({ reached: false });
+  });
+});
+
+describe("uploadDrainDeadlineMs", () => {
+  test.each([
+    ["an empty body", 0, REQUEST_DEADLINE_MS],
+    ["one second's worth at the floor", UPLOAD_DRAIN_FLOOR_BYTES_PER_SECOND, REQUEST_DEADLINE_MS + 1_000],
+    ["the 15 MB upload cap", 15 * 1024 * 1024, REQUEST_DEADLINE_MS + 960_000],
+  ])("%s", (_label, totalBytes, expected) => {
+    expect(uploadDrainDeadlineMs(totalBytes)).toBe(expected);
   });
 });

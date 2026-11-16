@@ -81,11 +81,43 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
  */
 export const REQUEST_DEADLINE_MS = 15_000;
 
+/**
+ * The slowest uplink an upload is still expected to finish over, in bytes per
+ * second: 16 KiB/s, about 128 kbps, which is a poor mobile signal that is still
+ * working.
+ *
+ * Needed because neither native uploader can tell this client when the server
+ * has the bytes. Android counts what OkHttp writes into the socket and iOS
+ * reports `didSendBodyData`, so both reach 100% once the operating system has
+ * taken the body, which on a slow connection is long before it has left the
+ * phone. After that last report there is nothing more to hear until the answer,
+ * and a fifteen-second silence there is a body still draining, not a dead
+ * request. A 2 MB video abandoned that way still reaches the server on Android
+ * and is stored with no message naming it, and on iOS never arrives: BUG-28.
+ */
+export const UPLOAD_DRAIN_FLOOR_BYTES_PER_SECOND = 16 * 1024;
+
+/**
+ * How long an upload may stay silent once its whole body has been handed to the
+ * operating system: long enough for `totalBytes` to drain at the floor rate,
+ * plus the ordinary deadline for the server's own answer.
+ *
+ * Not a bound on a dead connection. Both native uploaders give up on their own
+ * after sixty idle seconds (OkHttp's read timeout, URLSession's request
+ * timeout), so this only has to stop the client from giving up first.
+ */
+export function uploadDrainDeadlineMs(totalBytes: number): number {
+  return REQUEST_DEADLINE_MS + Math.ceil((totalBytes / UPLOAD_DRAIN_FLOOR_BYTES_PER_SECOND) * 1000);
+}
+
 /** The clock a round trip runs under, as the thing making the request sees it. */
 type Deadline = {
   signal: AbortSignal;
-  /** Push the deadline back. Bytes moving means this is slow, not hung. */
-  extend: () => void;
+  /**
+   * Push the deadline back, by `ms` or by the ordinary deadline. Bytes moving
+   * means this is slow, not hung.
+   */
+  extend: (ms?: number) => void;
 };
 
 /**
@@ -108,19 +140,19 @@ async function underDeadline<T>(
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const arm = () => {
-    timer = setTimeout(() => controller.abort(), REQUEST_DEADLINE_MS);
+  const arm = (ms: number) => {
+    timer = setTimeout(() => controller.abort(), ms);
   };
 
-  arm();
+  arm(REQUEST_DEADLINE_MS);
 
   try {
     return await run({
       signal: controller.signal,
-      extend: () => {
+      extend: (ms = REQUEST_DEADLINE_MS) => {
         if (timer === null) return;
         clearTimeout(timer);
-        arm();
+        arm(ms);
       },
     });
   } catch {
@@ -374,8 +406,13 @@ async function sendFile(
       // And it reports bytes leaving, which is the one place in this client that
       // can tell a slow transfer from a dead one. Fifteen megabytes over a bad
       // connection is a long upload, not a hung one, so every report pushes the
-      // deadline back and only silence ends it.
-      onProgress: extend,
+      // deadline back and only silence ends it. The last report is the body
+      // handed to the operating system rather than received by the server, so
+      // the silence after it gets as long as the body needs to drain.
+      onProgress: ({ bytesSent, totalBytes }) => {
+        if (totalBytes > 0 && bytesSent >= totalBytes) extend(uploadDrainDeadlineMs(totalBytes));
+        else extend();
+      },
     });
 
     return {
