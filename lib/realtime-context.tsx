@@ -12,7 +12,8 @@ import type { Socket } from 'socket.io-client'
 
 import { getSessionCookie } from '@/lib/api-client'
 import { useAuth } from '@/lib/auth-context'
-import { connectRealtime } from '@/lib/realtime'
+import { connectRealtime, reconnectRealtime } from '@/lib/realtime'
+import { shouldReconnectOnForeground } from '@/lib/realtime-reconnect'
 import type { Reassignment } from '@/lib/conversation-list'
 import {
   parseConversationDeleted,
@@ -217,8 +218,17 @@ export function useConversationRoom(conversationId: string | null): Conversation
 
     // The socket is not torn down when the app goes behind something, so a
     // bubble would otherwise stand for the five seconds the server takes to
-    // expire it while the phone sits in a pocket.
+    // expire it while the phone sits in a pocket. Coming back from the
+    // background replaces the connection, which may have died there without
+    // saying so; its `connect` joins the room again.
+    let current: string = AppState.currentState ?? 'unknown'
     const appState = AppState.addEventListener('change', (next) => {
+      const previous = current
+      current = next
+      if (shouldReconnectOnForeground(previous, next)) {
+        reconnectRealtime(socket)
+        return
+      }
       if (next === 'active' || lastSentRef.current === 0) return
       lastSentRef.current = 0
       socket.emit(REALTIME_EVENTS.typingStop, { conversationId })
@@ -354,7 +364,19 @@ function useRealtimeConnection(): RealtimeValue {
       emit({ kind: 'resync' })
     })
 
+    // BUG-29: a connection that sat in the background may be dead while still
+    // reporting itself connected, which on iOS left messages from the other
+    // side late or missing until a manual refresh. Replace it on the way back;
+    // its `connect` is a reconnect, so every list re-reads what it missed.
+    let current: string = AppState.currentState ?? 'unknown'
+    const appState = AppState.addEventListener('change', (next) => {
+      const previous = current
+      current = next
+      if (shouldReconnectOnForeground(previous, next)) reconnectRealtime(socket)
+    })
+
     return () => {
+      appState.remove()
       socket.removeAllListeners()
       socket.disconnect()
     }

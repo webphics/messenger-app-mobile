@@ -23,3 +23,21 @@ export function shouldRetryAfterServerHangUp(
   if (reason !== 'io server disconnect') return false
   return lastRetryAt === null || now - lastRetryAt >= SERVER_HANG_UP_RETRY_WINDOW_MS
 }
+
+/**
+ * Whether a return to the foreground should replace the socket (BUG-29).
+ *
+ * iOS suspends the app soon after it leaves the screen, and the socket goes with
+ * it without closing: `socket.io-client` still reports it connected, and only
+ * notices it is dead when a ping goes unanswered, up to 45 seconds later with the
+ * server's defaults. Everything sent in that time is sent to nobody, so messages
+ * from the other side arrive late or only on a manual refresh. A fresh
+ * connection on the way back costs one handshake, and its `connect` is a
+ * reconnect, which re-reads from REST whatever was missed.
+ *
+ * Only a return from `background`. iOS reports `inactive` for the notification
+ * shade and the app switcher, where nothing was suspended.
+ */
+export function shouldReconnectOnForeground(previous: string, next: string): boolean {
+  return previous === 'background' && next === 'active'
+}

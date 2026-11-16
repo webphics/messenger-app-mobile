@@ -1,5 +1,6 @@
 import {
   SERVER_HANG_UP_RETRY_WINDOW_MS,
+  shouldReconnectOnForeground,
   shouldRetryAfterServerHangUp,
 } from '@/lib/realtime-reconnect'
 
@@ -25,5 +26,18 @@ describe('shouldRetryAfterServerHangUp', () => {
   it("leaves every other close to socket.io's own reconnect or to the app", () => {
     expect(shouldRetryAfterServerHangUp('transport close', null, 1_000)).toBe(false)
     expect(shouldRetryAfterServerHangUp('io client disconnect', null, 1_000)).toBe(false)
+  })
+})
+
+describe('shouldReconnectOnForeground', () => {
+  it.each([
+    ['background', 'active', true],
+    ['inactive', 'active', false],
+    ['active', 'active', false],
+    ['active', 'background', false],
+    ['background', 'inactive', false],
+    ['unknown', 'active', false],
+  ])('%s -> %s is %s', (previous, next, expected) => {
+    expect(shouldReconnectOnForeground(previous, next)).toBe(expected)
   })
 })

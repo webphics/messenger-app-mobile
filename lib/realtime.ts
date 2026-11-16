@@ -74,12 +74,28 @@ export function connectRealtime(
   socket.on('disconnect', (reason) => {
     const now = Date.now()
     if (!shouldRetryAfterServerHangUp(reason, lastRetryAt, now)) return
-    const cookie = getSessionCookie()
-    if (!cookie) return
-    lastRetryAt = now
-    socket.io.opts.extraHeaders = { ...socket.io.opts.extraHeaders, Cookie: cookie }
-    socket.connect()
+    if (reconnectRealtime(socket)) lastRetryAt = now
   })
 
   return socket
+}
+
+/**
+ * Drop the connection, whatever state it claims to be in, and open it again
+ * with the cookie this app holds now. Answers false, and leaves the socket
+ * alone, when there is no cookie: the session has gone, so there is nothing to
+ * reconnect as.
+ *
+ * Used after a server close and on a return to the foreground, where the old
+ * connection may be dead while still reporting itself connected
+ * (`shouldReconnectOnForeground`). A client-side close never triggers the
+ * server-close retry above, so this cannot loop.
+ */
+export function reconnectRealtime(socket: Socket): boolean {
+  const cookie = getSessionCookie()
+  if (!cookie) return false
+  socket.io.opts.extraHeaders = { ...socket.io.opts.extraHeaders, Cookie: cookie }
+  if (socket.active) socket.disconnect()
+  socket.connect()
+  return true
 }
