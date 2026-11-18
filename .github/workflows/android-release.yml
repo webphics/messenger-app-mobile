@@ -126,11 +126,11 @@ env:
   # with no click, or `inProgress` for a staged rollout.
   PLAY_RELEASE_STATUS: draft
 
-  # The track a Production tag uploads to. `alpha` (closed testing) while the
-  # app is still earning production access, which Play grants only after a
+  # The track a Production tag uploads to. It was `alpha` (closed testing) while
+  # the app was earning production access, which Play grants only after a
   # closed test with 12 testers for 14 days; an upload to `production` before
-  # then is refused. Set it to `production` once access is granted.
-  PLAY_PRODUCTION_TRACK: alpha
+  # then is refused. Set it back to `alpha` if Play refuses the upload.
+  PLAY_PRODUCTION_TRACK: production
 
 # Metro inlines `EXPO_PUBLIC_*` at bundle time, and the bundling happens in
 # `build`, inside the Gradle task that embeds the JS. `.env` is gitignored and
@@ -627,8 +627,7 @@ jobs:
   #
   #   Development -> internal     Internal testing
   #   Release     -> alpha        Closed testing
-  #   Production  -> production   Production (PLAY_PRODUCTION_TRACK, `alpha`
-  #                               until Play grants production access)
+  #   Production  -> production   Production (PLAY_PRODUCTION_TRACK)
   #
   # A job of its own so that an upload Play refuses
   # is re-run alone, without rebuilding and without touching the Release. Same
