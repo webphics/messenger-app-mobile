@@ -101,7 +101,8 @@
 					}
 				}
 			],
-			"./plugins/with-r8-optimize"
+			"./plugins/with-r8-optimize",
+			"./plugins/with-material-edge-to-edge"
 		],
 		"extra": {
 			"eas": {
