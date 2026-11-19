@@ -121,10 +121,10 @@ env:
   # Only the release notes read it; the build takes its ABI from that profile.
   ANDROID_ABIS: arm64-v8a
 
-  # What `play-upload` creates on Play: `draft` while the app is unpublished
-  # there (Play refuses anything else on a draft app), then `completed` to ship
-  # with no click, or `inProgress` for a staged rollout.
-  PLAY_RELEASE_STATUS: draft
+  # What `play-upload` creates on Play. `completed` sends the release to Google's
+  # review and then to every user with no click in Play Console. `draft` holds it
+  # for a manual "Start rollout".
+  PLAY_RELEASE_STATUS: completed
 
   # The track a Production tag uploads to. It was `alpha` (closed testing) while
   # the app was earning production access, which Play grants only after a
@@ -633,12 +633,9 @@ jobs:
   # is re-run alone, without rebuilding and without touching the Release. Same
   # two guards as `release`, so an unmapped branch or a dry run sends nothing.
   #
-  # The release lands as whatever PLAY_RELEASE_STATUS says, `draft` until the
-  # app is published on Play, because Play refuses any other status on an app
-  # that is still a draft. A draft reaches nobody until somebody presses "Start
-  # rollout" in Play Console, which is also what makes a Production tag safe to
-  # push before the pipeline has been watched end to end. Once the app is live,
-  # `completed` ships every upload with no click.
+  # The release lands as whatever PLAY_RELEASE_STATUS says. The app is live on
+  # Play, so `completed` ships every upload with no click, and What's new comes
+  # from release-notes/<version>.md because nobody pastes it in Play Console.
   #
   # Authenticates with a Google Cloud service account invited to the app in Play
   # Console, its JSON key held as PLAY_SERVICE_ACCOUNT_JSON on each environment.
@@ -690,12 +687,41 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "${ENVIRONMENT} uploads to the ${TRACK} track as ${PLAY_RELEASE_STATUS}"
 
+      # Before the download, because a checkout cleans the workspace.
+      - name: Check out the release notes
+        if: ${{ steps.track.outputs.upload == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: release-notes
+          sparse-checkout-cone-mode: false
+
       - name: Download the AAB
         if: ${{ steps.track.outputs.upload == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: android-aab
           path: dist
+
+      # Play limits What's new to 500 characters per language, and en-GB is the
+      # listing's default language.
+      - name: Write What's new for Play
+        if: ${{ steps.track.outputs.upload == 'true' }}
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          NOTES="release-notes/${VERSION}.md"
+          if [ ! -s "$NOTES" ]; then
+            echo "::error::${NOTES} is missing or empty, and it is what Play shows as What's new."
+            exit 1
+          fi
+          LENGTH="$(wc -m < "$NOTES")"
+          if [ "$LENGTH" -gt 500 ]; then
+            echo "::error::${NOTES} is ${LENGTH} characters. Play allows 500."
+            exit 1
+          fi
+          mkdir -p whatsnew
+          cp "$NOTES" whatsnew/whatsnew-en-GB
 
       # Pinned to a commit rather than a tag, because this is the one third-party
       # action handed a key that can publish to Play, and a tag can be moved.
@@ -709,6 +735,7 @@ jobs:
           tracks: ${{ steps.track.outputs.track }}
           status: ${{ env.PLAY_RELEASE_STATUS }}
           releaseName: ${{ needs.meta.outputs.version }}
+          whatsNewDirectory: whatsnew
 
       - name: Summarise
         if: ${{ steps.track.outputs.upload == 'true' }}
@@ -719,5 +746,5 @@ jobs:
           {
             echo "### ${TITLE} on Google Play"
             echo
-            echo "Uploaded to the \`${TRACK}\` track as \`${PLAY_RELEASE_STATUS}\`. A draft goes out from Play Console's Release overview."
+            echo "Uploaded to the \`${TRACK}\` track as \`${PLAY_RELEASE_STATUS}\`. Play Console's Publishing overview shows Google's review status."
           } >> "$GITHUB_STEP_SUMMARY"

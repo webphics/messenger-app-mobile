@@ -1,6 +1,8 @@
 # Builds the iOS app (IPA) on a macOS runner when a version tag is pushed and
-# sends it to App Store Connect, where it lands in TestFlight. The Android half
-# of the same release is android-release.yml; both start from the same tags.
+# sends it to App Store Connect. A Production tag then goes on to App Review and
+# releases to the App Store once Apple approves it (see `app-store-review`). The
+# Android half of the same release is android-release.yml; both start from the
+# same tags.
 #
 # The build runs through `eas build --platform ios --profile store --local`, so
 # it compiles on this runner rather than on EAS's builders: no build credits and
@@ -23,11 +25,11 @@
 #
 # The upload goes through `eas submit` with an App Store Connect API key rather
 # than an Apple ID, again because a runner cannot answer 2FA. See
-# `testflight-upload` for the three secrets and the one variable it reads.
+# `app-store-upload` for the three secrets and the one variable it reads.
 #
 # App Store Connect refuses a build number it has already seen for a version,
 # and app.config.js derives `ios.buildNumber` from expo.version, so re-pushing a
-# tag that already uploaded fails in `testflight-upload` and nowhere else. The
+# tag that already uploaded fails in `app-store-upload` and nowhere else. The
 # fix is a new version, not a re-run.
 
 name: iOS Release
@@ -77,7 +79,7 @@ jobs:
   #   chatroute-release-v<X.Y.Z>      -> Release
   #
   # A dispatch from a branch builds with Development's values and uploads
-  # nothing, so a change to this file can be tried without reaching TestFlight.
+  # nothing, so a change to this file can be tried without reaching Apple.
   target:
     name: Resolve environment
     runs-on: ubuntu-latest
@@ -349,9 +351,8 @@ jobs:
           retention-days: 7
           overwrite: true
 
-  # Sends the IPA to App Store Connect. After Apple processes it (10 to 30
-  # minutes) it appears under TestFlight, and from there it is submitted for
-  # review by hand in App Store Connect.
+  # Sends the IPA to App Store Connect, where Apple processes it (10 to 30
+  # minutes). `app-store-review` picks it up from there on a Production tag.
   #
   # Runs on Linux: `eas submit` hands the file to EAS's submission service,
   # which does the upload, so no Mac is needed here.
@@ -367,7 +368,7 @@ jobs:
   #
   # An environment without ASC_APP_ID skips this job with a warning, so a tag
   # can build before App Store Connect is set up for it.
-  testflight-upload:
+  app-store-upload:
     name: Upload the IPA to App Store Connect
     needs: [target, meta, build]
     if: ${{ needs.target.outputs.publish == 'true' && !inputs.dry_run }}
@@ -474,5 +475,54 @@ jobs:
           {
             echo "### ${TITLE} sent to App Store Connect"
             echo
-            echo "It appears under TestFlight once Apple finishes processing, usually 10 to 30 minutes. Submit it for review from App Store Connect."
+            echo "Apple processes the build next, usually in 10 to 30 minutes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Production tags only. Waits for Apple to process the build, attaches it to the
+  # App Store version, sets What's New from release-notes/<version>.md and submits
+  # it for review. Apple releases it to the App Store once approved.
+  #
+  # A job of its own so a refusal here is re-run without uploading the IPA again,
+  # which App Store Connect would reject. The API key needs the App Manager or
+  # Admin role.
+  app-store-review:
+    name: Submit to App Review
+    needs: [target, meta, app-store-upload]
+    if: ${{ needs.target.outputs.publish == 'true' && needs.target.outputs.environment == 'Production' && !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    environment:
+      name: ${{ needs.target.outputs.environment }}
+      deployment: false
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            release-notes
+            scripts
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Submit the version for review
+        env:
+          ASC_APP_ID: ${{ vars.ASC_APP_ID }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          APP_VERSION: ${{ needs.meta.outputs.version }}
+          RELEASE_NOTES_FILE: release-notes/${{ needs.meta.outputs.version }}.md
+        run: node scripts/submit-app-store-review.mjs
+
+      - name: Summarise
+        env:
+          TITLE: ${{ needs.meta.outputs.title }}
+        run: |
+          {
+            echo "### ${TITLE} submitted to App Review"
+            echo
+            echo "Apple releases it to the App Store once approved."
           } >> "$GITHUB_STEP_SUMMARY"

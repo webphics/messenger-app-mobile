@@ -111,17 +111,19 @@ things:
 
 ## Per-release
 
+Write `release-notes/<version>.md`, then:
+
 ```bash
 pnpm release patch
 ```
 
 ```bash
-git push --follow-tags
+git push origin main refs/tags/chatroute-v<version>
 ```
 
-```bash
-eas build --platform ios --profile store --auto-submit
-```
+A `chatroute-v` tag runs `.github/workflows/ios-release.yml`, which builds the IPA, uploads it,
+submits it to App Review and has Apple release it once approved. TestFlight is not part of the
+path. The App Store Connect API key needs the App Manager or Admin role.
 
 `appVersionSource` is `local`, so `expo.version` in `app.json` is the marketing version and
 `app.config.js` derives `buildNumber` from it. A rejected build is replaced by bumping the version
