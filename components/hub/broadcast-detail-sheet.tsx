@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Modal, ScrollView, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { BroadcastComposeSheet } from "@/components/hub/broadcast-compose-sheet";
 import { X } from "@/components/icons";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
@@ -21,15 +22,26 @@ import type { Broadcast, BroadcastAcknowledgement } from "@/lib/types";
  * One sent Broadcast: what it said, who it went to, and, for one that asked for
  * acknowledgement and a viewer holding `view_acknowledgements`, who has
  * confirmed. The recipients were fixed when it was sent.
+ *
+ * A viewer holding `send_broadcasts` can start a new one to the same audience.
+ * The composer opens over this sheet, so backing out of it returns here.
  */
 
 type DetailSheetProps = {
   broadcast: Broadcast | null;
   canViewAcknowledgements: boolean;
+  canSend: boolean;
+  onSent: (broadcast: Broadcast) => void;
   onClose: () => void;
 };
 
-export function BroadcastDetailSheet({ broadcast, canViewAcknowledgements, onClose }: DetailSheetProps) {
+export function BroadcastDetailSheet({
+  broadcast,
+  canViewAcknowledgements,
+  canSend,
+  onSent,
+  onClose,
+}: DetailSheetProps) {
   return (
     <Modal
       visible={broadcast !== null}
@@ -43,6 +55,8 @@ export function BroadcastDetailSheet({ broadcast, canViewAcknowledgements, onClo
             key={broadcast.id}
             broadcast={broadcast}
             canViewAcknowledgements={canViewAcknowledgements}
+            canSend={canSend}
+            onSent={onSent}
             onClose={onClose}
           />
         ) : null}
@@ -73,9 +87,16 @@ export function BroadcastBadges({ broadcast }: { broadcast: Broadcast }) {
   );
 }
 
-function Detail({ broadcast, canViewAcknowledgements, onClose }: Omit<DetailSheetProps, "broadcast"> & { broadcast: Broadcast }) {
+function Detail({
+  broadcast,
+  canViewAcknowledgements,
+  canSend,
+  onSent,
+  onClose,
+}: Omit<DetailSheetProps, "broadcast"> & { broadcast: Broadcast }) {
   const insets = useSafeAreaInsets();
   const showsReport = broadcast.requiresAcknowledgement && canViewAcknowledgements;
+  const [reusing, setReusing] = useState(false);
 
   return (
     <View className="flex-1 bg-bg" style={{ paddingTop: Math.max(screenTopPad(insets.top), 16) }}>
@@ -121,8 +142,33 @@ function Detail({ broadcast, canViewAcknowledgements, onClose }: Omit<DetailShee
           </Text>
         </View>
 
+        {canSend ? (
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel="Send another broadcast to this audience"
+            onPress={() => setReusing(true)}
+            className="min-h-12 items-center justify-center rounded-2xl bg-primary px-4"
+          >
+            <Text variant="label" className="font-semibold text-primary-foreground">
+              Send another broadcast
+            </Text>
+          </TactilePressable>
+        ) : null}
+
         {showsReport ? <AcknowledgementReport broadcastId={broadcast.id} /> : null}
       </ScrollView>
+
+      {canSend ? (
+        <BroadcastComposeSheet
+          visible={reusing}
+          reuseFrom={broadcast}
+          onClose={() => setReusing(false)}
+          onSent={(sent) => {
+            onSent(sent);
+            onClose();
+          }}
+        />
+      ) : null}
     </View>
   );
 }
