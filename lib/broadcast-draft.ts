@@ -41,6 +41,47 @@ export function audienceSummary(audience: BroadcastAudience): string {
   return `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`
 }
 
+/**
+ * The starting selection for a new Broadcast sent to an earlier one's audience.
+ * The viewer is dropped because a sender never receives their own Broadcast.
+ */
+export function audienceToReuse(
+  audience: BroadcastAudience,
+  viewerId: string | null,
+): BroadcastAudience {
+  return {
+    userIds: [...new Set(audience.userIds)].filter((id) => id !== viewerId),
+    groupIds: [...new Set(audience.groupIds)],
+    communityIds: [...new Set(audience.communityIds)],
+    organizationIds: [...new Set(audience.organizationIds)],
+  }
+}
+
+/** The ids each list holds. Null means that list has not been read successfully. */
+export type KnownAudience = Record<keyof BroadcastAudience, ReadonlySet<string> | null>
+
+/**
+ * Splits a reused selection into what can still be sent to and how much of it is
+ * gone. A list that was not read removes nothing, so a dropped connection never
+ * empties an audience.
+ */
+export function settleAudience(
+  selection: BroadcastAudience,
+  known: KnownAudience,
+): { audience: BroadcastAudience; unavailableCount: number } {
+  const keep = (kind: keyof BroadcastAudience) => {
+    const held = known[kind]
+    return held ? selection[kind].filter((id) => held.has(id)) : selection[kind]
+  }
+  const audience: BroadcastAudience = {
+    userIds: keep('userIds'),
+    groupIds: keep('groupIds'),
+    communityIds: keep('communityIds'),
+    organizationIds: keep('organizationIds'),
+  }
+  return { audience, unavailableCount: audienceSize(selection) - audienceSize(audience) }
+}
+
 /** What is wrong with a draft, or null when it can be sent. */
 export function broadcastDraftProblem(draft: {
   title: string

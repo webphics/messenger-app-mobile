@@ -13,24 +13,39 @@ import {
   BROADCAST_TITLE_MAX,
   NO_AUDIENCE,
   audienceSummary,
+  audienceToReuse,
   broadcastDraftProblem,
+  settleAudience,
   toggleAudience,
+  type KnownAudience,
 } from "@/lib/broadcast-draft";
 import { cn } from "@/lib/cn";
 import { listCommunities } from "@/lib/community-api";
+import { listContacts } from "@/lib/conversation-api";
 import { useConversationInbox } from "@/lib/conversation-inbox";
 import { failureNotice } from "@/lib/conversation-failure";
 import { hapticSuccess } from "@/lib/haptics";
 import { listOrganizations } from "@/lib/org-api";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
-import type { Broadcast, BroadcastAudience, Community, OrganizationSummary } from "@/lib/types";
+import { useViewer } from "@/lib/use-viewer";
+import type {
+  Broadcast,
+  BroadcastAudience,
+  Community,
+  Contact,
+  OrganizationSummary,
+} from "@/lib/types";
 
 /**
  * Writing and sending a Broadcast.
  *
  * The audience is organizations, communities and groups, the three that name a
  * set of people at once. Picking people one by one stays on web, where the full
- * directory is searchable.
+ * directory is searchable. A reused audience still lists the people it named, so
+ * they can be reviewed and taken out here.
+ *
+ * Reusing carries the audience and nothing else. The message is new, and both
+ * delivery switches start off.
  *
  * Essential and acknowledgement are spelled out in what they do rather than
  * what they are called, because both reach people who turned announcements off,
@@ -41,9 +56,11 @@ type ComposeSheetProps = {
   visible: boolean;
   onClose: () => void;
   onSent: (broadcast: Broadcast) => void;
+  /** The earlier Broadcast whose audience this one starts from. */
+  reuseFrom?: Broadcast;
 };
 
-export function BroadcastComposeSheet({ visible, onClose, onSent }: ComposeSheetProps) {
+export function BroadcastComposeSheet({ visible, onClose, onSent, reuseFrom }: ComposeSheetProps) {
   return (
     <Modal
       visible={visible}
@@ -53,7 +70,7 @@ export function BroadcastComposeSheet({ visible, onClose, onSent }: ComposeSheet
     >
       {/* Its own window, so its own inset provider — see NewChatModal. */}
       <SafeAreaProvider>
-        {visible ? <ComposeForm onClose={onClose} onSent={onSent} /> : null}
+        {visible ? <ComposeForm onClose={onClose} onSent={onSent} reuseFrom={reuseFrom} /> : null}
       </SafeAreaProvider>
     </Modal>
   );
@@ -61,25 +78,47 @@ export function BroadcastComposeSheet({ visible, onClose, onSent }: ComposeSheet
 
 type Option = { id: string; name: string; meta: string | null };
 
-function ComposeForm({ onClose, onSent }: Omit<ComposeSheetProps, "visible">) {
+function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "visible">) {
   const insets = useSafeAreaInsets();
   const inbox = useConversationInbox();
+  const viewer = useViewer();
+  const [seed] = useState<BroadcastAudience>(() =>
+    reuseFrom ? audienceToReuse(reuseFrom.audience, viewer?.id ?? null) : NO_AUDIENCE,
+  );
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [audience, setAudience] = useState<BroadcastAudience>(NO_AUDIENCE);
+  const [picked, setAudience] = useState<BroadcastAudience>(seed);
   const [essential, setEssential] = useState(false);
   const [requiresAcknowledgement, setRequiresAcknowledgement] = useState(false);
   const [filter, setFilter] = useState("");
   const [organizations, setOrganizations] = useState<OrganizationSummary[] | null>(null);
   const [communities, setCommunities] = useState<Community[] | null>(null);
+  const [people, setPeople] = useState<Contact[] | null>(seed.userIds.length > 0 ? null : []);
+  // A list that failed is empty on screen but says nothing about what still exists.
+  const [listsRead, setListsRead] = useState({
+    organizations: false,
+    communities: false,
+    people: false,
+  });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   // Either list failing leaves that section saying so; the others still work.
   useEffect(() => {
-    void listOrganizations().then((result) => setOrganizations(result.ok ? result.value : []));
-    void listCommunities().then((result) => setCommunities(result.ok ? result.value : []));
-  }, []);
+    void listOrganizations().then((result) => {
+      setOrganizations(result.ok ? result.value : []);
+      setListsRead((held) => ({ ...held, organizations: result.ok }));
+    });
+    void listCommunities().then((result) => {
+      setCommunities(result.ok ? result.value : []);
+      setListsRead((held) => ({ ...held, communities: result.ok }));
+    });
+    if (seed.userIds.length === 0) return;
+    void listContacts().then((result) => {
+      setPeople(result.ok ? result.value : []);
+      setListsRead((held) => ({ ...held, people: result.ok }));
+    });
+  }, [seed]);
 
   const organizationOptions = useMemo<Option[]>(
     () =>
@@ -111,6 +150,40 @@ function ComposeForm({ onClose, onSent }: Omit<ComposeSheetProps, "visible">) {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [inbox]);
+  // Only the people the earlier Broadcast named, which stay listed once taken out.
+  const peopleOptions = useMemo<Option[]>(
+    () =>
+      (people ?? [])
+        .filter((person) => seed.userIds.includes(person.id))
+        .map((person) => ({ id: person.id, name: person.name, meta: null })),
+    [people, seed],
+  );
+
+  const known = useMemo<KnownAudience>(
+    () => ({
+      userIds: listsRead.people ? new Set((people ?? []).map((person) => person.id)) : null,
+      groupIds: inbox.status === "ready" ? new Set(groupOptions.map((group) => group.id)) : null,
+      communityIds: listsRead.communities
+        ? new Set((communities ?? []).map((community) => community.id))
+        : null,
+      organizationIds: listsRead.organizations
+        ? new Set((organizations ?? []).map((organization) => organization.id))
+        : null,
+    }),
+    [communities, groupOptions, inbox.status, listsRead, organizations, people],
+  );
+  // Whatever was deleted since the earlier send is left out of everything below.
+  const { audience, unavailableCount } = useMemo(
+    () =>
+      reuseFrom ? settleAudience(picked, known) : { audience: picked, unavailableCount: 0 },
+    [known, picked, reuseFrom],
+  );
+  const checkingAudience =
+    reuseFrom !== undefined &&
+    (organizations === null ||
+      communities === null ||
+      people === null ||
+      inbox.status === "loading");
 
   const send = useCallback(() => {
     const invalid = broadcastDraftProblem({ title, body, audience });
@@ -174,7 +247,7 @@ function ComposeForm({ onClose, onSent }: Omit<ComposeSheetProps, "visible">) {
             <Megaphone color={colors.primary} size={18} />
           </View>
           <Text variant="headline" className="text-ink">
-            New broadcast
+            {reuseFrom ? "Send another broadcast" : "New broadcast"}
           </Text>
         </View>
         <TactilePressable
@@ -232,6 +305,21 @@ function ComposeForm({ onClose, onSent }: Omit<ComposeSheetProps, "visible">) {
           <Text variant="label" className="uppercase tracking-wide text-muted">
             Audience
           </Text>
+          {reuseFrom ? (
+            <View className="gap-1 rounded-2xl border border-line/70 bg-surface p-3.5">
+              <Text variant="meta" className="text-ink-soft">
+                Copied from “{reuseFrom.title}”. Groups, communities and organizations go to their
+                current members.
+              </Text>
+              {unavailableCount > 0 ? (
+                <Text variant="meta" className="text-muted">
+                  {unavailableCount === 1
+                    ? "1 selection is no longer available and was left out."
+                    : `${unavailableCount} selections are no longer available and were left out.`}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <SearchFieldWithClear
             value={filter}
             onChangeText={setFilter}
@@ -262,6 +350,22 @@ function ComposeForm({ onClose, onSent }: Omit<ComposeSheetProps, "visible">) {
             emptyHint={needle ? "No group matches." : "There are no groups yet."}
             onToggle={(id) => setAudience((held) => toggleAudience(held, "groupIds", id))}
           />
+          {seed.userIds.length > 0 ? (
+            <AudienceSection
+              heading="People"
+              loading={people === null}
+              options={peopleOptions.filter(matches)}
+              selected={audience.userIds}
+              emptyHint={
+                needle
+                  ? "No person matches."
+                  : listsRead.people
+                    ? "These people are no longer available."
+                    : "Names could not be loaded. These people stay selected."
+              }
+              onToggle={(id) => setAudience((held) => toggleAudience(held, "userIds", id))}
+            />
+          ) : null}
           <Text variant="meta" className="text-ink-soft">
             Sending to: {audienceSummary(audience)}
           </Text>
@@ -298,15 +402,15 @@ function ComposeForm({ onClose, onSent }: Omit<ComposeSheetProps, "visible">) {
         <TactilePressable
           accessibilityRole="button"
           accessibilityLabel="Send broadcast"
-          accessibilityState={{ busy }}
-          disabled={busy}
+          accessibilityState={{ busy: busy || checkingAudience, disabled: busy || checkingAudience }}
+          disabled={busy || checkingAudience}
           onPress={send}
           className={cn(
             "min-h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary",
-            busy && "opacity-70",
+            (busy || checkingAudience) && "opacity-70",
           )}
         >
-          {busy ? <ActivityIndicator color={colors.primaryForeground} /> : null}
+          {busy || checkingAudience ? <ActivityIndicator color={colors.primaryForeground} /> : null}
           <Text variant="label" className="font-semibold text-primary-foreground">
             Send broadcast
           </Text>

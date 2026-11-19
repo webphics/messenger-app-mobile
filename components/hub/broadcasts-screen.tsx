@@ -209,6 +209,8 @@ export function BroadcastsScreen() {
       <BroadcastDetailSheet
         broadcast={open}
         canViewAcknowledgements={canViewAcknowledgements}
+        canSend={canSend}
+        onSent={sent}
         onClose={() => setOpen(null)}
       />
     </View>

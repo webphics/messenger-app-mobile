@@ -4,7 +4,9 @@ import {
   NO_AUDIENCE,
   audienceSize,
   audienceSummary,
+  audienceToReuse,
   broadcastDraftProblem,
+  settleAudience,
   toggleAudience,
 } from '@/lib/broadcast-draft'
 
@@ -46,5 +48,46 @@ describe('audience helpers', () => {
     expect(audienceSummary(audience)).toBe('2 organizations, 1 community and 1 group')
     expect(audienceSummary({ ...NO_AUDIENCE, groupIds: ['g1', 'g2'] })).toBe('2 groups')
     expect(audienceSummary(NO_AUDIENCE)).toBe('Nobody yet')
+  })
+})
+
+describe('reusing an audience', () => {
+  const selection = {
+    userIds: ['a', 'gone-person'],
+    groupIds: ['g'],
+    communityIds: ['gone-community'],
+    organizationIds: ['o'],
+  }
+
+  it('drops the viewer and repeated ids', () => {
+    expect(
+      audienceToReuse({ ...NO_AUDIENCE, userIds: ['me', 'a', 'a'], groupIds: ['g', 'g'] }, 'me'),
+    ).toEqual({ ...NO_AUDIENCE, userIds: ['a'], groupIds: ['g'] })
+  })
+
+  it('leaves out what the lists no longer hold and counts it', () => {
+    const settled = settleAudience(selection, {
+      userIds: new Set(['a']),
+      groupIds: new Set(['g']),
+      communityIds: new Set(),
+      organizationIds: new Set(['o']),
+    })
+    expect(settled.audience).toEqual({
+      userIds: ['a'],
+      groupIds: ['g'],
+      communityIds: [],
+      organizationIds: ['o'],
+    })
+    expect(settled.unavailableCount).toBe(2)
+  })
+
+  it('removes nothing from a list that was not read', () => {
+    const settled = settleAudience(selection, {
+      userIds: null,
+      groupIds: null,
+      communityIds: null,
+      organizationIds: null,
+    })
+    expect(settled).toEqual({ audience: selection, unavailableCount: 0 })
   })
 })
