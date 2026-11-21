@@ -1,6 +1,7 @@
 import { authenticatedRequest } from '@/lib/auth-service'
 import type { ContactPick } from '@/lib/contact-directory'
-import { acknowledged, query, readOutcome } from '@/lib/api-result'
+import { acknowledged, query, readOutcome, readPagedOutcome } from '@/lib/api-result'
+import type { CursorPage } from '@/lib/api-result'
 import type { ApiResult } from '@/lib/api-result'
 import {
   parseAttachment,
@@ -64,6 +65,29 @@ export async function listConversations(
 ): Promise<ApiResult<Conversation[]>> {
   const outcome = await authenticatedRequest(`/conversations${query({ type: params.type })}`)
   return readOutcome(outcome, parseConversations)
+}
+
+/**
+ * One page of the groups this person may see, newest activity first, narrowed
+ * by `q` on the API's side.
+ *
+ * Paged rather than read whole because an Admin sees every group there is, and
+ * a picker that asked for all of them at once froze the phone (#25). `cursor`
+ * is opaque — the API's, read back from the page before it — never an id.
+ */
+export async function listGroupPage(
+  params: { cursor?: string | null; limit?: number; q?: string } = {},
+): Promise<ApiResult<CursorPage<Conversation[]>>> {
+  const q = params.q?.trim()
+  const outcome = await authenticatedRequest(
+    `/conversations${query({
+      type: 'group',
+      limit: params.limit ?? 40,
+      cursor: params.cursor ?? undefined,
+      q: q === '' ? undefined : q,
+    })}`,
+  )
+  return readPagedOutcome(outcome, parseConversations)
 }
 
 export async function getConversation(id: string): Promise<ApiResult<Conversation>> {

@@ -6,6 +6,7 @@ import {
   audienceSummary,
   audienceToReuse,
   broadcastDraftProblem,
+  messageProblem,
   settleAudience,
   toggleAudience,
 } from '@/lib/broadcast-draft'
@@ -89,5 +90,15 @@ describe('reusing an audience', () => {
       organizationIds: null,
     })
     expect(settled).toEqual({ audience: selection, unavailableCount: 0 })
+  })
+})
+
+describe('messageProblem', () => {
+  it('judges the words and not the audience', () => {
+    expect(messageProblem({ title: 'Hi', body: 'There' })).toBeNull()
+    expect(messageProblem({ title: ' ', body: 'There' })).toBe('Give the announcement a title.')
+    expect(messageProblem({ title: 'Hi', body: 'y'.repeat(BROADCAST_BODY_MAX + 1) })).toBe(
+      `Keep the announcement to ${BROADCAST_BODY_MAX} characters.`,
+    )
   })
 })

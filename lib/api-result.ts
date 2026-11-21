@@ -106,6 +106,30 @@ export function readOutcome<T>(
   return value === null ? { ok: false, failure: { kind: 'malformed' } } : { ok: true, value }
 }
 
+/** One page of a list the API pages with an opaque cursor, and the cursor for the next. */
+export type CursorPage<T> = { items: T; nextCursor: string | null }
+
+/**
+ * `readOutcome` for a list the API pages with an opaque cursor, which it names
+ * beside the payload rather than inside it (`pagination.afterCursor`).
+ *
+ * A missing or unreadable pagination block reads as the last page rather than
+ * as malformed: the API sends none when it was not asked to page, and a client
+ * that asked again with no cursor would only read the first page twice.
+ */
+export function readPagedOutcome<T>(
+  outcome: HttpOutcome,
+  parse: (data: unknown) => T | null,
+): ApiResult<CursorPage<T>> {
+  const result = readOutcome(outcome, parse)
+  if (!result.ok) return result
+  const pagination = asRecord(asRecord(outcome.reached ? outcome.body : null)?.pagination)
+  const after = pagination?.afterCursor
+  const nextCursor =
+    pagination?.hasMoreAfter !== false && typeof after === 'string' && after !== '' ? after : null
+  return { ok: true, value: { items: result.value, nextCursor } }
+}
+
 /** A query string, or nothing at all. Undefined values are absent keys rather than empty ones. */
 export function query(
   params: Record<string, string | number | boolean | undefined>,
