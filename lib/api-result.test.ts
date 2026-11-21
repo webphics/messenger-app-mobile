@@ -1,4 +1,4 @@
-import { readOutcome, refusalSentence } from '@/lib/api-result'
+import { readOutcome, readPagedOutcome, refusalSentence } from '@/lib/api-result'
 
 /** A response that reached the API and was refused with this body. */
 function refusedWith(status: number, body: unknown) {
@@ -41,5 +41,33 @@ describe('refusalSentence', () => {
     ['falls back for a body it could not read', { kind: 'malformed' } as const, 'Fallback.'],
   ])('%s', (_, failure, expected) => {
     expect(refusalSentence(failure, 'Fallback.')).toBe(expected)
+  })
+})
+
+describe('readPagedOutcome', () => {
+  const page = (body: unknown) =>
+    readPagedOutcome({ reached: true, status: 200, body, sessionCookie: null }, (data) =>
+      Array.isArray(data) ? data : null,
+    )
+
+  test('carries the cursor the API named for the next page', () => {
+    expect(
+      page({ data: [1], pagination: { hasMoreAfter: true, afterCursor: 'abc' } }),
+    ).toEqual({ ok: true, value: { items: [1], nextCursor: 'abc' } })
+  })
+
+  test('reads a last page, or no pagination block at all, as the end', () => {
+    expect(page({ data: [1], pagination: { hasMoreAfter: false, afterCursor: 'abc' } })).toEqual({
+      ok: true,
+      value: { items: [1], nextCursor: null },
+    })
+    expect(page({ data: [] })).toEqual({ ok: true, value: { items: [], nextCursor: null } })
+  })
+
+  test('fails as readOutcome does', () => {
+    expect(page({ nope: true })).toEqual({ ok: false, failure: { kind: 'malformed' } })
+    expect(
+      readPagedOutcome({ reached: false }, () => []),
+    ).toEqual({ ok: false, failure: { kind: 'unreachable' } })
   })
 })

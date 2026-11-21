@@ -82,12 +82,11 @@ export function settleAudience(
   return { audience, unavailableCount: audienceSize(selection) - audienceSize(audience) }
 }
 
-/** What is wrong with a draft, or null when it can be sent. */
-export function broadcastDraftProblem(draft: {
-  title: string
-  body: string
-  audience: BroadcastAudience
-}): string | null {
+/**
+ * What is wrong with the words alone, or null. The composer's first step asks
+ * this before it offers the audience, so the message is settled first.
+ */
+export function messageProblem(draft: { title: string; body: string }): string | null {
   const title = draft.title.trim()
   const body = draft.body.trim()
   if (!title) return 'Give the announcement a title.'
@@ -98,6 +97,17 @@ export function broadcastDraftProblem(draft: {
   if (body.length > BROADCAST_BODY_MAX) {
     return `Keep the announcement to ${BROADCAST_BODY_MAX} characters.`
   }
+  return null
+}
+
+/** What is wrong with a draft, or null when it can be sent. */
+export function broadcastDraftProblem(draft: {
+  title: string
+  body: string
+  audience: BroadcastAudience
+}): string | null {
+  const words = messageProblem(draft)
+  if (words) return words
   if (audienceSize(draft.audience) === 0) {
     return 'Choose at least one organization, community or group.'
   }
