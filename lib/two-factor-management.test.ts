@@ -2,6 +2,7 @@ import {
   checkTwoFactorPassword,
   disableConfirmationMessage,
   groupSetupKey,
+  setupKeyLayout,
   TWO_FACTOR_COPY,
   twoFactorActions,
   type TwoFactorAccount,
@@ -68,6 +69,51 @@ describe("turning two-factor on", () => {
   test("the setup key is drawn in fours, as authenticator apps show it", () => {
     expect(groupSetupKey("JMYXUODFHBIF6X2R")).toBe("JMYX UODF HBIF 6X2R");
     expect(groupSetupKey("JMYXUO")).toBe("JMYX UO");
+  });
+});
+
+describe("which way into the authenticator app leads (BUG-26)", () => {
+  // iOS has no chooser for an `otpauth://` link: it opens the app set in
+  // Settings, Apple Passwords by default. So on iPhone the key leads and the
+  // link is the secondary way, named for where it goes.
+  test("on iPhone the setup key leads, copied by the primary button", () => {
+    const layout = setupKeyLayout("ios");
+
+    expect(layout.lead).toBe("key");
+    expect(layout.copyKeyLabel).toBe("Copy setup key");
+  });
+
+  test("on iPhone the link says it opens the default app, not any app", () => {
+    const layout = setupKeyLayout("ios");
+
+    expect(layout.openLabel).toMatch(/default app/i);
+    expect(layout.openLabel).not.toMatch(/authenticator app/i);
+  });
+
+  test("on iPhone the hint names the Settings path and the way to any other app", () => {
+    const { openHint } = setupKeyLayout("ios");
+
+    expect(openHint).toContain(
+      "Settings > General > AutoFill & Passwords > Set Up Codes In",
+    );
+    expect(openHint).toMatch(/Passwords unless you changed it/);
+    expect(openHint).toMatch(/other authenticator app.*setup key/i);
+  });
+
+  test("on Android the link leads as before, since its chooser reaches any app", () => {
+    const layout = setupKeyLayout("android");
+
+    expect(layout).toEqual({
+      lead: "link",
+      openLabel: "Open in authenticator app",
+      openAccessibilityLabel: "Add this account to an authenticator app on this phone",
+      openHint: null,
+      copyKeyLabel: "Copy key",
+    });
+  });
+
+  test("a platform with no warning to give gets the Android layout", () => {
+    expect(setupKeyLayout("web")).toEqual(setupKeyLayout("android"));
   });
 });
 
