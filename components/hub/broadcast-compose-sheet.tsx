@@ -4,7 +4,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   Switch,
   View,
@@ -442,7 +441,7 @@ function ComposeForm({
             : "ready";
     return (
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         className="flex-1 bg-bg"
         style={{ paddingTop: topPad }}
       >
@@ -485,9 +484,11 @@ function ComposeForm({
   const shownKinds: AudienceKind[] = ["organizationIds", "communityIds", "groupIds"];
   if (seed.userIds.length > 0) shownKinds.push("userIds");
 
+  // `padding` on Android too: the sheet is a Modal, whose window the activity's `resize`
+  // keyboard mode does not reach, so without it the footer sits under the keyboard.
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
       className="flex-1 bg-bg"
       style={{ paddingTop: topPad }}
     >
