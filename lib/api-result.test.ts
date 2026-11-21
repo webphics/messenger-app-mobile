@@ -26,6 +26,16 @@ describe('readOutcome refusals', () => {
     })
   })
 
+  test.each(['two_factor_already_enabled', 'two_factor_not_enabled'])(
+    'words the two-factor state mismatch %s itself, keeping the code',
+    (code) => {
+      expect(refusedWith(409, { code, message: 'Server sentence.' })).toMatchObject({
+        ok: false,
+        failure: { kind: 'refused', code, message: expect.stringMatching(/status here is updated/) },
+      })
+    },
+  )
+
   test('reads a code named like an object property as any other code', () => {
     expect(refusedWith(400, { code: 'toString', message: 'Bad request.' })).toMatchObject({
       failure: { message: 'Bad request.' },

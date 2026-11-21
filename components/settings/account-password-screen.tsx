@@ -11,6 +11,7 @@ import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import type { ApiFailure } from "@/lib/api-result";
 import { useAuth } from "@/lib/auth-context";
+import { useSessionUserRefresh } from "@/lib/use-session-user-refresh";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
 import { changePassword, setPassword } from "@/lib/password-api";
@@ -55,6 +56,13 @@ import { colors, screenBottomPad } from "@/lib/tokens";
  * screen opens, and the screen it turned into is the screen somebody finishes
  * reading. Coming back to it opens the other one, which is correct, because by
  * then they do have a password.
+ *
+ * One exception, before anything is typed: the screen re-reads the person when
+ * it opens and on a return to the foreground (`useSessionUserRefresh`), because
+ * another device can add or remove the password (turning two-factor off removes
+ * it). If that answer changes the mode while the form is still empty and
+ * nothing has been sent, the screen takes the new one, since nobody is reading
+ * a result yet and the old mode would ask for a password that does not exist.
  *
  * ## What happens to the signed-in person afterwards
  *
@@ -209,7 +217,7 @@ export function AccountPasswordScreen() {
    * arrives in, and `set` is the safer of the two to guess at: it asks for
    * nothing that does not exist.
    */
-  const [mode] = useState<PasswordMode>(() =>
+  const [mode, setMode] = useState<PasswordMode>(() =>
     state.status === "signed-in" ? passwordMode(state.user) : "set",
   );
 
@@ -218,6 +226,23 @@ export function AccountPasswordScreen() {
   const [failure, setFailure] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useSessionUserRefresh();
+
+  // The header comment's exception: a re-read that changed the mode is taken
+  // only while the form is untouched and nothing has been sent. Adjusted during
+  // render rather than in an effect, so the stale mode is never drawn.
+  const liveMode = state.status === "signed-in" ? passwordMode(state.user) : null;
+  const untouched =
+    !saving &&
+    !saved &&
+    failure === null &&
+    draft.current === "" &&
+    draft.next === "" &&
+    draft.confirmation === "";
+  if (liveMode !== null && liveMode !== mode && untouched) {
+    setMode(liveMode);
+  }
 
   /**
    * One ref per field, rather than a record of them.

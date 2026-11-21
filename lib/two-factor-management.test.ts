@@ -2,6 +2,7 @@ import {
   checkTwoFactorPassword,
   disableConfirmationMessage,
   groupSetupKey,
+  isStaleTwoFactorStatus,
   TWO_FACTOR_COPY,
   twoFactorActions,
   type TwoFactorAccount,
@@ -107,5 +108,18 @@ describe("what turning it off says", () => {
       );
     }
     expect(TWO_FACTOR_COPY.off.detail).not.toMatch(/password/);
+  });
+});
+
+describe("a refusal that says the status this device holds is out of date", () => {
+  test.each([
+    ["already on", { kind: "refused", message: "On.", code: "two_factor_already_enabled" }, true],
+    ["already off", { kind: "refused", message: "Off.", code: "two_factor_not_enabled" }, true],
+    ["a wrong password", { kind: "refused", message: "No.", code: "invalid_credentials" }, false],
+    ["a refusal with no code", { kind: "refused", message: "No." }, false],
+    ["no signal", { kind: "unreachable" }, false],
+    ["a body this client could not read", { kind: "malformed" }, false],
+  ] as const)("%s", (_case, failure, expected) => {
+    expect(isStaleTwoFactorStatus(failure)).toBe(expected);
   });
 });

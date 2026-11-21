@@ -1,3 +1,5 @@
+import type { ApiFailure } from "@/lib/api-result";
+
 /**
  * What the two-factor screen says and what it offers.
  *
@@ -12,11 +14,13 @@
  * The rules, from tickets 07 and 08 and
  * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`:
  *
- * 1. **The screen reports the state and never asks for it.** `twoFactorEnabled`
- *    on the signed-in person is the whole input, parsed at sign-in by
- *    `parseSessionUser` and carried on `SessionUser`. There is no second read
- *    for it, because the client was handed it and keeping it would be cheaper
- *    than asking again even if a route existed.
+ * 1. **The screen reports the state it holds.** `twoFactorEnabled` on the
+ *    signed-in person is the whole input, parsed by `parseSessionUser` and
+ *    carried on `SessionUser`. Another device can change it, so the screen
+ *    re-reads the person when it opens and on every return to the foreground
+ *    (`lib/use-session-user-refresh`, throttled by `lib/session-refresh`), and
+ *    at once when the API refuses a change because the state already differs
+ *    (`isStaleTwoFactorStatus`).
  * 2. **Two-factor on offers exactly two things, turning it off and replacing the
  *    backup codes.** Nothing else, in either order, ever.
  * 3. **Two-factor off offers exactly one thing, turning it on.** Ticket 08. It
@@ -65,13 +69,9 @@
  * reports. Omitting the password for an account that has one is a 400, and
  * sending an empty string is the same 400 wearing a different hat.
  *
- * One asymmetry is deliberate and is the safe way round. `hasPassword` is the
- * API's `hasCredentialAccount`, which is the existence of a credential row,
- * while better-auth tests the password column on that row. A row with no
- * password would therefore have this module ask for one the server does not
- * check, which costs a person one field. The reverse, a password the server
- * demands and this screen never drew, cannot happen, because no credential row
- * means no password to demand.
+ * `hasPassword` is the API's `hasPasswordSet`: a credential row with a password
+ * on it, which is the same test better-auth makes. It used to be the row alone,
+ * which asked an account with an empty row for a password it did not have.
  */
 
 /** The half of the signed-in person this screen reads. Nothing else is needed. */
@@ -109,6 +109,26 @@ export type TwoFactorAction = {
    */
   destructive: boolean;
 };
+
+/**
+ * The API's refusal for a change that does not fit the account's real state:
+ * turning on a factor that is already on, or turning off or replacing codes for
+ * one that is not. Proof the person this device holds is out of date, so the
+ * screen re-reads it rather than leaving the status it drew in place. The
+ * sentence is `lib/api-result`'s.
+ */
+export const STALE_TWO_FACTOR_CODES: ReadonlySet<string> = new Set([
+  "two_factor_already_enabled",
+  "two_factor_not_enabled",
+]);
+
+export function isStaleTwoFactorStatus(failure: ApiFailure): boolean {
+  return (
+    failure.kind === "refused" &&
+    failure.code !== undefined &&
+    STALE_TWO_FACTOR_CODES.has(failure.code)
+  );
+}
 
 /** Rule 1. The signed-in person is the whole input. */
 export function twoFactorStatus(
