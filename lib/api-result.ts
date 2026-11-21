@@ -61,6 +61,18 @@ const CLIENT_WORDING: ReadonlyMap<string, string> = new Map([
   // The server's terms gate. The person is moved to the terms screen as well
   // (`onTermsRequired`), so this is only what the screen they left says.
   ['terms_required', 'Agree to the Terms of Use to continue.'],
+  // Two-factor changed somewhere else after this device last read the person.
+  // The two-factor screen re-reads the person on either (`isStaleTwoFactorStatus`),
+  // so the sentence says the status was put right rather than that something
+  // failed.
+  [
+    'two_factor_already_enabled',
+    'Two-factor authentication is already on for this account. It was turned on somewhere else, and the status here is updated.',
+  ],
+  [
+    'two_factor_not_enabled',
+    'Two-factor authentication is already off for this account. It was turned off somewhere else, and the status here is updated.',
+  ],
 ])
 
 /** A refusal, carrying the API's code only when it sent one. */
@@ -104,6 +116,30 @@ export function readOutcome<T>(
 
   const value = parse(envelope.data)
   return value === null ? { ok: false, failure: { kind: 'malformed' } } : { ok: true, value }
+}
+
+/** One page of a list the API pages with an opaque cursor, and the cursor for the next. */
+export type CursorPage<T> = { items: T; nextCursor: string | null }
+
+/**
+ * `readOutcome` for a list the API pages with an opaque cursor, which it names
+ * beside the payload rather than inside it (`pagination.afterCursor`).
+ *
+ * A missing or unreadable pagination block reads as the last page rather than
+ * as malformed: the API sends none when it was not asked to page, and a client
+ * that asked again with no cursor would only read the first page twice.
+ */
+export function readPagedOutcome<T>(
+  outcome: HttpOutcome,
+  parse: (data: unknown) => T | null,
+): ApiResult<CursorPage<T>> {
+  const result = readOutcome(outcome, parse)
+  if (!result.ok) return result
+  const pagination = asRecord(asRecord(outcome.reached ? outcome.body : null)?.pagination)
+  const after = pagination?.afterCursor
+  const nextCursor =
+    pagination?.hasMoreAfter !== false && typeof after === 'string' && after !== '' ? after : null
+  return { ok: true, value: { items: result.value, nextCursor } }
 }
 
 /** A query string, or nothing at all. Undefined values are absent keys rather than empty ones. */

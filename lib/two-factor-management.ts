@@ -1,3 +1,5 @@
+import type { ApiFailure } from "@/lib/api-result";
+
 /**
  * What the two-factor screen says and what it offers.
  *
@@ -12,11 +14,13 @@
  * The rules, from tickets 07 and 08 and
  * `docs/adr/ADR-0013-the-two-factor-challenge-is-a-machine-state.md`:
  *
- * 1. **The screen reports the state and never asks for it.** `twoFactorEnabled`
- *    on the signed-in person is the whole input, parsed at sign-in by
- *    `parseSessionUser` and carried on `SessionUser`. There is no second read
- *    for it, because the client was handed it and keeping it would be cheaper
- *    than asking again even if a route existed.
+ * 1. **The screen reports the state it holds.** `twoFactorEnabled` on the
+ *    signed-in person is the whole input, parsed by `parseSessionUser` and
+ *    carried on `SessionUser`. Another device can change it, so the screen
+ *    re-reads the person when it opens and on every return to the foreground
+ *    (`lib/use-session-user-refresh`, throttled by `lib/session-refresh`), and
+ *    at once when the API refuses a change because the state already differs
+ *    (`isStaleTwoFactorStatus`).
  * 2. **Two-factor on offers exactly two things, turning it off and replacing the
  *    backup codes.** Nothing else, in either order, ever.
  * 3. **Two-factor off offers exactly one thing, turning it on.** Ticket 08. It
@@ -65,13 +69,9 @@
  * reports. Omitting the password for an account that has one is a 400, and
  * sending an empty string is the same 400 wearing a different hat.
  *
- * One asymmetry is deliberate and is the safe way round. `hasPassword` is the
- * API's `hasCredentialAccount`, which is the existence of a credential row,
- * while better-auth tests the password column on that row. A row with no
- * password would therefore have this module ask for one the server does not
- * check, which costs a person one field. The reverse, a password the server
- * demands and this screen never drew, cannot happen, because no credential row
- * means no password to demand.
+ * `hasPassword` is the API's `hasPasswordSet`: a credential row with a password
+ * on it, which is the same test better-auth makes. It used to be the row alone,
+ * which asked an account with an empty row for a password it did not have.
  */
 
 /** The half of the signed-in person this screen reads. Nothing else is needed. */
@@ -109,6 +109,34 @@ export type TwoFactorAction = {
    */
   destructive: boolean;
 };
+
+/**
+ * The API's refusal for a change that does not fit the account's real state:
+ * turning on a factor that is already on, or turning off or replacing codes for
+ * one that is not. Proof the person this device holds is out of date, so the
+ * screen re-reads it rather than leaving the status it drew in place. The
+ * sentence is `lib/api-result`'s.
+ */
+export const STALE_TWO_FACTOR_CODES: ReadonlySet<string> = new Set([
+  "two_factor_already_enabled",
+  "two_factor_not_enabled",
+]);
+
+/**
+ * What a change refused with `reauthentication_required` says. An account with
+ * no password confirms a two-factor change with a recent sign-in instead, and
+ * the API's own sentence does not say what to do about one that is too old.
+ */
+export const TWO_FACTOR_SIGN_IN_AGAIN =
+  "For your security, this change needs a recent sign-in. Sign out, sign in again, then try once more.";
+
+export function isStaleTwoFactorStatus(failure: ApiFailure): boolean {
+  return (
+    failure.kind === "refused" &&
+    failure.code !== undefined &&
+    STALE_TWO_FACTOR_CODES.has(failure.code)
+  );
+}
 
 /** Rule 1. The signed-in person is the whole input. */
 export function twoFactorStatus(
@@ -304,29 +332,40 @@ export const BACKUP_CODES_COPY = {
  * who has not stored the codes by then is the lockout ticket 08 was blocked on.
  * Shown first, they are stored while nothing depends on them yet.
  *
- * There is no QR code. Somebody setting up on this phone has the authenticator on
- * this phone too, and a phone cannot scan its own screen, so the link that opens
- * the app and the key to type by hand are the two ways that work.
+ * The QR code is for a second device, which can scan it; this phone cannot scan
+ * its own screen. On this phone the two ways in are the link that opens an
+ * authenticator app and the key to paste into one, and which of those leads is
+ * `setupKeyLayout`'s answer, because iOS sends the link to one app only.
  */
 export const TWO_FACTOR_SETUP_COPY = {
   title: "Set up your authenticator app",
   keyStep: "1. Add this account to your authenticator app.",
   openLabel: "Open in authenticator app",
   openAccessibilityLabel: "Add this account to an authenticator app on this phone",
+  /** iPhone only (BUG-26): the link goes to one app, so it is named as such. */
+  openLabelIos: "Open in default app",
+  openAccessibilityLabelIos:
+    "Add this account to the authenticator app chosen in iPhone Settings",
   /**
    * iPhone only (BUG-26). iOS offers no app picker for an `otpauth://` link: it
    * goes to the one app chosen in Settings, which is Apple Passwords until the
-   * person changes it. Said before the tap, so the way to another app is on
-   * screen before Passwords opens.
+   * person changes it. Sits beside the button it explains, so the way to
+   * another app is read before Passwords opens.
    */
   openHintIos:
-    "iPhone opens the app chosen in Settings > General > AutoFill & Passwords > Set Up Codes In, which is Passwords unless you changed it. To use another authenticator app, copy the setup key below into it.",
+    "Opens the app chosen in Settings > General > AutoFill & Passwords > Set Up Codes In, which is Passwords unless you changed it. For any other authenticator app, paste the setup key you copied.",
+  /** Android, where the key sits below the button that failed. */
   openFailed:
     "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
+  /** iPhone, where the key leads and is already above the button. */
+  openFailedIos:
+    "No app on this phone could open the setup link. Copy the setup key into your authenticator app instead.",
   scanHint: "Or scan this from another device.",
   qrAccessibilityLabel: "QR code for your authenticator app",
   keyLabel: "Setup key",
   copyKeyLabel: "Copy key",
+  /** iPhone only (BUG-26): the primary action there, so it names what it copies. */
+  copyKeyLabelIos: "Copy setup key",
   copyKeyAccessibilityLabel: "Copy the setup key to the clipboard",
   codesStep: "2. Store your backup codes.",
   codesWarning:
@@ -338,6 +377,57 @@ export const TWO_FACTOR_SETUP_COPY = {
   cancelLabel: "Cancel setup",
   cancelAccessibilityLabel: "Cancel setting up two-factor authentication",
 } as const;
+
+/** How the first setup step is laid out on one platform. */
+export type SetupKeyLayout = {
+  /**
+   * `key` puts the setup key and its copy button first, as the primary action;
+   * `link` puts the button that opens an authenticator app first.
+   */
+  lead: "key" | "link";
+  openLabel: string;
+  openAccessibilityLabel: string;
+  /** Said beside the open button, or null when the platform needs no warning. */
+  openHint: string | null;
+  copyKeyLabel: string;
+  /** What the screen says when no app opened the link; it points at where the key is. */
+  openFailed: string;
+};
+
+/**
+ * Which way into the authenticator app leads the setup (BUG-26).
+ *
+ * Android shows a chooser for an `otpauth://` link, so the link is the one tap
+ * that works for any app and it leads. iOS has no chooser: the link goes to the
+ * app set in Settings, Apple Passwords by default, so somebody using any other
+ * app needs the key. There the key leads, large, with copying it as the primary
+ * button, and the link follows as a secondary "Open in default app" with the
+ * Settings path beside it.
+ *
+ * Takes the platform rather than reading it, so this module stays free of
+ * anything native and the two layouts are a table.
+ */
+export function setupKeyLayout(os: string): SetupKeyLayout {
+  const copy = TWO_FACTOR_SETUP_COPY;
+  if (os === "ios") {
+    return {
+      lead: "key",
+      openLabel: copy.openLabelIos,
+      openAccessibilityLabel: copy.openAccessibilityLabelIos,
+      openHint: copy.openHintIos,
+      copyKeyLabel: copy.copyKeyLabelIos,
+      openFailed: copy.openFailedIos,
+    };
+  }
+  return {
+    lead: "link",
+    openLabel: copy.openLabel,
+    openAccessibilityLabel: copy.openAccessibilityLabel,
+    openHint: null,
+    copyKeyLabel: copy.copyKeyLabel,
+    openFailed: copy.openFailed,
+  };
+}
 
 /**
  * The setup key in groups of four, as authenticator apps show and accept it.

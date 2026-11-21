@@ -1,4 +1,4 @@
-import { readOutcome, refusalSentence } from '@/lib/api-result'
+import { readOutcome, readPagedOutcome, refusalSentence } from '@/lib/api-result'
 
 /** A response that reached the API and was refused with this body. */
 function refusedWith(status: number, body: unknown) {
@@ -26,6 +26,16 @@ describe('readOutcome refusals', () => {
     })
   })
 
+  test.each(['two_factor_already_enabled', 'two_factor_not_enabled'])(
+    'words the two-factor state mismatch %s itself, keeping the code',
+    (code) => {
+      expect(refusedWith(409, { code, message: 'Server sentence.' })).toMatchObject({
+        ok: false,
+        failure: { kind: 'refused', code, message: expect.stringMatching(/status here is updated/) },
+      })
+    },
+  )
+
   test('reads a code named like an object property as any other code', () => {
     expect(refusedWith(400, { code: 'toString', message: 'Bad request.' })).toMatchObject({
       failure: { message: 'Bad request.' },
@@ -41,5 +51,33 @@ describe('refusalSentence', () => {
     ['falls back for a body it could not read', { kind: 'malformed' } as const, 'Fallback.'],
   ])('%s', (_, failure, expected) => {
     expect(refusalSentence(failure, 'Fallback.')).toBe(expected)
+  })
+})
+
+describe('readPagedOutcome', () => {
+  const page = (body: unknown) =>
+    readPagedOutcome({ reached: true, status: 200, body, sessionCookie: null }, (data) =>
+      Array.isArray(data) ? data : null,
+    )
+
+  test('carries the cursor the API named for the next page', () => {
+    expect(
+      page({ data: [1], pagination: { hasMoreAfter: true, afterCursor: 'abc' } }),
+    ).toEqual({ ok: true, value: { items: [1], nextCursor: 'abc' } })
+  })
+
+  test('reads a last page, or no pagination block at all, as the end', () => {
+    expect(page({ data: [1], pagination: { hasMoreAfter: false, afterCursor: 'abc' } })).toEqual({
+      ok: true,
+      value: { items: [1], nextCursor: null },
+    })
+    expect(page({ data: [] })).toEqual({ ok: true, value: { items: [], nextCursor: null } })
+  })
+
+  test('fails as readOutcome does', () => {
+    expect(page({ nope: true })).toEqual({ ok: false, failure: { kind: 'malformed' } })
+    expect(
+      readPagedOutcome({ reached: false }, () => []),
+    ).toEqual({ ok: false, failure: { kind: 'unreachable' } })
   })
 })

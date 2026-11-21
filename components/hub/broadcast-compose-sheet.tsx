@@ -1,13 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, ScrollView, Switch, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  ScrollView,
+  Switch,
+  View,
+  type TextInputInstance,
+} from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Megaphone, X } from "@/components/icons";
-import { SearchFieldWithClear } from "@/components/search-field-with-clear";
+import { AudiencePicker } from "@/components/hub/audience-picker";
+import { ChevronRight, Megaphone, X } from "@/components/icons";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { createBroadcast } from "@/lib/broadcast-api";
+import {
+  GROUP_LOOKUP_CAP,
+  chosenLabel,
+  communityOption,
+  groupLookupOf,
+  matchingOptions,
+  organizationOption,
+  settleGroupLookups,
+  type AudienceOption,
+  type GroupLookup,
+} from "@/lib/broadcast-audience";
 import {
   BROADCAST_BODY_MAX,
   BROADCAST_TITLE_MAX,
@@ -15,18 +35,18 @@ import {
   audienceSummary,
   audienceToReuse,
   broadcastDraftProblem,
+  messageProblem,
   settleAudience,
-  toggleAudience,
   type KnownAudience,
 } from "@/lib/broadcast-draft";
 import { cn } from "@/lib/cn";
 import { listCommunities } from "@/lib/community-api";
-import { listContacts } from "@/lib/conversation-api";
-import { useConversationInbox } from "@/lib/conversation-inbox";
+import { getConversation, listContacts } from "@/lib/conversation-api";
 import { failureNotice } from "@/lib/conversation-failure";
 import { hapticSuccess } from "@/lib/haptics";
 import { listOrganizations } from "@/lib/org-api";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
+import { useGroupPages } from "@/lib/use-group-pages";
 import { useViewer } from "@/lib/use-viewer";
 import type {
   Broadcast,
@@ -37,7 +57,18 @@ import type {
 } from "@/lib/types";
 
 /**
- * Writing and sending a Broadcast.
+ * Writing and sending a Broadcast, in two steps: the message, then who it goes
+ * to and how. Each kind of audience is chosen in a picker drawn in place of the
+ * step, the way the web wizard opens a dialog per kind.
+ *
+ * #25 shaped it. The composer used to draw every organization, community and
+ * group as an animated chip in one scroll view beside the inputs, with the
+ * groups read out of the whole inbox. On an Admin's phone that was thousands of
+ * animated nodes inside a sheet still sliding up, re-rendered on every
+ * keystroke and every socket event, and it froze and then went white. Now the
+ * message step draws two inputs and nothing else, nothing is fetched until the
+ * sheet has finished presenting, the pickers are virtualised lists, and the
+ * groups come a page at a time from the API (`useGroupPages`).
  *
  * The audience is organizations, communities and groups, the three that name a
  * set of people at once. Picking people one by one stays on web, where the full
@@ -61,36 +92,133 @@ type ComposeSheetProps = {
 };
 
 export function BroadcastComposeSheet({ visible, onClose, onSent, reuseFrom }: ComposeSheetProps) {
+  // Set once the sheet has finished sliding up; nothing is fetched before then.
+  const [presented, setPresented] = useState(false);
+  const close = useCallback(() => {
+    setPresented(false);
+    onClose();
+  }, [onClose]);
+  // However the sheet was hidden — its own close or the parent dropping `visible` — the
+  // next open waits for its slide again before fetching. Adjusted while rendering, as React
+  // recommends for state that follows a prop, rather than one render late in an effect.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (!visible) setPresented(false);
+  }
+  // What Android's Back and iOS's swipe-down do, which the form sets: with a picker open
+  // they close the picker, so a stray gesture never throws away the message and audience.
+  const backRef = useRef<() => void>(close);
   return (
     <Modal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
+      onShow={() => setPresented(true)}
+      onRequestClose={() => backRef.current()}
     >
       {/* Its own window, so its own inset provider — see NewChatModal. */}
       <SafeAreaProvider>
-        {visible ? <ComposeForm onClose={onClose} onSent={onSent} reuseFrom={reuseFrom} /> : null}
+        {visible ? (
+          <ComposeForm
+            presented={presented}
+            backRef={backRef}
+            onClose={close}
+            onSent={onSent}
+            reuseFrom={reuseFrom}
+          />
+        ) : null}
       </SafeAreaProvider>
     </Modal>
   );
 }
 
-type Option = { id: string; name: string; meta: string | null };
+type AudienceKind = keyof BroadcastAudience;
 
-function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "visible">) {
+/** How each kind is named, in its picker and on the Audience step. */
+const KINDS: Record<
+  AudienceKind,
+  { heading: string; one: string; many: string; search: string; none: string; noMatch: string }
+> = {
+  organizationIds: {
+    heading: "Organizations",
+    one: "organization",
+    many: "organizations",
+    search: "Search organizations…",
+    none: "There are no organizations yet.",
+    noMatch: "No organization matches.",
+  },
+  communityIds: {
+    heading: "Communities",
+    one: "community",
+    many: "communities",
+    search: "Search communities…",
+    none: "There are no communities yet.",
+    noMatch: "No community matches.",
+  },
+  groupIds: {
+    heading: "Groups",
+    one: "group",
+    many: "groups",
+    search: "Search groups…",
+    none: "There are no groups yet.",
+    noMatch: "No group matches.",
+  },
+  userIds: {
+    heading: "People",
+    one: "person",
+    many: "people",
+    search: "Search people…",
+    none: "These people are no longer available.",
+    noMatch: "No person matches.",
+  },
+};
+
+const LOOKUP_BATCH = 4;
+
+/** Looks up reused groups a few at a time, so a long reuse never fans out at once. */
+async function lookUpGroups(ids: readonly string[]): Promise<GroupLookup[]> {
+  const lookups: GroupLookup[] = [];
+  for (let start = 0; start < ids.length; start += LOOKUP_BATCH) {
+    const batch = ids.slice(start, start + LOOKUP_BATCH);
+    const results = await Promise.all(batch.map((id) => getConversation(id)));
+    results.forEach((result, index) => lookups.push(groupLookupOf(batch[index], result)));
+  }
+  return lookups;
+}
+
+/**
+ * Whether a reused audience's groups are looked up one by one. Past the cap they
+ * are not, and count as unknown: nothing is removed, and the API ignores a group
+ * that has gone.
+ */
+function looksUpGroups(reuseFrom: Broadcast | undefined, seed: BroadcastAudience): boolean {
+  return reuseFrom !== undefined && seed.groupIds.length > 0 && seed.groupIds.length <= GROUP_LOOKUP_CAP;
+}
+
+function ComposeForm({
+  presented,
+  backRef,
+  onClose,
+  onSent,
+  reuseFrom,
+}: Omit<ComposeSheetProps, "visible"> & {
+  presented: boolean;
+  backRef: RefObject<() => void>;
+}) {
   const insets = useSafeAreaInsets();
-  const inbox = useConversationInbox();
   const viewer = useViewer();
   const [seed] = useState<BroadcastAudience>(() =>
     reuseFrom ? audienceToReuse(reuseFrom.audience, viewer?.id ?? null) : NO_AUDIENCE,
   );
+  const [step, setStep] = useState<"message" | "audience">("message");
+  const [picking, setPicking] = useState<AudienceKind | null>(null);
+  const [search, setSearch] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [picked, setAudience] = useState<BroadcastAudience>(seed);
   const [essential, setEssential] = useState(false);
   const [requiresAcknowledgement, setRequiresAcknowledgement] = useState(false);
-  const [filter, setFilter] = useState("");
   const [organizations, setOrganizations] = useState<OrganizationSummary[] | null>(null);
   const [communities, setCommunities] = useState<Community[] | null>(null);
   const [people, setPeople] = useState<Contact[] | null>(seed.userIds.length > 0 ? null : []);
@@ -100,69 +228,84 @@ function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "vi
     communities: false,
     people: false,
   });
+  // Reused groups, looked up by id: the group list is paged, so it cannot say what is gone.
+  const [groupCheck, setGroupCheck] = useState<{
+    done: boolean;
+    known: ReadonlySet<string> | null;
+  }>(() => ({ done: !looksUpGroups(reuseFrom, seed), known: null }));
+  // Names learned from pickers and lookups, for what the lists below do not hold.
+  const [learnedNames, setLearnedNames] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  // Either list failing leaves that section saying so; the others still work.
-  useEffect(() => {
+  const readOrganizations = useCallback(() => {
     void listOrganizations().then((result) => {
       setOrganizations(result.ok ? result.value : []);
       setListsRead((held) => ({ ...held, organizations: result.ok }));
     });
+  }, []);
+  const readCommunities = useCallback(() => {
     void listCommunities().then((result) => {
       setCommunities(result.ok ? result.value : []);
       setListsRead((held) => ({ ...held, communities: result.ok }));
     });
-    if (seed.userIds.length === 0) return;
-    void listContacts().then((result) => {
-      setPeople(result.ok ? result.value : []);
-      setListsRead((held) => ({ ...held, people: result.ok }));
-    });
-  }, [seed]);
+  }, []);
+  const retryOrganizations = useCallback(() => {
+    setOrganizations(null);
+    readOrganizations();
+  }, [readOrganizations]);
+  const retryCommunities = useCallback(() => {
+    setCommunities(null);
+    readCommunities();
+  }, [readCommunities]);
 
-  const organizationOptions = useMemo<Option[]>(
-    () =>
-      (organizations ?? []).map((organization) => ({
-        id: organization.id,
-        name: organization.name,
-        meta: `${organization.memberCount} ${organization.memberCount === 1 ? "member" : "members"}`,
-      })),
+  // Each list failing leaves its picker saying so; the others still work.
+  useEffect(() => {
+    if (!presented) return;
+    readOrganizations();
+    readCommunities();
+    if (seed.userIds.length > 0) {
+      void listContacts().then((result) => {
+        setPeople(result.ok ? result.value : []);
+        setListsRead((held) => ({ ...held, people: result.ok }));
+      });
+    }
+    if (!looksUpGroups(reuseFrom, seed)) return;
+    void lookUpGroups(seed.groupIds).then((lookups) => {
+      const settled = settleGroupLookups(seed.groupIds.length, lookups);
+      setLearnedNames((held) => new Map([...held, ...settled.names]));
+      setGroupCheck({ done: true, known: settled.known });
+    });
+  }, [presented, readCommunities, readOrganizations, reuseFrom, seed]);
+
+  const organizationOptions = useMemo<AudienceOption[]>(
+    () => (organizations ?? []).map(organizationOption),
     [organizations],
   );
-  const communityOptions = useMemo<Option[]>(
-    () =>
-      (communities ?? []).map((community) => ({
-        id: community.id,
-        name: community.name,
-        meta: `${community.memberCount} ${community.memberCount === 1 ? "member" : "members"}`,
-      })),
+  const communityOptions = useMemo<AudienceOption[]>(
+    () => (communities ?? []).map(communityOption),
     [communities],
   );
-  // The groups this Admin's list already holds; an Admin's list is every group.
-  const groupOptions = useMemo<Option[]>(() => {
-    if (inbox.status !== "ready") return [];
-    return inbox.conversations
-      .filter((conversation) => conversation.type === "group")
-      .map((conversation) => ({
-        id: conversation.id,
-        name: ("title" in conversation && conversation.title) || "Untitled group",
-        meta: null,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [inbox]);
   // Only the people the earlier Broadcast named, which stay listed once taken out.
-  const peopleOptions = useMemo<Option[]>(
-    () =>
-      (people ?? [])
-        .filter((person) => seed.userIds.includes(person.id))
-        .map((person) => ({ id: person.id, name: person.name, meta: null })),
-    [people, seed],
-  );
+  const peopleOptions = useMemo<AudienceOption[]>(() => {
+    const named = new Set(seed.userIds);
+    return (people ?? [])
+      .filter((person) => named.has(person.id))
+      .map((person) => ({ id: person.id, name: person.name, meta: null }));
+  }, [people, seed]);
+
+  const names = useMemo(() => {
+    const all = new Map(learnedNames);
+    for (const option of [...organizationOptions, ...communityOptions, ...peopleOptions]) {
+      all.set(option.id, option.name);
+    }
+    return all;
+  }, [communityOptions, learnedNames, organizationOptions, peopleOptions]);
 
   const known = useMemo<KnownAudience>(
     () => ({
       userIds: listsRead.people ? new Set((people ?? []).map((person) => person.id)) : null,
-      groupIds: inbox.status === "ready" ? new Set(groupOptions.map((group) => group.id)) : null,
+      groupIds: groupCheck.known,
       communityIds: listsRead.communities
         ? new Set((communities ?? []).map((community) => community.id))
         : null,
@@ -170,7 +313,7 @@ function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "vi
         ? new Set((organizations ?? []).map((organization) => organization.id))
         : null,
     }),
-    [communities, groupOptions, inbox.status, listsRead, organizations, people],
+    [communities, groupCheck.known, listsRead, organizations, people],
   );
   // Whatever was deleted since the earlier send is left out of everything below.
   const { audience, unavailableCount } = useMemo(
@@ -180,10 +323,66 @@ function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "vi
   );
   const checkingAudience =
     reuseFrom !== undefined &&
-    (organizations === null ||
-      communities === null ||
-      people === null ||
-      inbox.status === "loading");
+    (organizations === null || communities === null || people === null || !groupCheck.done);
+
+  const groups = useGroupPages(picking === "groupIds", search);
+  const localOptions =
+    picking === "organizationIds"
+      ? organizationOptions
+      : picking === "communityIds"
+        ? communityOptions
+        : peopleOptions;
+  const filteredOptions = useMemo(
+    () => matchingOptions(localOptions, search),
+    [localOptions, search],
+  );
+
+  const openPicker = useCallback((kind: AudienceKind) => {
+    setSearch("");
+    setPicking(kind);
+  }, []);
+  const closePicker = useCallback(() => {
+    setPicking(null);
+    setSearch("");
+  }, []);
+  // The open picker replaces this with a Back that asks before discarding a changed draft.
+  const pickerBackRef = useRef<() => void>(closePicker);
+  useEffect(() => {
+    backRef.current = picking === null ? onClose : () => pickerBackRef.current();
+  }, [backRef, onClose, picking]);
+  const commitPicker = useCallback(
+    (ids: string[], drawn: ReadonlyMap<string, string>) => {
+      if (picking === null) return;
+      setAudience((held) => ({ ...held, [picking]: ids }));
+      setLearnedNames((held) => {
+        const next = new Map(held);
+        for (const id of ids) {
+          const name = drawn.get(id);
+          if (name !== undefined) next.set(id, name);
+        }
+        return next;
+      });
+      setProblem(null);
+      closePicker();
+    },
+    [closePicker, picking],
+  );
+
+  const titleRef = useRef<TextInputInstance>(null);
+  const bodyRef = useRef<TextInputInstance>(null);
+
+  const next = useCallback(() => {
+    const invalid = messageProblem({ title, body });
+    if (invalid) {
+      setProblem(invalid);
+      // The first field the problem is about: the title until it is right, then the message.
+      const titleWrong = messageProblem({ title, body: "x" }) !== null;
+      (titleWrong ? titleRef : bodyRef).current?.focus();
+      return;
+    }
+    setProblem(null);
+    setStep("audience");
+  }, [body, title]);
 
   const send = useCallback(() => {
     const invalid = broadcastDraftProblem({ title, body, audience });
@@ -236,19 +435,94 @@ function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "vi
     ]);
   }, [audience, body, essential, onClose, onSent, requiresAcknowledgement, title]);
 
-  const needle = filter.trim().toLowerCase();
-  const matches = (option: Option) => !needle || option.name.toLowerCase().includes(needle);
+  const topPad = Math.max(screenTopPad(insets.top), 16);
 
+  if (picking !== null) {
+    const kind = KINDS[picking];
+    const isGroups = picking === "groupIds";
+    const localStatus: "loading" | "ready" | "failed" =
+      picking === "organizationIds"
+        ? organizations === null
+          ? "loading"
+          : listsRead.organizations
+            ? "ready"
+            : "failed"
+        : picking === "communityIds"
+          ? communities === null
+            ? "loading"
+            : listsRead.communities
+              ? "ready"
+              : "failed"
+          : people === null
+            ? "loading"
+            : "ready";
+    return (
+      <KeyboardAvoidingView
+        behavior="padding"
+        className="flex-1 bg-bg"
+        style={{ paddingTop: topPad }}
+      >
+        <AudiencePicker
+          key={picking}
+          title={kind.heading}
+          searchPlaceholder={kind.search}
+          search={search}
+          onSearchChange={setSearch}
+          options={isGroups ? groups.options : filteredOptions}
+          status={isGroups ? groups.status : localStatus}
+          emptyHint={(searching) =>
+            searching
+              ? kind.noMatch
+              : picking === "userIds" && !listsRead.people
+                ? "Names could not be loaded. These people stay selected."
+                : kind.none
+          }
+          failedHint={`${kind.heading} could not be loaded.`}
+          onRetry={
+            isGroups
+              ? groups.retry
+              : picking === "organizationIds"
+                ? retryOrganizations
+                : picking === "communityIds"
+                  ? retryCommunities
+                  : undefined
+          }
+          loadingMore={isGroups && groups.loadingMore}
+          onEndReached={isGroups ? groups.loadMore : undefined}
+          moreFailed={isGroups && groups.moreFailed}
+          initial={audience[picking]}
+          onCancel={closePicker}
+          backRef={pickerBackRef}
+          onDone={commitPicker}
+        />
+      </KeyboardAvoidingView>
+    );
+  }
+
+  const shownKinds: AudienceKind[] = ["organizationIds", "communityIds", "groupIds"];
+  if (seed.userIds.length > 0) shownKinds.push("userIds");
+
+  // `padding` on Android too: the sheet is a Modal, whose window the activity's `resize`
+  // keyboard mode does not reach, so without it the footer sits under the keyboard.
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: Math.max(screenTopPad(insets.top), 16) }}>
-      <View className="flex-row items-center justify-between border-b border-line/60 bg-surface px-4 pb-3">
-        <View className="flex-row items-center gap-2">
+    <KeyboardAvoidingView
+      behavior="padding"
+      className="flex-1 bg-bg"
+      style={{ paddingTop: topPad }}
+    >
+      <View className="flex-row items-center justify-between gap-3 border-b border-line/60 bg-surface px-4 pb-3">
+        <View className="min-w-0 flex-1 flex-row items-center gap-2">
           <View className="size-8 items-center justify-center rounded-full bg-primary-soft">
             <Megaphone color={colors.primary} size={18} />
           </View>
-          <Text variant="headline" className="text-ink">
-            {reuseFrom ? "Send another broadcast" : "New broadcast"}
-          </Text>
+          <View className="min-w-0 flex-1">
+            <Text variant="headline" className="text-ink" numberOfLines={1}>
+              {reuseFrom ? "Send another broadcast" : "New broadcast"}
+            </Text>
+            <Text variant="meta" className="text-muted">
+              {step === "message" ? "Step 1 of 2 · Message" : "Step 2 of 2 · Audience"}
+            </Text>
+          </View>
         </View>
         <TactilePressable
           accessibilityRole="button"
@@ -267,127 +541,118 @@ function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "vi
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        <View className="gap-2">
-          <Text variant="label" className="uppercase tracking-wide text-muted">
-            Title
-          </Text>
-          <Input
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Scheduled maintenance on Friday…"
-            accessibilityLabel="Title"
-            className="h-11 rounded-2xl border-line/80 bg-line/35 px-3.5 font-sans text-base text-ink"
-          />
-          <Text variant="label" className="font-normal text-muted">
-            {title.trim().length}/{BROADCAST_TITLE_MAX}
-          </Text>
-        </View>
-
-        <View className="gap-2">
-          <Text variant="label" className="uppercase tracking-wide text-muted">
-            Message
-          </Text>
-          <Input
-            value={body}
-            onChangeText={setBody}
-            placeholder="What people need to know…"
-            accessibilityLabel="Message"
-            multiline
-            textAlignVertical="top"
-            className="h-40 rounded-2xl border-line/80 bg-line/35 px-3.5 py-3 font-sans text-base text-ink"
-          />
-          <Text variant="label" className="font-normal text-muted">
-            {body.trim().length}/{BROADCAST_BODY_MAX}
-          </Text>
-        </View>
-
-        <View className="gap-3">
-          <Text variant="label" className="uppercase tracking-wide text-muted">
-            Audience
-          </Text>
-          {reuseFrom ? (
-            <View className="gap-1 rounded-2xl border border-line/70 bg-surface p-3.5">
-              <Text variant="meta" className="text-ink-soft">
-                Copied from “{reuseFrom.title}”. Groups, communities and organizations go to their
-                current members.
+        {step === "message" ? (
+          <>
+            <View className="gap-2">
+              <Text variant="label" className="uppercase tracking-wide text-muted">
+                Title
               </Text>
-              {unavailableCount > 0 ? (
-                <Text variant="meta" className="text-muted">
-                  {unavailableCount === 1
-                    ? "1 selection is no longer available and was left out."
-                    : `${unavailableCount} selections are no longer available and were left out.`}
-                </Text>
-              ) : null}
+              <Input
+                ref={titleRef}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Scheduled maintenance on Friday…"
+                accessibilityLabel="Title"
+                returnKeyType="next"
+                submitBehavior="submit"
+                // Enter goes on to the message, or past it when the message is already written.
+                onSubmitEditing={() => (body.trim() ? next() : bodyRef.current?.focus())}
+                className="h-11 rounded-2xl border-line/80 bg-line/35 px-3.5 font-sans text-base text-ink"
+              />
+              <Text variant="label" className="font-normal text-muted">
+                {title.trim().length}/{BROADCAST_TITLE_MAX}
+              </Text>
             </View>
-          ) : null}
-          <SearchFieldWithClear
-            value={filter}
-            onChangeText={setFilter}
-            placeholder="Filter organizations, communities, groups…"
-            accessibilityLabel="Filter audience"
-          />
-          <AudienceSection
-            heading="Organizations"
-            loading={organizations === null}
-            options={organizationOptions.filter(matches)}
-            selected={audience.organizationIds}
-            emptyHint={needle ? "No organization matches." : "There are no organizations yet."}
-            onToggle={(id) => setAudience((held) => toggleAudience(held, "organizationIds", id))}
-          />
-          <AudienceSection
-            heading="Communities"
-            loading={communities === null}
-            options={communityOptions.filter(matches)}
-            selected={audience.communityIds}
-            emptyHint={needle ? "No community matches." : "There are no communities yet."}
-            onToggle={(id) => setAudience((held) => toggleAudience(held, "communityIds", id))}
-          />
-          <AudienceSection
-            heading="Groups"
-            loading={inbox.status !== "ready"}
-            options={groupOptions.filter(matches)}
-            selected={audience.groupIds}
-            emptyHint={needle ? "No group matches." : "There are no groups yet."}
-            onToggle={(id) => setAudience((held) => toggleAudience(held, "groupIds", id))}
-          />
-          {seed.userIds.length > 0 ? (
-            <AudienceSection
-              heading="People"
-              loading={people === null}
-              options={peopleOptions.filter(matches)}
-              selected={audience.userIds}
-              emptyHint={
-                needle
-                  ? "No person matches."
-                  : listsRead.people
-                    ? "These people are no longer available."
-                    : "Names could not be loaded. These people stay selected."
-              }
-              onToggle={(id) => setAudience((held) => toggleAudience(held, "userIds", id))}
-            />
-          ) : null}
-          <Text variant="meta" className="text-ink-soft">
-            Sending to: {audienceSummary(audience)}
-          </Text>
-        </View>
 
-        <View className="gap-1">
-          <Text variant="label" className="uppercase tracking-wide text-muted">
-            Delivery
-          </Text>
-          <ToggleRow
-            label="Essential"
-            hint="Also reaches people who turned announcements off. Use it only for service, safety or legal notices."
-            value={essential}
-            onChange={setEssential}
-          />
-          <ToggleRow
-            label="Require acknowledgement"
-            hint="Each person must confirm they've read it before they can keep using the app. It also reaches people who turned announcements off."
-            value={requiresAcknowledgement}
-            onChange={setRequiresAcknowledgement}
-          />
-        </View>
+            <View className="gap-2">
+              <Text variant="label" className="uppercase tracking-wide text-muted">
+                Message
+              </Text>
+              <Input
+                ref={bodyRef}
+                value={body}
+                onChangeText={setBody}
+                placeholder="What people need to know…"
+                accessibilityLabel="Message"
+                multiline
+                textAlignVertical="top"
+                className="h-40 rounded-2xl border-line/80 bg-line/35 px-3.5 py-3 font-sans text-base text-ink"
+              />
+              <Text variant="label" className="font-normal text-muted">
+                {body.trim().length}/{BROADCAST_BODY_MAX}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <View className="gap-1 rounded-2xl border border-line/70 bg-surface p-3.5">
+              <Text variant="label" className="font-semibold text-ink" numberOfLines={2}>
+                {title.trim()}
+              </Text>
+              <Text variant="meta" className="text-ink-soft" numberOfLines={3}>
+                {body.trim()}
+              </Text>
+            </View>
+
+            <View className="gap-2">
+              <Text variant="label" className="uppercase tracking-wide text-muted">
+                Audience
+              </Text>
+              {reuseFrom ? (
+                <View className="gap-1 rounded-2xl border border-line/70 bg-surface p-3.5">
+                  <Text variant="meta" className="text-ink-soft">
+                    Copied from “{reuseFrom.title}”. Groups, communities and organizations go to
+                    their current members.
+                  </Text>
+                  {unavailableCount > 0 ? (
+                    <Text variant="meta" className="text-muted">
+                      {unavailableCount === 1
+                        ? "1 selection is no longer available and was left out."
+                        : `${unavailableCount} selections are no longer available and were left out.`}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
+              <View className="overflow-hidden rounded-2xl border border-line/70 bg-surface">
+                {shownKinds.map((kind, index) => (
+                  <AudienceKindRow
+                    key={kind}
+                    kind={kind}
+                    first={index === 0}
+                    label={
+                      checkingAudience && audience[kind].length > 0
+                        ? "Loading…"
+                        : chosenLabel(audience[kind], names, KINDS[kind])
+                    }
+                    count={audience[kind].length}
+                    onOpen={openPicker}
+                  />
+                ))}
+              </View>
+              <Text variant="meta" className="text-ink-soft">
+                Sending to: {audienceSummary(audience)}
+              </Text>
+            </View>
+
+            <View className="gap-1">
+              <Text variant="label" className="uppercase tracking-wide text-muted">
+                Delivery
+              </Text>
+              <ToggleRow
+                label="Essential"
+                hint="Also reaches people who turned announcements off. Use it only for service, safety or legal notices."
+                value={essential}
+                onChange={setEssential}
+              />
+              <ToggleRow
+                label="Require acknowledgement"
+                hint="Each person must confirm they've read it before they can keep using the app. It also reaches people who turned announcements off."
+                value={requiresAcknowledgement}
+                onChange={setRequiresAcknowledgement}
+              />
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <View
@@ -399,92 +664,92 @@ function ComposeForm({ onClose, onSent, reuseFrom }: Omit<ComposeSheetProps, "vi
             {problem}
           </Text>
         ) : null}
-        <TactilePressable
-          accessibilityRole="button"
-          accessibilityLabel="Send broadcast"
-          accessibilityState={{ busy: busy || checkingAudience, disabled: busy || checkingAudience }}
-          disabled={busy || checkingAudience}
-          onPress={send}
-          className={cn(
-            "min-h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary",
-            (busy || checkingAudience) && "opacity-70",
-          )}
-        >
-          {busy || checkingAudience ? <ActivityIndicator color={colors.primaryForeground} /> : null}
-          <Text variant="label" className="font-semibold text-primary-foreground">
-            Send broadcast
-          </Text>
-        </TactilePressable>
+        {step === "message" ? (
+          <TactilePressable
+            accessibilityRole="button"
+            accessibilityLabel="Next: choose the audience"
+            onPress={next}
+            className="min-h-12 flex-row items-center justify-center gap-2 rounded-2xl bg-primary"
+          >
+            <Text variant="label" className="font-semibold text-primary-foreground">
+              Next: audience
+            </Text>
+          </TactilePressable>
+        ) : (
+          <View className="flex-row gap-2">
+            <TactilePressable
+              accessibilityRole="button"
+              accessibilityLabel="Back to the message"
+              disabled={busy}
+              onPress={() => {
+                setProblem(null);
+                setStep("message");
+              }}
+              className="min-h-12 items-center justify-center rounded-2xl border border-line/80 px-4"
+            >
+              <Text variant="label" className="text-ink">
+                Back
+              </Text>
+            </TactilePressable>
+            <TactilePressable
+              accessibilityRole="button"
+              accessibilityLabel="Send broadcast"
+              accessibilityState={{ busy: busy || checkingAudience, disabled: busy || checkingAudience }}
+              disabled={busy || checkingAudience}
+              onPress={send}
+              className={cn(
+                "min-h-12 flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-primary",
+                (busy || checkingAudience) && "opacity-70",
+              )}
+            >
+              {busy || checkingAudience ? <ActivityIndicator color={colors.primaryForeground} /> : null}
+              <Text variant="label" className="font-semibold text-primary-foreground">
+                Send broadcast
+              </Text>
+            </TactilePressable>
+          </View>
+        )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
-function AudienceSection({
-  heading,
-  loading,
-  options,
-  selected,
-  emptyHint,
-  onToggle,
+/** One kind of audience on the Audience step: what is chosen, and the way into its picker. */
+function AudienceKindRow({
+  kind,
+  first,
+  label,
+  count,
+  onOpen,
 }: {
-  heading: string;
-  loading: boolean;
-  options: Option[];
-  selected: readonly string[];
-  emptyHint: string;
-  onToggle: (id: string) => void;
+  kind: AudienceKind;
+  first: boolean;
+  label: string;
+  count: number;
+  onOpen: (kind: AudienceKind) => void;
 }) {
-  const picked = options.filter((option) => selected.includes(option.id)).length;
+  const heading = KINDS[kind].heading;
   return (
-    <View className="gap-2">
-      <Text variant="label" className="text-ink-soft">
-        {heading}
-        {selected.length > 0 ? ` · ${selected.length} chosen` : ""}
-      </Text>
-      {loading ? (
-        <ActivityIndicator color={colors.primary} />
-      ) : options.length === 0 ? (
-        <Text variant="meta" className="text-muted">
-          {emptyHint}
-        </Text>
-      ) : (
-        <View className="flex-row flex-wrap gap-2" accessibilityHint={`${picked} chosen`}>
-          {options.map((option) => {
-            const on = selected.includes(option.id);
-            return (
-              <TactilePressable
-                key={option.id}
-                accessibilityRole="checkbox"
-                accessibilityLabel={option.meta ? `${option.name}, ${option.meta}` : option.name}
-                accessibilityState={{ checked: on }}
-                onPress={() => onToggle(option.id)}
-                className={cn(
-                  "min-h-11 max-w-full justify-center rounded-full border px-3.5",
-                  on ? "border-transparent bg-primary" : "border-line/80 bg-line/35",
-                )}
-              >
-                <Text
-                  variant="label"
-                  numberOfLines={1}
-                  className={on ? "text-primary-foreground" : "text-ink-soft"}
-                >
-                  {option.name}
-                  {option.meta ? (
-                    <Text
-                      variant="label"
-                      className={cn("font-normal", on ? "text-primary-foreground" : "text-muted")}
-                    >
-                      {` · ${option.meta}`}
-                    </Text>
-                  ) : null}
-                </Text>
-              </TactilePressable>
-            );
-          })}
-        </View>
+    <TactilePressable
+      accessibilityRole="button"
+      accessibilityLabel={`${heading}, ${count > 0 ? label : "none chosen"}`}
+      accessibilityHint={`Opens the list of ${heading.toLowerCase()}`}
+      onPress={() => onOpen(kind)}
+      className={cn(
+        "min-h-14 flex-row items-center gap-3 px-3.5 py-2.5",
+        !first && "border-t border-line/60",
       )}
-    </View>
+    >
+      <View className="min-w-0 flex-1 gap-0.5">
+        <Text variant="label" className="font-semibold text-ink">
+          {heading}
+        </Text>
+        <Text variant="meta" numberOfLines={1} className={count > 0 ? "text-ink-soft" : "text-muted"}>
+          {label}
+        </Text>
+      </View>
+      <ChevronRight color={colors.muted} size={18} />
+    </TactilePressable>
   );
 }
 

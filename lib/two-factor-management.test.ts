@@ -2,6 +2,8 @@ import {
   checkTwoFactorPassword,
   disableConfirmationMessage,
   groupSetupKey,
+  isStaleTwoFactorStatus,
+  setupKeyLayout,
   TWO_FACTOR_COPY,
   twoFactorActions,
   type TwoFactorAccount,
@@ -71,6 +73,57 @@ describe("turning two-factor on", () => {
   });
 });
 
+describe("which way into the authenticator app leads (BUG-26)", () => {
+  // iOS has no chooser for an `otpauth://` link: it opens the app set in
+  // Settings, Apple Passwords by default. So on iPhone the key leads and the
+  // link is the secondary way, named for where it goes.
+  test("on iPhone the setup key leads, copied by the primary button", () => {
+    const layout = setupKeyLayout("ios");
+
+    expect(layout.lead).toBe("key");
+    expect(layout.copyKeyLabel).toBe("Copy setup key");
+  });
+
+  test("on iPhone the link says it opens the default app, not any app", () => {
+    const layout = setupKeyLayout("ios");
+
+    expect(layout.openLabel).toMatch(/default app/i);
+    expect(layout.openLabel).not.toMatch(/authenticator app/i);
+  });
+
+  test("on iPhone the hint names the Settings path and the way to any other app", () => {
+    const { openHint } = setupKeyLayout("ios");
+
+    expect(openHint).toContain(
+      "Settings > General > AutoFill & Passwords > Set Up Codes In",
+    );
+    expect(openHint).toMatch(/Passwords unless you changed it/);
+    expect(openHint).toMatch(/other authenticator app.*setup key/i);
+  });
+
+  test("on Android the link leads as before, since its chooser reaches any app", () => {
+    const layout = setupKeyLayout("android");
+
+    expect(layout).toEqual({
+      lead: "link",
+      openLabel: "Open in authenticator app",
+      openAccessibilityLabel: "Add this account to an authenticator app on this phone",
+      openHint: null,
+      copyKeyLabel: "Copy key",
+      openFailed:
+        "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
+    });
+  });
+
+  test("on iPhone a link no app opened points at the key above, not below", () => {
+    expect(setupKeyLayout("ios").openFailed).not.toMatch(/below/);
+  });
+
+  test("a platform with no warning to give gets the Android layout", () => {
+    expect(setupKeyLayout("web")).toEqual(setupKeyLayout("android"));
+  });
+});
+
 describe("the body each account sends", () => {
   test("an empty field on an account that has a password is caught before the request", () => {
     const check = checkTwoFactorPassword({ hasPassword: true }, "");
@@ -107,5 +160,18 @@ describe("what turning it off says", () => {
       );
     }
     expect(TWO_FACTOR_COPY.off.detail).not.toMatch(/password/);
+  });
+});
+
+describe("a refusal that says the status this device holds is out of date", () => {
+  test.each([
+    ["already on", { kind: "refused", message: "On.", code: "two_factor_already_enabled" }, true],
+    ["already off", { kind: "refused", message: "Off.", code: "two_factor_not_enabled" }, true],
+    ["a wrong password", { kind: "refused", message: "No.", code: "invalid_credentials" }, false],
+    ["a refusal with no code", { kind: "refused", message: "No." }, false],
+    ["no signal", { kind: "unreachable" }, false],
+    ["a body this client could not read", { kind: "malformed" }, false],
+  ] as const)("%s", (_case, failure, expected) => {
+    expect(isStaleTwoFactorStatus(failure)).toBe(expected);
   });
 });
