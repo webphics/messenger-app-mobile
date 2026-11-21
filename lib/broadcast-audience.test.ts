@@ -8,6 +8,7 @@ import {
   matchingOptions,
   organizationOption,
   settleGroupLookups,
+  selectionChanged,
   toggleInSet,
   type AudienceOption,
 } from '@/lib/broadcast-audience'
@@ -84,6 +85,20 @@ describe('toggleInSet', () => {
     expect([...start]).toEqual(['a'])
     expect([...added]).toEqual(['a', 'b'])
     expect([...removed]).toEqual(['b'])
+  })
+})
+
+describe('selectionChanged', () => {
+  it.each([
+    ['nothing chosen, nothing held', [], [], false],
+    ['the same ids in another order', ['a', 'b'], ['b', 'a'], false],
+    ['duplicates in what it opened with', ['a'], ['a', 'a'], false],
+    ['one added', ['a', 'b'], ['a'], true],
+    ['one removed', ['a'], ['a', 'b'], true],
+    ['everything cleared', [], ['a'], true],
+    ['one swapped for another', ['b'], ['a'], true],
+  ])('%s', (_case, draft, initial, changed) => {
+    expect(selectionChanged(new Set(draft), initial)).toBe(changed)
   })
 })
 

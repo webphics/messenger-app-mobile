@@ -7,6 +7,7 @@ import {
   ScrollView,
   Switch,
   View,
+  type TextInputInstance,
 } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -336,9 +337,11 @@ function ComposeForm({
     setPicking(null);
     setSearch("");
   }, []);
+  // The open picker replaces this with a Back that asks before discarding a changed draft.
+  const pickerBackRef = useRef<() => void>(closePicker);
   useEffect(() => {
-    backRef.current = picking === null ? onClose : closePicker;
-  }, [backRef, closePicker, onClose, picking]);
+    backRef.current = picking === null ? onClose : () => pickerBackRef.current();
+  }, [backRef, onClose, picking]);
   const commitPicker = useCallback(
     (ids: string[], drawn: ReadonlyMap<string, string>) => {
       if (picking === null) return;
@@ -357,10 +360,16 @@ function ComposeForm({
     [closePicker, picking],
   );
 
+  const titleRef = useRef<TextInputInstance>(null);
+  const bodyRef = useRef<TextInputInstance>(null);
+
   const next = useCallback(() => {
     const invalid = messageProblem({ title, body });
     if (invalid) {
       setProblem(invalid);
+      // The first field the problem is about: the title until it is right, then the message.
+      const titleWrong = messageProblem({ title, body: "x" }) !== null;
+      (titleWrong ? titleRef : bodyRef).current?.focus();
       return;
     }
     setProblem(null);
@@ -475,6 +484,7 @@ function ComposeForm({
           moreFailed={isGroups && groups.moreFailed}
           initial={audience[picking]}
           onCancel={closePicker}
+          backRef={pickerBackRef}
           onDone={commitPicker}
         />
       </KeyboardAvoidingView>
@@ -530,10 +540,15 @@ function ComposeForm({
                 Title
               </Text>
               <Input
+                ref={titleRef}
                 value={title}
                 onChangeText={setTitle}
                 placeholder="Scheduled maintenance on Friday…"
                 accessibilityLabel="Title"
+                returnKeyType="next"
+                submitBehavior="submit"
+                // Enter goes on to the message, or past it when the message is already written.
+                onSubmitEditing={() => (body.trim() ? next() : bodyRef.current?.focus())}
                 className="h-11 rounded-2xl border-line/80 bg-line/35 px-3.5 font-sans text-base text-ink"
               />
               <Text variant="label" className="font-normal text-muted">
@@ -546,6 +561,7 @@ function ComposeForm({
                 Message
               </Text>
               <Input
+                ref={bodyRef}
                 value={body}
                 onChangeText={setBody}
                 placeholder="What people need to know…"

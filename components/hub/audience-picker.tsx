@@ -1,12 +1,19 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, View, type ListRenderItem } from "react-native";
+import { memo, useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  View,
+  type ListRenderItem,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Check, ChevronLeft } from "@/components/icons";
 import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
-import { toggleInSet, type AudienceOption } from "@/lib/broadcast-audience";
+import { selectionChanged, toggleInSet, type AudienceOption } from "@/lib/broadcast-audience";
 import { cn } from "@/lib/cn";
 import { colors, screenBottomPad } from "@/lib/tokens";
 
@@ -14,7 +21,8 @@ import { colors, screenBottomPad } from "@/lib/tokens";
  * Choosing one kind of Broadcast audience, drawn inside the composer's sheet in
  * place of its step rather than as a sheet of its own.
  *
- * Picking runs on a draft, as on web: Done commits it and Back throws it away.
+ * Picking runs on a draft, as on web: Done commits it and Back throws it away,
+ * after asking when the draft was changed. Clear can be undone until the next tap.
  * The list is virtualised and its rows are plain `Pressable`s, memoised on
  * whether they are checked, because the list can be every group there is and
  * an animated node per row is what froze the phone in #25. The search belongs
@@ -38,6 +46,11 @@ type AudiencePickerProps = {
   onEndReached?: () => void;
   initial: readonly string[];
   onCancel: () => void;
+  /**
+   * Where the sheet's hardware Back and swipe-down land while this picker is open,
+   * so they ask before discarding a changed draft exactly as the Back button does.
+   */
+  backRef?: RefObject<() => void>;
   /** The chosen ids, and the names of every row this picker drew. */
   onDone: (ids: string[], names: ReadonlyMap<string, string>) => void;
 };
@@ -57,17 +70,49 @@ export function AudiencePicker({
   onEndReached,
   initial,
   onCancel,
+  backRef,
   onDone,
 }: AudiencePickerProps) {
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<ReadonlySet<string>>(() => new Set(initial));
+  // What Clear took, held until the next change so Clear can be undone.
+  const [cleared, setCleared] = useState<ReadonlySet<string> | null>(null);
   // Names of the rows drawn so far, so a choice made before the search changed is still named.
   const names = useRef(new Map<string, string>());
   useEffect(() => {
     for (const option of options) names.current.set(option.id, option.name);
   }, [options]);
 
-  const toggle = useCallback((id: string) => setDraft((held) => toggleInSet(held, id)), []);
+  const toggle = useCallback((id: string) => {
+    setCleared(null);
+    setDraft((held) => toggleInSet(held, id));
+  }, []);
+
+  const clear = useCallback(() => {
+    setCleared(draft);
+    setDraft(new Set());
+  }, [draft]);
+
+  const undoClear = useCallback(() => {
+    if (cleared) setDraft(cleared);
+    setCleared(null);
+  }, [cleared]);
+
+  // Leaving without Done throws the draft away, so a changed one is asked about first.
+  const requestCancel = useCallback(() => {
+    if (!selectionChanged(draft, initial)) {
+      onCancel();
+      return;
+    }
+    Alert.alert("Discard your changes?", `What you chose here won't be kept.`, [
+      { text: "Keep choosing", style: "cancel" },
+      { text: "Discard", style: "destructive", onPress: onCancel },
+    ]);
+  }, [draft, initial, onCancel]);
+
+  useEffect(() => {
+    if (backRef) backRef.current = requestCancel;
+  }, [backRef, requestCancel]);
 
   const renderItem = useCallback<ListRenderItem<AudienceOption>>(
     ({ item }) => <AudienceRow option={item} checked={draft.has(item.id)} onToggle={toggle} />,
@@ -81,7 +126,7 @@ export function AudiencePicker({
           accessibilityRole="button"
           accessibilityLabel="Back without saving"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={onCancel}
+          onPress={requestCancel}
           className="size-11 items-center justify-center rounded-full"
         >
           <ChevronLeft color={colors.inkSoft} size={22} />
@@ -117,11 +162,22 @@ export function AudiencePicker({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Clear all chosen"
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              onPress={() => setDraft(new Set())}
+              onPress={clear}
+              className="-my-3 -mr-3 min-h-11 min-w-11 items-center justify-center px-3"
             >
               <Text variant="meta" className="font-semibold text-primary">
                 Clear
+              </Text>
+            </Pressable>
+          ) : cleared ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Undo clear, ${cleared.size} chosen`}
+              onPress={undoClear}
+              className="-my-3 -mr-3 min-h-11 min-w-11 items-center justify-center px-3"
+            >
+              <Text variant="meta" className="font-semibold text-primary">
+                Undo
               </Text>
             </Pressable>
           ) : null}
@@ -134,7 +190,11 @@ export function AudiencePicker({
         </View>
       ) : status === "failed" ? (
         <View className="items-center gap-3 px-6 py-8">
-          <Text variant="meta" className="text-center text-muted">
+          <Text
+            accessibilityLiveRegion="polite"
+            variant="meta"
+            className="text-center text-muted"
+          >
             {failedHint}
           </Text>
           {onRetry ? (
@@ -176,7 +236,7 @@ export function AudiencePicker({
               </View>
             ) : moreFailed && onEndReached ? (
               <View className="items-center gap-2 py-4">
-                <Text variant="meta" className="text-muted">
+                <Text accessibilityLiveRegion="polite" variant="meta" className="text-muted">
                   More could not be loaded.
                 </Text>
                 <TactilePressable

@@ -85,6 +85,18 @@ export function toggleInSet(set: ReadonlySet<string>, id: string): Set<string> {
 }
 
 /**
+ * Whether a picker's draft says something different from what it opened with, which
+ * is what makes leaving it without Done worth a question: order does not matter, and
+ * neither do duplicates in what it opened with.
+ */
+export function selectionChanged(draft: ReadonlySet<string>, initial: readonly string[]): boolean {
+  const start = new Set(initial)
+  if (start.size !== draft.size) return true
+  for (const id of draft) if (!start.has(id)) return true
+  return false
+}
+
+/**
  * What a picker's row on the Audience step says is chosen: the first name and
  * how many more, or a count where no name is known — a reused group that was
  * too far down the list to look up, say.
