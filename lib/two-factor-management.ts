@@ -304,29 +304,36 @@ export const BACKUP_CODES_COPY = {
  * who has not stored the codes by then is the lockout ticket 08 was blocked on.
  * Shown first, they are stored while nothing depends on them yet.
  *
- * There is no QR code. Somebody setting up on this phone has the authenticator on
- * this phone too, and a phone cannot scan its own screen, so the link that opens
- * the app and the key to type by hand are the two ways that work.
+ * The QR code is for a second device, which can scan it; this phone cannot scan
+ * its own screen. On this phone the two ways in are the link that opens an
+ * authenticator app and the key to paste into one, and which of those leads is
+ * `setupKeyLayout`'s answer, because iOS sends the link to one app only.
  */
 export const TWO_FACTOR_SETUP_COPY = {
   title: "Set up your authenticator app",
   keyStep: "1. Add this account to your authenticator app.",
   openLabel: "Open in authenticator app",
   openAccessibilityLabel: "Add this account to an authenticator app on this phone",
+  /** iPhone only (BUG-26): the link goes to one app, so it is named as such. */
+  openLabelIos: "Open in default app",
+  openAccessibilityLabelIos:
+    "Add this account to the authenticator app chosen in iPhone Settings",
   /**
    * iPhone only (BUG-26). iOS offers no app picker for an `otpauth://` link: it
    * goes to the one app chosen in Settings, which is Apple Passwords until the
-   * person changes it. Said before the tap, so the way to another app is on
-   * screen before Passwords opens.
+   * person changes it. Sits beside the button it explains, so the way to
+   * another app is read before Passwords opens.
    */
   openHintIos:
-    "iPhone opens the app chosen in Settings > General > AutoFill & Passwords > Set Up Codes In, which is Passwords unless you changed it. To use another authenticator app, copy the setup key below into it.",
+    "Opens the app chosen in Settings > General > AutoFill & Passwords > Set Up Codes In, which is Passwords unless you changed it. For any other authenticator app, paste the setup key you copied.",
   openFailed:
-    "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
+    "No app on this phone could open the setup link. Copy the setup key into your authenticator app instead.",
   scanHint: "Or scan this from another device.",
   qrAccessibilityLabel: "QR code for your authenticator app",
   keyLabel: "Setup key",
   copyKeyLabel: "Copy key",
+  /** iPhone only (BUG-26): the primary action there, so it names what it copies. */
+  copyKeyLabelIos: "Copy setup key",
   copyKeyAccessibilityLabel: "Copy the setup key to the clipboard",
   codesStep: "2. Store your backup codes.",
   codesWarning:
@@ -338,6 +345,53 @@ export const TWO_FACTOR_SETUP_COPY = {
   cancelLabel: "Cancel setup",
   cancelAccessibilityLabel: "Cancel setting up two-factor authentication",
 } as const;
+
+/** How the first setup step is laid out on one platform. */
+export type SetupKeyLayout = {
+  /**
+   * `key` puts the setup key and its copy button first, as the primary action;
+   * `link` puts the button that opens an authenticator app first.
+   */
+  lead: "key" | "link";
+  openLabel: string;
+  openAccessibilityLabel: string;
+  /** Said beside the open button, or null when the platform needs no warning. */
+  openHint: string | null;
+  copyKeyLabel: string;
+};
+
+/**
+ * Which way into the authenticator app leads the setup (BUG-26).
+ *
+ * Android shows a chooser for an `otpauth://` link, so the link is the one tap
+ * that works for any app and it leads. iOS has no chooser: the link goes to the
+ * app set in Settings, Apple Passwords by default, so somebody using any other
+ * app needs the key. There the key leads, large, with copying it as the primary
+ * button, and the link follows as a secondary "Open in default app" with the
+ * Settings path beside it.
+ *
+ * Takes the platform rather than reading it, so this module stays free of
+ * anything native and the two layouts are a table.
+ */
+export function setupKeyLayout(os: string): SetupKeyLayout {
+  const copy = TWO_FACTOR_SETUP_COPY;
+  if (os === "ios") {
+    return {
+      lead: "key",
+      openLabel: copy.openLabelIos,
+      openAccessibilityLabel: copy.openAccessibilityLabelIos,
+      openHint: copy.openHintIos,
+      copyKeyLabel: copy.copyKeyLabelIos,
+    };
+  }
+  return {
+    lead: "link",
+    openLabel: copy.openLabel,
+    openAccessibilityLabel: copy.openAccessibilityLabel,
+    openHint: null,
+    copyKeyLabel: copy.copyKeyLabel,
+  };
+}
 
 /**
  * The setup key in groups of four, as authenticator apps show and accept it.

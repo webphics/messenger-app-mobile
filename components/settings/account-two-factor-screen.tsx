@@ -51,6 +51,7 @@ import {
   checkTwoFactorPassword,
   disableConfirmationMessage,
   groupSetupKey,
+  setupKeyLayout,
   twoFactorActions,
   twoFactorStatus,
   type TwoFactorActionKind,
@@ -422,6 +423,81 @@ export function AccountTwoFactorScreen() {
     });
   }, [shownCodes]);
 
+  const keyLayout = setupKeyLayout(Platform.OS);
+
+  /** Copying the key: the primary action on iPhone, secondary on Android. */
+  const copyKeyButton = (rank: "primary" | "secondary") => (
+    <Button
+      variant={rank === "primary" ? "default" : "outline"}
+      className="min-h-12"
+      accessibilityLabel={TWO_FACTOR_SETUP_COPY.copyKeyAccessibilityLabel}
+      onPress={onCopyKey}
+    >
+      {keyCopied ? (
+        <Check color={rank === "primary" ? colors.primaryForeground : colors.success} size={16} />
+      ) : (
+        <Copy color={rank === "primary" ? colors.primaryForeground : colors.inkSoft} size={16} />
+      )}
+      <Text>{keyCopied ? BACKUP_CODES_COPY.copiedLabel : keyLayout.copyKeyLabel}</Text>
+    </Button>
+  );
+
+  const openFailedNotice = openFailed ? (
+    <Text
+      accessibilityLiveRegion="polite"
+      variant="label"
+      className="font-normal leading-5 text-amber"
+    >
+      {TWO_FACTOR_SETUP_COPY.openFailed}
+    </Text>
+  ) : null;
+
+  /**
+   * The link into an authenticator app, with what it is going to do said right
+   * beside it where the platform needs saying (iPhone), and why it did nothing
+   * if it failed.
+   */
+  const openButton = (rank: "primary" | "secondary") => (
+    <View className="gap-2">
+      <Button
+        variant={rank === "primary" ? "default" : "outline"}
+        className="min-h-12"
+        accessibilityLabel={keyLayout.openAccessibilityLabel}
+        disabled={confirming}
+        accessibilityState={{ disabled: confirming }}
+        onPress={onOpenAuthenticator}
+      >
+        <ExternalLink
+          color={rank === "primary" ? colors.primaryForeground : colors.inkSoft}
+          size={16}
+        />
+        <Text>{keyLayout.openLabel}</Text>
+      </Button>
+      {keyLayout.openHint ? (
+        <Text variant="label" className="font-normal leading-5 text-muted">
+          {keyLayout.openHint}
+        </Text>
+      ) : null}
+      {openFailedNotice}
+    </View>
+  );
+
+  /**
+   * The way in from a second phone, whichever way leads on this one. Drawn only
+   * with a setup, so cancelling or finishing unmounts it with the key.
+   */
+  const scanBlock = setup ? (
+    <>
+      <Text variant="label" className="mt-1 font-normal text-muted">
+        {TWO_FACTOR_SETUP_COPY.scanHint}
+      </Text>
+      <SetupQrCode
+        text={setup.totpURI}
+        accessibilityLabel={TWO_FACTOR_SETUP_COPY.qrAccessibilityLabel}
+      />
+    </>
+  ) : null;
+
   // While a setup is open its card is the whole of what this screen offers:
   // the button that started it, and the password that confirmed it, have done
   // their work.
@@ -537,60 +613,42 @@ export function AccountTwoFactorScreen() {
               <Text variant="label" className="text-ink">
                 {TWO_FACTOR_SETUP_COPY.keyStep}
               </Text>
-              <Button
-                className="min-h-12"
-                accessibilityLabel={TWO_FACTOR_SETUP_COPY.openAccessibilityLabel}
-                disabled={confirming}
-                accessibilityState={{ disabled: confirming }}
-                onPress={onOpenAuthenticator}
-              >
-                <ExternalLink color={colors.primaryForeground} size={16} />
-                <Text>{TWO_FACTOR_SETUP_COPY.openLabel}</Text>
-              </Button>
-              {Platform.OS === "ios" ? (
-                <Text variant="label" className="font-normal leading-5 text-muted">
-                  {TWO_FACTOR_SETUP_COPY.openHintIos}
-                </Text>
-              ) : null}
-              {openFailed ? (
-                <Text
-                  accessibilityLiveRegion="polite"
-                  variant="label"
-                  className="font-normal leading-5 text-amber"
-                >
-                  {TWO_FACTOR_SETUP_COPY.openFailed}
-                </Text>
-              ) : null}
-              {/* The way in from a second phone. Inside the setup branch, so
-                  cancelling or finishing unmounts it with the key. */}
-              <Text variant="label" className="mt-1 font-normal text-muted">
-                {TWO_FACTOR_SETUP_COPY.scanHint}
-              </Text>
-              <SetupQrCode
-                text={setup.totpURI}
-                accessibilityLabel={TWO_FACTOR_SETUP_COPY.qrAccessibilityLabel}
-              />
-              <View className="gap-1 rounded-2xl bg-line/35 p-3">
-                <Text variant="label" className="font-normal text-muted">
-                  {TWO_FACTOR_SETUP_COPY.keyLabel}
-                </Text>
-                <Text variant="mono" selectable className="min-w-0 text-ink">
-                  {groupSetupKey(setup.secret)}
-                </Text>
-              </View>
-              <Button
-                variant="outline"
-                className="min-h-12"
-                accessibilityLabel={TWO_FACTOR_SETUP_COPY.copyKeyAccessibilityLabel}
-                onPress={onCopyKey}
-              >
-                {keyCopied ? (
-                  <Check color={colors.success} size={16} />
-                ) : (
-                  <Copy color={colors.inkSoft} size={16} />
-                )}
-                <Text>{keyCopied ? BACKUP_CODES_COPY.copiedLabel : TWO_FACTOR_SETUP_COPY.copyKeyLabel}</Text>
-              </Button>
+              {/* Which way in leads is `setupKeyLayout`'s: the link on Android,
+                  whose chooser reaches any app, and the key on iPhone, whose
+                  link only reaches the app set in Settings (BUG-26). */}
+              {keyLayout.lead === "key" ? (
+                <>
+                  <View className="gap-1 rounded-2xl bg-line/35 p-3">
+                    <Text variant="label" className="font-normal text-muted">
+                      {TWO_FACTOR_SETUP_COPY.keyLabel}
+                    </Text>
+                    <Text
+                      variant="mono"
+                      selectable
+                      className="min-w-0 text-lg leading-7 tracking-wider text-ink"
+                    >
+                      {groupSetupKey(setup.secret)}
+                    </Text>
+                  </View>
+                  {copyKeyButton("primary")}
+                  {openButton("secondary")}
+                  {scanBlock}
+                </>
+              ) : (
+                <>
+                  {openButton("primary")}
+                  {scanBlock}
+                  <View className="gap-1 rounded-2xl bg-line/35 p-3">
+                    <Text variant="label" className="font-normal text-muted">
+                      {TWO_FACTOR_SETUP_COPY.keyLabel}
+                    </Text>
+                    <Text variant="mono" selectable className="min-w-0 text-ink">
+                      {groupSetupKey(setup.secret)}
+                    </Text>
+                  </View>
+                  {copyKeyButton("secondary")}
+                </>
+              )}
 
               <Text variant="label" className="mt-2 text-ink">
                 {TWO_FACTOR_SETUP_COPY.codesStep}
