@@ -188,6 +188,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Whether a confirmation is already out. Two would ask the same question twice. */
   const confirming = useRef(false);
 
+  /**
+   * A re-read asked for while another read was out. That read may have left
+   * before the change that prompted this one, so its answer cannot be trusted
+   * to include it: one more read follows it instead of the ask being dropped.
+   * `rereadNow` is `reconfirmSession`, reachable from the stale confirmation,
+   * which is declared before it.
+   */
+  const rereadAfter = useRef(false);
+  const rereadNow = useRef<() => void>(() => {});
+  const settleConfirmation = useCallback(() => {
+    confirming.current = false;
+    if (rereadAfter.current) {
+      rereadAfter.current = false;
+      rereadNow.current();
+    }
+  }, []);
+
   const stale = state.status === "signed-in" && state.stale;
 
   /**
@@ -225,13 +242,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           dispatch({ type: "confirmed", user: outcome.user });
         }
       })
-      .finally(() => {
-        confirming.current = false;
-      });
-  }, []);
+      .finally(settleConfirmation);
+  }, [settleConfirmation]);
 
   const reconfirmSession = useCallback(() => {
-    if (confirming.current) return;
+    if (confirming.current) {
+      rereadAfter.current = true;
+      return;
+    }
     confirming.current = true;
 
     void confirmSession()
@@ -242,10 +260,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           dispatch({ type: "reconfirmed", user: outcome.user });
         }
       })
-      .finally(() => {
-        confirming.current = false;
-      });
-  }, []);
+      .finally(settleConfirmation);
+  }, [settleConfirmation]);
+  useEffect(() => {
+    rereadNow.current = reconfirmSession;
+  }, [reconfirmSession]);
 
   /**
    * The two moments this provider can see for itself.

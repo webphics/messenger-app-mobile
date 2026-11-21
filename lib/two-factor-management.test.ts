@@ -110,7 +110,13 @@ describe("which way into the authenticator app leads (BUG-26)", () => {
       openAccessibilityLabel: "Add this account to an authenticator app on this phone",
       openHint: null,
       copyKeyLabel: "Copy key",
+      openFailed:
+        "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
     });
+  });
+
+  test("on iPhone a link no app opened points at the key above, not below", () => {
+    expect(setupKeyLayout("ios").openFailed).not.toMatch(/below/);
   });
 
   test("a platform with no warning to give gets the Android layout", () => {

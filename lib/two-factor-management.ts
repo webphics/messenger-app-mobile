@@ -122,6 +122,14 @@ export const STALE_TWO_FACTOR_CODES: ReadonlySet<string> = new Set([
   "two_factor_not_enabled",
 ]);
 
+/**
+ * What a change refused with `reauthentication_required` says. An account with
+ * no password confirms a two-factor change with a recent sign-in instead, and
+ * the API's own sentence does not say what to do about one that is too old.
+ */
+export const TWO_FACTOR_SIGN_IN_AGAIN =
+  "For your security, this change needs a recent sign-in. Sign out, sign in again, then try once more.";
+
 export function isStaleTwoFactorStatus(failure: ApiFailure): boolean {
   return (
     failure.kind === "refused" &&
@@ -346,7 +354,11 @@ export const TWO_FACTOR_SETUP_COPY = {
    */
   openHintIos:
     "Opens the app chosen in Settings > General > AutoFill & Passwords > Set Up Codes In, which is Passwords unless you changed it. For any other authenticator app, paste the setup key you copied.",
+  /** Android, where the key sits below the button that failed. */
   openFailed:
+    "No app on this phone could open the setup link. Copy the key below into your authenticator app instead.",
+  /** iPhone, where the key leads and is already above the button. */
+  openFailedIos:
     "No app on this phone could open the setup link. Copy the setup key into your authenticator app instead.",
   scanHint: "Or scan this from another device.",
   qrAccessibilityLabel: "QR code for your authenticator app",
@@ -378,6 +390,8 @@ export type SetupKeyLayout = {
   /** Said beside the open button, or null when the platform needs no warning. */
   openHint: string | null;
   copyKeyLabel: string;
+  /** What the screen says when no app opened the link; it points at where the key is. */
+  openFailed: string;
 };
 
 /**
@@ -402,6 +416,7 @@ export function setupKeyLayout(os: string): SetupKeyLayout {
       openAccessibilityLabel: copy.openAccessibilityLabelIos,
       openHint: copy.openHintIos,
       copyKeyLabel: copy.copyKeyLabelIos,
+      openFailed: copy.openFailedIos,
     };
   }
   return {
@@ -410,6 +425,7 @@ export function setupKeyLayout(os: string): SetupKeyLayout {
     openAccessibilityLabel: copy.openAccessibilityLabel,
     openHint: null,
     copyKeyLabel: copy.copyKeyLabel,
+    openFailed: copy.openFailed,
   };
 }
 

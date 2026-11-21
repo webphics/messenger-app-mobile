@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
+import { REAUTHENTICATION_REQUIRED } from "@/lib/account-deletion";
 import type { ApiFailure } from "@/lib/api-result";
 import { useAuth } from "@/lib/auth-context";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
@@ -45,6 +46,7 @@ import { codeError } from "@/lib/two-factor-challenge";
 import {
   BACKUP_CODES_COPY,
   TWO_FACTOR_COPY,
+  TWO_FACTOR_SIGN_IN_AGAIN,
   TWO_FACTOR_DISABLE_CONFIRMATION,
   TWO_FACTOR_PASSWORD_COPY,
   TWO_FACTOR_SETUP_COPY,
@@ -145,7 +147,9 @@ function actionRefusal(
           ? "Could not reach the server, so two-factor is still off. Check your connection and try again."
           : "Could not reach the server, so your backup codes have not changed. Check your connection and try again.";
     case "refused":
-      return failure.message;
+      return failure.code === REAUTHENTICATION_REQUIRED
+        ? TWO_FACTOR_SIGN_IN_AGAIN
+        : failure.message;
     case "malformed":
       return kind === "disable"
         ? "The server answered with something this app did not understand. Two-factor may not have been turned off."
@@ -468,7 +472,7 @@ export function AccountTwoFactorScreen() {
       variant="label"
       className="font-normal leading-5 text-amber"
     >
-      {TWO_FACTOR_SETUP_COPY.openFailed}
+      {keyLayout.openFailed}
     </Text>
   ) : null;
 

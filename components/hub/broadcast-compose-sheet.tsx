@@ -98,6 +98,14 @@ export function BroadcastComposeSheet({ visible, onClose, onSent, reuseFrom }: C
     setPresented(false);
     onClose();
   }, [onClose]);
+  // However the sheet was hidden — its own close or the parent dropping `visible` — the
+  // next open waits for its slide again before fetching. Adjusted while rendering, as React
+  // recommends for state that follows a prop, rather than one render late in an effect.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (!visible) setPresented(false);
+  }
   // What Android's Back and iOS's swipe-down do, which the form sets: with a picker open
   // they close the picker, so a stray gesture never throws away the message and audience.
   const backRef = useRef<() => void>(close);
