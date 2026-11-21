@@ -13,7 +13,9 @@ import type { Conversation } from '@/lib/types'
  *
  * Nothing is asked for until `enabled`, so the picker that owns this costs no
  * request until it is opened. A search is debounced and starts over from the
- * first page; an answer to a search that has since changed is dropped.
+ * first page; clearing it is not, so a picker reopened with an empty box never
+ * shows the last search's rows under it. An answer to a search that has since
+ * changed is dropped.
  */
 
 const SEARCH_DEBOUNCE_MS = 300
@@ -23,6 +25,8 @@ export type GroupPages = {
   options: readonly AudienceOption[]
   status: 'loading' | 'ready' | 'failed'
   loadingMore: boolean
+  /** The last next page failed; `loadMore` asks for it again. */
+  moreFailed: boolean
   loadMore: () => void
   retry: () => void
 }
@@ -41,10 +45,15 @@ export function useGroupPages(enabled: boolean, search: string): GroupPages {
   const [debounced, setDebounced] = useState(search)
   const [attempt, setAttempt] = useState(0)
   const [held, setHeld] = useState<Held | null>(null)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const key = `${attempt}:${debounced.trim()}`
+  // Keyed like `held`, so a page asked for under an older search says nothing about this one.
+  const [loadingMoreKey, setLoadingMoreKey] = useState<string | null>(null)
+  const [moreFailedKey, setMoreFailedKey] = useState<string | null>(null)
+  const effective = search.trim() === '' ? '' : debounced.trim()
+  const key = `${attempt}:${effective}`
   // The key of the answer the hook still wants; an answer for any other is dropped.
   const wanted = useRef(key)
+  // The key a next page is in flight for. A ref, so two scrolls in one frame ask once.
+  const inFlight = useRef<string | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(search), SEARCH_DEBOUNCE_MS)
@@ -54,9 +63,8 @@ export function useGroupPages(enabled: boolean, search: string): GroupPages {
   useEffect(() => {
     wanted.current = key
     if (!enabled) return
-    void listGroupPage({ q: debounced, limit: PAGE_SIZE }).then((result) => {
+    void listGroupPage({ q: effective, limit: PAGE_SIZE }).then((result) => {
       if (wanted.current !== key) return
-      setLoadingMore(false)
       setHeld(
         result.ok
           ? {
@@ -68,20 +76,31 @@ export function useGroupPages(enabled: boolean, search: string): GroupPages {
           : { key, status: 'failed', options: [], nextCursor: null },
       )
     })
-  }, [debounced, enabled, key])
+  }, [effective, enabled, key])
 
   const current = held?.key === key ? held : null
+  const retry = useCallback(() => setAttempt((n) => n + 1), [])
 
   const loadMore = useCallback(() => {
-    if (!enabled || !current || current.status !== 'ready' || loadingMore) return
+    if (!enabled || !current || current.status !== 'ready') return
     const after = current.nextCursor
-    if (after === null) return
-    setLoadingMore(true)
-    void listGroupPage({ q: debounced, limit: PAGE_SIZE, cursor: after }).then((result) => {
+    if (after === null || inFlight.current === key) return
+    inFlight.current = key
+    setLoadingMoreKey(key)
+    setMoreFailedKey(null)
+    void listGroupPage({ q: effective, limit: PAGE_SIZE, cursor: after }).then((result) => {
+      if (inFlight.current === key) inFlight.current = null
       if (wanted.current !== key) return
-      setLoadingMore(false)
-      // A page that failed leaves the cursor where it was, so the next scroll asks again.
-      if (!result.ok) return
+      setLoadingMoreKey(null)
+      if (!result.ok) {
+        // A cursor the API no longer accepts cannot be retried; the list starts over instead.
+        if (result.failure.kind === 'refused' && result.failure.code === 'invalid_conversation_cursor') {
+          retry()
+        } else {
+          setMoreFailedKey(key)
+        }
+        return
+      }
       setHeld((was) =>
         was && was.key === key
           ? {
@@ -92,14 +111,13 @@ export function useGroupPages(enabled: boolean, search: string): GroupPages {
           : was,
       )
     })
-  }, [current, debounced, enabled, key, loadingMore])
-
-  const retry = useCallback(() => setAttempt((n) => n + 1), [])
+  }, [current, effective, enabled, key, retry])
 
   return {
     options: current?.options ?? [],
     status: current ? current.status : 'loading',
-    loadingMore: current !== null && loadingMore,
+    loadingMore: current !== null && loadingMoreKey === key,
+    moreFailed: current !== null && moreFailedKey === key,
     loadMore,
     retry,
   }

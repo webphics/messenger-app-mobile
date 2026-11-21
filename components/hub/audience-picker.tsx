@@ -33,6 +33,8 @@ type AudiencePickerProps = {
   failedHint: string;
   onRetry?: () => void;
   loadingMore?: boolean;
+  /** The last next page failed; the footer offers `onEndReached` again. */
+  moreFailed?: boolean;
   onEndReached?: () => void;
   initial: readonly string[];
   onCancel: () => void;
@@ -51,6 +53,7 @@ export function AudiencePicker({
   failedHint,
   onRetry,
   loadingMore = false,
+  moreFailed = false,
   onEndReached,
   initial,
   onCancel,
@@ -126,7 +129,7 @@ export function AudiencePicker({
       </View>
 
       {status === "loading" ? (
-        <View className="items-center py-8" accessibilityLabel="Loading…">
+        <View className="items-center py-8" accessible accessibilityLabel="Loading…">
           <ActivityIndicator color={colors.primary} />
         </View>
       ) : status === "failed" ? (
@@ -168,8 +171,23 @@ export function AudiencePicker({
           }
           ListFooterComponent={
             loadingMore ? (
-              <View className="py-4">
+              <View className="py-4" accessible accessibilityLabel="Loading more…">
                 <ActivityIndicator color={colors.primary} />
+              </View>
+            ) : moreFailed && onEndReached ? (
+              <View className="items-center gap-2 py-4">
+                <Text variant="meta" className="text-muted">
+                  More could not be loaded.
+                </Text>
+                <TactilePressable
+                  accessibilityRole="button"
+                  onPress={onEndReached}
+                  className="min-h-11 justify-center rounded-full border border-line/80 px-4"
+                >
+                  <Text variant="label" className="text-ink">
+                    Try again
+                  </Text>
+                </TactilePressable>
               </View>
             ) : undefined
           }

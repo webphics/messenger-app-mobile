@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Modal, ScrollView, Switch, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  Switch,
+  View,
+} from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AudiencePicker } from "@/components/hub/audience-picker";
@@ -89,18 +98,27 @@ export function BroadcastComposeSheet({ visible, onClose, onSent, reuseFrom }: C
     setPresented(false);
     onClose();
   }, [onClose]);
+  // What Android's Back and iOS's swipe-down do, which the form sets: with a picker open
+  // they close the picker, so a stray gesture never throws away the message and audience.
+  const backRef = useRef<() => void>(close);
   return (
     <Modal
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
       onShow={() => setPresented(true)}
-      onRequestClose={close}
+      onRequestClose={() => backRef.current()}
     >
       {/* Its own window, so its own inset provider — see NewChatModal. */}
       <SafeAreaProvider>
         {visible ? (
-          <ComposeForm presented={presented} onClose={close} onSent={onSent} reuseFrom={reuseFrom} />
+          <ComposeForm
+            presented={presented}
+            backRef={backRef}
+            onClose={close}
+            onSent={onSent}
+            reuseFrom={reuseFrom}
+          />
         ) : null}
       </SafeAreaProvider>
     </Modal>
@@ -172,10 +190,14 @@ function looksUpGroups(reuseFrom: Broadcast | undefined, seed: BroadcastAudience
 
 function ComposeForm({
   presented,
+  backRef,
   onClose,
   onSent,
   reuseFrom,
-}: Omit<ComposeSheetProps, "visible"> & { presented: boolean }) {
+}: Omit<ComposeSheetProps, "visible"> & {
+  presented: boolean;
+  backRef: RefObject<() => void>;
+}) {
   const insets = useSafeAreaInsets();
   const viewer = useViewer();
   const [seed] = useState<BroadcastAudience>(() =>
@@ -315,6 +337,9 @@ function ComposeForm({
     setPicking(null);
     setSearch("");
   }, []);
+  useEffect(() => {
+    backRef.current = picking === null ? onClose : closePicker;
+  }, [backRef, closePicker, onClose, picking]);
   const commitPicker = useCallback(
     (ids: string[], drawn: ReadonlyMap<string, string>) => {
       if (picking === null) return;
@@ -416,7 +441,11 @@ function ComposeForm({
             ? "loading"
             : "ready";
     return (
-      <View className="flex-1 bg-bg" style={{ paddingTop: topPad }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1 bg-bg"
+        style={{ paddingTop: topPad }}
+      >
         <AudiencePicker
           key={picking}
           title={kind.heading}
@@ -444,11 +473,12 @@ function ComposeForm({
           }
           loadingMore={isGroups && groups.loadingMore}
           onEndReached={isGroups ? groups.loadMore : undefined}
+          moreFailed={isGroups && groups.moreFailed}
           initial={audience[picking]}
           onCancel={closePicker}
           onDone={commitPicker}
         />
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -456,7 +486,11 @@ function ComposeForm({
   if (seed.userIds.length > 0) shownKinds.push("userIds");
 
   return (
-    <View className="flex-1 bg-bg" style={{ paddingTop: topPad }}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      className="flex-1 bg-bg"
+      style={{ paddingTop: topPad }}
+    >
       <View className="flex-row items-center justify-between gap-3 border-b border-line/60 bg-surface px-4 pb-3">
         <View className="min-w-0 flex-1 flex-row items-center gap-2">
           <View className="size-8 items-center justify-center rounded-full bg-primary-soft">
@@ -651,7 +685,7 @@ function ComposeForm({
           </View>
         )}
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
