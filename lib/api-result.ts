@@ -61,6 +61,18 @@ const CLIENT_WORDING: ReadonlyMap<string, string> = new Map([
   // The server's terms gate. The person is moved to the terms screen as well
   // (`onTermsRequired`), so this is only what the screen they left says.
   ['terms_required', 'Agree to the Terms of Use to continue.'],
+  // Two-factor changed somewhere else after this device last read the person.
+  // The two-factor screen re-reads the person on either (`isStaleTwoFactorStatus`),
+  // so the sentence says the status was put right rather than that something
+  // failed.
+  [
+    'two_factor_already_enabled',
+    'Two-factor authentication is already on for this account. It was turned on somewhere else, and the status here is updated.',
+  ],
+  [
+    'two_factor_not_enabled',
+    'Two-factor authentication is already off for this account. It was turned off somewhere else, and the status here is updated.',
+  ],
 ])
 
 /** A refusal, carrying the API's code only when it sent one. */

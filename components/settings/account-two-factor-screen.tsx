@@ -32,6 +32,7 @@ import type { ApiFailure } from "@/lib/api-result";
 import { useAuth } from "@/lib/auth-context";
 import { hapticSuccess, hapticWarning } from "@/lib/haptics";
 import { useKeyboardAwareScroll } from "@/lib/keyboard-inset";
+import { useSessionUserRefresh } from "@/lib/use-session-user-refresh";
 import { colors, screenBottomPad } from "@/lib/tokens";
 import {
   confirmTwoFactorSetup,
@@ -51,6 +52,7 @@ import {
   checkTwoFactorPassword,
   disableConfirmationMessage,
   groupSetupKey,
+  isStaleTwoFactorStatus,
   setupKeyLayout,
   twoFactorActions,
   twoFactorStatus,
@@ -84,11 +86,14 @@ import {
  * has the run that showed it. The rules live in `lib/two-factor-management`,
  * so this file draws what it is handed.
  *
- * ## Where the state comes from, and why nothing is fetched
+ * ## Where the state comes from, and when it is read again
  *
- * `twoFactorEnabled` is on `SessionUser`, parsed at sign-in and carried since,
- * so this screen reports it rather than asking for it. There is no read to fail
- * here, which is why the only failures below are about actions. The state is
+ * `twoFactorEnabled` is on `SessionUser`, parsed at sign-in and carried since.
+ * Another device can change it, so the screen re-reads the person when it opens
+ * and when the app comes back to the front (`useSessionUserRefresh`, throttled),
+ * and at once when the API refuses a change because the factor is already on or
+ * already off. A re-read that fails leaves what is drawn, which is why the only
+ * failures below are still about actions. The state is
  * read live rather than frozen on the way in, which is the opposite of
  * `components/settings/account-password-screen` and deliberately so: turning the
  * factor off is exactly the change somebody is standing here to make, and a
@@ -208,6 +213,7 @@ export function AccountTwoFactorScreen() {
   const insets = useSafeAreaInsets();
   const { keyboardInset, contentRef, scrollProps } = useKeyboardAwareScroll();
   const { state, accountUpdated, retry } = useAuth();
+  const { refreshNow } = useSessionUserRefresh();
 
   // Read live rather than frozen: this screen exists to change it, and the
   // change has to show. See the header comment.
@@ -217,8 +223,13 @@ export function AccountTwoFactorScreen() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState<TwoFactorActionKind | null>(null);
+  /**
+   * `stale` marks a refusal that says the status on screen was out of date. It
+   * offers no retry: the re-read redraws the controls, and repeating the same
+   * change would be refused the same way.
+   */
   const [failure, setFailure] = useState<
-    { kind: TwoFactorActionKind; message: string } | null
+    { kind: TwoFactorActionKind; message: string; stale: boolean } | null
   >(null);
   const [codes, setCodes] = useState<string[] | null>(null);
   const [copied, setCopied] = useState(false);
@@ -286,7 +297,15 @@ export function AccountTwoFactorScreen() {
 
           if (!result.ok) {
             hapticWarning();
-            setFailure({ kind, message: actionRefusal(kind, result.failure) });
+            const stale = isStaleTwoFactorStatus(result.failure);
+            setFailure({
+              kind,
+              message: actionRefusal(kind, result.failure),
+              stale,
+            });
+            // Another device changed it: the re-read redraws the status and the
+            // controls in place, under the sentence that says so.
+            if (stale) refreshNow();
             return;
           }
 
@@ -336,7 +355,7 @@ export function AccountTwoFactorScreen() {
 
       send();
     },
-    [account, accountUpdated, busy, confirming, password],
+    [account, accountUpdated, busy, confirming, password, refreshNow],
   );
 
   /**
@@ -364,6 +383,7 @@ export function AccountTwoFactorScreen() {
       if (!result.ok) {
         hapticWarning();
         setSetupError(setupRefusal(result.failure) || null);
+        if (isStaleTwoFactorStatus(result.failure)) refreshNow();
         return;
       }
 
@@ -376,7 +396,7 @@ export function AccountTwoFactorScreen() {
       setTurnedOff(false);
       setTurnedOn(true);
     });
-  }, [accountUpdated, confirming, setup, setupCode]);
+  }, [accountUpdated, confirming, refreshNow, setup, setupCode]);
 
   /**
    * Leave the setup. Nothing is sent: the factor is off until a code comes
@@ -904,22 +924,24 @@ export function AccountTwoFactorScreen() {
                   {failure.message}
                 </Text>
               </View>
-              <Button
-                variant="outline"
-                className="min-h-11"
-                accessibilityLabel={
-                  failure.kind === "disable"
-                    ? "Try turning two-factor authentication off again"
-                    : failure.kind === "enable"
-                      ? "Try setting up two-factor authentication again"
-                      : "Try generating new backup codes again"
-                }
-                accessibilityState={{ disabled: busy !== null }}
-                disabled={busy !== null}
-                onPress={() => run(failure.kind)}
-              >
-                <Text>Try again</Text>
-              </Button>
+              {failure.stale ? null : (
+                <Button
+                  variant="outline"
+                  className="min-h-11"
+                  accessibilityLabel={
+                    failure.kind === "disable"
+                      ? "Try turning two-factor authentication off again"
+                      : failure.kind === "enable"
+                        ? "Try setting up two-factor authentication again"
+                        : "Try generating new backup codes again"
+                  }
+                  accessibilityState={{ disabled: busy !== null }}
+                  disabled={busy !== null}
+                  onPress={() => run(failure.kind)}
+                >
+                  <Text>Try again</Text>
+                </Button>
+              )}
             </View>
           ) : null}
 
