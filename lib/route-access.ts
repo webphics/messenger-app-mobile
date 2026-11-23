@@ -90,6 +90,12 @@ export const SCREEN_ACCESS = {
   labels: { roles: ['admin'], anyCapability: ['manage_labels'] },
   /** Writing the library. Reading it happens in the composer, open to all staff. */
   'saved-responses': { roles: ['admin'], anyCapability: ['manage_canned_replies'] },
+  /**
+   * Organization join links: generate, share, revoke. Web opens them to staff
+   * holding `manage_organizations`, which is what the API checks; here an Agent
+   * never enters `(admin)`, so it is the Admin holding it.
+   */
+  'join-links': { roles: ['admin'], anyCapability: ['manage_organizations'] },
   /** The Audit log. */
   activity: { roles: ['admin'], anyCapability: ['view_team_activity'] },
   /**
