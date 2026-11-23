@@ -326,6 +326,11 @@ export type UploadFile = {
   field: string;
   /** MIME type, which the API's allowlist is checked against. */
   type: string;
+  /**
+   * Plain form fields sent in the same multipart body, for an endpoint that
+   * reads a file and the rest of its input together (`POST /feedback`).
+   */
+  fields?: Record<string, string>;
 };
 
 /**
@@ -397,6 +402,7 @@ async function sendFile(
       uploadType: UploadType.MULTIPART,
       fieldName: file.field,
       mimeType: file.type,
+      ...(file.fields ? { parameters: file.fields } : {}),
       // No Content-Type here: the uploader writes one, and it is the only thing
       // that knows the boundary it generated.
       headers,

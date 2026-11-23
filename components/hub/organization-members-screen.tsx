@@ -11,12 +11,13 @@ import { cn } from "@/lib/cn";
 import { failureNotice } from "@/lib/conversation-failure";
 import { initials } from "@/lib/display";
 import { inviteToOrganizations, listOrganizationMembers, removeMembership } from "@/lib/org-api";
+import { memberScreenRows, type MemberScreenRow, type MembersState } from "@/lib/organization-members";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { listUsers } from "@/lib/user-api";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useViewer } from "@/lib/use-viewer";
-import { unmanageableIds, userDisplayName } from "@/lib/user-directory";
+import { memberDisplayName, unmanageableIds, userDisplayName } from "@/lib/user-directory";
 import type { ManagedUser, OrganizationMember } from "@/lib/types";
 
 /**
@@ -40,14 +41,7 @@ import type { ManagedUser, OrganizationMember } from "@/lib/types";
  * lists the members, and the people who could be invited are left out.
  */
 
-type MembersState =
-  | { status: "loading" }
-  | { status: "failed"; title: string; hint: string }
-  | { status: "ready"; members: OrganizationMember[] };
-
-type Row =
-  | { kind: "member"; member: OrganizationMember }
-  | { kind: "candidate"; user: ManagedUser };
+type Row = MemberScreenRow;
 
 function keyExtractor(row: Row) {
   return row.kind === "member" ? `m-${row.member.id}` : `c-${row.user.id}`;
@@ -77,14 +71,15 @@ export function OrganizationMembersScreen({
   const [invited, setInvited] = useState<string[]>([]);
 
   const load = useCallback(() => {
-    void Promise.all([
-      listOrganizationMembers(organizationId),
-      // The whole directory, because "could be invited" is everybody the
-      // members list does not already name and the API cannot be asked that.
-      listUsers({ pageSize: 200 }),
-    ]).then(([members, users]) => {
+    /*
+     * Two requests, deliberately not awaited together. The members are what
+     * this screen is about and come back small; the directory is up to two
+     * hundred accounts and only adds the second list, the locks and an email
+     * for a member with no name. Waiting on both held the members behind the
+     * slower one (CR-01), so each lands when it lands.
+     */
+    void listOrganizationMembers(organizationId).then((members) => {
       setRefreshing(false);
-      if (users.ok) setDirectory(users.value);
       if (members.ok) {
         setState({ status: "ready", members: members.value });
         return;
@@ -92,28 +87,57 @@ export function OrganizationMembersScreen({
       const notice = failureNotice(members.failure, "Could not load the members");
       setState({ status: "failed", title: notice.title, hint: notice.hint });
     });
+    // The whole directory, because "could be invited" is everybody the
+    // members list does not already name and the API cannot be asked that.
+    void listUsers({ pageSize: 200 }).then((users) => {
+      if (users.ok) setDirectory(users.value);
+    });
   }, [organizationId]);
 
   useEffect(() => load(), [load]);
 
-  const rows = useMemo<Row[]>(() => {
-    const members = state.status === "ready" ? state.members : [];
-    const inside = new Set(members.map((member) => member.id));
-    const q = query.trim().toLowerCase();
+  /**
+   * The members payload has no email, so a member with no name borrows the one
+   * the directory holds for them — once the directory has arrived.
+   */
+  const emailById = useMemo(
+    () => new Map(directory.map((user) => [user.id, user.email])),
+    [directory],
+  );
+  const memberName = useCallback(
+    (member: OrganizationMember) => memberDisplayName(member, emailById.get(member.id)),
+    [emailById],
+  );
 
-    const memberRows: Row[] = members
-      .filter((member) => !q || member.name.toLowerCase().includes(q))
-      .map((member) => ({ kind: "member", member }));
+  // Nothing until the members are known: see `memberScreenRows`.
+  const rows = useMemo(
+    () =>
+      memberScreenRows({
+        state,
+        directory,
+        canManage,
+        query,
+        memberName,
+        userName: userDisplayName,
+      }),
+    [canManage, directory, memberName, query, state],
+  );
 
-    const candidateRows: Row[] = (canManage ? directory : [])
-      .filter((user) => !inside.has(user.id))
-      .filter((user) => !q || userDisplayName(user).toLowerCase().includes(q))
-      .map((user) => ({ kind: "candidate", user }));
-
-    return [...memberRows, ...candidateRows];
-  }, [canManage, directory, query, state]);
-
-  const memberCount = state.status === "ready" ? state.members.length : 0;
+  /*
+   * The count is only said once there is one. A zero while the request is in
+   * flight read as an organization with nobody in it (CR-01), and a failure
+   * already says so in the list below.
+   */
+  const countLine =
+    state.status === "loading"
+      ? "Loading members…"
+      : state.status === "failed"
+        ? null
+        : state.members.length === 1
+          ? "1 member."
+          : `${state.members.length} members.`;
+  // Said only beside the list it describes, which is drawn once members are known.
+  const inviteLine = canManage && state.status === "ready";
 
   /**
    * The people the API will not let an Admin add or remove. A member row has
@@ -175,7 +199,7 @@ export function OrganizationMembersScreen({
   const confirmRemove = useCallback(
     (member: OrganizationMember) => {
       Alert.alert(
-        `Remove ${member.name}?`,
+        `Remove ${memberName(member)}?`,
         supportAssignment
           ? "They lose access to this organization's conversations, and anything assigned to them is reassigned."
           : "They lose access to this organization's conversations.",
@@ -189,7 +213,7 @@ export function OrganizationMembersScreen({
         ],
       );
     },
-    [remove, supportAssignment],
+    [memberName, remove, supportAssignment],
   );
 
   const renderItem = useCallback(
@@ -199,6 +223,7 @@ export function OrganizationMembersScreen({
         const busy = busyId === member.id;
         const own = viewer?.id === member.id;
         const fixed = locked.has(member.id);
+        const name = memberName(member);
         return (
           <View
             className={cn(
@@ -206,16 +231,16 @@ export function OrganizationMembersScreen({
               busy && "opacity-70",
             )}
           >
-            <Avatar alt={member.name} className="size-10">
+            <Avatar alt={name} className="size-10">
               <AvatarFallback className="bg-primary-soft">
                 <Text variant="meta" className="font-bold text-primary">
-                  {initials(member.name)}
+                  {initials(name)}
                 </Text>
               </AvatarFallback>
             </Avatar>
             <View className="min-w-0 flex-1">
               <Text variant="title" className="text-ink" numberOfLines={1}>
-                {member.name}
+                {name}
               </Text>
               <Text variant="label" className="mt-0.5 font-normal capitalize text-muted">
                 {member.role}
@@ -232,7 +257,7 @@ export function OrganizationMembersScreen({
             ) : fixed || !canManage ? null : (
               <TactilePressable
                 accessibilityRole="button"
-                accessibilityLabel={`Remove ${member.name}`}
+                accessibilityLabel={`Remove ${name}`}
                 onPress={() => confirmRemove(member)}
                 className="size-10 items-center justify-center rounded-full"
               >
@@ -289,7 +314,17 @@ export function OrganizationMembersScreen({
         </View>
       );
     },
-    [busyId, canManage, confirmRemove, invite, invited, locked, organizationId, viewer?.id],
+    [
+      busyId,
+      canManage,
+      confirmRemove,
+      invite,
+      invited,
+      locked,
+      memberName,
+      organizationId,
+      viewer?.id,
+    ],
   );
 
   return (
@@ -301,10 +336,13 @@ export function OrganizationMembersScreen({
           placeholder="Search people…"
           accessibilityLabel="Search people"
         />
-        <Text variant="meta" className="text-muted">
-          {memberCount === 1 ? "1 member" : `${memberCount} members`}.
-          {canManage ? " Everyone below the line can be invited." : ""}
-        </Text>
+        {countLine || inviteLine ? (
+          <Text variant="meta" className="text-muted">
+            {countLine}
+            {countLine && inviteLine ? " " : ""}
+            {inviteLine ? "Everyone below the line can be invited." : ""}
+          </Text>
+        ) : null}
         {problem ? (
           <Text accessibilityLiveRegion="polite" variant="label" className="text-danger">
             {problem}

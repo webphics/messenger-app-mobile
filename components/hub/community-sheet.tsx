@@ -18,6 +18,7 @@ import { failureNotice } from "@/lib/conversation-failure";
 import { hapticSuccess } from "@/lib/haptics";
 import { listOrganizationMembers, listOrganizations } from "@/lib/org-api";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
+import { memberDisplayName } from "@/lib/user-directory";
 import type { Community, OrganizationMember, OrganizationSummary } from "@/lib/types";
 
 /**
@@ -77,7 +78,7 @@ function CommunityForm({ onClose, community, onSaved }: Omit<CommunitySheetProps
     void listOrganizationMembers(organizationId).then((result) => {
       setMembers(
         result.ok
-          ? { status: "ready", members: [...result.value].sort((a, b) => a.name.localeCompare(b.name)) }
+          ? { status: "ready", members: [...result.value].sort((a, b) => memberDisplayName(a).localeCompare(memberDisplayName(b))) }
           : { status: "failed", hint: failureNotice(result.failure, "Could not load members").hint },
       );
     });
@@ -94,7 +95,7 @@ function CommunityForm({ onClose, community, onSaved }: Omit<CommunitySheetProps
     if (members.status !== "ready") return [];
     const needle = memberFilter.trim().toLowerCase();
     return needle
-      ? members.members.filter((member) => member.name.toLowerCase().includes(needle))
+      ? members.members.filter((member) => memberDisplayName(member).toLowerCase().includes(needle))
       : members.members;
   }, [memberFilter, members]);
 
@@ -266,7 +267,7 @@ function CommunityForm({ onClose, community, onSaved }: Omit<CommunitySheetProps
                           <TactilePressable
                             key={member.id}
                             accessibilityRole="checkbox"
-                            accessibilityLabel={`${member.name}, ${member.role}`}
+                            accessibilityLabel={`${memberDisplayName(member)}, ${member.role}`}
                             accessibilityState={{ checked: on }}
                             onPress={() => toggleMember(member.id)}
                             className={cn(
@@ -275,7 +276,7 @@ function CommunityForm({ onClose, community, onSaved }: Omit<CommunitySheetProps
                             )}
                           >
                             <Text variant="label" numberOfLines={1} className="min-w-0 flex-1 text-ink">
-                              {member.name}
+                              {memberDisplayName(member)}
                             </Text>
                             <Text variant="label" className="font-normal capitalize text-muted">
                               {member.role}

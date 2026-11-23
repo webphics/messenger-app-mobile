@@ -80,11 +80,15 @@ export function parseOrganizationSummaries(value: unknown): OrganizationSummary[
 export function parseOrganizationMembers(value: unknown): OrganizationMember[] {
   return rows(value).flatMap((item) => {
     const id = text(item.id)
-    const name = text(item.name)
+    // A blank name is somebody who has not finished onboarding, and they are a
+    // member all the same: the organization list counts them, so dropping them
+    // here is what made this list come up short of that count (CR-01). The
+    // screens print a fallback through `memberDisplayName` instead.
+    const name = typeof item.name === 'string' ? item.name.trim() : ''
     // A role this client does not recognise is still a role the API means; it
     // is printed rather than matched on, so it is kept as the string it is.
     const role = text(item.role)
-    return id && name && role ? [{ id, name, role }] : []
+    return id && role ? [{ id, name, role }] : []
   })
 }
 

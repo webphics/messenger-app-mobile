@@ -28,6 +28,9 @@ export default function AdminHomeLayout() {
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS["organization/[id]"])}>
         <Stack.Screen name="organization/[id]" options={{ title: "Members" }} />
       </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS["join-links"])}>
+        <Stack.Screen name="join-links" options={{ title: "Join links" }} />
+      </Stack.Protected>
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.users)}>
         <Stack.Screen name="users" options={{ title: "Accounts" }} />
       </Stack.Protected>
@@ -45,6 +48,12 @@ export default function AdminHomeLayout() {
       </Stack.Protected>
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.reports)}>
         <Stack.Screen name="reports" options={{ title: "Reports" }} />
+      </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.feedback)}>
+        <Stack.Screen name="feedback" options={{ title: "Bug reports & feedback" }} />
+      </Stack.Protected>
+      <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS["feedback-entry/[id]"])}>
+        <Stack.Screen name="feedback-entry/[id]" options={{ title: "Entry" }} />
       </Stack.Protected>
       <Stack.Protected guard={mayEnter(viewer, SCREEN_ACCESS.communities)}>
         <Stack.Screen name="communities" options={{ title: "Communities" }} />

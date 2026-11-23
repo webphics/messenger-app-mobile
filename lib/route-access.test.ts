@@ -68,9 +68,22 @@ describe('SCREEN_ACCESS', () => {
     ['broadcasts', ['view_acknowledgements'], true],
     ['broadcasts', ['manage_labels'], false],
     ['communities', [], true],
+    ['join-links', ['manage_organizations'], true],
+    ['join-links', ['manage_memberships'], false],
   ])('an Admin holding %s → %j: %s', (screen, held, expected) => {
     expect(mayEnter(viewer('admin', ...held), SCREEN_ACCESS[screen])).toBe(expected)
   })
+
+  test.each(['feedback', 'feedback-entry/[id]'] as const)(
+    '%s opens for the super admin only, and no capability stands in for the marker',
+    (screen) => {
+      const access = SCREEN_ACCESS[screen]
+      expect(mayEnter({ ...viewer('admin'), isSuperAdmin: true }, access)).toBe(true)
+      expect(mayEnter({ ...viewer('admin', ...CAPABILITIES), isSuperAdmin: false }, access)).toBe(false)
+      expect(mayEnter(viewer('admin', ...CAPABILITIES), access)).toBe(false)
+      expect(mayEnter({ ...viewer('agent', ...CAPABILITIES), isSuperAdmin: true }, access)).toBe(false)
+    },
+  )
 
   test.each<UserRole>(['agent', 'customer'])(
     'a %s enters none of them, whatever they hold',

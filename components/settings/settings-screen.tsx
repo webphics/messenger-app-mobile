@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { ScrollView, View } from "react-native";
 
 import { AccountCard } from "@/components/settings/account-card";
+import { FeedbackCard } from "@/components/settings/feedback-card";
 import { InvitationsCard } from "@/components/settings/invitations-card";
 import { LegalCard } from "@/components/settings/legal-card";
 import { NotificationPermissionRow } from "@/components/settings/notification-permission-row";
@@ -97,6 +98,10 @@ export function SettingsScreen() {
       {/* Static rows that leave the app, so nothing here arrives late above
           Sign out. The privacy policy has to be reachable from inside the app,
           not only from the store listing. */}
+      {/* Above About: reporting a problem is something this person does,
+          where the rows below only leave the app. */}
+      <FeedbackCard />
+
       <LegalCard />
 
       <View

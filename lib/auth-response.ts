@@ -245,6 +245,10 @@ export function parseSessionUser(data: unknown): SessionUser | null {
     // queue, which offers nobody an action the API would refuse.
     supportAssignmentEnabled: record.supportAssignmentEnabled === true,
     capabilities: parseCapabilities(record.capabilities),
+    // `=== true` for the reason the booleans above use it: anything else is a
+    // payload this client did not understand, and the marker only opens doors.
+    // Present only when set, so everybody else reads exactly as before it existed.
+    ...(record.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
     // Absent reads as not accepted: the terms screen asks once more, which is
     // a smaller failure than letting somebody past a step App Review requires.
     termsAcceptedAt: nonEmptyString(record.termsAcceptedAt) ?? null,

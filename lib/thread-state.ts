@@ -411,18 +411,73 @@ export function withoutMessages(state: ThreadState, ids: readonly string[]): Thr
  *
  * The raw page is compared, as in `threadContinues`, since a Message this viewer
  * is not shown is still evidence that it exists.
+ *
+ * An empty newest page is a thread with nothing left in it, so everything held
+ * is gone. `applyNewestPage` already clears the screen for it, but the Store
+ * only learns through this list: without it, the last Message of a thread,
+ * deleted elsewhere, comes back the next time the thread is opened.
  */
 export function vanishedFromNewestPage(
   held: readonly Message[],
   page: readonly Message[],
 ): string[] {
-  if (page.length === 0) return []
+  if (page.length === 0) return held.map((message) => message.id)
   const oldest = Math.min(...page.map((message) => Date.parse(message.createdAt)))
   const kept = new Set(page.map((message) => message.id))
 
   return held
     .filter((message) => Date.parse(message.createdAt) > oldest && !kept.has(message.id))
     .map((message) => message.id)
+}
+
+/**
+ * The held Messages an older page shows the API no longer has.
+ *
+ * The scroll-back half of `vanishedFromNewestPage`. Paging back reads this
+ * device first, so a Message deleted elsewhere while this phone was away comes
+ * back off the disk as though nothing happened. The page asked for with `before`
+ * as its cursor covers everything older than `before` down to its own oldest
+ * Message, so a held Message in that span and not in the page is gone.
+ *
+ * Strict at both ends, as on the newest page: a Message tied with either one may
+ * sit just past the cut. An empty page says nothing older than `before` exists,
+ * so everything held older than it is gone.
+ */
+export function vanishedFromOlderPage(
+  held: readonly Message[],
+  page: readonly Message[],
+  before: Message,
+): string[] {
+  const ceiling = Date.parse(before.createdAt)
+  const floor =
+    page.length === 0
+      ? Number.NEGATIVE_INFINITY
+      : Math.min(...page.map((message) => Date.parse(message.createdAt)))
+  const kept = new Set(page.map((message) => message.id))
+
+  return held
+    .filter((message) => {
+      const at = Date.parse(message.createdAt)
+      return at > floor && at < ceiling && !kept.has(message.id)
+    })
+    .map((message) => message.id)
+}
+
+/**
+ * Where to check held history the newest page did not cover, or null.
+ *
+ * A Restored thread can hold Messages older than the newest page, and the newest
+ * page says nothing about them. Answers the page's oldest Message, the cursor for
+ * the older page that does, when anything held is strictly older than it.
+ */
+export function uncheckedBeyondNewestPage(
+  held: readonly Message[],
+  page: readonly Message[],
+): Message | null {
+  if (page.length === 0) return null
+  const oldest = page.reduce((a, b) => (Date.parse(b.createdAt) < Date.parse(a.createdAt) ? b : a))
+  const at = Date.parse(oldest.createdAt)
+  return held.some((message) => Date.parse(message.createdAt) < at) ? oldest : null
 }
 
 /**
