@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, View } from "react-native";
 
-import { Archive, Plus, RotateCcw, Tag } from "@/components/icons";
-import { Input } from "@/components/ui/input";
+import { Archive, RotateCcw, Tag } from "@/components/icons";
+import { LabelComposer } from "@/components/hub/label-composer";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { cn } from "@/lib/cn";
@@ -13,9 +13,9 @@ import {
 } from "@/lib/conversation-api";
 import { failureNotice } from "@/lib/conversation-failure";
 import {
-  LABEL_COLOR_CHOICES,
   labelChipColors,
   orderedLabels,
+  withLabel,
 } from "@/lib/conversation-details";
 import { colors } from "@/lib/tokens";
 import type { Label, LabelColor } from "@/lib/types";
@@ -34,6 +34,10 @@ import type { Label, LabelColor } from "@/lib/types";
  * offered on none. That is the only honest way to withdraw a label somebody
  * has already used to record something — and it is reversible, which is why
  * the retired ones stay listed rather than disappearing.
+ *
+ * Drawn in two places: the Admin Hub's Labels route, and the Manage labels
+ * sheet on Conversation details, which is the way in for an Agent holding
+ * `manage_labels` — the Hub is under `(admin)`, which an Agent never enters.
  */
 
 type LabelsState =
@@ -45,11 +49,20 @@ function keyExtractor(item: Label) {
   return item.id;
 }
 
-export function LabelsScreen() {
+export function LabelsScreen({
+  onChanged,
+  bottomInset = 0,
+}: {
+  /**
+   * Every label this screen created, renamed or retired, as the API answered
+   * it. The sheet on Conversation details passes one, so the Labels card under
+   * it offers a new label at once and stops offering a retired one.
+   */
+  onChanged?: (label: Label) => void;
+  /** Extra space under the list, for a host that draws to the screen's bottom edge. */
+  bottomInset?: number;
+} = {}) {
   const [state, setState] = useState<LabelsState>({ status: "loading" });
-  const [draft, setDraft] = useState("");
-  const [color, setColor] = useState<LabelColor>("blue");
-  const [creating, setCreating] = useState(false);
   /** Which label has a write out for it, so its row can say it is working. */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -73,35 +86,30 @@ export function LabelsScreen() {
   );
 
   /** One label, replaced in place: every write here answers with the row it changed. */
-  const replace = useCallback((label: Label) => {
-    setState((held) =>
-      held.status === "ready"
-        ? {
-            status: "ready",
-            labels: held.labels.some((row) => row.id === label.id)
-              ? held.labels.map((row) => (row.id === label.id ? label : row))
-              : [...held.labels, label],
-          }
-        : { status: "ready", labels: [label] },
-    );
-  }, []);
+  const replace = useCallback(
+    (label: Label) => {
+      setState((held) =>
+        held.status === "ready"
+          ? { status: "ready", labels: withLabel(held.labels, label) }
+          : { status: "ready", labels: [label] },
+      );
+      onChanged?.(label);
+    },
+    [onChanged],
+  );
 
-  const create = useCallback(() => {
-    const name = draft.trim();
-    if (!name || creating) return;
-
-    setCreating(true);
-    setProblem(null);
-    void createLabel(name, color).then((result) => {
-      setCreating(false);
+  const create = useCallback(
+    async (name: string, color: LabelColor) => {
+      setProblem(null);
+      const result = await createLabel(name, color);
       if (!result.ok) {
-        setProblem(failureNotice(result.failure, "Could not create the label").hint);
-        return;
+        return failureNotice(result.failure, "Could not create the label").hint;
       }
       replace(result.value);
-      setDraft("");
-    });
-  }, [color, creating, draft, replace]);
+      return null;
+    },
+    [replace],
+  );
 
   const setArchived = useCallback(
     (label: Label, archived: boolean) => {
@@ -184,61 +192,7 @@ export function LabelsScreen() {
   return (
     <View className="flex-1 bg-bg">
       <View className="gap-3 border-b border-line/60 bg-surface px-4 pb-3.5 pt-3">
-        <View className="flex-row items-center gap-2">
-          <Input
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="New label…"
-            accessibilityLabel="New label name"
-            maxLength={40}
-            returnKeyType="done"
-            onSubmitEditing={create}
-            className="h-11 flex-1 rounded-2xl border-line/80 bg-line/35 px-3.5 font-sans text-base text-ink"
-          />
-          <TactilePressable
-            accessibilityRole="button"
-            accessibilityLabel="Create label"
-            accessibilityState={{ disabled: draft.trim() === "" || creating }}
-            disabled={draft.trim() === "" || creating}
-            onPress={create}
-            className={cn(
-              "size-11 items-center justify-center rounded-2xl bg-primary",
-              (draft.trim() === "" || creating) && "opacity-50",
-            )}
-          >
-            {creating ? (
-              <ActivityIndicator color={colors.primaryForeground} />
-            ) : (
-              <Plus color={colors.primaryForeground} size={20} />
-            )}
-          </TactilePressable>
-        </View>
-
-        <View className="flex-row flex-wrap gap-2">
-          {LABEL_COLOR_CHOICES.map((choice) => {
-            const chip = labelChipColors(choice);
-            const picked = choice === color;
-            return (
-              <TactilePressable
-                key={choice}
-                accessibilityRole="button"
-                accessibilityLabel={choice}
-                accessibilityState={{ selected: picked }}
-                onPress={() => setColor(choice)}
-                className={cn(
-                  "size-9 items-center justify-center rounded-full border-2",
-                  picked ? "border-ink" : "border-transparent",
-                )}
-                style={{ backgroundColor: chip.wash }}
-              >
-                <View
-                  className="size-4 rounded-full"
-                  style={{ backgroundColor: chip.ink }}
-                />
-              </TactilePressable>
-            );
-          })}
-        </View>
+        <LabelComposer onCreate={create} />
 
         {problem ? (
           <Text accessibilityLiveRegion="polite" variant="label" className="text-danger">
@@ -253,7 +207,8 @@ export function LabelsScreen() {
         keyExtractor={keyExtractor}
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        contentContainerClassName="gap-2.5 px-4 py-3"
+        contentContainerClassName="gap-2.5 px-4 pt-3"
+        contentContainerStyle={{ paddingBottom: 12 + bottomInset }}
         renderItem={renderItem}
         ListEmptyComponent={
           state.status === "loading" ? (

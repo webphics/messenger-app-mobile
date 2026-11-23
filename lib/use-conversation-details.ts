@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { refusalSentence } from '@/lib/api-result'
 import {
   attachLabel,
+  createLabel,
   createNote,
   deleteNote as deleteNoteRequest,
   detachLabel,
@@ -10,6 +11,7 @@ import {
   listNotes,
   updateNote,
 } from '@/lib/conversation-api'
+import { withLabel } from '@/lib/conversation-details'
 import {
   refusalStalesNotes,
   replaceNote,
@@ -17,7 +19,7 @@ import {
   withNoteEdited,
 } from '@/lib/note-view'
 import { getSessionUser } from '@/lib/session'
-import type { Conversation, ConversationNote, Label } from '@/lib/types'
+import type { Conversation, ConversationNote, Label, LabelColor } from '@/lib/types'
 import { useConversationWriteRefused } from '@/lib/use-conversation-write-refused'
 
 /**
@@ -84,6 +86,18 @@ export type ConversationDetails = {
   labelError: string | null
   attach: (labelId: string) => void
   detach: (labelId: string) => void
+  /**
+   * A label the label manager wrote, put into the catalogue in place, so the
+   * Add tray offers a new one and stops offering a retired one without a reread.
+   */
+  upsertLabel: (label: Label) => void
+  /**
+   * Make a label and put it on this thread, in that order. Answers the refusal
+   * to show, or null when the label was made — an attach that is then refused
+   * reports through `labelError` like any other, and the new label stays in
+   * the tray to be tapped again.
+   */
+  createAndAttach: (name: string, color: LabelColor) => Promise<string | null>
   notes: NotesState
   reloadNotes: () => void
   addNote: (text: string) => void
@@ -232,6 +246,25 @@ export function useConversationDetails({
     [changeLabel],
   )
 
+  const upsertLabel = useCallback((label: Label) => {
+    setLabels((held) =>
+      held.status === 'ready' ? { status: 'ready', labels: withLabel(held.labels, label) } : held,
+    )
+  }, [])
+
+  const createAndAttach = useCallback(
+    async (name: string, color: LabelColor): Promise<string | null> => {
+      const fallback = 'The label could not be created.'
+      if (!conversationId || labelBusy) return fallback
+      const result = await createLabel(name, color)
+      if (!result.ok) return refusalSentence(result.failure, fallback) ?? fallback
+      upsertLabel(result.value)
+      changeLabel(result.value.id, 'attach')
+      return null
+    },
+    [changeLabel, conversationId, labelBusy, upsertLabel],
+  )
+
   /**
    * Write a note.
    *
@@ -364,6 +397,8 @@ export function useConversationDetails({
     labelError,
     attach,
     detach,
+    upsertLabel,
+    createAndAttach,
     notes,
     reloadNotes,
     addNote,
