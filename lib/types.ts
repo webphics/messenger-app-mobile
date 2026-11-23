@@ -738,6 +738,7 @@ export type OrganizationSummary = Organization & {
 /** One accepted member of an organization, from `GET /memberships/organization/:id`. */
 export type OrganizationMember = {
   id: string
+  /** Empty for somebody who has not finished onboarding; print `memberDisplayName`. */
   name: string
   /** A free string on the API's schema rather than the role enum, so it is read as one. */
   role: string
