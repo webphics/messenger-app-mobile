@@ -411,12 +411,17 @@ export function withoutMessages(state: ThreadState, ids: readonly string[]): Thr
  *
  * The raw page is compared, as in `threadContinues`, since a Message this viewer
  * is not shown is still evidence that it exists.
+ *
+ * An empty newest page is a thread with nothing left in it, so everything held
+ * is gone. `applyNewestPage` already clears the screen for it, but the Store
+ * only learns through this list: without it, the last Message of a thread,
+ * deleted elsewhere, comes back the next time the thread is opened.
  */
 export function vanishedFromNewestPage(
   held: readonly Message[],
   page: readonly Message[],
 ): string[] {
-  if (page.length === 0) return []
+  if (page.length === 0) return held.map((message) => message.id)
   const oldest = Math.min(...page.map((message) => Date.parse(message.createdAt)))
   const kept = new Set(page.map((message) => message.id))
 

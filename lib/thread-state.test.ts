@@ -1071,7 +1071,11 @@ describe('vanishedFromNewestPage', () => {
     expect(vanished).not.toContain('edge')
   })
 
-  test('says nothing for an empty page, which rebuilds the thread anyway', () => {
-    expect(vanishedFromNewestPage(held, [])).toEqual([])
+  test('names everything held for an empty page, a thread with nothing left in it', () => {
+    expect(vanishedFromNewestPage(held, [])).toEqual(held.map((message) => message.id))
+  })
+
+  test('says nothing for an empty page over a thread holding nothing', () => {
+    expect(vanishedFromNewestPage([], [])).toEqual([])
   })
 })
