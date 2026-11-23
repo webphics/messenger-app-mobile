@@ -330,6 +330,15 @@ function RootStack({
           contentStyle: { backgroundColor: colors.bg },
         }}
       />
+      {/* Reporting a bug or sending feedback, from Settings, for every role.
+        A sibling of the account screens for the same reason they are. */}
+      <Stack.Screen
+        name="feedback/new"
+        options={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
       <Stack.Screen
         name="(auth)"
         options={{

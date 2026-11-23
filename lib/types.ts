@@ -57,6 +57,14 @@ export type SessionUser = {
    */
   capabilities: Capability[]
   /**
+   * The super admin marker (root ADR 0014), as the API puts it on the session
+   * user. It opens Feedback triage and nothing else on this client; the API's
+   * `SuperAdminGuard` is what actually decides. `parseSessionUser` sets it only
+   * when it is true; absent reads as not one, which is also what the Kept
+   * person answers until the first reachable refetch.
+   */
+  isSuperAdmin?: boolean
+  /**
    * When this person agreed to the Terms of Use, or null when the API says they
    * have not — a first Google sign-in, a sign-up link opened from an unknown
    * address, or an account from before the terms step existed. Null is what
