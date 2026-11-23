@@ -2,7 +2,7 @@
 	"expo": {
 		"name": "ChatRoute",
 		"slug": "chatroute",
-		"version": "1.1.3",
+		"version": "1.1.4",
 		"orientation": "portrait",
 		"icon": "./assets/images/icon.png",
 		"scheme": "chatroute",
