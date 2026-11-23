@@ -32,6 +32,11 @@ export type Access = {
    * opening for everyone.
    */
   readonly anyCapability?: readonly Capability[]
+  /**
+   * Only the session carrying the super admin marker (root ADR 0014) may
+   * enter. No capability stands in for it, as on web (`feedbackTriage`).
+   */
+  readonly superAdmin?: true
 }
 
 /**
@@ -39,7 +44,11 @@ export type Access = {
  * undefined are nobody signed in, who may enter nothing guarded.
  */
 export type RouteViewer =
-  | { readonly role: UserRole; readonly capabilities: readonly Capability[] }
+  | {
+      readonly role: UserRole
+      readonly capabilities: readonly Capability[]
+      readonly isSuperAdmin?: boolean
+    }
   | null
   | undefined
 
@@ -47,6 +56,7 @@ export function mayEnter(viewer: RouteViewer, access: Access): boolean {
   if (!viewer) return false
   if (access.roles !== undefined && !access.roles.includes(viewer.role)) return false
   if (access.anyCapability !== undefined && !canAny(viewer, access.anyCapability)) return false
+  if (access.superAdmin && viewer.isSuperAdmin !== true) return false
   return true
 }
 
@@ -114,6 +124,14 @@ export const SCREEN_ACCESS = {
    * the queue by a grant somebody forgot. The API's `GET /reports` asks the same.
    */
   reports: { roles: ['admin'] },
+  /**
+   * Bug reports and Feedback, read and triaged. The super admin only: the
+   * API's read and triage routes sit behind `SuperAdminGuard`, so an ordinary
+   * Admin would open a screen every request on which is refused. Filing one is
+   * on Settings for everybody and needs no entry here.
+   */
+  feedback: { roles: ['admin'], superAdmin: true },
+  'feedback-entry/[id]': { roles: ['admin'], superAdmin: true },
   /** The rule the Hub's carousel is drawn by, so a chart is drawn only where it opens. */
   'chart/[id]': ANALYTICS_ACCESS,
   'offer-add': { roles: ['admin'] },

@@ -144,6 +144,18 @@ describe("parseSessionUser", () => {
     });
   });
 
+  /** The super admin marker, which opens Feedback triage. Only exactly `true` is one. */
+  describe("isSuperAdmin", () => {
+    test.each([
+      ["true", true, true],
+      ["false", false, undefined],
+      ["a string", "true", undefined],
+      ["missing", undefined, undefined],
+    ])("%s reads as %s", (_label, value, expected) => {
+      expect(parseSessionUser({ ...apiUser(), isSuperAdmin: value })?.isSuperAdmin).toBe(expected);
+    });
+  });
+
   /**
    * The viewer's effective set, which the API computes (root ADR 0017). Like the
    * flags above it defaults rather than drops the person, and the default is

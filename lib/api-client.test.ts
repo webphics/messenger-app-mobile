@@ -379,6 +379,24 @@ describe("a file upload", () => {
     expect(uploads[0].options.headers).not.toHaveProperty("Content-Type");
   });
 
+  test("sends form fields in the same multipart body, and none when there are none", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
+    enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
+
+    await apiRequest("/feedback", {
+      method: "POST",
+      file: { ...FILE, field: "attachments", fields: { kind: "bug_report", title: "Broken" } },
+    });
+    await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
+
+    expect(uploads[0].options).toMatchObject({
+      fieldName: "attachments",
+      parameters: { kind: "bug_report", title: "Broken" },
+    });
+    expect(uploads[1].options).not.toHaveProperty("parameters");
+  });
+
   test("carries the Session cookie and the CSRF pair like any other mutation", async () => {
     setSessionCookie(SESSION_COOKIE);
     enqueue(csrfResponse());

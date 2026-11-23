@@ -3,6 +3,7 @@ import { View } from "react-native";
 
 import {
   Activity,
+  Bug,
   // BookOpen, // hidden with Knowledge
   Building2,
   Flag,
@@ -29,8 +30,10 @@ import { useConversationInbox } from "@/lib/conversation-inbox";
 import { latestInboxThread, listUnassignedConversations } from "@/lib/inbox-filter";
 // import { knowledgeListHref } from "@/lib/hub-routes"; // hidden with Knowledge
 import { ANALYTICS_ACCESS, mayEnter, SCREEN_ACCESS } from "@/lib/route-access";
+import { feedbackSummaryLine, newFeedbackCount } from "@/lib/feedback-rules";
 import { reportSummaryLine } from "@/lib/report-queue";
 import { useAnalytics } from "@/lib/use-analytics";
+import { useFeedbackSummary } from "@/lib/use-feedback-triage";
 import { useReportSummary } from "@/lib/use-report-queue";
 import { useSupportAssignment } from "@/lib/use-support-assignment";
 import { useViewer } from "@/lib/use-viewer";
@@ -83,6 +86,10 @@ export function AdminHub() {
    */
   const showsReports = mayEnter(me, SCREEN_ACCESS.reports);
   const reports = useReportSummary(showsReports);
+  /* Bug reports and feedback: the super admin's only, as the API answers. */
+  const showsFeedback = mayEnter(me, SCREEN_ACCESS.feedback);
+  const feedback = useFeedbackSummary(showsFeedback);
+  const freshFeedback = newFeedbackCount(feedback);
 
   return (
     <HubScroll>
@@ -221,6 +228,17 @@ export function AdminHub() {
               ) : undefined
             }
             onPress={() => router.push("/(admin)/reports" as Href)}
+          />
+        ) : null}
+        {showsFeedback ? (
+          <ActionRow
+            icon={Bug}
+            tone={freshFeedback > 0 ? "amber" : "neutral"}
+            title="Bug reports & feedback"
+            hint={feedbackSummaryLine(feedback)}
+            accessibilityLabel={`Bug reports and feedback, ${feedbackSummaryLine(feedback)}`}
+            trailing={freshFeedback > 0 ? <Pill label={`${freshFeedback} new`} tone="amber" /> : undefined}
+            onPress={() => router.push("/(admin)/feedback" as Href)}
           />
         ) : null}
         {mayEnter(me, SCREEN_ACCESS.organizations) ? (
