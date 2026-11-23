@@ -8,6 +8,7 @@ import { SearchFieldWithClear } from "@/components/search-field-with-clear";
 import { TactilePressable } from "@/components/ui/tactile-pressable";
 import { Text } from "@/components/ui/text";
 import { can } from "@/lib/capabilities";
+import { adminCommunitiesCaption, isCommunityMember, NOT_A_MEMBER_LABEL } from "@/lib/community-admin-list";
 import { listCommunities } from "@/lib/community-api";
 import { communityHref } from "@/lib/community-route";
 import { restoreCommunities, saveCommunities } from "@/lib/conversation-store";
@@ -18,6 +19,10 @@ import type { Community } from "@/lib/types";
 
 /**
  * Every Community in the product, for an Admin.
+ *
+ * Not only the ones they belong to, which is what the Communities tab and the
+ * web inbox list — so the screen says so above the list and marks every row the
+ * viewer has not joined (`lib/community-admin-list`, BUG-38).
  *
  * Opening one goes to the same Community screen members use. Creating and
  * editing are drawn for a viewer holding `create_communities`, which is what the
@@ -106,13 +111,26 @@ export function CommunitiesAdminScreen() {
       <View className="flex-row items-start gap-2 rounded-2xl border border-line/70 bg-surface p-3.5">
         <TactilePressable
           accessibilityRole="button"
-          accessibilityLabel={`Open ${item.name}`}
+          accessibilityLabel={
+            isCommunityMember(item, viewerId)
+              ? `Open ${item.name}`
+              : `Open ${item.name}, ${NOT_A_MEMBER_LABEL.toLowerCase()}`
+          }
           onPress={() => router.push(communityHref(item.id))}
           className="min-w-0 flex-1 gap-1"
         >
-          <Text variant="label" numberOfLines={1} className="font-semibold text-ink">
-            {item.name}
-          </Text>
+          <View className="min-w-0 flex-row items-center gap-2">
+            <Text variant="label" numberOfLines={1} className="shrink font-semibold text-ink">
+              {item.name}
+            </Text>
+            {isCommunityMember(item, viewerId) ? null : (
+              <View className="rounded-full border border-line/80 px-2 py-0.5">
+                <Text variant="label" numberOfLines={1} className="font-normal text-muted">
+                  {NOT_A_MEMBER_LABEL}
+                </Text>
+              </View>
+            )}
+          </View>
           {item.description ? (
             <Text variant="meta" numberOfLines={2} className="text-muted">
               {item.description}
@@ -135,8 +153,10 @@ export function CommunitiesAdminScreen() {
         ) : null}
       </View>
     ),
-    [canManage],
+    [canManage, viewerId],
   );
+
+  const caption = adminCommunitiesCaption(state.status === "ready" ? state.communities : null, viewerId);
 
   return (
     <View className="flex-1 bg-bg">
@@ -160,6 +180,9 @@ export function CommunitiesAdminScreen() {
           </TactilePressable>
         ) : null}
       </View>
+      <Text variant="meta" className="bg-bg px-4 pt-3 text-muted">
+        {caption}
+      </Text>
 
       <FlatList
         className="flex-1 bg-bg"
