@@ -21,7 +21,9 @@ import {
   withdrawSend,
   withoutMessages,
   withoutSenders,
+  uncheckedBeyondNewestPage,
   vanishedFromNewestPage,
+  vanishedFromOlderPage,
   isFinalSendRefusal,
 } from '@/lib/thread-state'
 import { parseMessageCreated } from '@/lib/realtime-events'
@@ -1071,7 +1073,76 @@ describe('vanishedFromNewestPage', () => {
     expect(vanished).not.toContain('edge')
   })
 
-  test('says nothing for an empty page, which rebuilds the thread anyway', () => {
-    expect(vanishedFromNewestPage(held, [])).toEqual([])
+  test('names everything held for an empty page, a thread with nothing left in it', () => {
+    expect(vanishedFromNewestPage(held, [])).toEqual(held.map((message) => message.id))
+  })
+
+  test('says nothing for an empty page over a thread holding nothing', () => {
+    expect(vanishedFromNewestPage([], [])).toEqual([])
+  })
+})
+
+describe('vanishedFromOlderPage', () => {
+  const before = customerMessage('before', '2026-08-13T09:00:00.000Z')
+  const held = [
+    customerMessage('older-than-page', '2026-08-13T06:00:00.000Z'),
+    customerMessage('floor-tie', '2026-08-13T07:00:00.000Z'),
+    customerMessage('p1', '2026-08-13T07:00:00.000Z'),
+    customerMessage('deleted', '2026-08-13T07:30:00.000Z'),
+    customerMessage('p2', '2026-08-13T08:00:00.000Z'),
+    customerMessage('ceiling-tie', '2026-08-13T09:00:00.000Z'),
+    before,
+    customerMessage('newer', '2026-08-13T10:00:00.000Z'),
+  ]
+  const page = [
+    customerMessage('p1', '2026-08-13T07:00:00.000Z'),
+    customerMessage('p2', '2026-08-13T08:00:00.000Z'),
+  ]
+
+  test('names what the page covers and no longer has', () => {
+    expect(vanishedFromOlderPage(held, page, before)).toEqual(['deleted'])
+  })
+
+  test('says nothing outside the span, or tied with either end of it', () => {
+    const vanished = vanishedFromOlderPage(held, page, before)
+    for (const id of ['older-than-page', 'floor-tie', 'ceiling-tie', 'before', 'newer']) {
+      expect(vanished).not.toContain(id)
+    }
+  })
+
+  test('names everything held older than the cursor for an empty page', () => {
+    expect(vanishedFromOlderPage(held, [], before)).toEqual([
+      'older-than-page',
+      'floor-tie',
+      'p1',
+      'deleted',
+      'p2',
+    ])
+  })
+
+  test('counts a Message the viewer is not shown as still existing', () => {
+    const notice = customerMessage('notice', '2026-08-13T07:30:00.000Z', { messageType: 'system' })
+    expect(vanishedFromOlderPage([notice], [...page, notice], before)).toEqual([])
+  })
+})
+
+describe('uncheckedBeyondNewestPage', () => {
+  const page = [
+    customerMessage('m1', '2026-08-13T08:00:00.000Z'),
+    customerMessage('m2', '2026-08-13T08:00:02.000Z'),
+  ]
+
+  test('answers the oldest Message of the page when something held is older', () => {
+    const held = [customerMessage('old', '2026-08-13T07:00:00.000Z'), ...page]
+    expect(uncheckedBeyondNewestPage(held, page)?.id).toBe('m1')
+  })
+
+  test('answers null when the page covers everything held', () => {
+    const held = [customerMessage('tie', '2026-08-13T08:00:00.000Z'), ...page]
+    expect(uncheckedBeyondNewestPage(held, page)).toBeNull()
+  })
+
+  test('answers null for an empty page, which forgets everything held instead', () => {
+    expect(uncheckedBeyondNewestPage([customerMessage('old', '2026-08-13T07:00:00.000Z')], [])).toBeNull()
   })
 })

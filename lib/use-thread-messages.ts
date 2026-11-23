@@ -50,7 +50,9 @@ import {
   refuseSend,
   LOCAL_ID_PREFIX,
   threadMessages,
+  uncheckedBeyondNewestPage,
   vanishedFromNewestPage,
+  vanishedFromOlderPage,
   withdrawSend,
   withoutMessages,
   withoutSenders,
@@ -365,6 +367,32 @@ export function useThreadMessages(
     setRefreshing(false)
   }
 
+  /**
+   * Ask the API about held history older than `before`, and drop what it no
+   * longer has.
+   *
+   * In the background and silent: what is drawn came off this device and stays
+   * drawn until the API answers, and an answer that never comes changes nothing.
+   * That is what keeps paging back off the disk instant and offline, while a
+   * Message deleted elsewhere still goes the first time this device can ask.
+   * Compared against what is held when the answer arrives rather than when the
+   * request left: everything that can arrive meanwhile is either newer than
+   * `before` or came from the API, so neither reads as deleted.
+   */
+  const checkOlder = useCallback(
+    async (before: Message, mine: number) => {
+      if (!conversationId || !ownerId) return
+      const page = await listMessages(conversationId, { cursor: before.id })
+      if (generation.current !== mine || !page.ok) return
+
+      const vanished = vanishedFromOlderPage(held.current.messages, page.value, before)
+      if (vanished.length === 0) return
+      setState((thread) => withoutMessages(thread, vanished))
+      void forgetMessages(ownerId, conversationId, vanished)
+    },
+    [conversationId, ownerId],
+  )
+
   const fetchPage = useCallback(
     async (cursor: string | undefined, mine: number) => {
       if (!conversationId || !viewer) return
@@ -387,18 +415,27 @@ export function useThreadMessages(
       }
 
       setFailure(null)
-      const vanished = cursor ? [] : vanishedFromNewestPage(heldBefore, page.value)
+      const before = cursor ? heldBefore.find((message) => message.id === cursor) : undefined
+      const vanished = cursor
+        ? before
+          ? vanishedFromOlderPage(heldBefore, page.value, before)
+          : []
+        : vanishedFromNewestPage(heldBefore, page.value)
       setState((thread) =>
         cursor
-          ? applyMessagePage(thread, page.value, viewer)
+          ? applyMessagePage(withoutMessages(thread, vanished), page.value, viewer)
           : applyNewestPage(withoutMessages(thread, vanished), page.value, viewer),
       )
       if (ownerId) void forgetMessages(ownerId, conversationId, vanished)
+      // A Restored thread can hold Messages older than the newest page, which
+      // that page says nothing about. See `checkOlder`.
+      const unchecked = cursor ? null : uncheckedBeyondNewestPage(heldBefore, page.value)
+      if (unchecked) void checkOlder(unchecked, mine)
       setLoading(false)
       setLoadingOlder(false)
       setRefreshing(false)
     },
-    [conversationId, ownerId, viewer],
+    [checkOlder, conversationId, ownerId, viewer],
   )
 
   useEffect(() => {
@@ -452,6 +489,9 @@ export function useThreadMessages(
       const older = restoreOlderMessages(ownerId, conversationId, oldest, MESSAGE_PAGE_LIMIT)
       if (older.length > 0) {
         setState((thread) => applyMessagePage(thread, older, viewer))
+        // Drawn off the disk at once, then checked: a Message deleted elsewhere
+        // while this device was away is still on the disk. See `checkOlder`.
+        void checkOlder(oldest, generation.current)
         return
       }
       drained.current = oldest.id
@@ -461,6 +501,7 @@ export function useThreadMessages(
     setLoadingOlder(true)
     void fetchPage(state.cursor, generation.current)
   }, [
+    checkOlder,
     conversationId,
     fetchPage,
     loading,
