@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import { failureNotice } from "@/lib/conversation-failure";
 import { initials } from "@/lib/display";
 import { inviteToOrganizations, listOrganizationMembers, removeMembership } from "@/lib/org-api";
+import { memberScreenRows, type MemberScreenRow, type MembersState } from "@/lib/organization-members";
 import { makeRefreshControl } from "@/lib/simulated-refresh";
 import { colors } from "@/lib/tokens";
 import { listUsers } from "@/lib/user-api";
@@ -40,14 +41,7 @@ import type { ManagedUser, OrganizationMember } from "@/lib/types";
  * lists the members, and the people who could be invited are left out.
  */
 
-type MembersState =
-  | { status: "loading" }
-  | { status: "failed"; title: string; hint: string }
-  | { status: "ready"; members: OrganizationMember[] };
-
-type Row =
-  | { kind: "member"; member: OrganizationMember }
-  | { kind: "candidate"; user: ManagedUser };
+type Row = MemberScreenRow;
 
 function keyExtractor(row: Row) {
   return row.kind === "member" ? `m-${row.member.id}` : `c-${row.user.id}`;
@@ -115,22 +109,19 @@ export function OrganizationMembersScreen({
     [emailById],
   );
 
-  const rows = useMemo<Row[]>(() => {
-    const members = state.status === "ready" ? state.members : [];
-    const inside = new Set(members.map((member) => member.id));
-    const q = query.trim().toLowerCase();
-
-    const memberRows: Row[] = members
-      .filter((member) => !q || memberName(member).toLowerCase().includes(q))
-      .map((member) => ({ kind: "member", member }));
-
-    const candidateRows: Row[] = (canManage ? directory : [])
-      .filter((user) => !inside.has(user.id))
-      .filter((user) => !q || userDisplayName(user).toLowerCase().includes(q))
-      .map((user) => ({ kind: "candidate", user }));
-
-    return [...memberRows, ...candidateRows];
-  }, [canManage, directory, memberName, query, state]);
+  // Nothing until the members are known: see `memberScreenRows`.
+  const rows = useMemo(
+    () =>
+      memberScreenRows({
+        state,
+        directory,
+        canManage,
+        query,
+        memberName,
+        userName: userDisplayName,
+      }),
+    [canManage, directory, memberName, query, state],
+  );
 
   /*
    * The count is only said once there is one. A zero while the request is in
@@ -145,6 +136,8 @@ export function OrganizationMembersScreen({
         : state.members.length === 1
           ? "1 member."
           : `${state.members.length} members.`;
+  // Said only beside the list it describes, which is drawn once members are known.
+  const inviteLine = canManage && state.status === "ready";
 
   /**
    * The people the API will not let an Admin add or remove. A member row has
@@ -343,11 +336,11 @@ export function OrganizationMembersScreen({
           placeholder="Search people…"
           accessibilityLabel="Search people"
         />
-        {countLine || canManage ? (
+        {countLine || inviteLine ? (
           <Text variant="meta" className="text-muted">
             {countLine}
-            {countLine && canManage ? " " : ""}
-            {canManage ? "Everyone below the line can be invited." : ""}
+            {countLine && inviteLine ? " " : ""}
+            {inviteLine ? "Everyone below the line can be invited." : ""}
           </Text>
         ) : null}
         {problem ? (
