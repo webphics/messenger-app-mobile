@@ -83,6 +83,7 @@ export { default as Save } from "lucide-react-native/icons/save";
 export { default as Search } from "lucide-react-native/icons/search";
 export { default as Send } from "lucide-react-native/icons/send";
 export { default as Settings } from "lucide-react-native/icons/settings";
+export { default as Share2 } from "lucide-react-native/icons/share-2";
 export { default as Shield } from "lucide-react-native/icons/shield";
 export { default as ShieldCheck } from "lucide-react-native/icons/shield-check";
 export { default as Smile } from "lucide-react-native/icons/face-slightly-smiling";

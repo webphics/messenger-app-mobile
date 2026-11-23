@@ -6,6 +6,7 @@ import {
   // BookOpen, // hidden with Knowledge
   Building2,
   Flag,
+  Link,
   Megaphone,
   MessageCircle,
   MessageSquare,
@@ -230,6 +231,16 @@ export function AdminHub() {
             hint="The container every conversation and membership belongs to"
             accessibilityLabel="Organizations"
             onPress={() => router.push("/(admin)/organizations" as Href)}
+          />
+        ) : null}
+        {mayEnter(me, SCREEN_ACCESS["join-links"]) ? (
+          <ActionRow
+            icon={Link}
+            tone="neutral"
+            title="Join links"
+            hint="Share a link that adds whoever opens it to organizations"
+            accessibilityLabel="Join links"
+            onPress={() => router.push("/(admin)/join-links" as Href)}
           />
         ) : null}
         {mayEnter(me, SCREEN_ACCESS.users) ? (

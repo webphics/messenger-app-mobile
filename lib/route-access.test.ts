@@ -68,6 +68,8 @@ describe('SCREEN_ACCESS', () => {
     ['broadcasts', ['view_acknowledgements'], true],
     ['broadcasts', ['manage_labels'], false],
     ['communities', [], true],
+    ['join-links', ['manage_organizations'], true],
+    ['join-links', ['manage_memberships'], false],
   ])('an Admin holding %s → %j: %s', (screen, held, expected) => {
     expect(mayEnter(viewer('admin', ...held), SCREEN_ACCESS[screen])).toBe(expected)
   })
