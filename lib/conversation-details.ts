@@ -1,3 +1,4 @@
+import { can, type CapabilityViewer } from '@/lib/capabilities'
 import { conversationPeer } from '@/lib/conversation-title'
 import { formatRelativeTime } from '@/lib/display'
 import { isStaffConversation } from '@/lib/types'
@@ -244,4 +245,34 @@ export function orderedLabels(labels: Label[]): Label[] {
     if (a.archived !== b.archived) return a.archived ? 1 : -1
     return a.name.localeCompare(b.name)
   })
+}
+
+/**
+ * The catalogue with one label written into it: the row with that id replaced,
+ * or appended when it is new. Every label write answers with the row it
+ * changed, so this is how a create, a rename or a retirement lands without a
+ * second read.
+ */
+export function withLabel(labels: readonly Label[], label: Label): Label[] {
+  return labels.some((row) => row.id === label.id)
+    ? labels.map((row) => (row.id === label.id ? label : row))
+    : [...labels, label]
+}
+
+/**
+ * Whether Conversation details offers the label catalogue itself — creating a
+ * label, and the Manage labels sheet — rather than only putting existing ones
+ * on the thread.
+ *
+ * Both halves, because they are two different API checks: the label write
+ * routes want `manage_labels` on the session, and a label created from a
+ * thread is attached to it in the same step, which is the conversation's
+ * `manageLabels`. Holding the Capability on a thread the API will not let this
+ * viewer label would offer a create whose attach is refused.
+ */
+export function offersLabelCatalogue(
+  viewer: CapabilityViewer,
+  attachOffered: boolean,
+): boolean {
+  return attachOffered && can(viewer, 'manage_labels')
 }

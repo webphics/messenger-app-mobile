@@ -1,9 +1,11 @@
 import {
   conversationDetailFields,
   offerableLabels,
+  offersLabelCatalogue,
   orderedLabels,
   peerPresence,
   supportStatusTone,
+  withLabel,
 } from '@/lib/conversation-details'
 import type { Conversation, Label } from '@/lib/types'
 
@@ -118,5 +120,39 @@ describe('peerPresence', () => {
     const now = Date.parse('2026-09-25T12:00:00Z')
     expect(peerPresence(staff(), now)).toBeNull()
     expect(peerPresence(customer(), now)).toBeNull()
+  })
+})
+
+describe('withLabel', () => {
+  const vip: Label = { id: 'l1', name: 'VIP', color: 'blue', archived: false }
+  const billing: Label = { id: 'l2', name: 'Billing', color: 'green', archived: false }
+
+  it('appends a label it has not held', () => {
+    expect(withLabel([vip], billing)).toEqual([vip, billing])
+  })
+
+  it('replaces a label in place, keeping the order', () => {
+    const retired = { ...vip, archived: true }
+    expect(withLabel([vip, billing], retired)).toEqual([retired, billing])
+  })
+
+  it('does not change the list it was given', () => {
+    const held = [vip]
+    withLabel(held, billing)
+    expect(held).toEqual([vip])
+  })
+})
+
+describe('offersLabelCatalogue', () => {
+  const holder = { capabilities: ['manage_labels'] as const }
+  const other = { capabilities: ['transfer'] as const }
+
+  it.each([
+    ['holds manage_labels, may label the thread', holder, true, true],
+    ['holds manage_labels, may not label the thread', holder, false, false],
+    ['lacks manage_labels, may label the thread', other, true, false],
+    ['nobody signed in', null, true, false],
+  ])('%s', (_case, viewer, attachOffered, offered) => {
+    expect(offersLabelCatalogue(viewer, attachOffered)).toBe(offered)
   })
 })

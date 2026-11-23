@@ -27,6 +27,8 @@ import {
 } from '@/components/icons'
 import { InScreenHeader } from '@/components/in-screen-header'
 import { DetailsCard } from '@/components/chat/details-card'
+import { ManageLabelsSheet } from '@/components/chat/manage-labels-sheet'
+import { LabelComposer } from '@/components/hub/label-composer'
 import { NoteSheet } from '@/components/chat/note-sheet'
 import { OnboardingPlacementSection } from '@/components/chat/onboarding-placement-section'
 import { ThreadManagementSection } from '@/components/chat/thread-management-section'
@@ -49,6 +51,7 @@ import {
   conversationPeerRole,
   labelChipColors,
   offerableLabels,
+  offersLabelCatalogue,
   peerPresence,
   supportStatusTone,
   type DetailField,
@@ -59,6 +62,7 @@ import { avatarInitials, initials, isCompanyPersona } from '@/lib/display'
 import { useKeyboardInset } from '@/lib/keyboard-inset'
 import { formatDayLabel } from '@/lib/message-day'
 import { requestNoteJump } from '@/lib/note-jump'
+import { getSessionUser } from '@/lib/session'
 import { noteActions, noteStatus, noteSubject } from '@/lib/note-view'
 import { colors, screenBottomPad } from '@/lib/tokens'
 import type {
@@ -74,6 +78,7 @@ import type {
   ConversationPerson,
   ConversationStaffPerson,
   Label,
+  LabelColor,
 } from '@/lib/types'
 
 type ConversationDetailsScreenProps = {
@@ -146,6 +151,12 @@ export function ConversationDetailsScreen({
    * `manageLabels`, so without the label Capability the chips are read-only.
    */
   const showLabels = offered.labels || labels.length > 0
+  /**
+   * Creating labels and the Manage labels sheet, for whoever holds
+   * `manage_labels` on a thread they may label. See `offersLabelCatalogue`.
+   */
+  const catalogue = offersLabelCatalogue(getSessionUser(), offered.labels)
+  const [managing, setManaging] = useState(false)
   const members = isStaffConversation(conversation) ? conversation.members : []
   // A broadcast thread carries no members, so a group is the only many-person shape left.
   const isGroup = conversation.type === 'group'
@@ -315,6 +326,9 @@ export function ConversationDetailsScreen({
               onAttach={details.attach}
               onDetach={details.detach}
               onReloadLabels={details.reloadLabels}
+              catalogue={catalogue}
+              onCreate={details.createAndAttach}
+              onManage={() => setManaging(true)}
             />
           ) : null}
 
@@ -342,6 +356,12 @@ export function ConversationDetailsScreen({
           {isGroup ? <ReportGroupRow conversationId={conversation.id} /> : null}
         </ScrollView>
       </View>
+
+      <ManageLabelsSheet
+        visible={managing}
+        onClose={() => setManaging(false)}
+        onChanged={details.upsertLabel}
+      />
 
       <NoteSheet
         visible={editing !== null}
@@ -598,6 +618,12 @@ function CountBadge({ count }: { count: number }) {
  * No confirm on removal, deliberately: the chip reappears under the add tray
  * the moment it comes off, so undoing is the same one tap that did it. A dialog
  * in front of that would cost more than the mistake it prevents.
+ *
+ * With `catalogue` on, the tray also makes a label — named, coloured, created
+ * and put on this thread in one step — and the card ends in the way to the
+ * label manager, for retiring a label nobody wants and bringing one back.
+ * The tray is offered then even with nothing left to add, since making one is
+ * exactly what an empty tray asks for.
  */
 function LabelsSection({
   applied,
@@ -609,6 +635,9 @@ function LabelsSection({
   onAttach,
   onDetach,
   onReloadLabels,
+  catalogue,
+  onCreate,
+  onManage,
 }: {
   applied: Label[]
   /** The API's `manageLabels`: attach and detach are offered only when it is on. */
@@ -620,17 +649,23 @@ function LabelsSection({
   onAttach: (id: string) => void
   onDetach: (id: string) => void
   onReloadLabels: () => void
+  /** Whether this viewer may also create labels and open the manager. */
+  catalogue: boolean
+  /** Create a label and attach it. Answers the refusal, or null. */
+  onCreate: (name: string, color: LabelColor) => Promise<string | null>
+  onManage: () => void
 }) {
   const [adding, setAdding] = useState(false)
   const offerable =
     editable && labels.status === 'ready' ? offerableLabels(labels.labels, conversation) : []
+  const trayOffered = offerable.length > 0 || catalogue
 
   return (
     <DetailsCard
       icon={Tag}
       title="Labels"
       trailing={
-        offerable.length > 0 ? (
+        trayOffered ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={adding ? 'Done adding labels' : 'Add a label'}
@@ -697,23 +732,35 @@ function LabelsSection({
         </View>
       ) : null}
 
-      {adding && offerable.length > 0 ? (
+      {adding && trayOffered ? (
         <View className="gap-2.5 rounded-2xl bg-bg p-3">
-          <Text variant="label" className="text-muted">
-            Tap a label to add it
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {offerable.map((label) => (
-              <LabelChip
-                key={label.id}
-                label={label}
-                action="add"
-                busy={busy === label.id}
-                disabled={busy !== null}
-                onPress={onAttach}
-              />
-            ))}
-          </View>
+          {offerable.length > 0 ? (
+            <>
+              <Text variant="label" className="text-muted">
+                Tap a label to add it
+              </Text>
+              <View className="flex-row flex-wrap gap-2">
+                {offerable.map((label) => (
+                  <LabelChip
+                    key={label.id}
+                    label={label}
+                    action="add"
+                    busy={busy === label.id}
+                    disabled={busy !== null}
+                    onPress={onAttach}
+                  />
+                ))}
+              </View>
+            </>
+          ) : null}
+          {catalogue ? (
+            <>
+              <Text variant="label" className={cn('text-muted', offerable.length > 0 && 'pt-1')}>
+                {offerable.length > 0 ? 'Or create one and add it' : 'Create a label and add it'}
+              </Text>
+              <LabelComposer onCreate={onCreate} actionLabel="Create label and add it" />
+            </>
+          ) : null}
         </View>
       ) : null}
 
@@ -721,6 +768,21 @@ function LabelsSection({
         <Text variant="meta" accessibilityLiveRegion="polite" className="text-danger">
           {error}
         </Text>
+      ) : null}
+
+      {catalogue ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Manage labels"
+          accessibilityHint="Create, retire and bring back the organization's labels"
+          onPress={onManage}
+          className="min-h-11 flex-row items-center gap-2 border-t border-line/60 pt-3 active:opacity-70"
+        >
+          <Text variant="meta" className="min-w-0 flex-1 font-semibold text-primary">
+            Manage labels…
+          </Text>
+          <ChevronRight color={colors.primary} size={16} />
+        </Pressable>
       ) : null}
     </DetailsCard>
   )
