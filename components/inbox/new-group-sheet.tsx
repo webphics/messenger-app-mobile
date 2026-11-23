@@ -18,6 +18,7 @@ import { failureNotice } from "@/lib/conversation-failure";
 import { initials } from "@/lib/display";
 import { listOrganizations, listOrganizationMembers } from "@/lib/org-api";
 import { colors, screenBottomPad, screenTopPad } from "@/lib/tokens";
+import { memberDisplayName } from "@/lib/user-directory";
 import type { OrganizationMember, OrganizationSummary } from "@/lib/types";
 
 /**
@@ -138,7 +139,7 @@ function GroupForm({ onClose, onCreated }: Omit<NewGroupSheetProps, "visible">) 
     if (!q) return all;
     return all.filter(
       (member) =>
-        member.name.toLowerCase().includes(q) || member.role.toLowerCase().includes(q),
+        memberDisplayName(member).toLowerCase().includes(q) || member.role.toLowerCase().includes(q),
     );
   }, [members, query]);
 
@@ -203,10 +204,11 @@ function GroupForm({ onClose, onCreated }: Omit<NewGroupSheetProps, "visible">) 
   const renderMember = useCallback(
     ({ item }: { item: OrganizationMember }) => {
       const picked = selected.includes(item.id);
+      const name = memberDisplayName(item);
       return (
         <TactilePressable
           accessibilityRole="checkbox"
-          accessibilityLabel={item.name}
+          accessibilityLabel={name}
           accessibilityState={{ checked: picked }}
           onPress={() => toggle(item.id)}
           className={cn(
@@ -214,16 +216,16 @@ function GroupForm({ onClose, onCreated }: Omit<NewGroupSheetProps, "visible">) 
             picked ? "border-primary/50" : "border-line/70",
           )}
         >
-          <Avatar alt={item.name} className="size-10">
+          <Avatar alt={name} className="size-10">
             <AvatarFallback className="bg-primary-soft">
               <Text variant="meta" className="font-bold text-primary">
-                {initials(item.name)}
+                {initials(name)}
               </Text>
             </AvatarFallback>
           </Avatar>
           <View className="min-w-0 flex-1">
             <Text variant="title" className="text-ink" numberOfLines={1}>
-              {item.name}
+              {name}
             </Text>
             <Text variant="label" className="mt-0.5 font-normal capitalize text-muted">
               {item.role}

@@ -1,4 +1,4 @@
-import { userRowActions } from '@/lib/user-directory'
+import { memberDisplayName, userRowActions } from '@/lib/user-directory'
 import { CAPABILITIES, type Capability } from '@/lib/capabilities'
 import type { ManagedUser } from '@/lib/types'
 
@@ -70,5 +70,18 @@ describe('userRowActions', () => {
   test('the role change also needs the row to say the viewer may change it', () => {
     const row = user({ id: 'other', roleEditable: false })
     expect(userRowActions(row, viewer('me', ...CAPABILITIES)).changeRole).toBe(false)
+  })
+})
+
+describe('memberDisplayName', () => {
+  it.each([
+    ['their name', { name: 'Jonah Reed' }, 'jonah@talo.test', 'Jonah Reed'],
+    ['their name over an email', { name: 'Jonah Reed' }, undefined, 'Jonah Reed'],
+    ['the directory email when unnamed', { name: '' }, 'jonah@talo.test', 'jonah@talo.test'],
+    ['the directory email when the name is blank', { name: '  ' }, 'jonah@talo.test', 'jonah@talo.test'],
+    ['a placeholder with no email to borrow', { name: '' }, undefined, 'Unnamed member'],
+    ['a placeholder with a blank email', { name: '' }, ' ', 'Unnamed member'],
+  ])('prints %s', (_label, member, email, expected) => {
+    expect(memberDisplayName(member, email)).toBe(expected)
   })
 })

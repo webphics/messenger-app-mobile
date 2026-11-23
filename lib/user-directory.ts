@@ -1,5 +1,5 @@
 import { can, type CapabilityViewer } from '@/lib/capabilities'
-import type { ManagedUser, UserRole } from '@/lib/types'
+import type { ManagedUser, OrganizationMember, UserRole } from '@/lib/types'
 
 /**
  * Reading the Admin user directory: what a row says about somebody, and which
@@ -17,6 +17,18 @@ import type { ManagedUser, UserRole } from '@/lib/types'
 /** The name to draw. An account created by invitation may not have one yet. */
 export function userDisplayName(user: ManagedUser): string {
   return user.name?.trim() || user.email
+}
+
+/**
+ * What a member row prints. The members payload carries no email, so a member
+ * with no name is printed with the email the directory holds for them when the
+ * screen has it, and as an unnamed member when it does not — never as a blank.
+ */
+export function memberDisplayName(
+  member: Pick<OrganizationMember, 'name'>,
+  email?: string | null,
+): string {
+  return member.name.trim() || email?.trim() || 'Unnamed member'
 }
 
 const ROLE_LABEL: Record<UserRole, string> = {
