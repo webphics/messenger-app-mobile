@@ -1,0 +1,21 @@
+# App Store search keywords, one per line. scripts/submit-app-store-review.mjs
+# joins them with commas and sets them on every localization of the version it
+# submits, replacing what the version had. Apple allows 100 characters in
+# total, commas included.
+#
+# Started from the list 1.1.4 went live with, which was set by hand in App
+# Store Connect. "chat" was swapped for "chatroute": Apple already matches
+# "chat" and "route" from the app name, but the one-word spelling found
+# nothing in App Store search on 2026-11-24.
+helpdesk
+internal
+agent
+tickets
+customer
+chatroute
+inbox
+voice
+notes
+staff
+organisation
+organization

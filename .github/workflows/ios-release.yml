@@ -479,7 +479,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Production tags only. Waits for Apple to process the build, attaches it to the
-  # App Store version, sets What's New from release-notes/<version>.md and submits
+  # App Store version, sets What's New from release-notes/<version>.md and the
+  # search keywords from store-listing/app-store-keywords.txt, and submits
   # it for review. Apple releases it to the App Store once approved.
   #
   # A job of its own so a refusal here is re-run without uploading the IPA again,
@@ -501,6 +502,7 @@ jobs:
           sparse-checkout: |
             release-notes
             scripts
+            store-listing
           sparse-checkout-cone-mode: false
 
       - uses: actions/setup-node@v4
@@ -515,6 +517,7 @@ jobs:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
           APP_VERSION: ${{ needs.meta.outputs.version }}
           RELEASE_NOTES_FILE: release-notes/${{ needs.meta.outputs.version }}.md
+          KEYWORDS_FILE: store-listing/app-store-keywords.txt
         run: node scripts/submit-app-store-review.mjs
 
       - name: Summarise

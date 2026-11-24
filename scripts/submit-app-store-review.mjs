@@ -5,7 +5,12 @@
  *
  * `eas submit` stops at App Store Connect. Everything after that is this script:
  * wait for Apple to process the build, put it on the App Store version, set
- * What's New from release-notes/<version>.md, and submit.
+ * What's New from release-notes/<version>.md and the search keywords from
+ * store-listing/app-store-keywords.txt, and submit.
+ *
+ * Keywords are set here because Apple only accepts them on a version that has
+ * not been submitted, and this script submits the version it creates without a
+ * pause in which anybody could edit it in App Store Connect.
  *
  * Every step checks what is already there, so "Re-run failed jobs" continues a
  * submission that stopped part-way. A version already with Apple exits cleanly.
@@ -16,6 +21,8 @@
 
 import { createPrivateKey, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
+
+import { readKeywords } from "./app-store-keywords.mjs";
 
 const API = "https://api.appstoreconnect.apple.com";
 const BUILD_POLL_MS = 30_000;
@@ -63,6 +70,7 @@ if (!whatsNew) throw new Error("The release notes file is empty.");
 if (whatsNew.length > WHATS_NEW_LIMIT) {
 	throw new Error(`The release notes are ${whatsNew.length} characters. Apple allows ${WHATS_NEW_LIMIT}.`);
 }
+const keywords = readKeywords(requireEnv("KEYWORDS_FILE"));
 
 function base64url(value) {
 	return Buffer.from(value).toString("base64url");
@@ -166,21 +174,20 @@ async function prepareVersion(versions) {
 	return data;
 }
 
-async function setWhatsNew(versionId) {
+/** Every localization gets the same keywords and, when it applies, the same What's New. */
+async function setLocalizations(versionId, withWhatsNew) {
 	const { data } = await request(
 		"GET",
 		`/v1/appStoreVersions/${versionId}/appStoreVersionLocalizations?limit=50`,
 	);
+	const attributes = withWhatsNew ? { keywords, whatsNew } : { keywords };
 	for (const localization of data) {
 		await request("PATCH", `/v1/appStoreVersionLocalizations/${localization.id}`, {
-			data: {
-				type: "appStoreVersionLocalizations",
-				id: localization.id,
-				attributes: { whatsNew },
-			},
+			data: { type: "appStoreVersionLocalizations", id: localization.id, attributes },
 		});
 	}
-	console.log(`Set What's New on ${data.length} localization(s).`);
+	const what = withWhatsNew ? "keywords and What's New" : "keywords";
+	console.log(`Set ${what} on ${data.length} localization(s): ${keywords}`);
 }
 
 async function submitForReview(versionId) {
@@ -242,12 +249,11 @@ async function main() {
 	});
 	console.log(`Attached build ${build.attributes.version} to ${version}.`);
 
-	// Apple refuses What's New on an app's first version, which has nothing to compare with.
-	if (versions.some((item) => LIVE.has(stateOf(item)))) {
-		await setWhatsNew(target.id);
-	} else {
-		console.log("No version has been live yet, so What's New does not apply.");
-	}
+	// Apple refuses What's New on an app's first version, which has nothing to
+	// compare with. Keywords apply to every version, the first one included.
+	const hasBeenLive = versions.some((item) => LIVE.has(stateOf(item)));
+	if (!hasBeenLive) console.log("No version has been live yet, so What's New does not apply.");
+	await setLocalizations(target.id, hasBeenLive);
 
 	await submitForReview(target.id);
 	console.log(`${version} is submitted for review and releases automatically once approved.`);
