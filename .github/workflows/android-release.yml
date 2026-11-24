@@ -451,11 +451,18 @@ jobs:
       # EXPO_TOKEN rather than `eas login`: --non-interactive cannot answer a
       # prompt, and even a --local build authenticates to resolve the project
       # that `extra.eas.projectId` in app.json names.
+      #
+      # The two EAS_LOCAL_BUILD_* variables keep the Gradle tree after the build
+      # in a known place. EAS builds in a temporary directory and deletes it on
+      # exit, and R8's mapping.txt, which the next step collects for Play, is
+      # only in there. The runner is thrown away at the end of the job anyway.
       - name: Build the ${{ matrix.format == 'aab' && 'AAB' || 'APK' }} with EAS
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           PROFILE: ${{ matrix.profile }}
           ENVIRONMENT: ${{ needs.target.outputs.environment }}
+          EAS_LOCAL_BUILD_WORKINGDIR: ${{ runner.temp }}/eas-build
+          EAS_LOCAL_BUILD_SKIP_CLEANUP: "1"
         run: |
           set -euo pipefail
           if [ -z "${EXPO_TOKEN:-}" ]; then
@@ -512,6 +519,43 @@ jobs:
         with:
           name: android-${{ matrix.format }}
           path: dist/${{ env.ARCHIVE }}
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      # R8 renames classes in the release build (expo-build-properties turns
+      # minify on), so without its mapping Play shows crash and ANR stack traces
+      # and its pre-launch reports as `iw3.q` rather than the real class. Only
+      # the AAB leg, because only the AAB goes to Play.
+      #
+      # A warning rather than a failure when it is missing: this runs after a
+      # 40-minute build, and a release without a mapping is still a release.
+      # `play-upload` uploads the AAB alone in that case.
+      - name: Collect the R8 mapping
+        id: mapping
+        if: ${{ matrix.format == 'aab' }}
+        env:
+          WORKDIR: ${{ runner.temp }}/eas-build
+        run: |
+          set -euo pipefail
+          FILE=$(find "$WORKDIR" -path '*/outputs/mapping/release/mapping.txt' -print -quit 2>/dev/null || true)
+          if [ -z "$FILE" ]; then
+            echo "::warning::No R8 mapping.txt under ${WORKDIR}, so Play gets the AAB without a deobfuscation file and its stack traces stay obfuscated."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          cp "$FILE" dist/mapping.txt
+          ls -lh dist/mapping.txt
+          echo "found=true" >> "$GITHUB_OUTPUT"
+
+      # Not `android-*`, which `release` downloads into the GitHub Release's
+      # directory. The mapping goes to Play and nowhere else.
+      - name: Upload the R8 mapping for play-upload
+        if: ${{ steps.mapping.outputs.found == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: r8-mapping
+          path: dist/mapping.txt
           if-no-files-found: error
           retention-days: 1
           overwrite: true
@@ -702,6 +746,17 @@ jobs:
           name: android-aab
           path: dist
 
+      # Missing when the build leg warned that it found no mapping, which is not
+      # a reason to hold back the AAB.
+      - name: Download the R8 mapping
+        id: mapping
+        if: ${{ steps.track.outputs.upload == 'true' }}
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: r8-mapping
+          path: dist
+
       # Play limits What's new to 500 characters per language, and en-GB is the
       # listing's default language.
       - name: Write What's new for Play
@@ -732,6 +787,7 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.thechatroute.app
           releaseFiles: dist/${{ needs.meta.outputs.aab }}
+          mappingFile: ${{ steps.mapping.outcome == 'success' && 'dist/mapping.txt' || '' }}
           tracks: ${{ steps.track.outputs.track }}
           status: ${{ env.PLAY_RELEASE_STATUS }}
           releaseName: ${{ needs.meta.outputs.version }}
