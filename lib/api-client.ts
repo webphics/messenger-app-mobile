@@ -406,6 +406,13 @@ async function sendFile(
       // No Content-Type here: the uploader writes one, and it is the only thing
       // that knows the boundary it generated.
       headers,
+      // In this process, like every `fetch`. The library's iOS default is a
+      // background URLSession run by `nsurlsessiond`, which iOS may hold back
+      // in Low Power Mode or Low Data Mode: a held upload reports no progress,
+      // the deadline ends it, and a phone whose other requests all work says
+      // "No connection". Background buys nothing here anyway, since nothing in
+      // this runtime survives a suspension to read the answer. Android ignores it.
+      sessionType: "foreground",
       // The uploader takes the signal and rejects on it, so an abandoned upload
       // arrives here as any other failure does.
       signal,

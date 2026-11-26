@@ -370,6 +370,22 @@ describe("a file upload", () => {
     expect(uploads[0].url).toBe(`${API_BASE_URL}/conversations/c1/files`);
   });
 
+  /**
+   * `expo-file-system` defaults iOS uploads to a background URLSession, which
+   * runs in `nsurlsessiond` and which iOS may hold back (Low Power Mode, Low
+   * Data Mode). A held upload reports no progress, the Request deadline ends
+   * it, and the person reads "No connection" on a phone whose every other
+   * request works. Foreground is the session every `fetch` already uses.
+   */
+  test("runs in a foreground session, never iOS's background one", async () => {
+    enqueue(csrfResponse());
+    enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
+
+    await apiRequest("/conversations/c1/files", { method: "POST", file: FILE });
+
+    expect(uploads[0].options.sessionType).toBe("foreground");
+  });
+
   test("declares no Content-Type, so the uploader can name the boundary", async () => {
     enqueue(csrfResponse());
     enqueueUpload({ status: 201, body: JSON.stringify({ data: {} }) });
